@@ -13,7 +13,8 @@ public class CardService {
     public List<CardDefinition> list() {
         return List.of(
                 new CardDefinition(new Ids.CardDefId("C001"), "기본 공격", 1, EnumSet.noneOf(Keyword.class), "DMG", false),
-                new CardDefinition(new Ids.CardDefId("C002"), "기본 방어", 1, EnumSet.noneOf(Keyword.class), "GUARD", false)
+                new CardDefinition(new Ids.CardDefId("C002"), "기본 회복", 1, EnumSet.noneOf(Keyword.class), "RECOVERY", false),
+                new CardDefinition(new Ids.CardDefId("C003"), "기본 방어", 1, EnumSet.noneOf(Keyword.class), "GUARD", false)
         );
     }
 }
