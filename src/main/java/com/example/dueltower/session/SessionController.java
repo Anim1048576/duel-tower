@@ -53,6 +53,14 @@ public class SessionController {
         }
         SessionRuntime rt = sessionService.get(code);
 
+        String t = req.type().trim().toUpperCase(Locale.ROOT);
+        if ("START_COMBAT".equals(t)) {
+            requirePlayer(req.playerId());
+            if (!req.playerId().trim().equals(rt.gmId())) {
+                throw new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "gm only");
+            }
+        }
+
         UUID commandId = parseOrNewUuid(req.commandId());
         long expectedVersion = (req.expectedVersion() == null) ? rt.state().version() : req.expectedVersion();
 
