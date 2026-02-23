@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('전투')}"></head>
+<body th:replace="~{ui/layout :: shell('combat', ~{::main})}">
+<main class="container wide" data-page="combat">
+  <div class="combat">
+
+    <aside class="panel">
+      <div class="panelTitle">턴 순서</div>
+      <div class="muted">이니셔티브 고정 · 라운드 <span data-bind="combat.round">—</span></div>
+      <div class="spacer"></div>
+      <div class="turnList" id="turnList"></div>
+
+      <div class="spacer"></div>
+      <div class="row wrap">
+        <button class="btn" id="btnStartCombat">전투 시작(데모)</button>
+        <button class="btn primary" id="btnEndTurn">턴 종료</button>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="panelTitle">내 상태</div>
+      <div class="spacer"></div>
+      <div class="kvs">
+        <div class="kv"><div class="k">HP</div><div class="v mono" data-bind="me.hp">—</div></div>
+        <div class="kv"><div class="k">행동력</div><div class="v mono" data-bind="me.ap">—</div></div>
+        <div class="kv"><div class="k">덱</div><div class="v mono" data-bind="me.deck">—</div></div>
+        <div class="kv"><div class="k">묘지</div><div class="v mono" data-bind="me.grave">—</div></div>
+        <div class="kv"><div class="k">제외</div><div class="v mono" data-bind="me.exiled">—</div></div>
+        <div class="kv"><div class="k">EX 쿨</div><div class="v mono" data-bind="me.exCd">—</div></div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="panelTitle">진영 효과</div>
+      <div class="muted">방벽/보호 등(데모)</div>
+      <div class="spacer"></div>
+      <div class="row wrap" id="globalEffects"></div>
+    </aside>
+
+    <section class="board">
+      <div class="boardTop">
+        <div>
+          <div class="h2">전투 화면</div>
+          <div class="muted">카드 클릭 → 서버 검증(예정) → 자동 처리 · 서치는 조건 리스트만 노출</div>
+        </div>
+        <div class="row wrap">
+          <a class="chip" th:href="@{/ui/node}">노드로</a>
+          <a class="chip" th:href="@{/ui/presets}">프리셋</a>
+        </div>
+      </div>
+
+      <div class="battlefield">
+        <div class="lane">
+          <div class="laneTitle">적</div>
+          <div class="unitRow" id="enemyRow"></div>
+        </div>
+        <div class="lane">
+          <div class="laneTitle">아군</div>
+          <div class="unitRow" id="allyRow"></div>
+        </div>
+      </div>
+
+      <div class="handArea">
+        <div class="row">
+          <div>
+            <div class="panelTitle">손패</div>
+            <div class="muted">최대 6 · 초과 시 강제 버리기(데모는 경고만)</div>
+          </div>
+          <div class="grow"></div>
+          <button class="btn" id="btnHandSwap">패 교환(1회)</button>
+          <button class="btn" id="btnUseEx">EX 사용</button>
+        </div>
+        <div class="spacer"></div>
+        <div class="cardRow" id="handRow"></div>
+      </div>
+
+      <div class="fieldArea">
+        <div class="row">
+          <div>
+            <div class="panelTitle">필드</div>
+            <div class="muted">설치/소환 최대 5</div>
+          </div>
+          <div class="grow"></div>
+          <button class="btn" id="btnToGrave">선택 카드 묘지로</button>
+        </div>
+        <div class="spacer"></div>
+        <div class="cardRow" id="fieldRow"></div>
+      </div>
+
+    </section>
+
+    <aside class="panel">
+      <div class="panelTitle">로그</div>
+      <div class="muted">"누가/무엇을/대상/결과" + 상세 계산(예정)</div>
+      <div class="spacer"></div>
+      <div class="log" id="logPanel"></div>
+
+      <div class="spacer"></div>
+      <button class="btn" id="btnClearLog">로그 지우기</button>
+    </aside>
+
+  </div>
+
+  <!-- search modal -->
+  <div class="modal" id="searchModal" aria-hidden="true">
+    <div class="modalPanel large">
+      <div class="row">
+        <div>
+          <div class="modalTitle">덱 서치</div>
+          <div class="muted" id="searchSubtitle">조건에 맞는 카드만 표시</div>
+        </div>
+        <div class="grow"></div>
+        <button class="iconBtn" id="searchModalClose" aria-label="닫기">✕</button>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="searchGrid" id="searchList"></div>
+
+      <div class="spacer"></div>
+      <div class="row wrap">
+        <button class="btn" id="btnSearchCancel">취소</button>
+        <div class="grow"></div>
+        <button class="btn primary" id="btnSearchPick" disabled>선택</button>
+      </div>
+
+      <div class="hint">선택 후 지정 존으로 이동 + 셔플(서버 처리) 로그가 남는 게 목표.</div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

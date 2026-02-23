@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('로비')}"></head>
+<body th:replace="~{ui/layout :: shell('lobby', ~{::main})}">
+<main class="container" data-page="lobby">
+  <div class="split">
+    <section class="card">
+      <div class="cardTitle">세션 로비</div>
+      <div class="muted">참가자 준비 상태를 맞추고 시작한다.</div>
+      <div class="spacer"></div>
+
+      <div class="row wrap">
+        <div class="pill">코드: <span class="mono" data-bind="session.code">—</span></div>
+        <div class="pill">GM: <span data-bind="session.gm">—</span></div>
+        <div class="pill">인원: <span data-bind="session.playerCount">—</span></div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="table" id="playersTable">
+        <!-- rendered by JS -->
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="row wrap">
+        <button class="btn" id="btnAddDummy">+ 더미 추가</button>
+        <button class="btn" id="btnToggleMe">내 READY 토글</button>
+        <div class="grow"></div>
+        <button class="btn primary" id="btnStart" disabled>세션 시작</button>
+      </div>
+
+      <div class="hint">전원 READY면 “세션 시작”이 활성화된다.</div>
+    </section>
+
+    <aside class="card">
+      <div class="cardTitle">다음 단계</div>
+      <div class="muted">MVP UI 동선</div>
+      <div class="spacer"></div>
+
+      <ol class="list">
+        <li>프리셋에서 덱/EX 선택</li>
+        <li>노드에서 선택지 1개 확정</li>
+        <li>전투에서 턴/드로우/서치 흐름 확인</li>
+      </ol>
+
+      <div class="spacer"></div>
+      <a class="btn" th:href="@{/ui/presets}">프리셋으로</a>
+    </aside>
+  </div>
+</main>
+</body>
+</html>

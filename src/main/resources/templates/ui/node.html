@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('노드')}"></head>
+<body th:replace="~{ui/layout :: shell('node', ~{::main})}">
+<main class="container" data-page="node">
+  <div class="split">
+    <section class="card">
+      <div class="cardTitle">노드 진행</div>
+      <div class="muted">선택지 1개를 확정하면 되돌릴 수 없다.</div>
+      <div class="spacer"></div>
+
+      <div class="row wrap">
+        <div class="pill">현재: <span data-bind="run.current">—</span></div>
+        <div class="pill">층: <span data-bind="run.floor">—</span></div>
+        <div class="pill">이력: <span data-bind="run.visitedCount">—</span></div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="choices" id="choiceList">
+        <!-- rendered by JS -->
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="row wrap">
+        <button class="btn" id="btnResetRun">데모 런 초기화</button>
+        <div class="grow"></div>
+        <a class="btn primary" th:href="@{/ui/combat}">전투로</a>
+      </div>
+
+      <div class="hint">실제로는 GM만 확정 가능 + WebSocket으로 동기화.</div>
+    </section>
+
+    <aside class="card">
+      <div class="cardTitle">진행 이력</div>
+      <div class="muted">되돌리기 불가 UX 확인용</div>
+      <div class="spacer"></div>
+      <div class="timeline" id="visitedList"></div>
+    </aside>
+  </div>
+
+  <!-- confirm modal -->
+  <div class="modal" id="choiceModal" aria-hidden="true">
+    <div class="modalPanel">
+      <div class="row">
+        <div class="modalTitle">선택 확정</div>
+        <div class="grow"></div>
+        <button class="iconBtn" id="choiceModalClose" aria-label="닫기">✕</button>
+      </div>
+      <div class="spacer"></div>
+      <div class="big" id="choiceModalText">—</div>
+      <div class="spacer"></div>
+      <div class="muted">확정하면 되돌릴 수 없다.</div>
+      <div class="spacer"></div>
+      <div class="row wrap">
+        <button class="btn" id="btnChoiceCancel">취소</button>
+        <div class="grow"></div>
+        <button class="btn primary" id="btnChoiceConfirm">확정</button>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

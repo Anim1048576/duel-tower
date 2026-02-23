@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('프리셋')}"></head>
+<body th:replace="~{ui/layout :: shell('presets', ~{::main})}">
+<main class="container" data-page="presets">
+  <div class="split">
+    <section class="card">
+      <div class="row">
+        <div>
+          <div class="cardTitle">캐릭터/덱 프리셋</div>
+          <div class="muted">12장 덱 + EX 1장. 카드 풀은 고정이라고 가정.</div>
+        </div>
+        <div class="grow"></div>
+        <button class="btn" id="btnNewPreset">+ 새 프리셋</button>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="grid3" id="presetGrid">
+        <!-- rendered by JS -->
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="row wrap">
+        <div class="pill">선택됨: <span data-bind="preset.selectedName">—</span></div>
+        <div class="grow"></div>
+        <a class="btn primary" th:href="@{/ui/lobby}">로비로 돌아가기</a>
+      </div>
+
+      <div class="hint">GM은 “복사”로 동일 몹/구성을 빠르게 여러 개 만든다는 느낌만 UI에 담아둠.</div>
+    </section>
+
+    <aside class="card">
+      <div class="cardTitle">검증 포인트</div>
+      <div class="muted">서버 붙일 때 체크할 것</div>
+      <div class="spacer"></div>
+      <ul class="list">
+        <li>덱 장수 12 + EX 1 강제</li>
+        <li>중복 제한 / 금지 카드</li>
+        <li>저장 시 서버 검증 실패 사유 표시</li>
+      </ul>
+      <div class="spacer"></div>
+      <a class="btn" th:href="@{/ui/node}">노드로</a>
+    </aside>
+  </div>
+
+  <!-- modal -->
+  <div class="modal" id="presetModal" aria-hidden="true">
+    <div class="modalPanel">
+      <div class="row">
+        <div class="modalTitle" id="presetModalTitle">프리셋 편집</div>
+        <div class="grow"></div>
+        <button class="iconBtn" id="presetModalClose" aria-label="닫기">✕</button>
+      </div>
+      <div class="spacer"></div>
+
+      <div class="form">
+        <label class="label">이름</label>
+        <input class="input" id="presetName" placeholder="예: 린(서포터)" />
+
+        <div class="spacer"></div>
+
+        <label class="label">덱(12장, 쉼표로 구분)</label>
+        <textarea class="textarea mono" id="presetDeck" rows="4" placeholder="Strike, Strike, Guard, ..."></textarea>
+
+        <div class="spacer"></div>
+
+        <label class="label">EX(1장)</label>
+        <input class="input" id="presetEx" placeholder="예: Overclock" />
+      </div>
+
+      <div class="spacer"></div>
+      <div class="row wrap">
+        <button class="btn danger" id="btnDeletePreset">삭제</button>
+        <div class="grow"></div>
+        <button class="btn" id="btnCancelPreset">취소</button>
+        <button class="btn primary" id="btnSavePreset">저장</button>
+      </div>
+
+      <div class="hint">데모에선 룰 검증을 최소로만 걸어둠(장수/EX 유무 정도).</div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('홈')}"></head>
+<body th:replace="~{ui/layout :: shell('home', ~{::main})}">
+<main class="container" data-page="home">
+  <section class="hero">
+    <h1 class="h1">수동 운영을 끝내는<br/>노드 탐색형 카드 전투 시뮬레이터</h1>
+    <p class="lead">
+      이 화면들은 <b>프론트 흐름</b>을 먼저 잡기 위한 프로토타입이다.
+      버튼을 누르면 데모용 세션/프리셋/전투 상태가 로컬에 저장된다.
+    </p>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="cardTitle">세션 생성</div>
+        <div class="muted">GM 기준. 참가 코드가 자동으로 만들어진다.</div>
+        <div class="spacer"></div>
+        <button class="btn primary" id="btnCreateSession">세션 만들기</button>
+        <div class="hint mono" id="createdCode"></div>
+      </div>
+
+      <div class="card">
+        <div class="cardTitle">세션 참가</div>
+        <div class="muted">코드를 입력하고 로비로 이동한다.</div>
+        <div class="spacer"></div>
+        <form class="row" id="joinForm">
+          <input class="input mono" id="joinCode" placeholder="예: A7K2FQ" maxlength="12" />
+          <button class="btn" type="submit">참가</button>
+        </form>
+        <div class="hint">데모에서는 아무 코드나 입력해도 참가된다.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="cardTitle">빠른 이동</div>
+    <div class="muted">흐름 테스트용 링크</div>
+    <div class="spacer"></div>
+    <div class="row wrap">
+      <a class="chip" th:href="@{/ui/lobby}">로비</a>
+      <a class="chip" th:href="@{/ui/presets}">프리셋</a>
+      <a class="chip" th:href="@{/ui/node}">노드</a>
+      <a class="chip" th:href="@{/ui/combat}">전투</a>
+    </div>
+  </section>
+</main>
+</body>
+</html>
