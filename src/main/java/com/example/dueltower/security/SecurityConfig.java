@@ -26,7 +26,7 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
 
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/logout")
+                        .ignoringRequestMatchers("/logout", "/api/**")
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 )
 
