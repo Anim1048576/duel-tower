@@ -7,8 +7,11 @@ import java.util.EnumSet;
 public record CardDefinition(
         CardDefId id,
         String name,
+        CardType type,
         int cost,
         EnumSet<Keyword> keywords,
         String effectId,
-        boolean token
+        Zone resolveTo,
+        boolean token,
+        String text
 ) {}

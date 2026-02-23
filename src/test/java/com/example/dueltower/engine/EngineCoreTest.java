@@ -4,6 +4,8 @@ import com.example.dueltower.engine.command.DrawCommand;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
+import com.example.dueltower.engine.core.CardEffect;
+import com.example.dueltower.engine.core.CardEffectResolver;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -20,6 +22,18 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class EngineCoreTest {
 
+    private static final CardEffectResolver NOOP_EFFECTS = new CardEffectResolver() {
+        @Override
+        public boolean exists(String effectId) {
+            return false;
+        }
+
+        @Override
+        public CardEffect resolve(String effectId) {
+            throw new IllegalStateException("NOOP resolver: effect should not be resolved in this test: " + effectId);
+        }
+    };
+
     @Test
     void draw_refill_from_grave_when_deck_empty() {
         SessionId sid = new SessionId(UUID.randomUUID());
@@ -30,9 +44,20 @@ public class EngineCoreTest {
         state.players().put(p1, ps);
 
         CardDefId defA = new CardDefId("A");
-        EngineContext ctx = new EngineContext(Map.of(
-                defA, new CardDefinition(defA, "A", 1, EnumSet.noneOf(Keyword.class), "E_A", false)
-        ));
+        EngineContext ctx = new EngineContext(
+                Map.of(defA, new CardDefinition(
+                        defA,
+                        "A",
+                        CardType.SKILL,
+                        1,
+                        EnumSet.noneOf(Keyword.class),
+                        "A",          // effectId (카드ID=effectId 규칙이면 이렇게)
+                        Zone.GRAVE,   // resolveTo
+                        false,        // token
+                        "text"        // text
+                )),
+                NOOP_EFFECTS
+        );
 
         CardInstId c1 = Ids.newCardInstId();
         CardInstId c2 = Ids.newCardInstId();
@@ -59,9 +84,20 @@ public class EngineCoreTest {
         state.players().put(p1, ps);
 
         CardDefId defA = new CardDefId("A");
-        EngineContext ctx = new EngineContext(Map.of(
-                defA, new CardDefinition(defA, "A", 1, EnumSet.noneOf(Keyword.class), "E_A", false)
-        ));
+        EngineContext ctx = new EngineContext(
+                Map.of(defA, new CardDefinition(
+                        defA,
+                        "A",
+                        CardType.SKILL,
+                        1,
+                        EnumSet.noneOf(Keyword.class),
+                        "A",
+                        Zone.GRAVE,
+                        false,
+                        "text"
+                )),
+                NOOP_EFFECTS
+        );
 
         for (int i = 0; i < 7; i++) {
             CardInstId id = Ids.newCardInstId();

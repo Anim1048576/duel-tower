@@ -1,9 +1,13 @@
 package com.example.dueltower.session;
 
+import com.example.dueltower.content.card.CardEffectRegistry;
 import com.example.dueltower.content.card.CardService;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.model.*;
-import com.example.dueltower.engine.model.Ids.*;
+import com.example.dueltower.engine.model.Ids.CardDefId;
+import com.example.dueltower.engine.model.Ids.CardInstId;
+import com.example.dueltower.engine.model.Ids.PlayerId;
+import com.example.dueltower.engine.model.Ids.SessionId;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -17,6 +21,7 @@ import static org.springframework.http.HttpStatus.*;
 public class SessionService {
 
     private final CardService cardService;
+    private final CardEffectRegistry effectRegistry;
 
     // code -> runtime (in-memory)
     private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
@@ -24,8 +29,9 @@ public class SessionService {
     private final SecureRandom rnd = new SecureRandom();
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
 
-    public SessionService(CardService cardService) {
+    public SessionService(CardService cardService, CardEffectRegistry effectRegistry) {
         this.cardService = cardService;
+        this.effectRegistry = effectRegistry;
     }
 
     public SessionRuntime createSession(String gmId) {
@@ -34,7 +40,7 @@ public class SessionService {
         Map<CardDefId, CardDefinition> defs = new HashMap<>();
         for (CardDefinition d : cardService.list()) defs.put(d.id(), d);
 
-        EngineContext ctx = new EngineContext(defs);
+        EngineContext ctx = new EngineContext(defs, effectRegistry);
         GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
 
         SessionRuntime rt = new SessionRuntime(code, gmId, state, ctx);

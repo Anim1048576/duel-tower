@@ -115,6 +115,16 @@ public class SessionController {
                 }
                 return new HandSwapCommand(commandId, expectedVersion, playerId, id);
             }
+            case "PLAY_CARD" -> {
+                requirePlayer(req.playerId());
+                if (req.cardId() == null || req.cardId().isBlank()) {
+                    throw new ResponseStatusException(BAD_REQUEST, "cardId is required");
+                }
+                CardInstId id;
+                try { id = new Ids.CardInstId(UUID.fromString(req.cardId().trim())); }
+                catch (Exception e) { throw new ResponseStatusException(BAD_REQUEST, "invalid cardId uuid"); }
+                return new PlayCardCommand(commandId, expectedVersion, playerId, id);
+            }
             case "USE_EX" -> {
                 requirePlayer(req.playerId());
                 return new UseExCommand(commandId, expectedVersion, playerId);

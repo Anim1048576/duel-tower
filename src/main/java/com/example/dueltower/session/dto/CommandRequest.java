@@ -8,5 +8,6 @@ public record CommandRequest(
         Long expectedVersion,
         String playerId,
         Integer count,
-        List<String> discardIds
+        List<String> discardIds,
+        String cardId
 ) {}
