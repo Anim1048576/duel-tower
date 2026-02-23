@@ -51,7 +51,6 @@ public class Member {
      * 소프트 삭제 처리
      * - deleted=true
      * - deletedDate=now
-     * - deleteReason=null이면 NONE으로 보정
      */
     public void softDelete() {
         this.deleted = true;
