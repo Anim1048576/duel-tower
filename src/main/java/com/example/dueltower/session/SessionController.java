@@ -86,15 +86,38 @@ public class SessionController {
 
     private static GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
         String type = req.type().trim().toUpperCase(Locale.ROOT);
+        final PlayerId playerId = new PlayerId(req.playerId().trim());
         switch (type) {
+            case "START_COMBAT" -> {
+                requirePlayer(req.playerId());
+                return new StartCombatCommand(commandId, expectedVersion, playerId);
+            }
             case "DRAW" -> {
                 requirePlayer(req.playerId());
                 int count = (req.count() == null) ? 1 : req.count();
-                return new DrawCommand(commandId, expectedVersion, new PlayerId(req.playerId().trim()), count);
+                return new DrawCommand(commandId, expectedVersion, playerId, count);
             }
             case "END_TURN" -> {
                 requirePlayer(req.playerId());
-                return new EndTurnCommand(commandId, expectedVersion, new PlayerId(req.playerId().trim()));
+                return new EndTurnCommand(commandId, expectedVersion, playerId);
+            }
+            case "HAND_SWAP" -> {
+                requirePlayer(req.playerId());
+                List<String> raw = (req.discardIds() == null) ? List.of() : req.discardIds();
+                if (raw.size() != 1) {
+                    throw new ResponseStatusException(BAD_REQUEST, "discardIds must have exactly 1 id for HAND_SWAP");
+                }
+                Ids.CardInstId id;
+                try {
+                    id = new Ids.CardInstId(UUID.fromString(raw.get(0)));
+                } catch (Exception e) {
+                    throw new ResponseStatusException(BAD_REQUEST, "invalid discardIds uuid: " + raw.get(0));
+                }
+                return new HandSwapCommand(commandId, expectedVersion, playerId, id);
+            }
+            case "USE_EX" -> {
+                requirePlayer(req.playerId());
+                return new UseExCommand(commandId, expectedVersion, playerId);
             }
             case "DISCARD_TO_HAND_LIMIT" -> {
                 requirePlayer(req.playerId());
@@ -107,7 +130,7 @@ public class SessionController {
                         throw new ResponseStatusException(BAD_REQUEST, "invalid discardIds uuid: " + s);
                     }
                 }
-                return new DiscardToHandLimitCommand(commandId, expectedVersion, new PlayerId(req.playerId().trim()), ids);
+                return new DiscardToHandLimitCommand(commandId, expectedVersion, playerId, ids);
             }
             default -> throw new ResponseStatusException(BAD_REQUEST, "unknown command type: " + req.type());
         }

@@ -46,8 +46,6 @@ public final class ZoneOps {
         ps.hand().remove(id);
         CardInstance ci = state.card(id);
         ci.zone(Zone.GRAVE);
-
-        CardDefinition def = null;
         events.add(new GameEvent.CardsMoved(ps.playerId().value(), "HAND", "GRAVE", 1));
 
         ps.grave().add(id);

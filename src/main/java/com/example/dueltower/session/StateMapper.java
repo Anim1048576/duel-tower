@@ -10,9 +10,10 @@ public final class StateMapper {
     private StateMapper() {}
 
     public static SessionStateDto toDto(String sessionCode, GameState state) {
+        int currentRound = (state.combat() == null) ? 0 : state.combat().round();
         Map<String, PlayerStateDto> players = new LinkedHashMap<>();
         for (Map.Entry<Ids.PlayerId, PlayerState> e : state.players().entrySet()) {
-            players.put(e.getKey().value(), toDto(e.getValue()));
+            players.put(e.getKey().value(), toDto(e.getValue(), currentRound));
         }
 
         Map<String, CardInstanceDto> cards = new HashMap<>();
@@ -47,7 +48,7 @@ public final class StateMapper {
         );
     }
 
-    private static PlayerStateDto toDto(PlayerState ps) {
+    private static PlayerStateDto toDto(PlayerState ps, int currentRound) {
         PendingDecisionDto pending = null;
         if (ps.pendingDecision() instanceof PendingDecision.DiscardToHandLimit dt) {
             pending = new PendingDecisionDto("DISCARD_TO_HAND_LIMIT", dt.reason(), dt.limit(), null);
@@ -63,7 +64,7 @@ public final class StateMapper {
                 ps.field().stream().map(id -> id.value().toString()).toList(),
                 ps.excluded().stream().map(id -> id.value().toString()).toList(),
                 ps.exCard() == null ? null : ps.exCard().value().toString(),
-                ps.exOnCooldown(),
+                ps.exOnCooldown(currentRound),
                 pending,
                 ps.handLimit(),
                 ps.fieldLimit()

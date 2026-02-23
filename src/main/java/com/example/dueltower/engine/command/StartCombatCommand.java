@@ -51,6 +51,10 @@ public final class StartCombatCommand implements GameCommand {
             PlayerState ps = state.player(pid);
             if (ps == null) continue;
 
+            // 전투 시작 시 초기화
+            ps.swappedThisTurn(false);
+            ps.exCooldownUntilRound(0);
+
             ZoneOps.drawWithRefill(state, ctx, ps, 4, events);
 
             if (ps.hand().size() > ps.handLimit()) {

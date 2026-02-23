@@ -36,3 +36,8 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### assets ###
+/src/main/resources/static/assets/**
+!/src/main/resources/static/assets/**/
+!/src/main/resources/static/assets/**/.gitkeep

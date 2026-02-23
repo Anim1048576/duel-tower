@@ -7,6 +7,7 @@ import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.PendingDecision;
 import com.example.dueltower.engine.model.PlayerState;
+import com.example.dueltower.engine.model.Zone;
 import com.example.dueltower.engine.model.Ids.*;
 
 public final class DiscardToHandLimitCommand implements GameCommand {
@@ -51,7 +52,7 @@ public final class DiscardToHandLimitCommand implements GameCommand {
         List<GameEvent> events = new ArrayList<>();
 
         for (CardInstId id : discardIds) {
-            ZoneOps.moveHandToGrave(state, ps, id, events);
+            ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, id, Zone.HAND, Zone.GRAVE, events);
         }
 
         ps.pendingDecision(null);

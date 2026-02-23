@@ -18,7 +18,14 @@ public final class PlayerState {
     private final List<CardInstId> excluded = new ArrayList<>();
 
     private CardInstId exCard;
-    private boolean exOnCooldown;
+    /**
+     * EX 쿨다운 종료 라운드(포함). 0이면 쿨다운 없음.
+     * 예) 현재 라운드가 3이고 exCooldownUntilRound가 4면, 4라운드 종료까지 사용 불가.
+     */
+    private int exCooldownUntilRound;
+
+    /** 패 교환(내 턴 1회) 사용 여부 */
+    private boolean swappedThisTurn;
 
     private PendingDecision pendingDecision;
 
@@ -37,8 +44,15 @@ public final class PlayerState {
     public CardInstId exCard() { return exCard; }
     public void exCard(CardInstId id) { this.exCard = id; }
 
-    public boolean exOnCooldown() { return exOnCooldown; }
-    public void exOnCooldown(boolean v) { this.exOnCooldown = v; }
+    public int exCooldownUntilRound() { return exCooldownUntilRound; }
+    public void exCooldownUntilRound(int v) { this.exCooldownUntilRound = v; }
+
+    public boolean exOnCooldown(int currentRound) {
+        return exCooldownUntilRound > 0 && currentRound <= exCooldownUntilRound;
+    }
+
+    public boolean swappedThisTurn() { return swappedThisTurn; }
+    public void swappedThisTurn(boolean v) { this.swappedThisTurn = v; }
 
     public PendingDecision pendingDecision() { return pendingDecision; }
     public void pendingDecision(PendingDecision d) { this.pendingDecision = d; }
