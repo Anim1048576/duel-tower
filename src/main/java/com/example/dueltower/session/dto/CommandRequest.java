@@ -9,5 +9,7 @@ public record CommandRequest(
         String playerId,
         Integer count,
         List<String> discardIds,
-        String cardId
+        String cardId,
+        List<String> targetPlayerIds, // 추가
+        List<String> targetEnemyIds   // 추가
 ) {}

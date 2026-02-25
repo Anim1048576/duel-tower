@@ -1,5 +1,7 @@
 package com.example.dueltower.engine.core;
 
+import com.example.dueltower.engine.core.effect.CardEffect;
+import com.example.dueltower.engine.core.effect.CardEffectResolver;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 

@@ -14,6 +14,7 @@ public final class GameState {
     private final long seed;
 
     private final Map<PlayerId, PlayerState> players = new LinkedHashMap<>();
+    private final Map<Ids.EnemyId, EnemyState> enemies = new LinkedHashMap<>();
     private final Map<CardInstId, CardInstance> cardInstances = new HashMap<>();
 
     private CombatState combat;
@@ -31,6 +32,9 @@ public final class GameState {
 
     public Map<PlayerId, PlayerState> players() { return players; }
     public PlayerState player(PlayerId id) { return players.get(id); }
+
+    public Map<Ids.EnemyId, EnemyState> enemies() { return enemies; }
+    public EnemyState enemy(Ids.EnemyId id) { return enemies.get(id); }
 
     public Map<CardInstId, CardInstance> cardInstances() { return cardInstances; }
     public CardInstance card(CardInstId id) { return cardInstances.get(id); }

@@ -1,7 +1,8 @@
 package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
-import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.effect.CardEffect;
+import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -17,12 +18,14 @@ public final class PlayCardCommand implements GameCommand {
     private final long expectedVersion;
     private final PlayerId playerId;
     private final CardInstId cardId;
+    private final TargetSelection selection;
 
-    public PlayCardCommand(UUID commandId, long expectedVersion, PlayerId playerId, CardInstId cardId) {
+    public PlayCardCommand(UUID commandId, long expectedVersion, PlayerId playerId, CardInstId cardId, TargetSelection selection) {
         this.commandId = commandId;
         this.expectedVersion = expectedVersion;
         this.playerId = playerId;
         this.cardId = cardId;
+        this.selection = selection == null ? TargetSelection.empty() : selection;
     }
 
     @Override public UUID commandId() { return commandId; }
@@ -48,13 +51,11 @@ public final class PlayCardCommand implements GameCommand {
         if (!ci.ownerId().equals(playerId)) errors.add("not your card");
 
         CardDefinition def = ctx.def(ci.defId());
-        if (def.keywords() != null && def.keywords().contains(Keyword.부동)) {
-            errors.add("cannot play a '부동' card");
-        }
+        CardEffect eff = ctx.effect(def.effectId());
 
-        if (!ctx.hasEffect(def.effectId())) errors.add("missing effect: " + def.effectId());
+        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, List.of());
+        errors.addAll(eff.validate(ec));
 
-        // 비용/자원은 나중에 PlayerState에 붙이면 여기서 체크
         return errors;
     }
 
@@ -66,17 +67,9 @@ public final class PlayCardCommand implements GameCommand {
         CardInstance ci = state.card(cardId);
         CardDefinition def = ctx.def(ci.defId());
 
-        // 1) 공통: 사용 처리(이동)
-        ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, cardId, Zone.HAND, def.resolveTo(), events);
-
-        // 2) 카드 전용 효과
-        ctx.effect(def.effectId()).resolve(state, ctx, playerId, cardId, events);
-
-        // 3) 공통: 손패 제한 체크
-        if (ps.hand().size() > ps.handLimit()) {
-            ps.pendingDecision(new PendingDecision.DiscardToHandLimit("hand limit exceeded", ps.handLimit()));
-            events.add(new GameEvent.PendingDecisionSet(ps.playerId().value(), "DISCARD_TO_HAND_LIMIT", "hand limit exceeded"));
-        }
+        CardEffect eff = ctx.effect(def.effectId());
+        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, events);
+        eff.resolve(ec);
 
         events.add(new GameEvent.LogAppended(ps.playerId().value() + " plays " + def.id().value()));
         return events;

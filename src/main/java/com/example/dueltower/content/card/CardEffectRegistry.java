@@ -1,7 +1,7 @@
 package com.example.dueltower.content.card;
 
-import com.example.dueltower.engine.core.CardEffect;
-import com.example.dueltower.engine.core.CardEffectResolver;
+import com.example.dueltower.engine.core.effect.CardEffect;
+import com.example.dueltower.engine.core.effect.CardEffectResolver;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;

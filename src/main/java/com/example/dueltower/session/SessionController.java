@@ -5,11 +5,16 @@ import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
+import com.example.dueltower.engine.model.TargetRef;
+import com.example.dueltower.engine.model.TargetSelection;
 import com.example.dueltower.session.dto.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
@@ -120,10 +125,21 @@ public class SessionController {
                 if (req.cardId() == null || req.cardId().isBlank()) {
                     throw new ResponseStatusException(BAD_REQUEST, "cardId is required");
                 }
+
                 CardInstId id;
                 try { id = new Ids.CardInstId(UUID.fromString(req.cardId().trim())); }
                 catch (Exception e) { throw new ResponseStatusException(BAD_REQUEST, "invalid cardId uuid"); }
-                return new PlayCardCommand(commandId, expectedVersion, playerId, id);
+
+                List<TargetRef> targets = new ArrayList<>();
+                if (req.targetPlayerIds() != null) {
+                    for (String s : req.targetPlayerIds()) targets.add(TargetRef.ofPlayer(new PlayerId(s)));
+                }
+                if (req.targetEnemyIds() != null) {
+                    for (String s : req.targetEnemyIds()) targets.add(TargetRef.ofEnemy(new Ids.EnemyId(s)));
+                }
+                TargetSelection sel = new TargetSelection(List.copyOf(targets));
+
+                return new PlayCardCommand(commandId, expectedVersion, playerId, id, sel);
             }
             case "USE_EX" -> {
                 requirePlayer(req.playerId());

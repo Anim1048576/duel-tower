@@ -10,12 +10,15 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-public class C001_BasicAttack implements CardEffect {
-    @Override public String id() { return "C001"; }
+public class C002_BasicRecovery implements CardEffect {
+
+    @Override
+    public String id() { return "C002"; }
 
     @Override
     public List<String> validate(EffectContext ec) {
-        return new EffectOps(ec).validateTarget(Target.ENEMY_ONE);
+        // 아군 1명 선택이 필요하다면
+        return new EffectOps(ec).validateTarget(Target.ALLY_ONE);
     }
 
     @Override
@@ -25,7 +28,7 @@ public class C001_BasicAttack implements CardEffect {
         PlayerState me = ec.state().player(ec.actor());
         if (me == null) throw new IllegalStateException("missing player: " + ec.actor().value());
 
-        int dmg = me.attackPower();
-        ops.damage(Target.ENEMY_ONE, dmg);
+        int heal = me.healPower();
+        ops.heal(Target.ALLY_ONE, heal);
     }
 }
