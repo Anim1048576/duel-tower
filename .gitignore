@@ -37,7 +37,12 @@ out/
 ### VS Code ###
 .vscode/
 
-### assets ###
+### assets-legacy ###
 /src/main/resources/static/assets/**
 !/src/main/resources/static/assets/**/
 !/src/main/resources/static/assets/**/.gitkeep
+
+### assets ###
+/duel-tower-ui/public/assets/**
+!/duel-tower-ui/public/assets/**/
+!/duel-tower-ui/public/assets/**/.gitkeep
