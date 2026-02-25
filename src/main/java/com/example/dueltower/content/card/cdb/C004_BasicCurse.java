@@ -10,19 +10,20 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * 기본 회복 [코스트:1]
- * 효과: 아군 1명의 체력을 {치유력} 만큼 회복한다.
+ * 기본 저주 [코스트:2]
+ * 효과: 적 1명에게 {공격력} 만큼의 [고통]을 부여한다.
  */
 @Component
-public class C002_BasicRecovery implements CardEffect {
+public class C004_BasicCurse implements CardEffect {
+
+    public static final String PAIN = "PAIN"; // [고통] 상태 키
 
     @Override
-    public String id() { return "C002"; }
+    public String id() { return "C004"; }
 
     @Override
     public List<String> validate(EffectContext ec) {
-        // 아군 1명 선택이 필요하다면
-        return new EffectOps(ec).validateTarget(Target.ALLY_ONE);
+        return new EffectOps(ec).validateTarget(Target.ENEMY_ONE);
     }
 
     @Override
@@ -32,7 +33,7 @@ public class C002_BasicRecovery implements CardEffect {
         PlayerState me = ec.state().player(ec.actor());
         if (me == null) throw new IllegalStateException("missing player: " + ec.actor().value());
 
-        int heal = me.healPower();
-        ops.heal(Target.ALLY_ONE, heal);
+        int pain = me.attackPower(); // 룰: 고통 수치 = 공격력
+        ops.addStatus(Target.ENEMY_ONE, PAIN, pain);
     }
 }

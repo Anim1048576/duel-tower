@@ -7,23 +7,15 @@ import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.Target;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
 /**
- * 기본 회복 [코스트:1]
- * 효과: 아군 1명의 체력을 {치유력} 만큼 회복한다.
+ * 기본 방어 [코스트:1]
+ * 효과: 자신은 {치유력} 만큼의 [보호]를 얻는다.
  */
 @Component
-public class C002_BasicRecovery implements CardEffect {
+public class C003_BasicGuard implements CardEffect {
 
     @Override
-    public String id() { return "C002"; }
-
-    @Override
-    public List<String> validate(EffectContext ec) {
-        // 아군 1명 선택이 필요하다면
-        return new EffectOps(ec).validateTarget(Target.ALLY_ONE);
-    }
+    public String id() { return "C003"; }
 
     @Override
     public void resolve(EffectContext ec) {
@@ -32,7 +24,7 @@ public class C002_BasicRecovery implements CardEffect {
         PlayerState me = ec.state().player(ec.actor());
         if (me == null) throw new IllegalStateException("missing player: " + ec.actor().value());
 
-        int heal = me.healPower();
-        ops.heal(Target.ALLY_ONE, heal);
+        int shield = me.healPower();
+        ops.addStatus(Target.SELF, EffectOps.SHIELD, shield);
     }
 }
