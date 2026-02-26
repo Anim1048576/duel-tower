@@ -1,4 +1,6 @@
-package com.example.dueltower.engine.core.effect;
+package com.example.dueltower.engine.core.effect.card;
+
+import com.example.dueltower.engine.core.effect.EffectContext;
 
 import java.util.List;
 

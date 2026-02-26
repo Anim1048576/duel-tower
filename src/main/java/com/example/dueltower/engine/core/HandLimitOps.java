@@ -1,6 +1,8 @@
 package com.example.dueltower.engine.core;
 
 import com.example.dueltower.engine.event.GameEvent;
+import com.example.dueltower.engine.core.effect.keyword.DiscardReason;
+import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 
@@ -35,11 +37,13 @@ public final class HandLimitOps {
     }
 
     public static boolean isImmovable(GameState state, EngineContext ctx, CardInstId id) {
+        // 'immovable' means: cannot be discarded even in HAND_LIMIT context.
         if (id == null) return false;
         CardInstance ci = state.card(id);
         if (ci == null) return false;
-        CardDefinition def = ctx.def(ci.defId());
-        return def.keywords() != null && def.keywords().contains(Keyword.부동);
+        PlayerState owner = state.player(ci.ownerId());
+        if (owner == null) return false;
+        return KeywordOps.blocksDiscard(state, ctx, owner, id, DiscardReason.HAND_LIMIT);
     }
 
     /**

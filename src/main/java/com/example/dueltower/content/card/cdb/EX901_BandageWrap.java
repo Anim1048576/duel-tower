@@ -8,7 +8,6 @@ import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
-import java.util.EnumSet;
 import java.util.List;
 
 /**
@@ -28,10 +27,13 @@ public class EX901_BandageWrap implements CardBlueprint {
                 "붕대 감기",
                 CardType.EX,
                 1,
-                EnumSet.noneOf(Keyword.class),
+                List.of(),
                 Zone.EX,
                 false,
-                "아군 1명의 체력을 {치유력}*3/4 만큼 회복한다. 자신의 패가 1장 이하라면, [스킬 카드]를 1장 뽑는다."
+                """
+                        아군 1명의 체력을 {치유력}*3/4 만큼 회복한다.
+                        자신의 패가 1장 이하라면, [스킬 카드]를 1장 뽑는다.
+                        """
         );
     }
 

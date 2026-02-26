@@ -2,6 +2,8 @@ package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.effect.keyword.DiscardReason;
+import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -71,10 +73,8 @@ public final class HandSwapCommand implements GameCommand {
             return errors;
         }
 
-        CardDefinition def = ctx.def(ci.defId());
-        if (def.keywords() != null && def.keywords().contains(Keyword.부동)) {
-            errors.add("cannot discard a '부동' card");
-        }
+        // keyword hook: discard validation (e.g. '부동')
+        KeywordOps.validateDiscard(state, ctx, ps, discardId, DiscardReason.HAND_SWAP, errors);
 
         return errors;
     }

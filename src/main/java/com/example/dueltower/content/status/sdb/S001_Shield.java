@@ -1,7 +1,7 @@
 package com.example.dueltower.content.status.sdb;
 
 import com.example.dueltower.content.status.StatusBlueprint;
-import com.example.dueltower.engine.core.status.StatusRuntime;
+import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.model.*;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +23,9 @@ public class S001_Shield implements StatusBlueprint {
                 StatusScope.CHARACTER,
                 10,
                 false,
-                "적에게 대미지를 받을 때, 그것을 먼저 n만큼 흡수하고 남은 피해만 받는다."
+                """
+                        적에게 대미지를 받을 때, 그것을 먼저 n만큼 흡수하고 남은 피해만 받는다.
+                        """
         );
     }
 

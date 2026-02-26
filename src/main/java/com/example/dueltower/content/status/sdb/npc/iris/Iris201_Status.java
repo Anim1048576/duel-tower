@@ -22,7 +22,9 @@ public class Iris201_Status implements StatusBlueprint {
                 StatusScope.CHARACTER,
                 999,
                 true,
-                "이 상태는 전투가 종료되어도 소멸하지 않는다."
+                """
+                        이 상태는 전투가 종료되어도 소멸하지 않는다.
+                        """
         );
     }
 }

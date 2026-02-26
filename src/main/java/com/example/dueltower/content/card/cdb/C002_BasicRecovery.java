@@ -3,16 +3,10 @@ package com.example.dueltower.content.card.cdb;
 import com.example.dueltower.content.card.CardBlueprint;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
-import com.example.dueltower.engine.model.CardDefinition;
-import com.example.dueltower.engine.model.CardType;
-import com.example.dueltower.engine.model.Keyword;
-import com.example.dueltower.engine.model.PlayerState;
-import com.example.dueltower.engine.model.Target;
-import com.example.dueltower.engine.model.Zone;
+import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
-import java.util.EnumSet;
 import java.util.List;
 
 /**
@@ -30,10 +24,12 @@ public class C002_BasicRecovery implements CardBlueprint {
                 "기본 치유",
                 CardType.SKILL,
                 1,
-                EnumSet.noneOf(Keyword.class),
+                List.of(),
                 Zone.GRAVE,
                 false,
-                "아군 1명의 체력을 {치유력} 만큼 회복한다."
+                """
+                        아군 1명의 체력을 {치유력} 만큼 회복한다.
+                        """
         );
     }
 

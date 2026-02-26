@@ -2,7 +2,7 @@ package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.ZoneOps;
-import com.example.dueltower.engine.core.effect.CardEffect;
+import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;

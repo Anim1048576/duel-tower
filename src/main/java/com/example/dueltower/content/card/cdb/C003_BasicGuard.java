@@ -8,7 +8,7 @@ import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
-import java.util.EnumSet;
+import java.util.List;
 
 /**
  * 기본 방어 [코스트:1]
@@ -25,10 +25,12 @@ public class C003_BasicGuard implements CardBlueprint {
                 "기본 방어",
                 CardType.SKILL,
                 1,
-                EnumSet.noneOf(Keyword.class),
+                List.of(),
                 Zone.GRAVE,
                 false,
-                "자신은 {치유력} 만큼의 [보호]를 얻는다."
+                """
+                        자신은 {치유력} 만큼의 [보호]를 얻는다.
+                        """
         );
     }
 

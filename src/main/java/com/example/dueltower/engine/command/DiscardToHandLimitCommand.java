@@ -3,6 +3,8 @@ package com.example.dueltower.engine.command;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.effect.keyword.DiscardReason;
+import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -69,9 +71,8 @@ public final class DiscardToHandLimitCommand implements GameCommand {
                 continue;
             }
 
-            if (HandLimitOps.isImmovable(state, ctx, id)) {
-                errors.add("cannot discard a '부동' card: " + id.value());
-            }
+            // keyword hook: discard validation (e.g. '부동')
+            KeywordOps.validateDiscard(state, ctx, ps, id, DiscardReason.HAND_LIMIT, errors);
         }
         return errors;
     }
@@ -83,8 +84,9 @@ public final class DiscardToHandLimitCommand implements GameCommand {
 
         // validate 우회 방지
         for (CardInstId id : discardIds) {
-            if (HandLimitOps.isImmovable(state, ctx, id)) {
-                throw new IllegalStateException("cannot discard a '부동' card: " + id.value());
+            List<String> errs = KeywordOps.validateDiscard(state, ctx, ps, id, DiscardReason.HAND_LIMIT);
+            if (!errs.isEmpty()) {
+                throw new IllegalStateException(String.join("; ", errs));
             }
         }
 

@@ -1,4 +1,4 @@
-package com.example.dueltower.engine.core.status;
+package com.example.dueltower.engine.core.effect.status;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.combat.DamageOps;

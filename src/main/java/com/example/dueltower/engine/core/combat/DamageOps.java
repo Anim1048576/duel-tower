@@ -1,7 +1,7 @@
 package com.example.dueltower.engine.core.combat;
 
 import com.example.dueltower.engine.core.EngineContext;
-import com.example.dueltower.engine.core.status.StatusRuntime;
+import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 

@@ -2,6 +2,7 @@ package com.example.dueltower.session;
 
 import com.example.dueltower.content.card.CardService;
 import com.example.dueltower.content.status.StatusService;
+import com.example.dueltower.content.keyword.KeywordService;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
@@ -22,6 +23,7 @@ public class SessionService {
 
     private final CardService cardService;
     private final StatusService statusService;
+    private final KeywordService keywordService;
 
     // code -> runtime (in-memory)
     private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
@@ -29,9 +31,10 @@ public class SessionService {
     private final SecureRandom rnd = new SecureRandom();
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
 
-    public SessionService(CardService cardService, StatusService statusService) {
+    public SessionService(CardService cardService, StatusService statusService, KeywordService keywordService) {
         this.cardService = cardService;
         this.statusService = statusService;
+        this.keywordService = keywordService;
     }
 
     public SessionRuntime createSession(String gmId) {
@@ -41,7 +44,9 @@ public class SessionService {
                 cardService.asMap(),
                 cardService.effectsMap(),
                 statusService.defsMap(),
-                statusService.effectsMap()
+                statusService.effectsMap(),
+                keywordService.defsMap(),
+                keywordService.effectsMap()
         );
         GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
 

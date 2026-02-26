@@ -8,7 +8,6 @@ import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
-import java.util.EnumSet;
 import java.util.List;
 
 /**
@@ -26,10 +25,12 @@ public class C004_BasicCurse implements CardBlueprint {
                 "기본 저주",
                 CardType.SKILL,
                 2,
-                EnumSet.noneOf(Keyword.class),
+                List.of(),
                 Zone.GRAVE,
                 false,
-                "적 1명에게 {공격력} 만큼의 [고통]을 부여한다."
+                """
+                        적 1명에게 {공격력} 만큼의 [고통]을 부여한다.
+                        """
         );
     }
 

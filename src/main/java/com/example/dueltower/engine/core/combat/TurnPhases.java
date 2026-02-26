@@ -3,7 +3,7 @@ package com.example.dueltower.engine.core.combat;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
-import com.example.dueltower.engine.core.status.StatusPhases;
+import com.example.dueltower.engine.core.effect.status.StatusPhases;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.PlayerState;

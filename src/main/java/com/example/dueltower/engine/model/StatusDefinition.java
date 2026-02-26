@@ -7,5 +7,5 @@ public record StatusDefinition(
         StatusScope scope,
         int priority,
         boolean persistsAfterCombat,
-        String text
+        String description
 ) {}

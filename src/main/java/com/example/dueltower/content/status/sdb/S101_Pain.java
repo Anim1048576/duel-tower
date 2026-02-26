@@ -1,7 +1,7 @@
 package com.example.dueltower.content.status.sdb;
 
 import com.example.dueltower.content.status.StatusBlueprint;
-import com.example.dueltower.engine.core.status.StatusRuntime;
+import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.model.*;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +23,9 @@ public class S101_Pain implements StatusBlueprint {
                 StatusScope.CHARACTER,
                 50,
                 false,
-                "턴 종료 시, 해당 수치만큼 대미지를 받고, 이 수치를 절반으로 감소한다."
+                """
+                        턴 종료 시, 해당 수치만큼 대미지를 받고, 이 수치를 절반으로 감소한다.
+                        """
         );
     }
 
