@@ -74,15 +74,19 @@ public class SessionService {
         PlayerState ps = new PlayerState(pid);
         state.players().put(pid, ps);
 
-        // Default deck: 6x C001 + 6x C002
-        CardDefId atk = new CardDefId("C001");
-        CardDefId def = new CardDefId("C002");
+        // Default deck: 3x C001 + 3x C002 + 3x C003 + 3x C004
+        CardDefId attack = new CardDefId("C001");
+        CardDefId recovery = new CardDefId("C002");
+        CardDefId guard = new CardDefId("C003");
+        CardDefId curse = new CardDefId("C004");
 
-        for (int i = 0; i < 6; i++) addCardToDeck(state, ps, atk);
-        for (int i = 0; i < 6; i++) addCardToDeck(state, ps, def);
+        for (int i = 0; i < 3; i++) addCardToDeck(state, ps, attack);
+        for (int i = 0; i < 3; i++) addCardToDeck(state, ps, recovery);
+        for (int i = 0; i < 3; i++) addCardToDeck(state, ps, guard);
+        for (int i = 0; i < 3; i++) addCardToDeck(state, ps, curse);
 
-        // Default EX: C001
-        addCardToEx(state, ps, atk);
+        // Default EX: X001
+        addCardToEx(state, ps, new CardDefId("X001"));
 
         // Join 시 1회 셔플
         List<CardInstId> list = new ArrayList<>(ps.deck());
