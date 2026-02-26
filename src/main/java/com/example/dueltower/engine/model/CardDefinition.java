@@ -10,7 +10,6 @@ public record CardDefinition(
         CardType type,
         int cost,
         EnumSet<Keyword> keywords,
-        String effectId,
         Zone resolveTo,
         boolean token,
         String text

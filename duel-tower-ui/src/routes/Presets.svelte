@@ -14,12 +14,12 @@
   $: selected = $presets.presets.find((p) => p.id === $presets.selectedId) ?? $presets.presets[0]
   $: if (selected && nameDraft === '') nameDraft = selected.name
 
-  function iconFor(effectId?: string) {
-    const e = (effectId || '').toUpperCase()
+  function iconForCard(c: { name?: string; text?: string }) {
+    const t = `${c?.name ?? ''} ${c?.text ?? ''}`
     const base = import.meta.env.BASE_URL
-    if (e.includes('DMG') || e.includes('ATTACK')) return `${base}assets/skills/attack.png`
-    if (e.includes('GUARD')) return `${base}assets/skills/guard.png`
-    if (e.includes('RECOVER') || e.includes('HEAL')) return `${base}assets/skills/recovery.png`
+    if (t.includes('대미지') || t.includes('공격') || t.includes('타격')) return `${base}assets/skills/attack.png`
+    if (t.includes('보호') || t.includes('방어') || t.includes('가드')) return `${base}assets/skills/guard.png`
+    if (t.includes('회복') || t.includes('치유') || t.includes('힐')) return `${base}assets/skills/recovery.png`
     return null
   }
 
@@ -56,7 +56,6 @@
       return (
         c.id.toLowerCase().includes(s) ||
         (c.name || '').toLowerCase().includes(s) ||
-        (c.effectId || '').toLowerCase().includes(s) ||
         (c.text || '').toLowerCase().includes(s)
       )
     })
@@ -81,7 +80,7 @@
           <div class="hint">카드 풀을 보고 덱(12)+EX(1)을 구성한다. (현재는 프론트 저장)</div>
         </div>
         <div class="row wrap" style="justify-content:flex-end">
-          <input class="input" style="width:240px" bind:value={q} placeholder="검색 (이름/ID/효과)" />
+          <input class="input" style="width:240px" bind:value={q} placeholder="검색 (이름/ID/텍스트)" />
           <button class="btn" on:click={() => ensureCards()}>카드 재로딩</button>
         </div>
       </div>
@@ -114,16 +113,16 @@
               <div class="gcardTitle">{c.name}</div>
               <span class="badge">{c.cost}</span>
             </div>
-            <div class="gcardSub mono">{c.id} · {c.effectId ?? '-'}</div>
+            <div class="gcardSub mono">{c.id}</div>
             <div class="gcardTags">
               {#if c.token}<span class="tag d">TOKEN</span>{/if}
               {#each c.keywords as k (k)}
                 <span class="tag p">{k}</span>
               {/each}
             </div>
-            {#if iconFor(c.effectId)}
+            {#if iconForCard(c)}
               <img
-                src={iconFor(c.effectId) || ''}
+                src={iconForCard(c) || ''}
                 alt=""
                 style="position:absolute; right:10px; bottom:10px; width:26px; height:26px; opacity:.9"
               />

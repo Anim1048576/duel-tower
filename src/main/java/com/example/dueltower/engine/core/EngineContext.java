@@ -1,7 +1,6 @@
 package com.example.dueltower.engine.core;
 
 import com.example.dueltower.engine.core.effect.CardEffect;
-import com.example.dueltower.engine.core.effect.CardEffectResolver;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 
@@ -9,11 +8,11 @@ import java.util.Map;
 
 public final class EngineContext {
     private final Map<CardDefId, CardDefinition> definitions;
-    private final CardEffectResolver effects;
+    private final Map<CardDefId, CardEffect> effects;
 
-    public EngineContext(Map<CardDefId, CardDefinition> definitions, CardEffectResolver effects) {
+    public EngineContext(Map<CardDefId, CardDefinition> definitions, Map<CardDefId, CardEffect> effects) {
         this.definitions = Map.copyOf(definitions);
-        this.effects = effects;
+        this.effects = Map.copyOf(effects);
     }
 
     public CardDefinition def(CardDefId id) {
@@ -22,11 +21,13 @@ public final class EngineContext {
         return d;
     }
 
-    public boolean hasEffect(String effectId) {
-        return effects.exists(effectId);
+    public boolean hasEffect(CardDefId defId) {
+        return effects.containsKey(defId);
     }
 
-    public CardEffect effect(String effectId) {
-        return effects.resolve(effectId);
+    public CardEffect effect(CardDefId defId) {
+        CardEffect e = effects.get(defId);
+        if (e == null) throw new IllegalArgumentException("missing CardEffect: " + defId.value());
+        return e;
     }
 }

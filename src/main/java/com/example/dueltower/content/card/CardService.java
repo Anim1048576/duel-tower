@@ -1,19 +1,65 @@
 package com.example.dueltower.content.card;
 
 import com.example.dueltower.engine.model.*;
+import com.example.dueltower.engine.core.effect.CardEffect;
+import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Service;
 
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
 
 @Service
 public class CardService {
+    private final List<CardDefinition> all;
+    private final Map<CardDefId, CardDefinition> byId;
+    private final Map<CardDefId, CardEffect> effectsById;
+
+    public CardService(List<CardBlueprint> blueprints) {
+        // Spring 주입 순서는 보장되지 않으니, 항상 정렬해서 노출
+        List<CardBlueprint> sorted = blueprints.stream()
+                .sorted(Comparator.comparing(CardBlueprint::id))
+                .toList();
+
+        Map<CardDefId, CardDefinition> m = new HashMap<>();
+        Map<CardDefId, CardEffect> e = new HashMap<>();
+        List<CardDefinition> defs = new ArrayList<>();
+
+        for (CardBlueprint bp : sorted) {
+            CardDefinition def = bp.definition();
+
+            // 안전장치: definition.id == blueprint.id
+            if (!def.id().value().equals(bp.id())) {
+                throw new IllegalStateException("definition id mismatch: def=" + def.id().value() + ", bp=" + bp.id());
+            }
+
+            CardDefinition prev = m.put(def.id(), def);
+            if (prev != null) {
+                throw new IllegalStateException("duplicate card id: " + def.id().value());
+            }
+
+            CardEffect prevEff = e.put(def.id(), bp);
+            if (prevEff != null) {
+                throw new IllegalStateException("duplicate card effect id: " + def.id().value());
+            }
+            defs.add(def);
+        }
+
+        this.all = List.copyOf(defs);
+        this.byId = Map.copyOf(m);
+        this.effectsById = Map.copyOf(e);
+    }
+
+    /** API 용: 전체 목록 */
     public List<CardDefinition> list() {
-        return List.of(
-                new CardDefinition(new Ids.CardDefId("C001"), "기본 공격", CardType.SKILL, 1, EnumSet.noneOf(Keyword.class), "DMG", Zone.GRAVE, false, "적 1명에게 {공격력} 만큼의 대미지를 준다."),
-                new CardDefinition(new Ids.CardDefId("C002"), "기본 치유", CardType.SKILL, 1, EnumSet.noneOf(Keyword.class), "RECOVERY", Zone.GRAVE, false, "아군 1명의 체력을 {치유력} 만큼 회복한다."),
-                new CardDefinition(new Ids.CardDefId("C003"), "기본 방어", CardType.SKILL, 1, EnumSet.noneOf(Keyword.class), "SHIELD", Zone.GRAVE, false, "자신은 {치유력} 만큼의 [보호]를 얻는다."),
-                new CardDefinition(new Ids.CardDefId("C004"), "기본 저주", CardType.SKILL, 2, EnumSet.noneOf(Keyword.class), "AVOID", Zone.GRAVE, false, "적 1명에게 {공격력} 만큼의 [고통]을 부여한다.")
-        );
+        return all;
+    }
+
+    /** 엔진 구성/검증/디버깅용 */
+    public Map<CardDefId, CardDefinition> asMap() {
+        return byId;
+    }
+
+    /** 엔진용: 카드 ID -> 실제 효과 구현체(CardBlueprint) */
+    public Map<CardDefId, CardEffect> effectsMap() {
+        return effectsById;
     }
 }

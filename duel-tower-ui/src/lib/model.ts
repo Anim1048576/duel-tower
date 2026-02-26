@@ -8,7 +8,6 @@ export type CardDef = {
   type?: string
   cost: number
   keywords: string[]
-  effectId?: string
   resolveTo?: string
   token: boolean
   text?: string
@@ -103,7 +102,6 @@ export function normalizeCardDef(raw: any): CardDef {
     type: raw?.type ? String(raw.type) : undefined,
     cost: Number(raw?.cost ?? 0),
     keywords: Array.isArray(raw?.keywords) ? raw.keywords.map(String) : [],
-    effectId: raw?.effectId ? String(raw.effectId) : undefined,
     resolveTo: raw?.resolveTo ? String(raw.resolveTo) : undefined,
     token: Boolean(raw?.token ?? false),
     text: raw?.text ? String(raw.text) : undefined,

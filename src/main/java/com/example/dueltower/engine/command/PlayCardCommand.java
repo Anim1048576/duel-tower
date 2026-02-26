@@ -51,7 +51,7 @@ public final class PlayCardCommand implements GameCommand {
         if (!ci.ownerId().equals(playerId)) errors.add("not your card");
 
         CardDefinition def = ctx.def(ci.defId());
-        CardEffect eff = ctx.effect(def.effectId());
+        CardEffect eff = ctx.effect(ci.defId());
 
         EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, List.of());
         errors.addAll(eff.validate(ec));
@@ -67,7 +67,7 @@ public final class PlayCardCommand implements GameCommand {
         CardInstance ci = state.card(cardId);
         CardDefinition def = ctx.def(ci.defId());
 
-        CardEffect eff = ctx.effect(def.effectId());
+        CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, events);
         eff.resolve(ec);
 

@@ -1,12 +1,18 @@
 package com.example.dueltower.content.card.cdb;
 
-import com.example.dueltower.engine.core.effect.CardEffect;
+import com.example.dueltower.content.card.CardBlueprint;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
+import com.example.dueltower.engine.model.CardDefinition;
+import com.example.dueltower.engine.model.CardType;
+import com.example.dueltower.engine.model.Keyword;
 import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.Target;
+import com.example.dueltower.engine.model.Zone;
+import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
+import java.util.EnumSet;
 import java.util.List;
 
 /**
@@ -14,12 +20,26 @@ import java.util.List;
  * 효과: 적 1명에게 {공격력} 만큼의 [고통]을 부여한다.
  */
 @Component
-public class C004_BasicCurse implements CardEffect {
+public class C004_BasicCurse implements CardBlueprint {
 
     public static final String PAIN = "PAIN"; // [고통] 상태 키
 
     @Override
     public String id() { return "C004"; }
+
+    @Override
+    public CardDefinition definition() {
+        return new CardDefinition(
+                new CardDefId(id()),
+                "기본 저주",
+                CardType.SKILL,
+                2,
+                EnumSet.noneOf(Keyword.class),
+                Zone.GRAVE,
+                false,
+                "적 1명에게 {공격력} 만큼의 [고통]을 부여한다."
+        );
+    }
 
     @Override
     public List<String> validate(EffectContext ec) {
