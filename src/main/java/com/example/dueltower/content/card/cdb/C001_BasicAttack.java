@@ -8,6 +8,7 @@ import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 기본 공격 [코스트:1]
@@ -24,7 +25,7 @@ public class C001_BasicAttack implements CardBlueprint {
                 "기본 공격",
                 CardType.SKILL,
                 1,
-                List.of(),
+                Map.of(),
                 Zone.GRAVE,
                 false,
                 """

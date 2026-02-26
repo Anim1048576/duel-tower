@@ -9,6 +9,7 @@ import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * EX - 붕대 감기 [코스트: 1]
@@ -27,7 +28,7 @@ public class EX901_BandageWrap implements CardBlueprint {
                 "붕대 감기",
                 CardType.EX,
                 1,
-                List.of(),
+                Map.of(),
                 Zone.EX,
                 false,
                 """

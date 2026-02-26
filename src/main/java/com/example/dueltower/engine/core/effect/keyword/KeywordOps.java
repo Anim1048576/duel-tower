@@ -9,6 +9,7 @@ import com.example.dueltower.engine.model.Ids.CardInstId;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Helper methods to run keyword hooks for a card instance.
@@ -16,32 +17,43 @@ import java.util.List;
 public final class KeywordOps {
     private KeywordOps() {}
 
-    public static boolean blocksDiscard(GameState state, EngineContext ctx, PlayerState ps, CardInstId id, DiscardReason reason) {
+    public static boolean blocksDiscard(
+            GameState state, EngineContext ctx, PlayerState ps, CardInstId id, DiscardReason reason
+    ) {
         if (id == null) return false;
         CardInstance ci = state.card(id);
         if (ci == null) return false;
+
         CardDefinition def = ctx.def(ci.defId());
-        List<String> kws = def.keywords();
+        Map<String, Integer> kws = def.keywords();
         if (kws == null || kws.isEmpty()) return false;
 
         DiscardCtx dc = new DiscardCtx(ps, id, reason);
 
-        for (String raw : kws) {
-            KeywordRuntime rt = KeywordRuntime.parse(raw);
-            if (rt.id().isEmpty()) continue;
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+
             if (!ctx.hasKeywordEffect(rt.id())) continue; // unknown keyword: no behavior
             if (ctx.keywordEffect(rt.id()).blocksDiscard(rt, dc)) return true;
         }
         return false;
     }
 
-    public static List<String> validateDiscard(GameState state, EngineContext ctx, PlayerState ps, CardInstId id, DiscardReason reason) {
+    public static List<String> validateDiscard(
+            GameState state, EngineContext ctx, PlayerState ps, CardInstId id, DiscardReason reason
+    ) {
         List<String> errors = new ArrayList<>();
         validateDiscard(state, ctx, ps, id, reason, errors);
         return errors;
     }
 
-    public static void validateDiscard(GameState state, EngineContext ctx, PlayerState ps, CardInstId id, DiscardReason reason, List<String> errors) {
+    public static void validateDiscard(
+            GameState state, EngineContext ctx, PlayerState ps, CardInstId id, DiscardReason reason, List<String> errors
+    ) {
         if (id == null) {
             errors.add("discard id is null");
             return;
@@ -51,15 +63,20 @@ public final class KeywordOps {
             errors.add("card instance missing: " + id.value());
             return;
         }
+
         CardDefinition def = ctx.def(ci.defId());
-        List<String> kws = def.keywords();
+        Map<String, Integer> kws = def.keywords();
         if (kws == null || kws.isEmpty()) return;
 
         DiscardCtx dc = new DiscardCtx(ps, id, reason);
 
-        for (String raw : kws) {
-            KeywordRuntime rt = KeywordRuntime.parse(raw);
-            if (rt.id().isEmpty()) continue;
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+
             if (!ctx.hasKeywordEffect(rt.id())) continue; // unknown keyword: no behavior
             ctx.keywordEffect(rt.id()).validateDiscard(rt, dc, errors);
         }

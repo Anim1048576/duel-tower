@@ -9,6 +9,7 @@ import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 기본 저주 [코스트:2]
@@ -25,7 +26,7 @@ public class C004_BasicCurse implements CardBlueprint {
                 "기본 저주",
                 CardType.SKILL,
                 2,
-                List.of(),
+                Map.of(),
                 Zone.GRAVE,
                 false,
                 """

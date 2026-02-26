@@ -2,6 +2,7 @@ package com.example.dueltower.content.keyword.kdb;
 
 import com.example.dueltower.content.keyword.KeywordBlueprint;
 import com.example.dueltower.engine.core.effect.keyword.DiscardCtx;
+import com.example.dueltower.engine.core.effect.keyword.DiscardReason;
 import com.example.dueltower.engine.core.effect.keyword.KeywordRuntime;
 import com.example.dueltower.engine.model.KeywordDefinition;
 import org.springframework.stereotype.Component;
@@ -16,15 +17,17 @@ import java.util.List;
 @Component
 public class K006_Immovable implements KeywordBlueprint {
 
+    public static final String ID = "부동";
+
     @Override
     public String id() {
-        return "부동";
+        return ID;
     }
 
     @Override
     public KeywordDefinition definition() {
         return new KeywordDefinition(
-                id(),
+                ID,
                 "부동",
                 false,
                 """
@@ -36,11 +39,20 @@ public class K006_Immovable implements KeywordBlueprint {
 
     @Override
     public boolean blocksDiscard(KeywordRuntime rt, DiscardCtx c) {
-        return true;
+        // 값이 0이면 비활성 취급, 그 외는 활성
+        return rt.value() != 0;
     }
 
     @Override
     public void validateDiscard(KeywordRuntime rt, DiscardCtx c, List<String> errors) {
-        errors.add("cannot discard a '부동' card: " + c.cardId().value());
+        if (rt.value() == 0) return;
+
+        // 이유별 메시지 분기하고 싶으면 여기서 처리
+        DiscardReason r = c.reason();
+        if (r == DiscardReason.HAND_LIMIT) {
+            errors.add("부동 카드는 손패 제한으로도 버릴 수 없습니다.");
+        } else {
+            errors.add("부동 카드는 버릴 수 없습니다.");
+        }
     }
 }

@@ -9,6 +9,7 @@ import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 기본 방어 [코스트:1]
@@ -25,7 +26,7 @@ public class C003_BasicGuard implements CardBlueprint {
                 "기본 방어",
                 CardType.SKILL,
                 1,
-                List.of(),
+                Map.of(),
                 Zone.GRAVE,
                 false,
                 """
