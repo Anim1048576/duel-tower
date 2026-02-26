@@ -3,6 +3,8 @@
   import Home from './routes/Home.svelte'
   import Lobby from './routes/Lobby.svelte'
   import Presets from './routes/Presets.svelte'
+  import Decks from './routes/Decks.svelte'
+  import DeckDetail from './routes/DeckDetail.svelte'
   import Node from './routes/Node.svelte'
   import Combat from './routes/Combat.svelte'
 
@@ -33,6 +35,7 @@
     <a class="navItem" class:isActive={cur === '/'} href="/ui/" on:click|preventDefault={() => navigate('/')}>홈</a>
     <a class="navItem" class:isActive={cur === '/lobby'} href="/ui/lobby" on:click|preventDefault={() => navigate('/lobby')}>로비</a>
     <a class="navItem" class:isActive={cur === '/presets'} href="/ui/presets" on:click|preventDefault={() => navigate('/presets')}>프리셋</a>
+    <a class="navItem" class:isActive={cur === '/decks' || cur.startsWith('/decks/')} href="/ui/decks" on:click|preventDefault={() => navigate('/decks')}>덱</a>
     <a class="navItem" class:isActive={cur === '/node'} href="/ui/node" on:click|preventDefault={() => navigate('/node')}>노드</a>
     <a class="navItem" class:isActive={cur === '/combat'} href="/ui/combat" on:click|preventDefault={() => navigate('/combat')}>전투</a>
   </nav>
@@ -62,6 +65,10 @@
       <Lobby />
     {:else if $route === '/presets'}
       <Presets />
+    {:else if $route === '/decks'}
+      <Decks />
+    {:else if $route.startsWith('/decks/')}
+      <DeckDetail id={$route.split('/')[2] || ''} />
     {:else if $route === '/node'}
       <Node />
     {:else if $route === '/combat'}

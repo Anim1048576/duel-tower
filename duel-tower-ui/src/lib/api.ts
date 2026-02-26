@@ -9,6 +9,21 @@ import type {
 
 import { normalizeCardDef } from './model'
 
+// Deck API models (DB-backed)
+export type DeckType = 'PLAYER' | 'ENEMY'
+export type DeckCardDto = { cardId: string; count: number }
+export type DeckResponse = {
+  id: number
+  name: string
+  type: DeckType
+  totalCards: number
+  cards: DeckCardDto[]
+}
+export type DeckCardSpec = { cardId: string; count?: number | null }
+export type CreateDeckRequest = { name?: string | null; type: DeckType; cards?: DeckCardSpec[] | null }
+export type UpdateDeckRequest = { name?: string | null; type?: DeckType | null; cards?: DeckCardSpec[] | null }
+export type AddDeckCardsRequest = { cards?: DeckCardSpec[] | null }
+
 type ApiError = Error & { status?: number; body?: any }
 
 async function readJson(res: Response) {
@@ -75,6 +90,43 @@ export async function joinSession(code: string, playerId: string): Promise<JoinS
 
 export async function sendCommand(code: string, req: CommandRequest): Promise<EngineResponse> {
   return await request<EngineResponse>(`/api/sessions/${encodeURIComponent(code)}/command`, {
+    method: 'POST',
+    body: JSON.stringify(req),
+  })
+}
+
+// ------------------
+// Deck API
+// ------------------
+
+export async function listDecks(): Promise<DeckResponse[]> {
+  return await request<DeckResponse[]>('/api/content/decks')
+}
+
+export async function getDeck(id: number): Promise<DeckResponse> {
+  return await request<DeckResponse>(`/api/content/decks/${id}`)
+}
+
+export async function createDeck(req: CreateDeckRequest): Promise<DeckResponse> {
+  return await request<DeckResponse>('/api/content/decks', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  })
+}
+
+export async function updateDeck(id: number, req: UpdateDeckRequest): Promise<DeckResponse> {
+  return await request<DeckResponse>(`/api/content/decks/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(req),
+  })
+}
+
+export async function deleteDeck(id: number): Promise<void> {
+  await request<void>(`/api/content/decks/${id}`, { method: 'DELETE' })
+}
+
+export async function addDeckCards(id: number, req: AddDeckCardsRequest): Promise<DeckResponse> {
+  return await request<DeckResponse>(`/api/content/decks/${id}/cards/add`, {
     method: 'POST',
     body: JSON.stringify(req),
   })
