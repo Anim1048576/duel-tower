@@ -20,7 +20,8 @@
   $: state = $combat.state
   $: cs = state?.combat
   $: me = state?.players?.[$session.meId]
-  $: isMyTurn = Boolean(cs && me && cs.currentTurnPlayer === me.playerId)
+  $: myKey = me ? `P:${me.playerId}` : ''
+  $: isMyTurn = Boolean(cs && me && cs.currentTurnPlayer === myKey)
 
   function instDef(instId: string) {
     const ci = state?.cards?.[instId]
