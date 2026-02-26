@@ -1,6 +1,7 @@
 package com.example.dueltower.session;
 
 import com.example.dueltower.content.card.CardService;
+import com.example.dueltower.content.status.StatusService;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
@@ -20,6 +21,7 @@ import static org.springframework.http.HttpStatus.*;
 public class SessionService {
 
     private final CardService cardService;
+    private final StatusService statusService;
 
     // code -> runtime (in-memory)
     private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
@@ -27,14 +29,20 @@ public class SessionService {
     private final SecureRandom rnd = new SecureRandom();
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
 
-    public SessionService(CardService cardService) {
+    public SessionService(CardService cardService, StatusService statusService) {
         this.cardService = cardService;
+        this.statusService = statusService;
     }
 
     public SessionRuntime createSession(String gmId) {
         String code = generateUniqueCode(8);
 
-        EngineContext ctx = new EngineContext(cardService.asMap(), cardService.effectsMap());
+        EngineContext ctx = new EngineContext(
+                cardService.asMap(),
+                cardService.effectsMap(),
+                statusService.defsMap(),
+                statusService.effectsMap()
+        );
         GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
 
         SessionRuntime rt = new SessionRuntime(code, gmId, state, ctx);

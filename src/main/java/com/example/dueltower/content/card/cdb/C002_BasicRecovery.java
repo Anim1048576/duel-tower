@@ -21,9 +21,7 @@ import java.util.List;
  */
 @Component
 public class C002_BasicRecovery implements CardBlueprint {
-
-    @Override
-    public String id() { return "C002"; }
+    @Override public String id() { return "C002"; }
 
     @Override
     public CardDefinition definition() {

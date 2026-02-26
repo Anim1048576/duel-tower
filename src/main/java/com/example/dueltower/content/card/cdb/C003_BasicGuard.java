@@ -1,14 +1,10 @@
 package com.example.dueltower.content.card.cdb;
 
 import com.example.dueltower.content.card.CardBlueprint;
+import com.example.dueltower.content.status.sdb.S001_Shield;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
-import com.example.dueltower.engine.model.CardDefinition;
-import com.example.dueltower.engine.model.CardType;
-import com.example.dueltower.engine.model.Keyword;
-import com.example.dueltower.engine.model.PlayerState;
-import com.example.dueltower.engine.model.Target;
-import com.example.dueltower.engine.model.Zone;
+import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
@@ -20,9 +16,7 @@ import java.util.EnumSet;
  */
 @Component
 public class C003_BasicGuard implements CardBlueprint {
-
-    @Override
-    public String id() { return "C003"; }
+    @Override public String id() { return "C003"; }
 
     @Override
     public CardDefinition definition() {
@@ -46,6 +40,6 @@ public class C003_BasicGuard implements CardBlueprint {
         if (me == null) throw new IllegalStateException("missing player: " + ec.actor().value());
 
         int shield = me.healPower();
-        ops.addStatus(Target.SELF, EffectOps.SHIELD, shield);
+        ops.addStatus(Target.SELF, S001_Shield.ID, shield);
     }
 }

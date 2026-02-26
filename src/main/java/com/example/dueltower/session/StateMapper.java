@@ -33,8 +33,12 @@ public final class StateMapper {
         CombatStateDto combat = null;
         if (state.combat() != null) {
             CombatState cs = state.combat();
-            List<String> order = cs.turnOrder().stream().map(Ids.PlayerId::value).toList();
-            combat = new CombatStateDto(cs.round(), order, cs.currentTurnIndex(), cs.currentTurnPlayer().value());
+            List<String> order = cs.turnOrder().stream()
+                    .map(CombatState::actorKey)
+                    .toList();
+
+            combat = new CombatStateDto(cs.round(), order, cs.currentTurnIndex(),
+                    CombatState.actorKey(cs.currentTurnActor()));
         }
 
         return new SessionStateDto(

@@ -44,8 +44,12 @@ public final class HandSwapCommand implements GameCommand {
             return errors;
         }
 
-        if (state.combat() != null && !state.combat().currentTurnPlayer().equals(playerId)) {
-            errors.add("not your turn");
+        CombatState cs = state.combat();
+        if (cs != null) {
+            TargetRef cur = cs.currentTurnActor();
+            if (!(cur instanceof TargetRef.Player p) || !p.id().equals(playerId)) {
+                errors.add("not your turn");
+            }
         }
 
         if (ps.pendingDecision() != null) errors.add("pending decision exists");

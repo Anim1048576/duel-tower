@@ -34,8 +34,11 @@ public final class StartCombatCommand implements GameCommand {
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         List<GameEvent> events = new ArrayList<>();
 
-        // 1) 턴 오더 생성 (일단 랜덤 셔플)
-        List<Ids.PlayerId> order = new ArrayList<>(state.players().keySet());
+        // 1) 턴 오더 생성 (플레이어 + 적, 랜덤 셔플)
+        List<TargetRef> order = new ArrayList<>();
+        for (Ids.PlayerId pid : state.players().keySet()) order.add(TargetRef.ofPlayer(pid));
+        for (Ids.EnemyId eid : state.enemies().keySet()) order.add(TargetRef.ofEnemy(eid));
+
         Collections.shuffle(order, new Random(state.seed() ^ state.version()));
 
         CombatState cs = new CombatState();
@@ -46,12 +49,11 @@ public final class StartCombatCommand implements GameCommand {
 
         state.combat(cs);
 
-        // 2) 전투 시작 손패 4장 드로우
-        for (Ids.PlayerId pid : order) {
+        // 2) 전투 시작 손패 4장 드로우(플레이어만)
+        for (Ids.PlayerId pid : state.players().keySet()) {
             PlayerState ps = state.player(pid);
             if (ps == null) continue;
 
-            // 전투 시작 시 초기화
             ps.swappedThisTurn(false);
             ps.exCooldownUntilRound(0);
 
@@ -66,8 +68,11 @@ public final class StartCombatCommand implements GameCommand {
         }
 
         // 3) 로그 + 현재 턴 알림 이벤트
-        events.add(new GameEvent.LogAppended(actorId.value() + " starts combat. order=" + join(order)));
-        events.add(new GameEvent.TurnAdvanced(cs.currentTurnPlayer().value(), cs.round()));
+        String orderStr = order.stream().map(CombatState::actorKey)
+                .collect(java.util.stream.Collectors.joining(","));
+
+        events.add(new GameEvent.LogAppended(actorId.value() + " starts combat. order=" + orderStr));
+        events.add(new GameEvent.TurnAdvanced(CombatState.actorKey(cs.currentTurnActor()), cs.round()));
 
         return events;
     }

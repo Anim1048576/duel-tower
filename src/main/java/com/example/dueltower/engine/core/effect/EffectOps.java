@@ -1,16 +1,14 @@
 package com.example.dueltower.engine.core.effect;
 
+import com.example.dueltower.engine.core.combat.DamageOps;
+import com.example.dueltower.engine.core.status.StatusRuntime;
 import com.example.dueltower.engine.event.GameEvent;
-import com.example.dueltower.engine.model.EnemyState;
-import com.example.dueltower.engine.model.PlayerState;
-import com.example.dueltower.engine.model.Target;
-import com.example.dueltower.engine.model.TargetRef;
+import com.example.dueltower.engine.model.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public final class EffectOps {
-    public static final String SHIELD = "SHIELD";
 
     private final EffectContext ec;
 
@@ -55,8 +53,32 @@ public final class EffectOps {
 
     public void addStatus(Target t, String key, int delta) {
         if (delta == 0) return;
-        for (TargetRef ref : resolveTargets(t)) {
-            applyStatus(ref, key, delta);
+
+        StatusScope scope = ec.ctx().statusDef(key).scope();
+        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
+
+        switch (scope) {
+            case CHARACTER -> {
+                for (TargetRef ref : resolveTargets(t)) {
+                    rt.stacksAdd(StatusOwnerRef.of(ref), key, delta);
+                }
+            }
+
+            case FACTION -> {
+                // 타겟들이 속한 진영에 1회만 적용(중복 방지)
+                var factions = new java.util.HashSet<CombatState.FactionId>();
+                for (TargetRef ref : resolveTargets(t)) {
+                    factions.add(CombatState.factionOf(ref));
+                }
+                for (CombatState.FactionId f : factions) {
+                    rt.stacksAdd(StatusOwnerRef.of(f), key, delta);
+                }
+            }
+
+            case CARD -> {
+                // 최소 구현: "지금 효과를 실행 중인 카드"에 부여
+                rt.stacksAdd(StatusOwnerRef.of(ec.cardId()), key, delta);
+            }
         }
     }
 
@@ -79,46 +101,7 @@ public final class EffectOps {
     }
 
     private void applyDamage(TargetRef ref, int amount) {
-        if (ref instanceof TargetRef.Player p) {
-            PlayerState ps = ec.state().player(p.id());
-            if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
-
-            int remaining = amount;
-
-            int shield = ps.status(SHIELD);
-            if (shield > 0) {
-                int absorbed = Math.min(shield, remaining);
-                ps.statusSet(SHIELD, shield - absorbed);
-                remaining -= absorbed;
-            }
-
-            if (remaining > 0) ps.hp(ps.hp() - remaining);
-
-            ec.out().add(new GameEvent.LogAppended(
-                    ec.actor().value() + " deals " + amount + " to PLAYER:" + p.id().value() + " (hp=" + ps.hp() + "/" + ps.maxHp() + ")"
-            ));
-            return;
-        }
-
-        if (ref instanceof TargetRef.Enemy e) {
-            EnemyState es = ec.state().enemy(e.id());
-            if (es == null) throw new IllegalStateException("missing enemy: " + e.id().value());
-
-            int remaining = amount;
-
-            int shield = es.status(SHIELD);
-            if (shield > 0) {
-                int absorbed = Math.min(shield, remaining);
-                es.statusSet(SHIELD, shield - absorbed);
-                remaining -= absorbed;
-            }
-
-            if (remaining > 0) es.hp(es.hp() - remaining);
-
-            ec.out().add(new GameEvent.LogAppended(
-                    ec.actor().value() + " deals " + amount + " to ENEMY:" + e.id().value() + " (hp=" + es.hp() + "/" + es.maxHp() + ")"
-            ));
-        }
+        DamageOps.apply(ec.state(), ec.ctx(), ec.out(), ec.actor().value(), ref, amount);
     }
 
     private void applyHeal(TargetRef ref, int amount) {

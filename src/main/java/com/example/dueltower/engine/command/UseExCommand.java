@@ -4,8 +4,9 @@ import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.CombatState;
 import com.example.dueltower.engine.model.GameState;
-import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.Ids.PlayerId;
+import com.example.dueltower.engine.model.PlayerState;
+import com.example.dueltower.engine.model.TargetRef;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +43,12 @@ public final class UseExCommand implements GameCommand {
         }
 
         CombatState cs = state.combat();
-        if (cs != null && !cs.currentTurnPlayer().equals(playerId)) errors.add("not your turn");
+        if (cs != null) {
+            TargetRef cur = cs.currentTurnActor();
+            if (!(cur instanceof TargetRef.Player p) || !p.id().equals(playerId)) {
+                errors.add("not your turn");
+            }
+        }
         if (ps.pendingDecision() != null) errors.add("pending decision exists");
         if (ps.exCard() == null) errors.add("ex card not set");
 

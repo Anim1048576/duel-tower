@@ -1,10 +1,14 @@
 package com.example.dueltower.engine.command;
 
-import java.util.*;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.status.StatusPhases;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 public final class EndTurnCommand implements GameCommand {
     private final UUID commandId;
@@ -25,7 +29,12 @@ public final class EndTurnCommand implements GameCommand {
         List<String> errors = new ArrayList<>();
         if (state.combat() == null) errors.add("combat not started");
         if (state.player(playerId) == null) errors.add("player not found");
-        if (state.combat() != null && !state.combat().currentTurnPlayer().equals(playerId)) errors.add("not your turn");
+        if (state.combat() != null) {
+            TargetRef cur = state.combat().currentTurnActor();
+            if (!(cur instanceof TargetRef.Player p) || !p.id().equals(playerId)) {
+                errors.add("not your turn");
+            }
+        }
 
         PlayerState ps = state.player(playerId);
         if (ps != null && ps.pendingDecision() != null) errors.add("pending decision exists");
@@ -37,7 +46,9 @@ public final class EndTurnCommand implements GameCommand {
         List<GameEvent> events = new ArrayList<>();
 
         CombatState cs = state.combat();
-        events.add(new GameEvent.LogAppended(playerId.value() + " ends turn"));
+        TargetRef current = cs.currentTurnActor();
+        events.add(new GameEvent.LogAppended(CombatState.actorKey(current) + " ends turn"));
+        StatusPhases.turnEnd(state, ctx, current, events, "TURN_END");
 
         int nextIndex = cs.currentTurnIndex() + 1;
         int nextRound = cs.round();
@@ -56,24 +67,25 @@ public final class EndTurnCommand implements GameCommand {
         }
 
         cs.currentTurnIndex(nextIndex);
-        PlayerState nextPs = state.player(cs.currentTurnPlayer());
-        if (nextPs != null) {
-            // 턴 시작 시: 패 교환(1턴 1회) 플래그 리셋
-            nextPs.swappedThisTurn(false);
+        TargetRef nextActor = cs.currentTurnActor();
+        if (nextActor instanceof TargetRef.Player np) {
+            PlayerState nextPs = state.player(np.id());
+            if (nextPs != null) {
+                nextPs.swappedThisTurn(false);
 
-            // 턴 시작 드로우: 손패 4장 미만이면 2장, 아니면 1장
-            int draw = (nextPs.hand().size() < 4) ? 2 : 1;
-            ZoneOps.drawWithRefill(state, ctx, nextPs, draw, events);
+                int draw = (nextPs.hand().size() < 4) ? 2 : 1;
+                ZoneOps.drawWithRefill(state, ctx, nextPs, draw, events);
 
-            if (nextPs.hand().size() > nextPs.handLimit()) {
-                nextPs.pendingDecision(new PendingDecision.DiscardToHandLimit("hand limit exceeded", nextPs.handLimit()));
-                events.add(new GameEvent.PendingDecisionSet(nextPs.playerId().value(), "DISCARD_TO_HAND_LIMIT", "hand limit exceeded"));
+                if (nextPs.hand().size() > nextPs.handLimit()) {
+                    nextPs.pendingDecision(new PendingDecision.DiscardToHandLimit("hand limit exceeded", nextPs.handLimit()));
+                    events.add(new GameEvent.PendingDecisionSet(nextPs.playerId().value(), "DISCARD_TO_HAND_LIMIT", "hand limit exceeded"));
+                }
+
+                events.add(new GameEvent.LogAppended(nextPs.playerId().value() + " draws " + draw + " (turn start)"));
             }
-
-            events.add(new GameEvent.LogAppended(nextPs.playerId().value() + " draws " + draw + " (turn start)"));
         }
 
-        events.add(new GameEvent.TurnAdvanced(cs.currentTurnPlayer().value(), cs.round()));
+        events.add(new GameEvent.TurnAdvanced(CombatState.actorKey(cs.currentTurnActor()), cs.round()));
         return events;
     }
 }

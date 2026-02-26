@@ -1,14 +1,10 @@
 package com.example.dueltower.content.card.cdb;
 
 import com.example.dueltower.content.card.CardBlueprint;
+import com.example.dueltower.content.status.sdb.S101_Pain;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
-import com.example.dueltower.engine.model.CardDefinition;
-import com.example.dueltower.engine.model.CardType;
-import com.example.dueltower.engine.model.Keyword;
-import com.example.dueltower.engine.model.PlayerState;
-import com.example.dueltower.engine.model.Target;
-import com.example.dueltower.engine.model.Zone;
+import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
@@ -21,11 +17,7 @@ import java.util.List;
  */
 @Component
 public class C004_BasicCurse implements CardBlueprint {
-
-    public static final String PAIN = "PAIN"; // [고통] 상태 키
-
-    @Override
-    public String id() { return "C004"; }
+    @Override public String id() { return "C004"; }
 
     @Override
     public CardDefinition definition() {
@@ -53,7 +45,7 @@ public class C004_BasicCurse implements CardBlueprint {
         PlayerState me = ec.state().player(ec.actor());
         if (me == null) throw new IllegalStateException("missing player: " + ec.actor().value());
 
-        int pain = me.attackPower(); // 룰: 고통 수치 = 공격력
-        ops.addStatus(Target.ENEMY_ONE, PAIN, pain);
+        int pain = me.attackPower();
+        ops.addStatus(Target.ENEMY_ONE, S101_Pain.ID, pain);
     }
 }
