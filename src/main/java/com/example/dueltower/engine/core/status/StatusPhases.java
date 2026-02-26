@@ -12,19 +12,6 @@ import java.util.List;
 public final class StatusPhases {
     private StatusPhases() {}
 
-    /** 특정 대상(owner)의 '턴 시작'에 상태 효과를 실행 */
-    public static void turnStart(GameState state, EngineContext ctx, TargetRef owner, List<GameEvent> out, String source) {
-        StatusRuntime rt = new StatusRuntime(state, ctx, out, source);
-
-        var keys = new ArrayList<>(rt.statusMap(owner).keySet()); // 도중 수정 대비 스냅샷
-        for (String key : keys) {
-            int stacks = rt.stacks(owner, key);
-            if (stacks <= 0) continue;
-            if (!ctx.hasStatusEffect(key)) continue;
-            ctx.statusEffect(key).onTurnStart(rt, owner, stacks);
-        }
-    }
-
     /** 특정 대상(owner)의 '턴 종료'에 상태 효과를 실행 */
     public static void turnEnd(GameState state, EngineContext ctx, TargetRef owner, List<GameEvent> out, String source) {
         StatusRuntime rt = new StatusRuntime(state, ctx, out, source);

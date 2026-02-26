@@ -8,10 +8,6 @@ public final class CombatState {
     private final List<TargetRef> turnOrder = new ArrayList<>();
     private final Map<FactionId, Map<String,Integer>> factionStatusValues = new EnumMap<>(FactionId.class);
 
-    private final Map<String, Integer> initiatives = new LinkedHashMap<>();
-
-    private final List<List<String>> initiativeTieGroups = new ArrayList<>();
-
     public CombatState() {
         factionStatusValues.put(FactionId.PLAYERS, new LinkedHashMap<>());
         factionStatusValues.put(FactionId.ENEMIES, new LinkedHashMap<>());
@@ -35,9 +31,6 @@ public final class CombatState {
     public Map<String,Integer> factionStatusValues(FactionId faction) {
         return factionStatusValues.get(faction);
     }
-
-    public Map<String, Integer> initiatives() { return initiatives; }
-    public List<List<String>> initiativeTieGroups() { return initiativeTieGroups; }
 
     public static FactionId factionOf(TargetRef ref) {
         if (ref instanceof TargetRef.Player) return FactionId.PLAYERS;

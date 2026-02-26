@@ -2,10 +2,10 @@ package com.example.dueltower.engine.command;
 
 import java.util.*;
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
-import com.example.dueltower.engine.model.PendingDecision;
 import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 
@@ -42,10 +42,7 @@ public final class DrawCommand implements GameCommand {
 
         ZoneOps.drawWithRefill(state, ctx, ps, count, events);
 
-        if (ps.hand().size() > ps.handLimit()) {
-            ps.pendingDecision(new PendingDecision.DiscardToHandLimit("hand limit exceeded", ps.handLimit()));
-            events.add(new GameEvent.PendingDecisionSet(ps.playerId().value(), "DISCARD_TO_HAND_LIMIT", "hand limit exceeded"));
-        }
+        HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, events, "hand limit exceeded");
 
         events.add(new GameEvent.LogAppended(ps.playerId().value() + " draws " + count));
         return events;

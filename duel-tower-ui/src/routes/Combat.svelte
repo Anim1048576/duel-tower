@@ -20,8 +20,7 @@
   $: state = $combat.state
   $: cs = state?.combat
   $: me = state?.players?.[$session.meId]
-  $: myKey = me ? `P:${me.playerId}` : ''
-  $: isMyTurn = Boolean(cs && me && cs.currentTurnPlayer === myKey)
+  $: isMyTurn = Boolean(cs && me && cs.currentTurnPlayer === me.playerId)
 
   function instDef(instId: string) {
     const ci = state?.cards?.[instId]
@@ -42,7 +41,15 @@
     return $content.cardsById[ci.defId]?.cost ?? 0
   }
 
+  function isImmovable(instId: string) {
+    return instDef(instId)?.keywords?.includes('부동') ?? false
+  }
+
   function toggleDiscard(id: string) {
+    if (isImmovable(id)) {
+      pushToast('부동', '부동 카드는 버릴 수 없음')
+      return
+    }
     const next = new Set(discardSet)
     if (next.has(id)) next.delete(id)
     else next.add(id)
@@ -236,8 +243,13 @@
           <div class="spacer"></div>
           <div class="cardRow">
             {#each me.hand as id (id)}
-              <button class="btn" class:primary={discardSet.has(id)} on:click={() => toggleDiscard(id)}>
-                {label(id)}
+              <button
+                class="btn"
+                class:primary={discardSet.has(id)}
+                disabled={isImmovable(id)}
+                on:click={() => toggleDiscard(id)}
+              >
+                {label(id)}{#if isImmovable(id)} <span class="badge">부동</span>{/if}
               </button>
             {/each}
           </div>

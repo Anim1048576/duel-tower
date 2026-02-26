@@ -37,14 +37,8 @@ public final class StateMapper {
                     .map(CombatState::actorKey)
                     .toList();
 
-            combat = new CombatStateDto(
-                    cs.round(),
-                    order,
-                    cs.currentTurnIndex(),
-                    CombatState.actorKey(cs.currentTurnActor()),
-                    Map.copyOf(cs.initiatives()),
-                    List.copyOf(cs.initiativeTieGroups())
-            );
+            combat = new CombatStateDto(cs.round(), order, cs.currentTurnIndex(),
+                    CombatState.actorKey(cs.currentTurnActor()));
         }
 
         return new SessionStateDto(

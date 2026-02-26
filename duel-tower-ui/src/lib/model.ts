@@ -47,8 +47,6 @@ export type CombatState = {
   turnOrder: string[]
   currentTurnIndex: number
   currentTurnPlayer: string
-  initiatives?: Record<string, number>
-  initiativeTieGroups?: string[][]
 }
 
 export type SessionState = {
