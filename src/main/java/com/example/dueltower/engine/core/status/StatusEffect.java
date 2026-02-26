@@ -12,4 +12,7 @@ public interface StatusEffect {
 
     /** 턴 종료 훅 */
     default void onTurnEnd(StatusRuntime rt, TargetRef owner, int stacks) {}
+
+    /** 턴 시작 훅 */
+    default void onTurnStart(StatusRuntime rt, TargetRef owner, int stacks) {}
 }

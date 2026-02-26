@@ -10,6 +10,7 @@ import java.util.List;
 
 /**
  * 턴 시작/턴 종료에서 공통으로 실행할 처리들을 한 군데로 모아둔다.
+ * - 룰(듀탑 룰.xlsx - 언제나의 룰 AZ4/AZ24)을 기준으로 한다.
  */
 public final class TurnPhases {
     private TurnPhases() {}

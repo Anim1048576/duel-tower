@@ -8,6 +8,12 @@ public final class CombatState {
     private final List<TargetRef> turnOrder = new ArrayList<>();
     private final Map<FactionId, Map<String,Integer>> factionStatusValues = new EnumMap<>(FactionId.class);
 
+    // 전투 시작 시 굴린 이니셔티브 (actorKey -> 1..100)
+    private final Map<String, Integer> initiatives = new LinkedHashMap<>();
+
+    // 플레이어끼리 이니셔티브가 동률인 그룹(협의 필요 표시용)
+    private final List<List<String>> initiativeTieGroups = new ArrayList<>();
+
     public CombatState() {
         factionStatusValues.put(FactionId.PLAYERS, new LinkedHashMap<>());
         factionStatusValues.put(FactionId.ENEMIES, new LinkedHashMap<>());
@@ -31,6 +37,9 @@ public final class CombatState {
     public Map<String,Integer> factionStatusValues(FactionId faction) {
         return factionStatusValues.get(faction);
     }
+
+    public Map<String, Integer> initiatives() { return initiatives; }
+    public List<List<String>> initiativeTieGroups() { return initiativeTieGroups; }
 
     public static FactionId factionOf(TargetRef ref) {
         if (ref instanceof TargetRef.Player) return FactionId.PLAYERS;

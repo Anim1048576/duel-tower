@@ -2,7 +2,6 @@ package com.example.dueltower.engine.command;
 
 import java.util.*;
 import com.example.dueltower.engine.core.EngineContext;
-import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
@@ -43,7 +42,6 @@ public final class DiscardToHandLimitCommand implements GameCommand {
 
         for (CardInstId id : discardIds) {
             if (!ps.hand().contains(id)) errors.add("card not in hand: " + id.value());
-            if (HandLimitOps.isImmovable(state, ctx, id)) errors.add("cannot discard a '부동' card: " + id.value());
         }
         return errors;
     }
