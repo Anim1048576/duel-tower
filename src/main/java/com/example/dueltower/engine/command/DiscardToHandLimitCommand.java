@@ -1,14 +1,17 @@
 package com.example.dueltower.engine.command;
 
-import java.util.*;
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.Ids.CardInstId;
+import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.PendingDecision;
 import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.Zone;
-import com.example.dueltower.engine.model.Ids.*;
+
+import java.util.*;
 
 public final class DiscardToHandLimitCommand implements GameCommand {
     private final UUID commandId;
@@ -20,7 +23,7 @@ public final class DiscardToHandLimitCommand implements GameCommand {
         this.commandId = commandId;
         this.expectedVersion = expectedVersion;
         this.playerId = playerId;
-        this.discardIds = List.copyOf(discardIds);
+        this.discardIds = discardIds == null ? List.of() : List.copyOf(discardIds);
     }
 
     @Override public UUID commandId() { return commandId; }
@@ -37,11 +40,38 @@ public final class DiscardToHandLimitCommand implements GameCommand {
             return errors;
         }
 
-        int needDiscard = Math.max(0, ps.hand().size() - dt.limit());
-        if (discardIds.size() != needDiscard) errors.add("discard count mismatch");
+        // pendingDecision이 handLimit(6)로 만들어졌더라도,
+        // 부동 수만큼은 최소 보장되게 실제 목표 limit을 보정
+        int effectiveLimit = Math.max(dt.limit(), HandLimitOps.immovableCountInHand(state, ctx, ps));
+        int needDiscard = Math.max(0, ps.hand().size() - effectiveLimit);
+
+        if (discardIds.size() != needDiscard) {
+            errors.add("discard count mismatch (need=" + needDiscard + ")");
+        }
+
+        // 중복/NULL 체크
+        Set<CardInstId> uniq = new HashSet<>();
+        for (CardInstId id : discardIds) {
+            if (id == null) {
+                errors.add("discard id is null");
+                continue;
+            }
+            if (!uniq.add(id)) {
+                errors.add("duplicate discard id: " + id.value());
+            }
+        }
 
         for (CardInstId id : discardIds) {
-            if (!ps.hand().contains(id)) errors.add("card not in hand: " + id.value());
+            if (id == null) continue;
+
+            if (!ps.hand().contains(id)) {
+                errors.add("card not in hand: " + id.value());
+                continue;
+            }
+
+            if (HandLimitOps.isImmovable(state, ctx, id)) {
+                errors.add("cannot discard a '부동' card: " + id.value());
+            }
         }
         return errors;
     }
@@ -50,6 +80,13 @@ public final class DiscardToHandLimitCommand implements GameCommand {
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         PlayerState ps = state.player(playerId);
         List<GameEvent> events = new ArrayList<>();
+
+        // validate 우회 방지
+        for (CardInstId id : discardIds) {
+            if (HandLimitOps.isImmovable(state, ctx, id)) {
+                throw new IllegalStateException("cannot discard a '부동' card: " + id.value());
+            }
+        }
 
         for (CardInstId id : discardIds) {
             ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, id, Zone.HAND, Zone.GRAVE, events);

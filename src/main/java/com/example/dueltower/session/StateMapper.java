@@ -76,6 +76,9 @@ public final class StateMapper {
                 ps.exCard() == null ? null : ps.exCard().value().toString(),
                 ps.exOnCooldown(currentRound),
                 pending,
+                ps.swappedThisTurn(),
+                ps.cardsPlayedThisTurn(),
+                ps.usedExThisTurn(),
                 ps.handLimit(),
                 ps.fieldLimit()
         );

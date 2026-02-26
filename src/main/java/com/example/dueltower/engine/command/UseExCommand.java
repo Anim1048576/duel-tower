@@ -66,6 +66,7 @@ public final class UseExCommand implements GameCommand {
 
         int round = state.combat().round();
         int until = round + 1; // 다음 라운드 종료까지
+        ps.usedExThisTurn(true);
         ps.exCooldownUntilRound(until);
 
         events.add(new GameEvent.LogAppended(ps.playerId().value() + " uses EX (cooldown until end of round " + until + ")"));

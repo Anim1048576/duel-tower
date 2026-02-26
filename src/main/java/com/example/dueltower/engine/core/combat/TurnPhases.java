@@ -1,10 +1,13 @@
 package com.example.dueltower.engine.core.combat;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.status.StatusPhases;
 import com.example.dueltower.engine.event.GameEvent;
-import com.example.dueltower.engine.model.*;
+import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.PlayerState;
+import com.example.dueltower.engine.model.TargetRef;
 
 import java.util.List;
 
@@ -30,11 +33,14 @@ public final class TurnPhases {
             if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
 
             ps.swappedThisTurn(false);
+            ps.swappedThisTurn(false);
+            ps.cardsPlayedThisTurn(0);
+            ps.usedExThisTurn(false);
 
             int draw = (ps.hand().size() < 4) ? 2 : 1;
             ZoneOps.drawWithRefill(state, ctx, ps, draw, out);
 
-            ensureHandLimitOrSetPending(ps, out);
+            HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, out, "hand limit exceeded");
             out.add(new GameEvent.LogAppended(ps.playerId().value() + " draws " + draw + " (turn start)"));
         }
     }
@@ -52,13 +58,6 @@ public final class TurnPhases {
             PlayerState ps = state.player(p.id());
             if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
             ps.ap(ps.maxAp());
-        }
-    }
-
-    private static void ensureHandLimitOrSetPending(PlayerState ps, List<GameEvent> out) {
-        if (ps.hand().size() > ps.handLimit() && ps.pendingDecision() == null) {
-            ps.pendingDecision(new PendingDecision.DiscardToHandLimit("hand limit exceeded", ps.handLimit()));
-            out.add(new GameEvent.PendingDecisionSet(ps.playerId().value(), "DISCARD_TO_HAND_LIMIT", "hand limit exceeded"));
         }
     }
 }

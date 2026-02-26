@@ -2,6 +2,7 @@ package com.example.dueltower.engine.command;
 
 import com.example.base.BaseUtility;
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.combat.TurnFlow;
 import com.example.dueltower.engine.event.GameEvent;
@@ -100,10 +101,7 @@ public final class StartCombatCommand implements GameCommand {
 
             ZoneOps.drawWithRefill(state, ctx, ps, 4, events);
 
-            if (ps.hand().size() > ps.handLimit()) {
-                ps.pendingDecision(new PendingDecision.DiscardToHandLimit("hand limit exceeded", ps.handLimit()));
-                events.add(new GameEvent.PendingDecisionSet(ps.playerId().value(), "DISCARD_TO_HAND_LIMIT", "hand limit exceeded"));
-            }
+            HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, events, "hand limit exceeded");
 
             events.add(new GameEvent.LogAppended(ps.playerId().value() + " draws 4 (combat start)"));
         }

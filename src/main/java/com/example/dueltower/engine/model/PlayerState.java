@@ -22,8 +22,14 @@ public final class PlayerState {
      * 예) 현재 라운드가 3이고 exCooldownUntilRound가 4면, 4라운드 종료까지 사용 불가.
      */
     private int exCooldownUntilRound;
+
     /** 패 교환(내 턴 1회) 사용 여부 */
     private boolean swappedThisTurn;
+    /** 이번 턴에 PlayCard로 카드를 사용한 횟수 */
+    private int cardsPlayedThisTurn;
+    /** 이번 턴에 EX 사용 여부 */
+    private boolean usedExThisTurn;
+
     private PendingDecision pendingDecision;
 
     // ===== 생활 스탯(기본) =====
@@ -70,6 +76,13 @@ public final class PlayerState {
     // ===== 턴 플래그 =====
     public boolean swappedThisTurn() { return swappedThisTurn; }
     public void swappedThisTurn(boolean v) { this.swappedThisTurn = v; }
+
+    public int cardsPlayedThisTurn() { return cardsPlayedThisTurn; }
+    public void cardsPlayedThisTurn(int v) { this.cardsPlayedThisTurn = Math.max(0, v); }
+    public void incCardsPlayedThisTurn() { this.cardsPlayedThisTurn++; }
+
+    public boolean usedExThisTurn() { return usedExThisTurn; }
+    public void usedExThisTurn(boolean v) { this.usedExThisTurn = v; }
 
     public PendingDecision pendingDecision() { return pendingDecision; }
     public void pendingDecision(PendingDecision d) { this.pendingDecision = d; }

@@ -48,7 +48,7 @@ public final class HandLimitOps {
      */
     public static void ensureHandLimitOrPending(GameState state, EngineContext ctx, PlayerState ps, List<GameEvent> events, String reason) {
         int limit = effectiveHandLimit(state, ctx, ps);
-        if (ps.hand().size() > limit) {
+        if (ps.hand().size() > limit && ps.pendingDecision() == null) {
             ps.pendingDecision(new PendingDecision.DiscardToHandLimit(reason, limit));
             events.add(new GameEvent.PendingDecisionSet(ps.playerId().value(), "DISCARD_TO_HAND_LIMIT", reason));
         }

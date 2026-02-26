@@ -12,6 +12,9 @@ public record PlayerStateDto(
         String exCard,
         boolean exOnCooldown,
         PendingDecisionDto pendingDecision,
+        boolean swappedThisTurn,
+        int cardsPlayedThisTurn,
+        boolean usedExThisTurn,
         int handLimit,
         int fieldLimit
 ) {}

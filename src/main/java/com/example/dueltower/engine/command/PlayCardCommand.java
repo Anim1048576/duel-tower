@@ -106,6 +106,9 @@ public final class PlayCardCommand implements GameCommand {
             ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, cardId, Zone.HAND, to, events);
         }
 
+        // 이번 턴 카드 사용 횟수 트래킹
+        ps.incCardsPlayedThisTurn();
+
         events.add(new GameEvent.LogAppended(ps.playerId().value() + " plays " + def.id().value()));
         return events;
     }
