@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  * 이 상태는 전투가 종료되어도 소멸하지 않는다.
  */
 @Component
-public class Iris201 implements StatusBlueprint {
+public class Iris201_Status implements StatusBlueprint {
     public static final String ID = "Iris201";
     @Override public String id() { return ID; }
 
