@@ -2,47 +2,58 @@ import { writable } from 'svelte/store'
 import { KEY } from '../lib/keys'
 import { load, save } from '../lib/storage'
 
-export type Player = { id: string; name: string; ready: boolean }
-export type Session = {
+export type SessionClient = {
+  mode: 'api' | 'local'
   code: string
-  phase: 'lobby' | 'node' | 'combat'
-  gm: string
-  players: Player[]
+  gmId: string
+  meId: string
   createdAt: string
+  lastError?: string
 }
 
-function now() { return new Date().toISOString() }
-function code() {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+function now() {
+  return new Date().toISOString()
 }
 
-const seed: Session = load(KEY.session, {
-  code: '—',
-  phase: 'lobby',
-  gm: 'GM',
-  players: [{ id: 'me', name: 'Me', ready: false }],
+function randomId(prefix = 'p') {
+  return `${prefix}-${Math.random().toString(16).slice(2, 6)}${Math.random().toString(16).slice(2, 6)}`
+}
+
+const seed: SessionClient = load(KEY.session, {
+  mode: 'api',
+  code: '',
+  gmId: '',
+  meId: 'me',
   createdAt: now(),
 })
 
-export const session = writable<Session>(seed)
-session.subscribe(v => save(KEY.session, v))
+if (!seed.meId) seed.meId = randomId('p')
 
-export function createSession() {
-  session.set({
-    code: code(),
-    phase: 'lobby',
-    gm: 'GM',
-    players: [{ id: 'me', name: 'Me', ready: false }],
-    createdAt: now(),
-  })
+export const session = writable<SessionClient>(seed)
+session.subscribe((v) => save(KEY.session, v))
+
+export function setMeId(meId: string) {
+  session.update((s) => ({ ...s, meId: (meId || 'me').trim() }))
 }
 
-export function joinSession(joinCode: string) {
-  session.update(s => ({
-    ...s,
-    code: (joinCode || code()).trim().toUpperCase(),
-    phase: 'lobby',
-    players: s.players?.length ? s.players : [{ id: 'me', name: 'Me', ready: false }],
-  }))
+export function setSessionCode(code: string) {
+  session.update((s) => ({ ...s, code: (code || '').trim().toUpperCase() }))
+}
+
+export function setGmId(gmId: string) {
+  session.update((s) => ({ ...s, gmId: (gmId || '').trim() }))
+}
+
+export function setLastError(msg?: string) {
+  session.update((s) => ({ ...s, lastError: msg }))
+}
+
+export function resetSession() {
+  session.set({
+    mode: 'api',
+    code: '',
+    gmId: '',
+    meId: seed.meId || randomId('p'),
+    createdAt: now(),
+  })
 }
