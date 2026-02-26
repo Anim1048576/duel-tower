@@ -3,6 +3,7 @@ package com.example.dueltower.engine.command;
 import com.example.base.BaseUtility;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.combat.TurnFlow;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -106,6 +107,10 @@ public final class StartCombatCommand implements GameCommand {
 
             events.add(new GameEvent.LogAppended(ps.playerId().value() + " draws 4 (combat start)"));
         }
+
+        // 2.5) 첫 턴 시작 처리(드로우 규칙/턴 플래그 초기화 등)
+        // - 적이 선공이면(현재는 AI가 없으므로) 자동 스킵해서 플레이어 턴으로 맞춘다.
+        TurnFlow.normalizeToPlayerAtCombatStart(state, ctx, events);
 
         // 3) 로그 + 현재 턴 알림 이벤트
         for (TargetRef ref : order) {

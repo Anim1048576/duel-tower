@@ -1,8 +1,7 @@
 package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
-import com.example.dueltower.engine.core.ZoneOps;
-import com.example.dueltower.engine.core.status.StatusPhases;
+import com.example.dueltower.engine.core.combat.TurnFlow;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -45,46 +44,9 @@ public final class EndTurnCommand implements GameCommand {
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         List<GameEvent> events = new ArrayList<>();
 
+        TurnFlow.endCurrentAndAdvanceToNextPlayer(state, ctx, events);
+
         CombatState cs = state.combat();
-        TargetRef current = cs.currentTurnActor();
-        events.add(new GameEvent.LogAppended(CombatState.actorKey(current) + " ends turn"));
-        StatusPhases.turnEnd(state, ctx, current, events, "TURN_END");
-
-        int nextIndex = cs.currentTurnIndex() + 1;
-        int nextRound = cs.round();
-
-        if (nextIndex >= cs.turnOrder().size()) {
-            nextIndex = 0;
-            nextRound = cs.round() + 1;
-            cs.round(nextRound);
-
-            // 라운드가 넘어가는 시점에 EX 쿨다운 만료 정리
-            for (PlayerState ps : state.players().values()) {
-                if (ps.exCooldownUntilRound() > 0 && nextRound > ps.exCooldownUntilRound()) {
-                    ps.exCooldownUntilRound(0);
-                }
-            }
-        }
-
-        cs.currentTurnIndex(nextIndex);
-        TargetRef nextActor = cs.currentTurnActor();
-        if (nextActor instanceof TargetRef.Player np) {
-            PlayerState nextPs = state.player(np.id());
-            if (nextPs != null) {
-                nextPs.swappedThisTurn(false);
-
-                int draw = (nextPs.hand().size() < 4) ? 2 : 1;
-                ZoneOps.drawWithRefill(state, ctx, nextPs, draw, events);
-
-                if (nextPs.hand().size() > nextPs.handLimit()) {
-                    nextPs.pendingDecision(new PendingDecision.DiscardToHandLimit("hand limit exceeded", nextPs.handLimit()));
-                    events.add(new GameEvent.PendingDecisionSet(nextPs.playerId().value(), "DISCARD_TO_HAND_LIMIT", "hand limit exceeded"));
-                }
-
-                events.add(new GameEvent.LogAppended(nextPs.playerId().value() + " draws " + draw + " (turn start)"));
-            }
-        }
-
         events.add(new GameEvent.TurnAdvanced(CombatState.actorKey(cs.currentTurnActor()), cs.round()));
         return events;
     }
