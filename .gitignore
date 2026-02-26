@@ -46,3 +46,6 @@ out/
 /duel-tower-ui/public/assets/**
 !/duel-tower-ui/public/assets/**/
 !/duel-tower-ui/public/assets/**/.gitkeep
+/src/main/resources/static/ui/assets/**
+!/src/main/resources/static/ui/assets/**/
+!/src/main/resources/static/ui/assets/**/.gitkeep
