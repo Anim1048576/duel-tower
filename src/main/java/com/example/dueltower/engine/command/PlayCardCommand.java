@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.CardEffect;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.event.GameEvent;
@@ -55,8 +56,19 @@ public final class PlayCardCommand implements GameCommand {
         if (!ci.ownerId().equals(playerId)) errors.add("not your card");
 
         CardDefinition def = ctx.def(ci.defId());
-        CardEffect eff = ctx.effect(ci.defId());
+        Zone to = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
 
+        // 코스트/AP 체크
+        int need = def.cost();
+        int have = ps.ap();
+        if (have < need) errors.add("not enough ap (need=" + need + ", have=" + have + ")");
+
+        // 필드 제한 체크 (resolveTo가 FIELD일 때)
+        if (to == Zone.FIELD && ps.field().size() >= ps.fieldLimit()) {
+            errors.add("field is full (limit=" + ps.fieldLimit() + ")");
+        }
+
+        CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, List.of());
         errors.addAll(eff.validate(ec));
 
@@ -69,11 +81,30 @@ public final class PlayCardCommand implements GameCommand {
         List<GameEvent> events = new ArrayList<>();
 
         CardInstance ci = state.card(cardId);
-        CardDefinition def = ctx.def(ci.defId());
+        if (ci == null) {
+            events.add(new GameEvent.LogAppended("missing card instance: " + cardId.value()));
+            return events;
+        }
 
+        CardDefinition def = ctx.def(ci.defId());
+        Zone to = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
+
+        // 코스트 지불
+        int cost = def.cost();
+        if (ps.ap() < cost) {
+            throw new IllegalStateException("not enough ap during handle (need=" + cost + ", have=" + ps.ap() + ")");
+        }
+        if (cost > 0) ps.ap(ps.ap() - cost);
+
+        // 효과 해결
         CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, events);
         eff.resolve(ec);
+
+        // 카드 이동 (HAND -> resolveTo)
+        if (ps.hand().contains(cardId) && state.card(cardId) != null) {
+            ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, cardId, Zone.HAND, to, events);
+        }
 
         events.add(new GameEvent.LogAppended(ps.playerId().value() + " plays " + def.id().value()));
         return events;
