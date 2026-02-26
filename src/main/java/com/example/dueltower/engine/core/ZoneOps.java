@@ -1,6 +1,8 @@
 package com.example.dueltower.engine.core;
 
 import com.example.dueltower.engine.event.GameEvent;
+import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
+import com.example.dueltower.engine.core.effect.keyword.MoveReason;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 
@@ -52,10 +54,16 @@ public final class ZoneOps {
     }
 
     public static void moveToZoneOrVanishIfToken(GameState state, EngineContext ctx, PlayerState ps, CardInstId id, Zone from, Zone to, List<GameEvent> events) {
+        moveToZoneOrVanishIfToken(state, ctx, ps, id, from, to, events, MoveReason.OTHER);
+    }
+
+    public static void moveToZoneOrVanishIfToken(GameState state, EngineContext ctx, PlayerState ps, CardInstId id, Zone from, Zone to, List<GameEvent> events, MoveReason reason) {
         CardInstance ci = state.card(id);
         CardDefinition def = ctx.def(ci.defId());
 
-        if (def.token() && (to == Zone.DECK || to == Zone.GRAVE || to == Zone.EXCLUDED || to == Zone.EX)) {
+        Zone finalTo = KeywordOps.overrideMoveDestination(state, ctx, ps, id, from, to, reason);
+
+        if (def.token() && (finalTo == Zone.DECK || finalTo == Zone.GRAVE || finalTo == Zone.EXCLUDED || finalTo == Zone.EX)) {
             removeFromZone(ps, id, from);
             state.cardInstances().remove(id);
             events.add(new GameEvent.LogAppended("token vanished"));
@@ -63,9 +71,9 @@ public final class ZoneOps {
         }
 
         removeFromZone(ps, id, from);
-        addToZone(ps, id, to);
-        ci.zone(to);
-        events.add(new GameEvent.CardsMoved(ps.playerId().value(), from.name(), to.name(), 1));
+        addToZone(ps, id, finalTo);
+        ci.zone(finalTo);
+        events.add(new GameEvent.CardsMoved(ps.playerId().value(), from.name(), finalTo.name(), 1));
     }
 
     private static void removeFromZone(PlayerState ps, CardInstId id, Zone from) {

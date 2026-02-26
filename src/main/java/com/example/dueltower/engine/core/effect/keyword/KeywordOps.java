@@ -5,6 +5,7 @@ import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardInstance;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.PlayerState;
+import com.example.dueltower.engine.model.Zone;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 
 import java.util.ArrayList;
@@ -80,5 +81,38 @@ public final class KeywordOps {
             if (!ctx.hasKeywordEffect(rt.id())) continue; // unknown keyword: no behavior
             ctx.keywordEffect(rt.id()).validateDiscard(rt, dc, errors);
         }
+    }
+
+    /**
+     * Let keywords override the destination zone for a move.
+     * This is typically used for "제외" (PLAY/DESTROY: GRAVE -> EXCLUDED), etc.
+     */
+    public static Zone overrideMoveDestination(
+            GameState state, EngineContext ctx, PlayerState ps, CardInstId id,
+            Zone from, Zone to, MoveReason reason
+    ) {
+        if (id == null) return to;
+        CardInstance ci = state.card(id);
+        if (ci == null) return to;
+
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return to;
+
+        MoveCtx mc = new MoveCtx(ps, id, from, to, reason == null ? MoveReason.OTHER : reason);
+        Zone current = to;
+
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+
+            if (!ctx.hasKeywordEffect(rt.id())) continue; // unknown keyword: no behavior
+            Zone next = ctx.keywordEffect(rt.id()).overrideMoveDestination(rt, mc, current);
+            current = (next == null) ? current : next;
+        }
+        return current;
     }
 }

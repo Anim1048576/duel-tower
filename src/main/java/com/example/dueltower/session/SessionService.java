@@ -91,7 +91,7 @@ public class SessionService {
         for (int i = 0; i < 3; i++) addCardToDeck(state, ps, curse);
 
         // Default EX: X001
-        addCardToEx(state, ps, new CardDefId("X001"));
+        addCardToEx(state, ps, new CardDefId("EX901"));
 
         // Join 시 1회 셔플
         List<CardInstId> list = new ArrayList<>(ps.deck());

@@ -2,6 +2,8 @@ package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
+import com.example.dueltower.engine.core.effect.keyword.MoveReason;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.event.GameEvent;
@@ -56,7 +58,8 @@ public final class PlayCardCommand implements GameCommand {
         if (!ci.ownerId().equals(playerId)) errors.add("not your card");
 
         CardDefinition def = ctx.def(ci.defId());
-        Zone to = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
+        Zone toBase = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
+        Zone to = KeywordOps.overrideMoveDestination(state, ctx, ps, cardId, Zone.HAND, toBase, MoveReason.PLAY);
 
         // 코스트/AP 체크
         int need = def.cost();
@@ -87,7 +90,8 @@ public final class PlayCardCommand implements GameCommand {
         }
 
         CardDefinition def = ctx.def(ci.defId());
-        Zone to = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
+        Zone toBase = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
+        Zone to = KeywordOps.overrideMoveDestination(state, ctx, ps, cardId, Zone.HAND, toBase, MoveReason.PLAY);
 
         // 코스트 지불
         int cost = def.cost();
@@ -103,7 +107,7 @@ public final class PlayCardCommand implements GameCommand {
 
         // 카드 이동 (HAND -> resolveTo)
         if (ps.hand().contains(cardId) && state.card(cardId) != null) {
-            ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, cardId, Zone.HAND, to, events);
+            ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, cardId, Zone.HAND, to, events, MoveReason.PLAY);
         }
 
         // 이번 턴 카드 사용 횟수 트래킹
