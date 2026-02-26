@@ -8,7 +8,6 @@ import java.util.List;
 
 /**
  * "현재 턴 종료" 후 "다음 턴 시작"까지의 흐름을 한 곳에 모아둔다.
- *
  * 주의: 현재는 적(AI) 턴이 구현되지 않았으므로, 적 턴은 자동 스킵(상태 틱만 처리)한다.
  */
 public final class TurnFlow {
