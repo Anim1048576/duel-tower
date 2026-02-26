@@ -143,7 +143,17 @@ public class SessionController {
             }
             case "USE_EX" -> {
                 requirePlayer(req.playerId());
-                return new UseExCommand(commandId, expectedVersion, playerId);
+
+                List<TargetRef> targets = new ArrayList<>();
+                if (req.targetPlayerIds() != null) {
+                    for (String s : req.targetPlayerIds()) targets.add(TargetRef.ofPlayer(new PlayerId(s)));
+                }
+                if (req.targetEnemyIds() != null) {
+                    for (String s : req.targetEnemyIds()) targets.add(TargetRef.ofEnemy(new Ids.EnemyId(s)));
+                }
+                TargetSelection sel = new TargetSelection(List.copyOf(targets));
+
+                return new UseExCommand(commandId, expectedVersion, playerId, sel);
             }
             case "DISCARD_TO_HAND_LIMIT" -> {
                 requirePlayer(req.playerId());
