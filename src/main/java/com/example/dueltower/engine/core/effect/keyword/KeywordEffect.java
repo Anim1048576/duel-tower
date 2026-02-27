@@ -17,9 +17,7 @@ public interface KeywordEffect {
      * Whether this keyword blocks discarding the card in the given context.
      * Used for cheap checks such as effective hand limit.
      */
-    default boolean blocksDiscard(KeywordRuntime rt, DiscardCtx c) {
-        return false;
-    }
+    default boolean blocksDiscard(KeywordRuntime rt, DiscardCtx c) { return false; }
 
     /**
      * Validation hook: append human-readable error messages if discard is not allowed.
@@ -34,7 +32,7 @@ public interface KeywordEffect {
      * Hook to override the destination zone when a card is moved.
      * Implementations should usually return {@code currentTo} unchanged unless the keyword is active.
      */
-    default Zone overrideMoveDestination(KeywordRuntime rt, MoveCtx c, Zone currentTo) {
-        return currentTo;
-    }
+    default Zone overrideMoveDestination(KeywordRuntime rt, MoveCtx c, Zone currentTo) { return currentTo; }
+
+    default boolean overrideExActivatable(KeywordRuntime rt, ExActivationCtx c, boolean current) { return current; }
 }

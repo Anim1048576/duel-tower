@@ -1,9 +1,7 @@
 package com.example.dueltower.content.keyword.kdb;
 
 import com.example.dueltower.content.keyword.KeywordBlueprint;
-import com.example.dueltower.engine.core.effect.keyword.KeywordRuntime;
-import com.example.dueltower.engine.core.effect.keyword.MoveCtx;
-import com.example.dueltower.engine.core.effect.keyword.MoveReason;
+import com.example.dueltower.engine.core.effect.keyword.*;
 import com.example.dueltower.engine.model.KeywordDefinition;
 import com.example.dueltower.engine.model.Zone;
 import org.springframework.stereotype.Component;
@@ -38,10 +36,15 @@ public class K005_Excluded implements KeywordBlueprint {
     @Override
     public Zone overrideMoveDestination(KeywordRuntime rt, MoveCtx c, Zone currentTo) {
         if (rt.value() == 0) return currentTo;
-
         if ((c.reason() == MoveReason.PLAY || c.reason() == MoveReason.DESTROY) && currentTo == Zone.GRAVE) {
             return Zone.EXCLUDED;
         }
         return currentTo;
+    }
+
+    @Override
+    public boolean overrideExActivatable(KeywordRuntime rt, ExActivationCtx c, boolean current) {
+        if (c.exCard() && c.reason() == ExActivationReason.USED_EX) return false;
+        return current;
     }
 }

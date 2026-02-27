@@ -1,11 +1,7 @@
 package com.example.dueltower.engine.core.effect.keyword;
 
 import com.example.dueltower.engine.core.EngineContext;
-import com.example.dueltower.engine.model.CardDefinition;
-import com.example.dueltower.engine.model.CardInstance;
-import com.example.dueltower.engine.model.GameState;
-import com.example.dueltower.engine.model.PlayerState;
-import com.example.dueltower.engine.model.Zone;
+import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 
 import java.util.ArrayList;
@@ -114,5 +110,54 @@ public final class KeywordOps {
             current = (next == null) ? current : next;
         }
         return current;
+    }
+
+    /**
+     * Let keywords override whether an EX card can be activated again in this combat.
+     * - current: current activatable flag
+     * - reason: why we are checking/updating
+     */
+    public static boolean overrideExActivatable(
+            GameState state,
+            EngineContext ctx,
+            PlayerState ps,
+            CardInstId exId,
+            boolean current,
+            ExActivationReason reason,
+            int round
+    ) {
+        if (exId == null) return current;
+
+        CardInstance ci = state.card(exId);
+        if (ci == null) return current;
+
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return current;
+
+        boolean isExCard = (def.type() == CardType.EX);
+
+        ExActivationCtx ac = new ExActivationCtx(
+                ps,
+                exId,
+                isExCard,
+                (reason == null) ? ExActivationReason.OTHER : reason,
+                round
+        );
+
+        boolean cur = current;
+
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+
+            if (!ctx.hasKeywordEffect(rt.id())) continue; // unknown keyword: no behavior
+            cur = ctx.keywordEffect(rt.id()).overrideExActivatable(rt, ac, cur);
+        }
+
+        return cur;
     }
 }

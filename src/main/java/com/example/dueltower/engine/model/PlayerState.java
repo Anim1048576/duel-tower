@@ -22,6 +22,7 @@ public final class PlayerState {
      * 예) 현재 라운드가 3이고 exCooldownUntilRound가 4면, 4라운드 종료까지 사용 불가.
      */
     private int exCooldownUntilRound;
+    private boolean exActivatable = true;
 
     /** 패 교환(내 턴 1회) 사용 여부 */
     private boolean swappedThisTurn;
@@ -68,6 +69,9 @@ public final class PlayerState {
 
     public int exCooldownUntilRound() { return exCooldownUntilRound; }
     public void exCooldownUntilRound(int v) { this.exCooldownUntilRound = v; }
+
+    public boolean exActivatable() { return exActivatable; }
+    public void exActivatable(boolean v) { this.exActivatable = v; }
 
     public boolean exOnCooldown(int currentRound) {
         return exCooldownUntilRound > 0 && currentRound <= exCooldownUntilRound;

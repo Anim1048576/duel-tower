@@ -98,6 +98,7 @@ public final class StartCombatCommand implements GameCommand {
 
             ps.swappedThisTurn(false);
             ps.exCooldownUntilRound(0);
+            ps.exActivatable(true);
 
             ZoneOps.drawWithRefill(state, ctx, ps, 4, events);
 
