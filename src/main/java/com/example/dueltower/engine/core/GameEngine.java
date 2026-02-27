@@ -1,9 +1,11 @@
 package com.example.dueltower.engine.core;
 
 import com.example.dueltower.engine.command.GameCommand;
+import com.example.dueltower.engine.core.combat.VictoryOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,7 +29,11 @@ public final class GameEngine {
             return EngineResult.rejected(errors, state);
         }
 
-        List<GameEvent> events = cmd.handle(state, ctx);
+        // Collect events (copy to ensure mutability for post-processing)
+        List<GameEvent> events = new ArrayList<>(cmd.handle(state, ctx));
+
+        // Post-processing: victory/defeat check after ANY command
+        VictoryOps.postHandleCheck(state, events);
 
         state.bumpVersion();
         processedCommandIds.add(cmd.commandId());

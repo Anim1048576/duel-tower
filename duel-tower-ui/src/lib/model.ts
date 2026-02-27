@@ -47,6 +47,7 @@ export type CombatState = {
   turnOrder: string[]
   currentTurnIndex: number
   currentTurnPlayer: string
+  phase?: string
 }
 
 export type SessionState = {
