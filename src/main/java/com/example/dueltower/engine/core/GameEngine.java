@@ -6,17 +6,23 @@ import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 public final class GameEngine {
 
-    private final Set<UUID> processedCommandIds = new HashSet<>();
+    private static final int MAX_PROCESSED_COMMAND_IDS = 10_000;
 
-    public EngineResult process(GameState state, EngineContext ctx, GameCommand cmd) {
-        if (processedCommandIds.contains(cmd.commandId())) {
+    private final Map<UUID, Boolean> processedCommandIds = new LinkedHashMap<>(16, 0.75f, false) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<UUID, Boolean> eldest) {
+            return size() > MAX_PROCESSED_COMMAND_IDS;
+        }
+    };
+public EngineResult process(GameState state, EngineContext ctx, GameCommand cmd) {
+        if (processedCommandIds.containsKey(cmd.commandId())) {
             return EngineResult.rejected(List.of("duplicate command"), state);
         }
 
@@ -36,7 +42,7 @@ public final class GameEngine {
         VictoryOps.postHandleCheck(state, events);
 
         state.bumpVersion();
-        processedCommandIds.add(cmd.commandId());
+        processedCommandIds.put(cmd.commandId(), Boolean.TRUE);
 
         return EngineResult.accepted(events, state);
     }

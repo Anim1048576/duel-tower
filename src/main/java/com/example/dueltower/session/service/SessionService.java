@@ -72,35 +72,38 @@ public class SessionService {
         }
 
         SessionRuntime rt = get(code);
-        GameState state = rt.state();
         PlayerId pid = new PlayerId(playerIdRaw.trim());
 
-        if (state.players().containsKey(pid)) return state;
+        return rt.withLock(() -> {
+            GameState state = rt.state();
 
-        PlayerState ps = new PlayerState(pid);
-        state.players().put(pid, ps);
+            if (state.players().containsKey(pid)) return state;
 
-        // Default deck: 3x C001 + 3x C002 + 3x C003 + 3x C004
-        CardDefId attack = new CardDefId("C001");
-        CardDefId recovery = new CardDefId("C002");
-        CardDefId guard = new CardDefId("C003");
-        CardDefId curse = new CardDefId("C004");
+            PlayerState ps = new PlayerState(pid);
+            state.players().put(pid, ps);
 
-        for (int i = 0; i < 3; i++) addCardToDeck(state, ps, attack);
-        for (int i = 0; i < 3; i++) addCardToDeck(state, ps, recovery);
-        for (int i = 0; i < 3; i++) addCardToDeck(state, ps, guard);
-        for (int i = 0; i < 3; i++) addCardToDeck(state, ps, curse);
+            // Default deck: 3x C001 + 3x C002 + 3x C003 + 3x C004
+            CardDefId attack = new CardDefId("C001");
+            CardDefId recovery = new CardDefId("C002");
+            CardDefId guard = new CardDefId("C003");
+            CardDefId curse = new CardDefId("C004");
 
-        // Default EX: X001
-        addCardToEx(state, ps, new CardDefId("EX901"));
+            for (int i = 0; i < 3; i++) addCardToDeck(state, ps, attack);
+            for (int i = 0; i < 3; i++) addCardToDeck(state, ps, recovery);
+            for (int i = 0; i < 3; i++) addCardToDeck(state, ps, guard);
+            for (int i = 0; i < 3; i++) addCardToDeck(state, ps, curse);
 
-        // Join 시 1회 셔플
-        List<CardInstId> list = new ArrayList<>(ps.deck());
-        ps.deck().clear();
-        Collections.shuffle(list, new Random(state.seed() ^ pid.value().hashCode()));
-        for (CardInstId id : list) ps.deck().addLast(id);
+            // Default EX: EX901
+            addCardToEx(state, ps, new CardDefId("EX901"));
 
-        return state;
+            // Join 시 1회 셔플
+            List<CardInstId> list = new ArrayList<>(ps.deck());
+            ps.deck().clear();
+            Collections.shuffle(list, new Random(state.seed() ^ pid.value().hashCode()));
+            for (CardInstId id : list) ps.deck().addLast(id);
+
+            return state;
+        });
     }
 
     private void addCardToDeck(GameState state, PlayerState ps, CardDefId defId) {

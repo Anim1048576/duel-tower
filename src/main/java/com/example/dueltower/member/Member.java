@@ -61,12 +61,12 @@ public class Member {
     public String toString() {
         String deletedDateStr = (deletedDate == null)
                 ? "null"
-                : BaseUtility.formatTimestamp(deletedDate, "yyyy-MM-dd");
+                : BaseUtility.formatTimestamp(deletedDate, "yyyy-mm-dd");
         return "[Member]: {[id: " + id +
                 "][username: " + username +
                 "][email: " + email +
                 "][role: " + role +
-                "][createDate: " + BaseUtility.formatTimestamp(createDate, "yyyy-MM-dd") +
+                "][createDate: " + BaseUtility.formatTimestamp(createDate, "yyyy-mm-dd") +
                 "][deleted: " + deleted +
                 "][deletedDate: " + deletedDateStr + "]}";
     }

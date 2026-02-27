@@ -6,6 +6,8 @@ import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
 import com.example.dueltower.engine.model.GameState;
 
+import java.util.function.Supplier;
+
 /**
  * 세션 1개당 런타임.
  * - 세션별로 GameEngine 인스턴스를 분리(커맨드 중복처리 Set이 세션 단위가 되게)
@@ -35,6 +37,12 @@ public final class SessionRuntime {
 
     public GameState state() { return state; }
     public EngineContext ctx() { return ctx; }
+
+    public <T> T withLock(Supplier<T> work) {
+        synchronized (lock) {
+            return work.get();
+        }
+    }
 
     public EngineResult apply(GameCommand cmd) {
         synchronized (lock) {
