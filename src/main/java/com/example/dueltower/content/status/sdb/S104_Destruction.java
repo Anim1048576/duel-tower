@@ -2,10 +2,7 @@ package com.example.dueltower.content.status.sdb;
 
 import com.example.dueltower.content.status.model.StatusBlueprint;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
-import com.example.dueltower.engine.model.StatusDefinition;
-import com.example.dueltower.engine.model.StatusKind;
-import com.example.dueltower.engine.model.StatusScope;
-import com.example.dueltower.engine.model.TargetRef;
+import com.example.dueltower.engine.model.*;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,6 +29,29 @@ public class S104_Destruction implements StatusBlueprint {
                         턴을 종료하면 모두 제거한다.
                         """
         );
+    }
+
+    @Override
+    public void onAfterPlayCard(StatusRuntime rt, TargetRef actor, CardInstance ci, CardDefinition def) {
+        int stacks = rt.stacks(actor, id());
+        if (stacks <= 0) return;
+        if (def.type() != CardType.SKILL) return;
+
+        // self-damage (do not go through DamageOps; this is "recoil" from the rule text)
+        if (actor instanceof TargetRef.Player p) {
+            PlayerState ps = rt.state().player(p.id());
+            if (ps == null) return;
+            ps.hp(ps.hp() - stacks);
+            rt.log("DESTRUCTION deals " + stacks + " to " + CombatState.actorKey(actor) + " (hp=" + ps.hp() + "/" + ps.maxHp() + ")");
+            return;
+        }
+
+        if (actor instanceof TargetRef.Enemy e) {
+            EnemyState es = rt.state().enemy(e.id());
+            if (es == null) return;
+            es.hp(es.hp() - stacks);
+            rt.log("DESTRUCTION deals " + stacks + " to " + CombatState.actorKey(actor) + " (hp=" + es.hp() + "/" + es.maxHp() + ")");
+        }
     }
 
     @Override

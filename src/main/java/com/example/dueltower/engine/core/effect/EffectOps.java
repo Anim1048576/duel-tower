@@ -2,6 +2,7 @@ package com.example.dueltower.engine.core.effect;
 
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
+import com.example.dueltower.engine.core.effect.status.StatusOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -33,6 +34,11 @@ public final class EffectOps {
             TargetRef one = ec.selection().targets().get(0);
             if (t == Target.ALLY_ONE && !(one instanceof TargetRef.Player)) errors.add("ally(one player) target required");
             if (t == Target.ENEMY_ONE && !(one instanceof TargetRef.Enemy)) errors.add("enemy(one enemy) target required");
+
+            // 도발(등) 타겟 강제 규칙 검증
+            if (one instanceof TargetRef.Enemy) {
+                StatusOps.validateEnemyOneTarget(ec.state(), ec.ctx(), TargetRef.ofPlayer(ec.actor()), ec.cardId(), one, errors);
+            }
         }
         return errors;
     }
@@ -95,8 +101,19 @@ public final class EffectOps {
                     ec.state().enemies().keySet().stream().map(TargetRef::ofEnemy).toList();
 
             case ALLY_ONE -> List.of(TargetRef.ofPlayer(ec.selection().requireOnePlayer()));
-            case ENEMY_ONE -> List.of(TargetRef.ofEnemy(ec.selection().requireOneEnemy()));
-            case ANY_ONE -> List.of(ec.selection().requireOne());
+            case ENEMY_ONE -> {
+                TargetRef chosen = TargetRef.ofEnemy(ec.selection().requireOneEnemy());
+                TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), TargetRef.ofPlayer(ec.actor()), ec.cardId(), chosen, ec.out(), ec.actor().value());
+                yield List.of(resolved);
+            }
+            case ANY_ONE -> {
+                TargetRef chosen = ec.selection().requireOne();
+                if (chosen instanceof TargetRef.Enemy) {
+                    TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), TargetRef.ofPlayer(ec.actor()), ec.cardId(), chosen, ec.out(), ec.actor().value());
+                    yield List.of(resolved);
+                }
+                yield List.of(chosen);
+            }
         };
     }
 

@@ -2,11 +2,11 @@ package com.example.dueltower.content.status.sdb;
 
 import com.example.dueltower.content.status.model.StatusBlueprint;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
-import com.example.dueltower.engine.model.StatusDefinition;
-import com.example.dueltower.engine.model.StatusKind;
-import com.example.dueltower.engine.model.StatusScope;
-import com.example.dueltower.engine.model.TargetRef;
+import com.example.dueltower.engine.model.*;
+
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * [해로운 상태 : 기절]
@@ -32,6 +32,22 @@ public class S102_Stun implements StatusBlueprint {
                         턴을 종료하면 제거된다.
                         """
         );
+    }
+
+    @Override
+    public void validatePlayCard(StatusRuntime rt, TargetRef actor, CardInstance ci, CardDefinition def, List<String> errors) {
+        if (rt.stacks(actor, id()) <= 0) return;
+        if (def.type() == CardType.SKILL) {
+            errors.add("stun: cannot play skill cards");
+        }
+    }
+
+    @Override
+    public void validateUseEx(StatusRuntime rt, TargetRef actor, CardInstance ci, CardDefinition def, List<String> errors) {
+        if (rt.stacks(actor, id()) <= 0) return;
+        if (def.type() == CardType.EX) {
+            errors.add("stun: cannot use EX while stunned");
+        }
     }
 
     @Override

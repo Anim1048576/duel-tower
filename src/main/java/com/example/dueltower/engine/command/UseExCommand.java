@@ -6,6 +6,7 @@ import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.keyword.ExActivationReason;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
+import com.example.dueltower.engine.core.effect.status.StatusOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -82,12 +83,16 @@ public final class UseExCommand implements GameCommand {
         CardDefinition def = ctx.def(ci.defId());
         if (def.type() != CardType.EX) errors.add("not an EX card: " + def.id().value());
 
-        // 코스트/AP 체크
-        int need = def.cost();
+
+// 상태에 의한 EX 사용 제한(예: 기절)
+StatusOps.validateUseEx(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
+
+        // 코스트/AP 체크 (상태에 의한 코스트 증감 포함)
+        int needBase = def.cost();
+        int need = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, List.of(), "VALIDATE");
         int have = ps.ap();
         if (have < need) errors.add("not enough ap (need=" + need + ", have=" + have + ")");
-
-        // 카드 효과 validate(타겟 등)
+// 카드 효과 validate(타겟 등)
         CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, exId, selection, List.of());
         errors.addAll(eff.validate(ec));
@@ -113,17 +118,20 @@ public final class UseExCommand implements GameCommand {
 
         CardDefinition def = ctx.def(ci.defId());
 
-        // 코스트 지불
-        int cost = def.cost();
+        // 코스트 지불 (상태에 의한 코스트 증감 포함)
+        int costBase = def.cost();
+        int cost = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costBase, events, "USE_EX_COST");
         if (ps.ap() < cost) {
             throw new IllegalStateException("not enough ap during handle (need=" + cost + ", have=" + ps.ap() + ")");
         }
         if (cost > 0) ps.ap(ps.ap() - cost);
-
-        // 효과 실행
+// 효과 실행
         CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, exId, selection, events);
         eff.resolve(ec);
+
+        // EX 사용 후 상태 훅
+        StatusOps.afterUseEx(state, ctx, TargetRef.ofPlayer(playerId), ci, def, events, "USE_EX");
 
         // EX는 기본적으로 존 이동 없이 '비활성(쿨다운)'만 적용
         int until = round + 1; // 다음 라운드 종료까지

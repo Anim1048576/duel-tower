@@ -2,10 +2,7 @@ package com.example.dueltower.content.status.sdb;
 
 import com.example.dueltower.content.status.model.StatusBlueprint;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
-import com.example.dueltower.engine.model.StatusDefinition;
-import com.example.dueltower.engine.model.StatusKind;
-import com.example.dueltower.engine.model.StatusScope;
-import com.example.dueltower.engine.model.TargetRef;
+import com.example.dueltower.engine.model.*;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,6 +29,13 @@ public class S103_Pressure implements StatusBlueprint {
                         턴을 종료하면 모두 제거한다.
                         """
         );
+    }
+
+    @Override
+    public int onCost(StatusRuntime rt, TargetRef actor, CardInstance ci, CardDefinition def, int currentCost) {
+        int stacks = rt.stacks(actor, id());
+        if (stacks <= 0) return currentCost;
+        return currentCost + stacks;
     }
 
     @Override
