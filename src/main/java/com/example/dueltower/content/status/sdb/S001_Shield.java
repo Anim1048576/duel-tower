@@ -30,12 +30,12 @@ public class S001_Shield implements StatusBlueprint {
     }
 
     @Override
-    public int onIncomingDamage(StatusRuntime rt, TargetRef target, int amount) {
-        int shield = rt.stacks(target, id());
+    public int onIncomingDamage(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, int amount) {
+        int shield = rt.stacks(owner, id());
         if (shield <= 0 || amount <= 0) return amount;
 
         int absorbed = Math.min(shield, amount);
-        rt.stacksSet(target, id(), shield - absorbed);
+        rt.stacksSet(owner, id(), shield - absorbed);
         return amount - absorbed;
     }
 }

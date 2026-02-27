@@ -11,25 +11,26 @@ public final class DamageOps {
     private DamageOps() {}
 
     public static void apply(GameState state, EngineContext ctx, List<GameEvent> out, String source, TargetRef target, int amount) {
+        apply(state, ctx, out, null, source, target, amount);
+    }
+
+    public static void apply(GameState state, EngineContext ctx, List<GameEvent> out, TargetRef sourceRef, String source, TargetRef target, int amount) {
         if (amount <= 0) return;
 
         StatusRuntime rt = new StatusRuntime(state, ctx, out, source);
-
         int remaining = amount;
 
-        // 우선순위(priority)가 낮은 상태부터 처리
-        Map<String, Integer> statusMap = rt.statusMap(target);
-        List<String> keys = new ArrayList<>(statusMap.keySet());
-        keys.sort(Comparator.comparingInt(k -> ctx.hasStatusDef(k) ? ctx.statusDef(k).priority() : Integer.MAX_VALUE));
-
-        for (String k : keys) {
-            if (remaining <= 0) { remaining = 0; break; }
-            if (!ctx.hasStatusEffect(k)) continue;
-            remaining = ctx.statusEffect(k).onIncomingDamage(rt, target, remaining);
+        // 0) '주는 피해' 변형(공격자 상태)
+        if (sourceRef != null) {
+            remaining = applyOutgoing(state, ctx, rt, sourceRef, target, remaining);
         }
-
         if (remaining <= 0) return;
 
+        // 1) '받는 피해' 변형(대상 상태 + 대상 진영 상태)
+        remaining = applyIncoming(state, ctx, rt, sourceRef, target, remaining);
+        if (remaining <= 0) return;
+
+        // 2) HP 적용
         if (target instanceof TargetRef.Player p) {
             PlayerState ps = state.player(p.id());
             if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
@@ -48,5 +49,67 @@ public final class DamageOps {
                     source + " deals " + remaining + " to ENEMY:" + e.id().value() + " (hp=" + es.hp() + "/" + es.maxHp() + ")"
             ));
         }
+    }
+
+    private record HookEntry(StatusOwnerRef owner, String statusId, int priority) {}
+
+    private static int applyOutgoing(GameState state, EngineContext ctx, StatusRuntime rt, TargetRef source, TargetRef target, int amount) {
+        int cur = amount;
+        List<HookEntry> entries = new ArrayList<>();
+
+        var ownerChar = StatusOwnerRef.of(source);
+        for (String k : rt.statusMap(ownerChar).keySet()) {
+            entries.add(new HookEntry(ownerChar, k, ctx.hasStatusDef(k) ? ctx.statusDef(k).priority() : Integer.MAX_VALUE));
+        }
+
+        CombatState cs = state.combat();
+        if (cs != null) {
+            var ownerFaction = StatusOwnerRef.of(CombatState.factionOf(source));
+            for (String k : rt.statusMap(ownerFaction).keySet()) {
+                entries.add(new HookEntry(ownerFaction, k, ctx.hasStatusDef(k) ? ctx.statusDef(k).priority() : Integer.MAX_VALUE));
+            }
+        }
+
+        entries.sort(Comparator.comparingInt(HookEntry::priority));
+
+        for (HookEntry it : entries) {
+            if (cur <= 0) { cur = 0; break; }
+            String k = it.statusId();
+            if (!ctx.hasStatusEffect(k)) continue;
+            int stacks = rt.stacks(it.owner(), k);
+            if (stacks <= 0) continue;
+            cur = ctx.statusEffect(k).onOutgoingDamage(rt, it.owner(), source, target, cur);
+        }
+        return Math.max(cur, 0);
+    }
+
+    private static int applyIncoming(GameState state, EngineContext ctx, StatusRuntime rt, TargetRef sourceRef, TargetRef target, int amount) {
+        int cur = amount;
+        List<HookEntry> entries = new ArrayList<>();
+
+        var ownerChar = StatusOwnerRef.of(target);
+        for (String k : rt.statusMap(ownerChar).keySet()) {
+            entries.add(new HookEntry(ownerChar, k, ctx.hasStatusDef(k) ? ctx.statusDef(k).priority() : Integer.MAX_VALUE));
+        }
+
+        CombatState cs = state.combat();
+        if (cs != null) {
+            var ownerFaction = StatusOwnerRef.of(CombatState.factionOf(target));
+            for (String k : rt.statusMap(ownerFaction).keySet()) {
+                entries.add(new HookEntry(ownerFaction, k, ctx.hasStatusDef(k) ? ctx.statusDef(k).priority() : Integer.MAX_VALUE));
+            }
+        }
+
+        entries.sort(Comparator.comparingInt(HookEntry::priority));
+
+        for (HookEntry it : entries) {
+            if (cur <= 0) { cur = 0; break; }
+            String k = it.statusId();
+            if (!ctx.hasStatusEffect(k)) continue;
+            int stacks = rt.stacks(it.owner(), k);
+            if (stacks <= 0) continue;
+            cur = ctx.statusEffect(k).onIncomingDamage(rt, it.owner(), sourceRef, target, cur);
+        }
+        return Math.max(cur, 0);
     }
 }

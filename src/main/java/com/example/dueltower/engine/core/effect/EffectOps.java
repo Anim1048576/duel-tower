@@ -101,7 +101,15 @@ public final class EffectOps {
     }
 
     private void applyDamage(TargetRef ref, int amount) {
-        DamageOps.apply(ec.state(), ec.ctx(), ec.out(), ec.actor().value(), ref, amount);
+        DamageOps.apply(
+                ec.state(),
+                ec.ctx(),
+                ec.out(),
+                TargetRef.ofPlayer(ec.actor()),
+                ec.actor().value(),
+                ref,
+                amount
+        );
     }
 
     private void applyHeal(TargetRef ref, int amount) {

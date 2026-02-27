@@ -1,12 +1,18 @@
 package com.example.dueltower.engine.core.effect.status;
 
+import com.example.dueltower.engine.model.StatusOwnerRef;
 import com.example.dueltower.engine.model.TargetRef;
 
 public interface StatusEffect {
     String id();
 
     /** 상태가 '받는 피해'를 변형할 수 있는 훅 */
-    default int onIncomingDamage(StatusRuntime rt, TargetRef target, int amount) {
+    default int onIncomingDamage(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, int amount) {
+        return amount;
+    }
+
+    /** 상태가 '주는 피해'를 변형할 수 있는 훅 */
+    default int onOutgoingDamage(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, int amount) {
         return amount;
     }
 
