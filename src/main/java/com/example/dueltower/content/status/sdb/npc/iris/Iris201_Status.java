@@ -1,6 +1,6 @@
 package com.example.dueltower.content.status.sdb.npc.iris;
 
-import com.example.dueltower.content.status.StatusBlueprint;
+import com.example.dueltower.content.status.model.StatusBlueprint;
 import com.example.dueltower.engine.model.*;
 import org.springframework.stereotype.Component;
 

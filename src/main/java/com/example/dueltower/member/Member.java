@@ -1,6 +1,6 @@
 package com.example.dueltower.member;
 
-import com.example.base.BaseUtility;
+import com.example.dueltower.common.util.BaseUtility;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

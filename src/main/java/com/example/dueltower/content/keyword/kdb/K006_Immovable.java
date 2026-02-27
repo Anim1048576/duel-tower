@@ -1,6 +1,6 @@
 package com.example.dueltower.content.keyword.kdb;
 
-import com.example.dueltower.content.keyword.KeywordBlueprint;
+import com.example.dueltower.content.keyword.model.KeywordBlueprint;
 import com.example.dueltower.engine.core.effect.keyword.DiscardCtx;
 import com.example.dueltower.engine.core.effect.keyword.DiscardReason;
 import com.example.dueltower.engine.core.effect.keyword.KeywordRuntime;

@@ -1,6 +1,6 @@
 package com.example.dueltower.content.card.cdb;
 
-import com.example.dueltower.content.card.CardBlueprint;
+import com.example.dueltower.content.card.model.CardBlueprint;
 import com.example.dueltower.content.status.sdb.S101_Pain;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;

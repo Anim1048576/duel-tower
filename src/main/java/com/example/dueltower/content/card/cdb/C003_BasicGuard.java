@@ -1,6 +1,6 @@
 package com.example.dueltower.content.card.cdb;
 
-import com.example.dueltower.content.card.CardBlueprint;
+import com.example.dueltower.content.card.model.CardBlueprint;
 import com.example.dueltower.content.status.sdb.S001_Shield;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
@@ -8,7 +8,6 @@ import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Map;
 
 /**

@@ -1,6 +1,6 @@
 package com.example.dueltower.content.status.sdb;
 
-import com.example.dueltower.content.status.StatusBlueprint;
+import com.example.dueltower.content.status.model.StatusBlueprint;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.model.*;
 import org.springframework.stereotype.Component;
