@@ -115,9 +115,9 @@ public class SessionController {
                 if (raw.size() != 1) {
                     throw new ResponseStatusException(BAD_REQUEST, "discardIds must have exactly 1 id for HAND_SWAP");
                 }
-                Ids.CardInstId id;
+                CardInstId id;
                 try {
-                    id = new Ids.CardInstId(UUID.fromString(raw.get(0)));
+                    id = new CardInstId(UUID.fromString(raw.get(0)));
                 } catch (Exception e) {
                     throw new ResponseStatusException(BAD_REQUEST, "invalid discardIds uuid: " + raw.get(0));
                 }
@@ -130,7 +130,7 @@ public class SessionController {
                 }
 
                 CardInstId id;
-                try { id = new Ids.CardInstId(UUID.fromString(req.cardId().trim())); }
+                try { id = new CardInstId(UUID.fromString(req.cardId().trim())); }
                 catch (Exception e) { throw new ResponseStatusException(BAD_REQUEST, "invalid cardId uuid"); }
 
                 List<TargetRef> targets = new ArrayList<>();
@@ -164,7 +164,7 @@ public class SessionController {
                 List<CardInstId> ids = new ArrayList<>(raw.size());
                 for (String s : raw) {
                     try {
-                        ids.add(new Ids.CardInstId(UUID.fromString(s)));
+                        ids.add(new CardInstId(UUID.fromString(s)));
                     } catch (Exception e) {
                         throw new ResponseStatusException(BAD_REQUEST, "invalid discardIds uuid: " + s);
                     }

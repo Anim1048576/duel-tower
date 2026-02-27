@@ -22,6 +22,8 @@ public final class TurnFlow {
 
         TargetRef current = cs.currentTurnActor();
         out.add(new GameEvent.LogAppended(CombatState.actorKey(current) + " ends turn"));
+
+        cs.phase(CombatPhase.TURN_END);
         TurnPhases.turnEnd(state, ctx, current, out, "TURN_END");
 
         advanceOne(state, cs);
@@ -31,14 +33,23 @@ public final class TurnFlow {
         while (guard-- > 0 && cs.currentTurnActor() instanceof TargetRef.Enemy) {
             TargetRef enemy = cs.currentTurnActor();
             out.add(new GameEvent.LogAppended(CombatState.actorKey(enemy) + " turn (auto-skip: enemy AI not implemented)"));
+
+            cs.phase(CombatPhase.TURN_START);
             TurnPhases.turnStart(state, ctx, enemy, out, "TURN_START");
+
+            cs.phase(CombatPhase.TURN_END);
             TurnPhases.turnEnd(state, ctx, enemy, out, "TURN_END");
             advanceOne(state, cs);
         }
 
         // 이제 플레이어 턴 시작
         TargetRef next = cs.currentTurnActor();
+
+        cs.phase(CombatPhase.TURN_START);
         TurnPhases.turnStart(state, ctx, next, out, "TURN_START");
+
+        // 입력 가능한 시점
+        cs.phase(CombatPhase.MAIN);
     }
 
     /**
@@ -52,12 +63,19 @@ public final class TurnFlow {
         while (guard-- > 0 && cs.currentTurnActor() instanceof TargetRef.Enemy) {
             TargetRef enemy = cs.currentTurnActor();
             out.add(new GameEvent.LogAppended(CombatState.actorKey(enemy) + " opens combat (auto-skip: enemy AI not implemented)"));
+
+            cs.phase(CombatPhase.TURN_START);
             TurnPhases.turnStart(state, ctx, enemy, out, "TURN_START");
+
+            cs.phase(CombatPhase.TURN_END);
             TurnPhases.turnEnd(state, ctx, enemy, out, "TURN_END");
             advanceOne(state, cs);
         }
 
+        cs.phase(CombatPhase.TURN_START);
         TurnPhases.turnStart(state, ctx, cs.currentTurnActor(), out, "TURN_START");
+
+        cs.phase(CombatPhase.MAIN);
     }
 
     /**

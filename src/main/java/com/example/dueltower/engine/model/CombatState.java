@@ -5,6 +5,7 @@ import java.util.*;
 public final class CombatState {
     private int round = 1;
     private int currentTurnIndex = 0;
+    private CombatPhase phase = CombatPhase.INIT;
     private final List<TargetRef> turnOrder = new ArrayList<>();
     private final Map<FactionId, Map<String,Integer>> factionStatusValues = new EnumMap<>(FactionId.class);
 
@@ -18,6 +19,9 @@ public final class CombatState {
         factionStatusValues.put(FactionId.PLAYERS, new LinkedHashMap<>());
         factionStatusValues.put(FactionId.ENEMIES, new LinkedHashMap<>());
     }
+
+    public CombatPhase phase() { return phase; }
+    public void phase(CombatPhase p) { this.phase = (p == null) ? CombatPhase.INIT : p; }
 
     public int round() { return round; }
     public void round(int r) { this.round = r; }

@@ -8,6 +8,7 @@ public record CombatStateDto(
         List<String> turnOrder,
         int currentTurnIndex,
         String currentTurnPlayer,
+        String phase,
         Map<String, Integer> initiatives,
         List<List<String>> initiativeTieGroups
 ) {}

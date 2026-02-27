@@ -48,6 +48,9 @@ public final class UseExCommand implements GameCommand {
 
         CombatState cs = state.combat();
         if (cs != null) {
+            if (cs.phase() != CombatPhase.MAIN) {
+                errors.add("invalid phase: " + cs.phase());
+            }
             TargetRef cur = cs.currentTurnActor();
             if (!(cur instanceof TargetRef.Player p) || !p.id().equals(playerId)) {
                 errors.add("not your turn");

@@ -29,6 +29,9 @@ public final class EndTurnCommand implements GameCommand {
         if (state.combat() == null) errors.add("combat not started");
         if (state.player(playerId) == null) errors.add("player not found");
         if (state.combat() != null) {
+            if (state.combat().phase() != CombatPhase.MAIN) {
+                errors.add("invalid phase: " + state.combat().phase());
+            }
             TargetRef cur = state.combat().currentTurnActor();
             if (!(cur instanceof TargetRef.Player p) || !p.id().equals(playerId)) {
                 errors.add("not your turn");

@@ -42,6 +42,7 @@ public final class StateMapper {
                     order,
                     cs.currentTurnIndex(),
                     CombatState.actorKey(cs.currentTurnActor()),
+                    cs.phase().name(),
                     Map.copyOf(cs.initiatives()),
                     List.copyOf(cs.initiativeTieGroups())
             );

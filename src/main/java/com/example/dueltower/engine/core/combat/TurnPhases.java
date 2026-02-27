@@ -33,7 +33,6 @@ public final class TurnPhases {
             if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
 
             ps.swappedThisTurn(false);
-            ps.swappedThisTurn(false);
             ps.cardsPlayedThisTurn(0);
             ps.usedExThisTurn(false);
 
