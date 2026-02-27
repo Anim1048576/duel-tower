@@ -2,8 +2,10 @@ package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
-import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.EffectContext;
+import com.example.dueltower.engine.core.effect.card.CardEffect;
+import com.example.dueltower.engine.core.effect.keyword.ExActivationReason;
+import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -60,6 +62,10 @@ public final class UseExCommand implements GameCommand {
 
         if (cs != null && ps.exOnCooldown(cs.round())) {
             errors.add("ex on cooldown");
+        }
+
+        if (!ps.exActivatable()) {
+            errors.add("ex is disabled for this combat");
         }
 
         CardInstId exId = ps.exCard();
@@ -120,6 +126,10 @@ public final class UseExCommand implements GameCommand {
         int until = round + 1; // 다음 라운드 종료까지
         ps.exCooldownUntilRound(until);
         ps.usedExThisTurn(true);
+
+        // EX 영구 비활성 여부 체크
+        boolean next = KeywordOps.overrideExActivatable(state, ctx, ps, exId, ps.exActivatable(), ExActivationReason.USED_EX, round);
+        ps.exActivatable(next);
 
         // EX 효과로 드로우가 발생했을 수 있으니 hand limit 처리
         HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, events, "hand limit exceeded");
