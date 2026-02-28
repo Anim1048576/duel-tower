@@ -21,7 +21,7 @@ public final class GameEngine {
             return size() > MAX_PROCESSED_COMMAND_IDS;
         }
     };
-public EngineResult process(GameState state, EngineContext ctx, GameCommand cmd) {
+    public EngineResult process(GameState state, EngineContext ctx, GameCommand cmd) {
         if (processedCommandIds.containsKey(cmd.commandId())) {
             return EngineResult.rejected(List.of("duplicate command"), state);
         }
