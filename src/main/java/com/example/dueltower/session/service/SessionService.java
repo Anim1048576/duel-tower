@@ -10,6 +10,7 @@ import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SessionId;
 import com.example.dueltower.session.runtime.SessionRuntime;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -20,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.springframework.http.HttpStatus.*;
 
 @Service
+@Slf4j
 public class SessionService {
 
     private final CardService cardService;
@@ -53,6 +55,9 @@ public class SessionService {
 
         SessionRuntime rt = new SessionRuntime(code, gmId, state, ctx);
         sessions.put(code, rt);
+
+        log.debug("created session code={} gmId={} sessionId={} seed={}",
+                code, gmId, state.sessionId().value(), state.seed());
         return rt;
     }
 
@@ -77,7 +82,10 @@ public class SessionService {
         return rt.withLock(() -> {
             GameState state = rt.state();
 
-            if (state.players().containsKey(pid)) return state;
+            if (state.players().containsKey(pid)) {
+                log.debug("join is idempotent code={} playerId={}", code, pid.value());
+                return state;
+            }
 
             PlayerState ps = new PlayerState(pid);
             state.players().put(pid, ps);
@@ -101,6 +109,13 @@ public class SessionService {
             ps.deck().clear();
             Collections.shuffle(list, new Random(state.seed() ^ pid.value().hashCode()));
             for (CardInstId id : list) ps.deck().addLast(id);
+
+            log.debug("player joined code={} playerId={} deckSize={} exId={}",
+                    code,
+                    pid.value(),
+                    ps.deck().size(),
+                    (ps.exCard() == null) ? null : ps.exCard().value()
+            );
 
             return state;
         });

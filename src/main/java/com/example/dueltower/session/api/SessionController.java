@@ -11,6 +11,7 @@ import com.example.dueltower.session.service.SessionService;
 import com.example.dueltower.session.dto.*;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import com.example.dueltower.session.runtime.StateMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -23,6 +24,7 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @RestController
 @RequestMapping("/api/sessions")
+@Slf4j
 public class SessionController {
 
     private final SessionService sessionService;
@@ -35,12 +37,21 @@ public class SessionController {
     public CreateSessionResponse create(@RequestBody(required = false) CreateSessionRequest req) {
         String gmId = (req == null || req.gmId() == null || req.gmId().isBlank()) ? "gm" : req.gmId().trim();
         SessionRuntime rt = sessionService.createSession(gmId);
+
+        log.info("session created code={} gmId={} sessionId={} seed={}",
+                rt.code(),
+                rt.gmId(),
+                rt.state().sessionId().value(),
+                rt.state().seed()
+        );
+
         return new CreateSessionResponse(rt.code(), rt.gmId(), StateMapper.toDto(rt.code(), rt.state()));
     }
 
     @GetMapping("/{code}")
     public SessionStateDto state(@PathVariable String code) {
         SessionRuntime rt = sessionService.get(code);
+        log.debug("session state requested code={} version={}", code, rt.state().version());
         return StateMapper.toDto(rt.code(), rt.state());
     }
 
@@ -51,11 +62,20 @@ public class SessionController {
         }
         SessionRuntime rt = sessionService.get(code);
         sessionService.join(code, req.playerId());
+
+        log.info("session join code={} playerId={} playersNow={}",
+                code,
+                req.playerId().trim(),
+                rt.state().players().size()
+        );
+
         return new JoinSessionResponse(StateMapper.toDto(rt.code(), rt.state()));
     }
 
     @PostMapping("/{code}/command")
     public EngineResponseDto command(@PathVariable String code, @RequestBody CommandRequest req) {
+        long startNs = System.nanoTime();
+
         if (req == null || req.type() == null || req.type().isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "type is required");
         }
@@ -72,8 +92,30 @@ public class SessionController {
         UUID commandId = parseOrNewUuid(req.commandId());
         long expectedVersion = (req.expectedVersion() == null) ? rt.state().version() : req.expectedVersion();
 
+        log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} count={} discardIds={} targetPlayers={} targetEnemies={}",
+                code,
+                req.type(),
+                (req.playerId() == null) ? null : req.playerId().trim(),
+                expectedVersion,
+                commandId,
+                (req.cardId() == null) ? null : req.cardId().trim(),
+                req.count(),
+                (req.discardIds() == null) ? 0 : req.discardIds().size(),
+                (req.targetPlayerIds() == null) ? 0 : req.targetPlayerIds().size(),
+                (req.targetEnemyIds() == null) ? 0 : req.targetEnemyIds().size()
+        );
+
         GameCommand cmd = toCommand(req, commandId, expectedVersion);
         EngineResult res = rt.apply(cmd);
+
+        long tookMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
+        if (res.accepted()) {
+            log.debug("command accepted code={} type={} commandId={} events={} newVersion={} ({}ms)",
+                    code, req.type(), commandId, res.events().size(), res.state().version(), tookMs);
+        } else {
+            log.warn("command rejected code={} type={} commandId={} errors={} version={} ({}ms)",
+                    code, req.type(), commandId, res.errors(), res.state().version(), tookMs);
+        }
 
         return new EngineResponseDto(
                 res.accepted(),
