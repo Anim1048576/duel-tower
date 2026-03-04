@@ -365,4 +365,38 @@ public final class KeywordOps {
         if (!ignoreEvasion && !ignoreShield && !ignoreBarrier) return DamageFlags.NONE;
         return new DamageFlags(ignoreEvasion, ignoreShield, ignoreBarrier);
     }
+
+    /**
+     * Post-play hook runner for keywords on a card instance.
+     */
+    public static void onAfterPlayCard(
+            GameState state,
+            EngineContext ctx,
+            PlayerState ps,
+            Ids.CardInstId cardId,
+            int cost,
+            int haveBeforePay,
+            int debt
+    ) {
+        if (cardId == null) return;
+        CardInstance ci = state.card(cardId);
+        if (ci == null) return;
+
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return;
+
+        AfterPlayCardCtx pc = new AfterPlayCardCtx(ps, cardId, cost, haveBeforePay, debt);
+
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+            if (!ctx.hasKeywordEffect(rt.id())) continue;
+
+            ctx.keywordEffect(rt.id()).onAfterPlayCard(rt, pc);
+        }
+    }
 }

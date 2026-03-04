@@ -93,11 +93,6 @@ public final class PlayCardCommand implements GameCommand {
 
         CardDefinition def = ctx.def(ci.defId());
 
-        // 집념(턴당 1장) 중복 방지 (validate에서 걸리지만, 동시성/재검증 안전)
-        if (KeywordOps.hasKeyword(state, ctx, cardId, "집념") && ps.usedTenacityThisTurn()) {
-            throw new IllegalStateException("tenacity already used this turn");
-        }
-
         Zone toBase = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
         Zone to = KeywordOps.overrideMoveDestination(state, ctx, ps, cardId, Zone.HAND, toBase, MoveReason.PLAY);
 
@@ -106,22 +101,28 @@ public final class PlayCardCommand implements GameCommand {
         int cost = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costBase, events, "PLAY_CARD_COST");
 
         int have = ps.ap();
+        int debt = 0;
+
+        // 키워드 제약 재검증 (validate에서 걸리지만, 동시성/재검증 안전)
+        List<String> kwErrors = new ArrayList<>();
+        KeywordOps.validateApDebtPayment(state, ctx, ps, cardId, cost, have, kwErrors);
+        if (!kwErrors.isEmpty()) {
+            throw new IllegalStateException(String.join("; ", kwErrors));
+        }
+
         if (have < cost) {
             boolean allowDebt = KeywordOps.allowsApDebtPayment(state, ctx, ps, cardId, cost, have);
             if (!allowDebt) {
                 throw new IllegalStateException("not enough ap during handle (need=" + cost + ", have=" + have + ")");
             }
-            int debt = KeywordOps.apDebtAmount(state, ctx, ps, cardId, cost, have);
+            debt = KeywordOps.apDebtAmount(state, ctx, ps, cardId, cost, have);
             ps.ap(0);
-            ps.tenacityDebtThisTurn(debt);
         } else {
             if (cost > 0) ps.ap(have - cost);
         }
 
-        // 집념 사용 처리 (턴당 1장)
-        if (KeywordOps.hasKeyword(state, ctx, cardId, "집념")) {
-            ps.usedTenacityThisTurn(true);
-        }
+        // 키워드 후처리(턴당 1장 트래킹, AP debt 기록 등)
+        KeywordOps.onAfterPlayCard(state, ctx, ps, cardId, cost, have, debt);
 
         // 효과 해결
         CardEffect eff = ctx.effect(ci.defId());

@@ -2,6 +2,7 @@ package com.example.dueltower.content.keyword.kdb;
 
 import com.example.dueltower.content.keyword.model.KeywordBlueprint;
 import com.example.dueltower.engine.core.effect.keyword.ApDebtCtx;
+import com.example.dueltower.engine.core.effect.keyword.AfterPlayCardCtx;
 import com.example.dueltower.engine.core.effect.keyword.KeywordRuntime;
 import com.example.dueltower.engine.model.KeywordDefinition;
 import org.springframework.stereotype.Component;
@@ -65,5 +66,20 @@ public class K010_Tenacity implements KeywordBlueprint {
         if (rt.value() == 0) return 0;
         if (c.owner() != null && c.owner().usedTenacityThisTurn()) return 0;
         return Math.max(0, cost - have);
+    }
+
+
+    @Override
+    public void onAfterPlayCard(KeywordRuntime rt, AfterPlayCardCtx c) {
+        if (rt.value() == 0) return;
+        if (c == null || c.owner() == null) return;
+
+        // 턴당 1장 사용 처리
+        c.owner().usedTenacityThisTurn(true);
+
+        // AP debt 기록(턴 종료 회복 AP에서 차감)
+        if (c.debt() > 0) {
+            c.owner().tenacityDebtThisTurn(c.debt());
+        }
     }
 }

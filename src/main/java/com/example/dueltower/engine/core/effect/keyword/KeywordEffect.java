@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * Runtime behavior for a keyword.
  * NOTE:
- * - We started with discard-related hooks (to replace hard-coded '부동').
+ * - We started with discard-related hooks (to replace hard-coded behavior).
  * - Add more hooks (cost, resolveTo override, damage flags, etc.) as needed.
  */
 public interface KeywordEffect {
@@ -38,19 +38,16 @@ public interface KeywordEffect {
 
     /**
      * Targeting rule hook: if true, global TAUNT constraints are ignored for ENEMY_ONE targeting.
-     * (Used by keyword: "명경")
      */
     default boolean ignoresTaunt(KeywordRuntime rt, EnemyOneTargetCtx c) { return false; }
 
     /**
      * AP payment hook: whether this keyword allows playing even when AP is insufficient.
-     * (Used by keyword: "집념")
      */
     default boolean allowsApDebtPayment(KeywordRuntime rt, ApDebtCtx c, int cost, int have) { return false; }
 
     /**
      * If {@link #allowsApDebtPayment} is true, return how much AP debt should be recorded.
-     * (Used by keyword: "집념")
      */
     default int apDebtAmount(KeywordRuntime rt, ApDebtCtx c, int cost, int have) { return 0; }
 
@@ -60,20 +57,22 @@ public interface KeywordEffect {
     default void validateApDebtPayment(KeywordRuntime rt, ApDebtCtx c, int cost, int have, List<String> errors) {}
 
     /**
+     * Post-play hook. Called after paying the card cost.
+     */
+    default void onAfterPlayCard(KeywordRuntime rt, AfterPlayCardCtx c) {}
+
+    /**
      * Damage rule hook: if true, EVASION (회피) should be ignored for this damage instance.
-     * (Used by keyword: "필중")
      */
     default boolean ignoresEvasion(KeywordRuntime rt, DamageKeywordCtx c) { return false; }
 
     /**
      * Damage rule hook: if true, SHIELD (보호) should be ignored for this damage instance.
-     * (Used by keyword: "관통")
      */
     default boolean ignoresShield(KeywordRuntime rt, DamageKeywordCtx c) { return false; }
 
     /**
      * Damage rule hook: if true, BARRIER (방벽) should be ignored for this damage instance.
-     * (Used by keyword: "관통")
      */
     default boolean ignoresBarrier(KeywordRuntime rt, DamageKeywordCtx c) { return false; }
 }

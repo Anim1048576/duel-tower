@@ -4,7 +4,7 @@ import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.PlayerState;
 
 /**
- * Context for paying a card cost with AP debt (e.g., "집념").
+ * Context for paying a card cost with AP debt.
  */
 public record ApDebtCtx(
         PlayerState owner,
