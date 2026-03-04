@@ -51,8 +51,9 @@ public final class PlayCardCommand implements GameCommand {
         Zone toBase = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
         Zone to = KeywordOps.overrideMoveDestination(state, ctx, ps, cardId, Zone.HAND, toBase, MoveReason.PLAY);
 
-        // 상태에 의한 카드 사용 제한(예: 기절)
-        StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
+
+// 상태에 의한 카드 사용 제한(예: 기절)
+StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
 
         // 코스트/AP 체크 (상태에 의한 코스트 증감 포함)
         int needBase = def.cost();
@@ -66,7 +67,7 @@ public final class PlayCardCommand implements GameCommand {
         if (have < need && !allowDebt) {
             errors.add("not enough ap (need=" + need + ", have=" + have + ")");
         }
-        // 필드 제한 체크 (resolveTo가 FIELD일 때)
+// 필드 제한 체크 (resolveTo가 FIELD일 때)
         if (to == Zone.FIELD && ps.field().size() >= ps.fieldLimit()) {
             errors.add("field is full (limit=" + ps.fieldLimit() + ")");
         }
@@ -120,8 +121,7 @@ public final class PlayCardCommand implements GameCommand {
         if (KeywordOps.hasKeyword(state, ctx, cardId, "집념")) {
             ps.usedTenacityThisTurn(true);
         }
-
-        // 효과 해결
+// 효과 해결
         CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, events);
         eff.resolve(ec);

@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.core.effect.keyword;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.combat.DamageFlags;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 
@@ -315,5 +316,53 @@ public final class KeywordOps {
             if (d > best) best = d;
         }
         return Math.max(0, best);
+    }
+
+    /**
+     * Compute damage interaction flags from keywords on the card.
+     *
+     * <p>Examples:
+     * <ul>
+     *   <li>필중 -> ignore EVASION</li>
+     *   <li>관통 -> ignore SHIELD and BARRIER</li>
+     * </ul>
+     */
+    public static DamageFlags damageFlags(
+            GameState state,
+            EngineContext ctx,
+            TargetRef source,
+            Ids.CardInstId cardId,
+            TargetRef target
+    ) {
+        if (cardId == null) return DamageFlags.NONE;
+        CardInstance ci = state.card(cardId);
+        if (ci == null) return DamageFlags.NONE;
+
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return DamageFlags.NONE;
+
+        DamageKeywordCtx dc = new DamageKeywordCtx(source, cardId, target);
+
+        boolean ignoreEvasion = false;
+        boolean ignoreShield = false;
+        boolean ignoreBarrier = false;
+
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+            if (!ctx.hasKeywordEffect(rt.id())) continue;
+
+            var eff = ctx.keywordEffect(rt.id());
+            if (eff.ignoresEvasion(rt, dc)) ignoreEvasion = true;
+            if (eff.ignoresShield(rt, dc)) ignoreShield = true;
+            if (eff.ignoresBarrier(rt, dc)) ignoreBarrier = true;
+        }
+
+        if (!ignoreEvasion && !ignoreShield && !ignoreBarrier) return DamageFlags.NONE;
+        return new DamageFlags(ignoreEvasion, ignoreShield, ignoreBarrier);
     }
 }

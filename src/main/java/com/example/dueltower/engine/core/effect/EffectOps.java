@@ -1,6 +1,8 @@
 package com.example.dueltower.engine.core.effect;
 
+import com.example.dueltower.engine.core.combat.DamageFlags;
 import com.example.dueltower.engine.core.combat.DamageOps;
+import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
 import com.example.dueltower.engine.event.GameEvent;
@@ -118,6 +120,13 @@ public final class EffectOps {
     }
 
     private void applyDamage(TargetRef ref, int amount) {
+        DamageFlags flags = KeywordOps.damageFlags(
+                ec.state(),
+                ec.ctx(),
+                TargetRef.ofPlayer(ec.actor()),
+                ec.cardId(),
+                ref
+        );
         DamageOps.apply(
                 ec.state(),
                 ec.ctx(),
@@ -125,7 +134,8 @@ public final class EffectOps {
                 TargetRef.ofPlayer(ec.actor()),
                 ec.actor().value(),
                 ref,
-                amount
+                amount,
+                flags
         );
     }
 

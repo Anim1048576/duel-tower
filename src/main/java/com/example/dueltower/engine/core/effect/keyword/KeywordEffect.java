@@ -58,4 +58,22 @@ public interface KeywordEffect {
      * Validation hook for AP debt payment rules (e.g., once-per-turn constraints).
      */
     default void validateApDebtPayment(KeywordRuntime rt, ApDebtCtx c, int cost, int have, List<String> errors) {}
+
+    /**
+     * Damage rule hook: if true, EVASION (회피) should be ignored for this damage instance.
+     * (Used by keyword: "필중")
+     */
+    default boolean ignoresEvasion(KeywordRuntime rt, DamageKeywordCtx c) { return false; }
+
+    /**
+     * Damage rule hook: if true, SHIELD (보호) should be ignored for this damage instance.
+     * (Used by keyword: "관통")
+     */
+    default boolean ignoresShield(KeywordRuntime rt, DamageKeywordCtx c) { return false; }
+
+    /**
+     * Damage rule hook: if true, BARRIER (방벽) should be ignored for this damage instance.
+     * (Used by keyword: "관통")
+     */
+    default boolean ignoresBarrier(KeywordRuntime rt, DamageKeywordCtx c) { return false; }
 }

@@ -11,11 +11,26 @@ public final class DamageOps {
     private DamageOps() {}
 
     public static void apply(GameState state, EngineContext ctx, List<GameEvent> out, String source, TargetRef target, int amount) {
-        apply(state, ctx, out, null, source, target, amount);
+        apply(state, ctx, out, null, source, target, amount, DamageFlags.NONE);
     }
 
     public static void apply(GameState state, EngineContext ctx, List<GameEvent> out, TargetRef sourceRef, String source, TargetRef target, int amount) {
+        apply(state, ctx, out, sourceRef, source, target, amount, DamageFlags.NONE);
+    }
+
+    public static void apply(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef sourceRef,
+            String source,
+            TargetRef target,
+            int amount,
+            DamageFlags flags
+    ) {
         if (amount <= 0) return;
+
+        DamageFlags f = (flags == null) ? DamageFlags.NONE : flags;
 
         StatusRuntime rt = new StatusRuntime(state, ctx, out, source);
         int remaining = amount;
@@ -27,7 +42,7 @@ public final class DamageOps {
         if (remaining <= 0) return;
 
         // 1) '받는 피해' 변형(대상 상태 + 대상 진영 상태)
-        remaining = applyIncoming(state, ctx, rt, sourceRef, target, remaining);
+        remaining = applyIncoming(state, ctx, rt, sourceRef, target, remaining, f);
         if (remaining <= 0) return;
 
         // 2) HP 적용
@@ -83,7 +98,15 @@ public final class DamageOps {
         return Math.max(cur, 0);
     }
 
-    private static int applyIncoming(GameState state, EngineContext ctx, StatusRuntime rt, TargetRef sourceRef, TargetRef target, int amount) {
+    private static int applyIncoming(
+            GameState state,
+            EngineContext ctx,
+            StatusRuntime rt,
+            TargetRef sourceRef,
+            TargetRef target,
+            int amount,
+            DamageFlags flags
+    ) {
         int cur = amount;
         List<HookEntry> entries = new ArrayList<>();
 
@@ -105,6 +128,14 @@ public final class DamageOps {
         for (HookEntry it : entries) {
             if (cur <= 0) { cur = 0; break; }
             String k = it.statusId();
+
+            // Keyword-driven ignores (필중/관통)
+            if (flags != null) {
+                if (flags.ignoreEvasion() && "EVASION".equals(k)) continue;
+                if (flags.ignoreShield() && "SHIELD".equals(k)) continue;
+                if (flags.ignoreBarrier() && "BARRIER".equals(k)) continue;
+            }
+
             if (!ctx.hasStatusEffect(k)) continue;
             int stacks = rt.stacks(it.owner(), k);
             if (stacks <= 0) continue;
