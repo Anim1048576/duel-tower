@@ -49,3 +49,6 @@ out/
 /src/main/resources/static/ui/assets/**
 !/src/main/resources/static/ui/assets/**/
 !/src/main/resources/static/ui/assets/**/.gitkeep
+
+## logs ##
+/logs/**
