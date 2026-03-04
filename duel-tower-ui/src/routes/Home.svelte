@@ -1,6 +1,7 @@
 <script lang="ts">
   import { navigate } from '../lib/router'
   import { createSession, explainApiError, joinSession } from '../lib/api'
+  import { copyToClipboard } from '../lib/clipboard'
   import { session, setGmId, setLastError, setMeId, setSessionCode } from '../stores/session'
   import { ensureCards } from '../stores/content'
   import { refreshState } from '../stores/combat'
@@ -57,12 +58,9 @@
   }
 
   async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text)
-      pushToast('복사됨', text)
-    } catch {
-      pushToast('복사 실패')
-    }
+    const ok = await copyToClipboard(text)
+    if (ok) pushToast('복사됨', text)
+    else pushToast('복사 실패')
   }
 </script>
 

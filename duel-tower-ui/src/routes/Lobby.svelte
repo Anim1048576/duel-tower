@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from 'svelte'
   import { navigate } from '../lib/router'
   import { joinSession, explainApiError } from '../lib/api'
+  import { copyToClipboard } from '../lib/clipboard'
   import { combat, ensureJoined, refreshState, startPolling, stopPolling, command } from '../stores/combat'
   import { session } from '../stores/session'
   import { ensureCards } from '../stores/content'
@@ -54,12 +55,9 @@
   }
 
   async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text)
-      pushToast('복사됨', text)
-    } catch {
-      pushToast('복사 실패')
-    }
+    const ok = await copyToClipboard(text)
+    if (ok) pushToast('복사됨', text)
+    else pushToast('복사 실패')
   }
 </script>
 

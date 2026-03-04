@@ -134,107 +134,97 @@ public class SessionController {
         }
     }
 
+    private static PlayerId parsePlayerId(String playerId) {
+        requirePlayer(playerId);
+        return new PlayerId(playerId.trim());
+    }
+
+    private static CardInstId parseCardInstId(String raw, String fieldName) {
+        if (raw == null || raw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, fieldName + " is blank");
+        }
+        try {
+            return new CardInstId(UUID.fromString(raw.trim()));
+        } catch (Exception e) {
+            throw new ResponseStatusException(BAD_REQUEST, "invalid " + fieldName + " uuid: " + raw);
+        }
+    }
+
+    private static CardInstId parseSingleCardInstId(List<String> raw, String fieldName) {
+        List<String> list = (raw == null) ? List.of() : raw;
+        if (list.size() != 1) {
+            throw new ResponseStatusException(BAD_REQUEST, fieldName + " must have exactly 1 id");
+        }
+        return parseCardInstId(list.get(0), fieldName + "[0]");
+    }
+
+    private static List<CardInstId> parseCardInstIds(List<String> raw, String fieldName) {
+        List<String> list = (raw == null) ? List.of() : raw;
+        List<CardInstId> ids = new ArrayList<>(list.size());
+        for (String s : list) {
+            ids.add(parseCardInstId(s, fieldName));
+        }
+        return ids;
+    }
+
+    private static TargetSelection parseTargetSelection(CommandRequest req) {
+        List<TargetRef> targets = new ArrayList<>();
+        if (req.targetPlayerIds() != null) {
+            for (String s : req.targetPlayerIds()) {
+                if (s == null || s.isBlank()) continue;
+                targets.add(TargetRef.ofPlayer(new PlayerId(s.trim())));
+            }
+        }
+        if (req.targetEnemyIds() != null) {
+            for (String s : req.targetEnemyIds()) {
+                if (s == null || s.isBlank()) continue;
+                targets.add(TargetRef.ofEnemy(new Ids.EnemyId(s.trim())));
+            }
+        }
+        return targets.isEmpty() ? TargetSelection.empty() : new TargetSelection(List.copyOf(targets));
+    }
+
     private static GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
         String type = req.type().trim().toUpperCase(Locale.ROOT);
         switch (type) {
             case "START_COMBAT" -> {
-                requirePlayer(req.playerId());
-                PlayerId playerId = new PlayerId(req.playerId().trim());
+                PlayerId playerId = parsePlayerId(req.playerId());
                 return new StartCombatCommand(commandId, expectedVersion, playerId);
             }
             case "DRAW" -> {
-                requirePlayer(req.playerId());
-                PlayerId playerId = new PlayerId(req.playerId().trim());
+                PlayerId playerId = parsePlayerId(req.playerId());
                 int count = (req.count() == null) ? 1 : req.count();
                 return new DrawCommand(commandId, expectedVersion, playerId, count);
             }
             case "END_TURN" -> {
-                requirePlayer(req.playerId());
-                PlayerId playerId = new PlayerId(req.playerId().trim());
+                PlayerId playerId = parsePlayerId(req.playerId());
                 return new EndTurnCommand(commandId, expectedVersion, playerId);
             }
             case "HAND_SWAP" -> {
-                requirePlayer(req.playerId());
-                PlayerId playerId = new PlayerId(req.playerId().trim());
-                List<String> raw = (req.discardIds() == null) ? List.of() : req.discardIds();
-                if (raw.size() != 1) {
-                    throw new ResponseStatusException(BAD_REQUEST, "discardIds must have exactly 1 id for HAND_SWAP");
-                }
-                if (raw.get(0) == null || raw.get(0).isBlank()) {
-                    throw new ResponseStatusException(BAD_REQUEST, "discardIds[0] is blank");
-                }
-                CardInstId id;
-                try {
-                    id = new CardInstId(UUID.fromString(raw.get(0).trim()));
-                } catch (Exception e) {
-                    throw new ResponseStatusException(BAD_REQUEST, "invalid discardIds uuid: " + raw.get(0));
-                }
+                PlayerId playerId = parsePlayerId(req.playerId());
+                CardInstId id = parseSingleCardInstId(req.discardIds(), "discardIds");
                 return new HandSwapCommand(commandId, expectedVersion, playerId, id);
             }
             case "PLAY_CARD" -> {
-                requirePlayer(req.playerId());
-                PlayerId playerId = new PlayerId(req.playerId().trim());
+                PlayerId playerId = parsePlayerId(req.playerId());
                 if (req.cardId() == null || req.cardId().isBlank()) {
                     throw new ResponseStatusException(BAD_REQUEST, "cardId is required");
                 }
 
-                CardInstId id;
-                try { id = new CardInstId(UUID.fromString(req.cardId().trim())); }
-                catch (Exception e) { throw new ResponseStatusException(BAD_REQUEST, "invalid cardId uuid"); }
-
-                List<TargetRef> targets = new ArrayList<>();
-                if (req.targetPlayerIds() != null) {
-                    for (String s : req.targetPlayerIds()) {
-                        if (s == null || s.isBlank()) continue;
-                        targets.add(TargetRef.ofPlayer(new PlayerId(s.trim())));
-                    }
-                }
-                if (req.targetEnemyIds() != null) {
-                    for (String s : req.targetEnemyIds()) {
-                        if (s == null || s.isBlank()) continue;
-                        targets.add(TargetRef.ofEnemy(new Ids.EnemyId(s.trim())));
-                    }
-                }
-                TargetSelection sel = new TargetSelection(List.copyOf(targets));
+                CardInstId id = parseCardInstId(req.cardId(), "cardId");
+                TargetSelection sel = parseTargetSelection(req);
 
                 return new PlayCardCommand(commandId, expectedVersion, playerId, id, sel);
             }
             case "USE_EX" -> {
-                requirePlayer(req.playerId());
-
-                PlayerId playerId = new PlayerId(req.playerId().trim());
-                List<TargetRef> targets = new ArrayList<>();
-                if (req.targetPlayerIds() != null) {
-                    for (String s : req.targetPlayerIds()) {
-                        if (s == null || s.isBlank()) continue;
-                        targets.add(TargetRef.ofPlayer(new PlayerId(s.trim())));
-                    }
-                }
-                if (req.targetEnemyIds() != null) {
-                    for (String s : req.targetEnemyIds()) {
-                        if (s == null || s.isBlank()) continue;
-                        targets.add(TargetRef.ofEnemy(new Ids.EnemyId(s.trim())));
-                    }
-                }
-                TargetSelection sel = new TargetSelection(List.copyOf(targets));
+                PlayerId playerId = parsePlayerId(req.playerId());
+                TargetSelection sel = parseTargetSelection(req);
 
                 return new UseExCommand(commandId, expectedVersion, playerId, sel);
             }
             case "DISCARD_TO_HAND_LIMIT" -> {
-                requirePlayer(req.playerId());
-                PlayerId playerId = new PlayerId(req.playerId().trim());
-                List<String> raw = (req.discardIds() == null) ? List.of() : req.discardIds();
-                List<CardInstId> ids = new ArrayList<>(raw.size());
-                for (String s : raw) {
-                    if (s == null || s.isBlank()) {
-                        throw new ResponseStatusException(BAD_REQUEST, "invalid discardIds uuid: blank");
-                    }
-                    try {
-                        ids.add(new CardInstId(UUID.fromString(s.trim())));
-                    } catch (Exception e) {
-                        throw new ResponseStatusException(BAD_REQUEST, "invalid discardIds uuid: " + s);
-                    }
-                }
+                PlayerId playerId = parsePlayerId(req.playerId());
+                List<CardInstId> ids = parseCardInstIds(req.discardIds(), "discardIds");
                 return new DiscardToHandLimitCommand(commandId, expectedVersion, playerId, ids);
             }
             default -> throw new ResponseStatusException(BAD_REQUEST, "unknown command type: " + req.type());

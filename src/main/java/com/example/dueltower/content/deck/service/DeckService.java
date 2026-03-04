@@ -51,15 +51,13 @@ public class DeckService {
 
     @Transactional(readOnly = true)
     public DeckResponse get(long id) {
-        Deck deck = deckRepository.findWithCardsById(id)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "deck not found: " + id));
+        Deck deck = getDeckOrThrow(id);
         return toResponse(deck);
     }
 
     @Transactional
     public DeckResponse update(long id, UpdateDeckRequest req) {
-        Deck deck = deckRepository.findWithCardsById(id)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "deck not found: " + id));
+        Deck deck = getDeckOrThrow(id);
 
         DeckType newType = (req == null || req.type() == null) ? deck.getType() : req.type();
         String newName = normalizeName(req == null ? null : req.name(), newType);
@@ -80,8 +78,7 @@ public class DeckService {
      */
     @Transactional
     public DeckResponse addCards(long id, AddDeckCardsRequest req) {
-        Deck deck = deckRepository.findWithCardsById(id)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "deck not found: " + id));
+        Deck deck = getDeckOrThrow(id);
 
         // 현재 덱 상태 -> Map(cardId -> count)
         Map<String, Integer> current = new LinkedHashMap<>();
@@ -141,13 +138,17 @@ public class DeckService {
         return (type == DeckType.ENEMY) ? "enemy-deck" : "player-deck";
     }
 
+    private Deck getDeckOrThrow(long id) {
+        return deckRepository.findWithCardsById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "deck not found: " + id));
+    }
+
     /**
-     * cards 요청을 Map(cardId -> count)로 정규화 + 카드ID 존재 검증 + (플레이어 덱만) 제약 검증
+     * 요청 스펙을 Map(cardId -> count)로 정규화 + 중복 합산.
      */
-    private List<DeckCard> normalizeAndValidateCards(DeckType type, List<DeckCardSpec> specs) {
+    private Map<String, Integer> normalizeAndMergeSpecs(List<DeckCardSpec> specs) {
         if (specs == null) specs = List.of();
 
-        // 1) normalize & merge duplicates
         Map<String, Integer> merged = new LinkedHashMap<>();
         for (DeckCardSpec s : specs) {
             if (s == null) continue;
@@ -161,15 +162,38 @@ public class DeckService {
             }
             merged.merge(cardId, count, Integer::sum);
         }
+        return merged;
+    }
 
-        // 2) validate cardId exists in content
+    private void validateCardIdsExist(Set<String> cardIds) {
         var cardMap = cardService.asMap();
-        for (String cardId : merged.keySet()) {
+        for (String cardId : cardIds) {
             Ids.CardDefId id = new Ids.CardDefId(cardId);
             if (!cardMap.containsKey(id)) {
                 throw new ResponseStatusException(BAD_REQUEST, "unknown cardId: " + cardId);
             }
         }
+    }
+
+    private static List<DeckCard> toEntities(Map<String, Integer> merged) {
+        List<DeckCard> cards = new ArrayList<>();
+        for (var e : merged.entrySet()) {
+            cards.add(DeckCard.builder()
+                    .cardId(e.getKey())
+                    .count(e.getValue())
+                    .build());
+        }
+        return cards;
+    }
+
+    /**
+     * cards 요청을 Map(cardId -> count)로 정규화 + 카드ID 존재 검증 + (플레이어 덱만) 제약 검증
+     */
+    private List<DeckCard> normalizeAndValidateCards(DeckType type, List<DeckCardSpec> specs) {
+        Map<String, Integer> merged = normalizeAndMergeSpecs(specs);
+
+        // validate cardId exists in content
+        validateCardIdsExist(merged.keySet());
 
         // 3) constraints (PLAYER only)
         if (type == DeckType.PLAYER) {
@@ -184,44 +208,15 @@ public class DeckService {
             }
         }
 
-        // 4) to entities
-        List<DeckCard> cards = new ArrayList<>();
-        for (var e : merged.entrySet()) {
-            cards.add(DeckCard.builder()
-                    .cardId(e.getKey())
-                    .count(e.getValue())
-                    .build());
-        }
-        return cards;
+        return toEntities(merged);
     }
 
     /**
      * add 전용: Map(cardId -> count)로 정규화 + 카드ID 존재 검증
      */
     private Map<String, Integer> normalizeAndValidateAddSpecs(List<DeckCardSpec> specs) {
-        if (specs == null) specs = List.of();
-
-        Map<String, Integer> merged = new LinkedHashMap<>();
-        for (DeckCardSpec s : specs) {
-            if (s == null) continue;
-            if (s.cardId() == null || s.cardId().isBlank()) {
-                throw new ResponseStatusException(BAD_REQUEST, "cardId is required");
-            }
-            String cardId = s.cardId().trim();
-            int count = (s.count() == null) ? 1 : s.count();
-            if (count <= 0) {
-                throw new ResponseStatusException(BAD_REQUEST, "count must be >= 1: " + cardId);
-            }
-            merged.merge(cardId, count, Integer::sum);
-        }
-
-        var cardMap = cardService.asMap();
-        for (String cardId : merged.keySet()) {
-            Ids.CardDefId id = new Ids.CardDefId(cardId);
-            if (!cardMap.containsKey(id)) {
-                throw new ResponseStatusException(BAD_REQUEST, "unknown cardId: " + cardId);
-            }
-        }
+        Map<String, Integer> merged = normalizeAndMergeSpecs(specs);
+        validateCardIdsExist(merged.keySet());
         return merged;
     }
 

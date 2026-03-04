@@ -38,22 +38,8 @@ public final class PlayCardCommand implements GameCommand {
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
         List<String> errors = new ArrayList<>();
-        if (state.combat() == null) errors.add("combat not started");
-
-        PlayerState ps = state.player(playerId);
-        if (ps == null) return List.of("player not found");
-
-        CombatState cs = state.combat();
-        if (cs != null) {
-            if (cs.phase() != CombatPhase.MAIN) {
-                errors.add("invalid phase: " + cs.phase());
-            }
-            TargetRef cur = cs.currentTurnActor();
-            if (!(cur instanceof TargetRef.Player p) || !p.id().equals(playerId)) {
-                errors.add("not your turn");
-            }
-        }
-        if (ps.pendingDecision() != null) errors.add("pending decision exists");
+        PlayerState ps = CommandValidation.validateMainTurn(state, playerId, errors);
+        if (ps == null) return errors;
 
         if (!ps.hand().contains(cardId)) errors.add("card not in hand: " + cardId.value());
 

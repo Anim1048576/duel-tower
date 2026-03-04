@@ -38,26 +38,8 @@ public final class HandSwapCommand implements GameCommand {
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
         List<String> errors = new ArrayList<>();
-        if (state.combat() == null) errors.add("combat not started");
-
-        PlayerState ps = state.player(playerId);
-        if (ps == null) {
-            errors.add("player not found");
-            return errors;
-        }
-
-        CombatState cs = state.combat();
-        if (cs != null) {
-            if (cs.phase() != CombatPhase.MAIN) {
-                errors.add("invalid phase: " + cs.phase());
-            }
-            TargetRef cur = cs.currentTurnActor();
-            if (!(cur instanceof TargetRef.Player p) || !p.id().equals(playerId)) {
-                errors.add("not your turn");
-            }
-        }
-
-        if (ps.pendingDecision() != null) errors.add("pending decision exists");
+        PlayerState ps = CommandValidation.validateMainTurn(state, playerId, errors);
+        if (ps == null) return errors;
         if (ps.swappedThisTurn()) errors.add("hand swap already used this turn");
 
         if (discardId == null) {

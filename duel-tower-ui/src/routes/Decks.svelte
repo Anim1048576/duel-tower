@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { navigate } from '../lib/router'
   import { createDeck, deleteDeck, explainApiError, listDecks, type DeckResponse, type DeckType } from '../lib/api'
+  import CardTile from '../lib/components/CardTile.svelte'
   import { content, ensureCards } from '../stores/content'
   import { pushToast } from '../stores/log'
 
@@ -198,19 +199,7 @@
         <div class="spacer"></div>
         <div class="searchGrid">
           {#each filtered as c (c.id)}
-            <div class="gcard" on:click={() => addToDraft(c.id)}>
-              <div class="row" style="justify-content:space-between; align-items:flex-start">
-                <div class="gcardTitle">{c.name}</div>
-                <span class="badge">{c.cost}</span>
-              </div>
-              <div class="gcardSub mono">{c.id}</div>
-              <div class="gcardTags">
-                {#if c.token}<span class="tag d">TOKEN</span>{/if}
-                {#each c.keywords as k (k)}
-                  <span class="tag p">{k}</span>
-                {/each}
-              </div>
-            </div>
+            <CardTile card={c} onClick={() => addToDraft(c.id)} />
           {/each}
         </div>
 
