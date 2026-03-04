@@ -56,6 +56,11 @@ public final class GameEngine {
         // Post-processing: victory/defeat check after ANY command
         VictoryOps.postHandleCheck(state, events);
 
+        // Debug safety net: detect zone/list inconsistencies as early as possible.
+        if (log.isDebugEnabled()) {
+            ZoneOps.assertInvariants(state);
+        }
+
         state.bumpVersion();
         processedCommandIds.put(cmd.commandId(), Boolean.TRUE);
 

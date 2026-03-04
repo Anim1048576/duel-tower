@@ -11,6 +11,70 @@ import java.util.*;
 public final class ZoneOps {
     private ZoneOps() {}
 
+    /**
+     * Validate zone invariants and throw if something looks inconsistent.
+     *
+     * This is intended for development/debug use. Call it from the engine after a command is applied.
+     */
+    public static void assertInvariants(GameState state) {
+        List<String> issues = validateInvariants(state);
+        if (!issues.isEmpty()) {
+            StringBuilder sb = new StringBuilder("Zone invariants violated (" + issues.size() + ")\n");
+            int limit = Math.min(issues.size(), 20);
+            for (int i = 0; i < limit; i++) {
+                sb.append("- ").append(issues.get(i)).append('\n');
+            }
+            if (issues.size() > limit) sb.append("- ...");
+            throw new IllegalStateException(sb.toString());
+        }
+    }
+
+    /** Returns human-readable invariant violations (empty if OK). */
+    public static List<String> validateInvariants(GameState state) {
+        if (state == null) return List.of("state is null");
+
+        List<String> issues = new ArrayList<>();
+        Map<CardInstId, Zone> membership = new HashMap<>();
+
+        for (PlayerState ps : state.players().values()) {
+            if (ps == null) continue;
+
+            for (CardInstId id : ps.deck()) recordMembership(state, issues, membership, ps, id, Zone.DECK);
+            for (CardInstId id : ps.hand()) recordMembership(state, issues, membership, ps, id, Zone.HAND);
+            for (CardInstId id : ps.grave()) recordMembership(state, issues, membership, ps, id, Zone.GRAVE);
+            for (CardInstId id : ps.field()) recordMembership(state, issues, membership, ps, id, Zone.FIELD);
+            for (CardInstId id : ps.excluded()) recordMembership(state, issues, membership, ps, id, Zone.EXCLUDED);
+            if (ps.exCard() != null) recordMembership(state, issues, membership, ps, ps.exCard(), Zone.EX);
+        }
+
+        // Every existing card instance should belong to exactly one zone of its owner.
+        for (Map.Entry<CardInstId, CardInstance> e : state.cardInstances().entrySet()) {
+            CardInstId id = e.getKey();
+            CardInstance ci = e.getValue();
+            if (ci == null) {
+                issues.add("cardInstances[" + safeId(id) + "] is null");
+                continue;
+            }
+
+            PlayerState owner = state.player(ci.ownerId());
+            if (owner == null) {
+                issues.add("card " + safeId(id) + " owner missing: " + ci.ownerId().value());
+                continue;
+            }
+
+            Zone z = membership.get(id);
+            if (z == null) {
+                issues.add("card " + safeId(id) + " exists but not present in any owner zone list (owner=" + ci.ownerId().value() + ", zone=" + ci.zone() + ")");
+                continue;
+            }
+            if (ci.zone() != z) {
+                issues.add("card " + safeId(id) + " zone mismatch: instance=" + ci.zone() + ", list=" + z + " (owner=" + ci.ownerId().value() + ")");
+            }
+        }
+
+        return issues;
+    }
+
     public static void drawWithRefill(GameState state, EngineContext ctx, PlayerState ps, int count, List<GameEvent> events) {
         for (int i = 0; i < count; i++) {
             if (ps.deck().isEmpty()) {
@@ -53,12 +117,29 @@ public final class ZoneOps {
         ps.grave().add(id);
     }
 
+    // 기존 시그니처는 호환용으로 남겨둠 (from은 무시하고 CardInstance.zone()을 기준으로 처리)
     public static void moveToZoneOrVanishIfToken(GameState state, EngineContext ctx, PlayerState ps, CardInstId id, Zone from, Zone to, List<GameEvent> events) {
-        moveToZoneOrVanishIfToken(state, ctx, ps, id, from, to, events, MoveReason.OTHER);
+        moveToZoneOrVanishIfToken(state, ctx, ps, id, to, events, MoveReason.OTHER);
     }
 
     public static void moveToZoneOrVanishIfToken(GameState state, EngineContext ctx, PlayerState ps, CardInstId id, Zone from, Zone to, List<GameEvent> events, MoveReason reason) {
+        moveToZoneOrVanishIfToken(state, ctx, ps, id, to, events, reason);
+    }
+
+    /**
+     * Move a card to the given zone. The current zone is derived from the card instance.
+     * This avoids callers accidentally providing a wrong "from".
+     */
+    public static void moveToZoneOrVanishIfToken(GameState state, EngineContext ctx, PlayerState ps, CardInstId id, Zone to, List<GameEvent> events) {
+        moveToZoneOrVanishIfToken(state, ctx, ps, id, to, events, MoveReason.OTHER);
+    }
+
+    public static void moveToZoneOrVanishIfToken(GameState state, EngineContext ctx, PlayerState ps, CardInstId id, Zone to, List<GameEvent> events, MoveReason reason) {
+        if (id == null || ps == null || state == null) return;
         CardInstance ci = state.card(id);
+        if (ci == null) return;
+
+        Zone from = ci.zone();
         CardDefinition def = ctx.def(ci.defId());
 
         Zone finalTo = KeywordOps.overrideMoveDestination(state, ctx, ps, id, from, to, reason);
@@ -74,6 +155,34 @@ public final class ZoneOps {
         addToZone(ps, id, finalTo);
         ci.zone(finalTo);
         events.add(new GameEvent.CardsMoved(ps.playerId().value(), from.name(), finalTo.name(), 1));
+    }
+
+    private static void recordMembership(GameState state, List<String> issues, Map<CardInstId, Zone> membership, PlayerState ps, CardInstId id, Zone z) {
+        if (id == null) {
+            issues.add("null card id in " + ps.playerId().value() + " " + z);
+            return;
+        }
+
+        CardInstance ci = state.card(id);
+        if (ci == null) {
+            issues.add("zone list references missing card instance: " + safeId(id) + " (owner=" + ps.playerId().value() + ", zone=" + z + ")");
+        } else {
+            if (!Objects.equals(ci.ownerId(), ps.playerId())) {
+                issues.add("card " + safeId(id) + " is in " + ps.playerId().value() + " zone list but owner is " + ci.ownerId().value());
+            }
+            if (ci.zone() != z) {
+                issues.add("card " + safeId(id) + " zone mismatch: instance=" + ci.zone() + ", list=" + z + " (owner=" + ps.playerId().value() + ")");
+            }
+        }
+
+        Zone prev = membership.putIfAbsent(id, z);
+        if (prev != null && prev != z) {
+            issues.add("card " + safeId(id) + " appears in multiple zones: " + prev + " and " + z + " (owner=" + ps.playerId().value() + ")");
+        }
+    }
+
+    private static String safeId(CardInstId id) {
+        return (id == null) ? "<null>" : String.valueOf(id.value());
     }
 
     private static void removeFromZone(PlayerState ps, CardInstId id, Zone from) {

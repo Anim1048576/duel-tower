@@ -91,7 +91,7 @@ public final class DiscardToHandLimitCommand implements GameCommand {
         }
 
         for (CardInstId id : discardIds) {
-            ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, id, Zone.HAND, Zone.GRAVE, events);
+            ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, id, Zone.GRAVE, events);
         }
 
         ps.pendingDecision(null);

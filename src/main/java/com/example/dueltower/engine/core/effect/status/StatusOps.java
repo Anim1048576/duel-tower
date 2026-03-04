@@ -70,7 +70,7 @@ public final class StatusOps {
             CardDefinition def,
             List<String> errors
     ) {
-        StatusRuntime rt = new StatusRuntime(state, ctx, List.of(), "VALIDATE");
+        StatusRuntime rt = new StatusRuntime(state, ctx, new ArrayList<>(), "VALIDATE");
 
         for (HookEntry it : collectActorAndFactionEntries(rt, state, ctx, actor)) {
             String k = it.statusId();
@@ -109,7 +109,7 @@ public final class StatusOps {
             CardDefinition def,
             List<String> errors
     ) {
-        StatusRuntime rt = new StatusRuntime(state, ctx, List.of(), "VALIDATE");
+        StatusRuntime rt = new StatusRuntime(state, ctx, new ArrayList<>(), "VALIDATE");
 
         for (HookEntry it : collectActorAndFactionEntries(rt, state, ctx, actor)) {
             String k = it.statusId();
@@ -154,7 +154,7 @@ public final class StatusOps {
     ) {
         if (!(chosenEnemy instanceof TargetRef.Enemy)) return;
 
-        StatusRuntime rt = new StatusRuntime(state, ctx, List.of(), "VALIDATE");
+        StatusRuntime rt = new StatusRuntime(state, ctx, new ArrayList<>(), "VALIDATE");
 
         // CONFUSION ignores TAUNT (rule: 혼란은 도발 무시)
         if (ctx.hasStatusEffect("CONFUSION") && rt.stacks(actor, "CONFUSION") > 0) {

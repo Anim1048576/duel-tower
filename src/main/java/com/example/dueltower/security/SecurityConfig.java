@@ -2,81 +2,42 @@ package com.example.dueltower.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
         http
+                // 현재는 인증/세션 기반 로그인을 안 쓰므로 전부 비활성화
                 .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
 
-                .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/logout", "/api/**")
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                )
+                // API + SPA 개발 단계에서는 CSRF 끄는 편이 관리가 쉬움
+                .csrf(AbstractHttpConfigurer::disable)
 
                 .authorizeHttpRequests(auth -> auth
-                        // 정적 리소스
+                        // Svelte SPA(빌드 산출물) 및 기타 정적 리소스
                         .requestMatchers(
-                                "/",
-                                "/css/**", "/js/**", "/assets/**",
-                                "/attach/summernote/**", "/favicon.ico",
-                                "/noLogin/login",
-                                "/member/login", "/member/login/error"
+                                "/", "/favicon.ico",
+                                "/ui/**",
+                                "/ui-legacy/**",
+                                "/assets/**", "/css/**", "/js/**"
                         ).permitAll()
+
+                        // JSON API
+                        .requestMatchers("/api/**").permitAll()
+
+                        // 나머지도 일단 전부 허용 (필요해지면 여기서부터 잠그면 됨)
                         .anyRequest().permitAll()
-                )
-
-                .exceptionHandling(e -> e
-                        .accessDeniedHandler((request, response, ex) -> {
-                            response.sendRedirect("/healthCafe");
-                        })
-                )
-
-                .formLogin(form -> form
-                        .loginPage("/member/login")
-                        .loginProcessingUrl("/member/login")
-                        .defaultSuccessUrl("/", true)
-                        .failureUrl("/member/login/error")
-                        .permitAll()
-                )
-
-                .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .logoutSuccessUrl("/")
-                        .invalidateHttpSession(true)
-                        .deleteCookies("JSESSIONID")
-                        .permitAll()
                 );
 
         return http.build();
     }
-
-    //import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-    //import org.springframework.security.crypto.password.PasswordEncoder;
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();
-    }
-
 }

@@ -71,17 +71,19 @@ public final class UseExCommand implements GameCommand {
         if (def.type() != CardType.EX) errors.add("not an EX card: " + def.id().value());
 
 
-// 상태에 의한 EX 사용 제한(예: 기절)
-StatusOps.validateUseEx(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
+        // 상태에 의한 EX 사용 제한(예: 기절)
+        StatusOps.validateUseEx(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
 
         // 코스트/AP 체크 (상태에 의한 코스트 증감 포함)
+        List<GameEvent> dummyOut = new ArrayList<>();
         int needBase = def.cost();
-        int need = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, List.of(), "VALIDATE");
+        int need = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, dummyOut, "VALIDATE");
         int have = ps.ap();
         if (have < need) errors.add("not enough ap (need=" + need + ", have=" + have + ")");
-// 카드 효과 validate(타겟 등)
+
+        // 카드 효과 validate(타겟 등)
         CardEffect eff = ctx.effect(ci.defId());
-        EffectContext ec = new EffectContext(state, ctx, playerId, exId, selection, List.of());
+        EffectContext ec = new EffectContext(state, ctx, playerId, exId, selection, dummyOut);
         errors.addAll(eff.validate(ec));
 
         return errors;

@@ -49,7 +49,7 @@ public final class StatusPhases {
     }
 
     private static void cleanupOne(TargetRef owner, GameState state, EngineContext ctx) {
-        StatusRuntime rt = new StatusRuntime(state, ctx, List.of(), "COMBAT_END"); // out은 안 써도 됨
+        StatusRuntime rt = new StatusRuntime(state, ctx, new ArrayList<>(), "COMBAT_END"); // out은 안 써도 됨
 
         var keys = new ArrayList<>(rt.statusMap(owner).keySet());
         for (String key : keys) {

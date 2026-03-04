@@ -51,13 +51,13 @@ public final class PlayCardCommand implements GameCommand {
         Zone toBase = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
         Zone to = KeywordOps.overrideMoveDestination(state, ctx, ps, cardId, Zone.HAND, toBase, MoveReason.PLAY);
 
-
-// 상태에 의한 카드 사용 제한(예: 기절)
-StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
+        // 상태에 의한 카드 사용 제한(예: 기절)
+        StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
 
         // 코스트/AP 체크 (상태에 의한 코스트 증감 포함)
+        List<GameEvent> dummyOut = new ArrayList<>();
         int needBase = def.cost();
-        int need = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, List.of(), "VALIDATE");
+        int need = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, dummyOut, "VALIDATE");
         int have = ps.ap();
 
         // 키워드에 의한 코스트 규칙(집념 등)
@@ -67,13 +67,14 @@ StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, er
         if (have < need && !allowDebt) {
             errors.add("not enough ap (need=" + need + ", have=" + have + ")");
         }
-// 필드 제한 체크 (resolveTo가 FIELD일 때)
+
+        // 필드 제한 체크 (resolveTo가 FIELD일 때)
         if (to == Zone.FIELD && ps.field().size() >= ps.fieldLimit()) {
             errors.add("field is full (limit=" + ps.fieldLimit() + ")");
         }
 
         CardEffect eff = ctx.effect(ci.defId());
-        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, List.of());
+        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, dummyOut);
         errors.addAll(eff.validate(ec));
 
         return errors;
@@ -121,7 +122,8 @@ StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, er
         if (KeywordOps.hasKeyword(state, ctx, cardId, "집념")) {
             ps.usedTenacityThisTurn(true);
         }
-// 효과 해결
+
+        // 효과 해결
         CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, events);
         eff.resolve(ec);
@@ -131,7 +133,7 @@ StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, er
 
         // 카드 이동 (HAND -> resolveTo)
         if (ps.hand().contains(cardId) && state.card(cardId) != null) {
-            ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, cardId, Zone.HAND, to, events, MoveReason.PLAY);
+            ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, cardId, to, events, MoveReason.PLAY);
         }
 
         // 이번 턴 카드 사용 횟수 트래킹

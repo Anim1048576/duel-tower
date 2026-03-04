@@ -74,7 +74,7 @@ public final class HandSwapCommand implements GameCommand {
         boolean isToken = def.token();
 
         // 1) 손패 1장 버리기(토큰이면 소멸)
-        ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, discardId, Zone.HAND, Zone.GRAVE, events);
+        ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, discardId, Zone.GRAVE, events);
 
         // 2) 토큰이 아니면 1장 드로우
         if (!isToken) {

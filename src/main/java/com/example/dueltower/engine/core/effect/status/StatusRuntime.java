@@ -93,6 +93,11 @@ public final class StatusRuntime {
     }
 
     public void log(String line) {
-        out.add(new GameEvent.LogAppended(line));
+        if (line == null) return;
+        try {
+            out.add(new GameEvent.LogAppended(line));
+        } catch (UnsupportedOperationException ignored) {
+            // validate 단계에서 out이 List.of()처럼 불변일 수 있다.
+        }
     }
 }
