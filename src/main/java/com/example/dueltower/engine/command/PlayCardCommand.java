@@ -51,16 +51,22 @@ public final class PlayCardCommand implements GameCommand {
         Zone toBase = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
         Zone to = KeywordOps.overrideMoveDestination(state, ctx, ps, cardId, Zone.HAND, toBase, MoveReason.PLAY);
 
-
-// 상태에 의한 카드 사용 제한(예: 기절)
-StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
+        // 상태에 의한 카드 사용 제한(예: 기절)
+        StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
 
         // 코스트/AP 체크 (상태에 의한 코스트 증감 포함)
         int needBase = def.cost();
         int need = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, List.of(), "VALIDATE");
         int have = ps.ap();
-        if (have < need) errors.add("not enough ap (need=" + need + ", have=" + have + ")");
-// 필드 제한 체크 (resolveTo가 FIELD일 때)
+
+        // 키워드에 의한 코스트 규칙(집념 등)
+        KeywordOps.validateApDebtPayment(state, ctx, ps, cardId, need, have, errors);
+
+        boolean allowDebt = KeywordOps.allowsApDebtPayment(state, ctx, ps, cardId, need, have);
+        if (have < need && !allowDebt) {
+            errors.add("not enough ap (need=" + need + ", have=" + have + ")");
+        }
+        // 필드 제한 체크 (resolveTo가 FIELD일 때)
         if (to == Zone.FIELD && ps.field().size() >= ps.fieldLimit()) {
             errors.add("field is full (limit=" + ps.fieldLimit() + ")");
         }
@@ -84,17 +90,38 @@ StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, er
         }
 
         CardDefinition def = ctx.def(ci.defId());
+
+        // 집념(턴당 1장) 중복 방지 (validate에서 걸리지만, 동시성/재검증 안전)
+        if (KeywordOps.hasKeyword(state, ctx, cardId, "집념") && ps.usedTenacityThisTurn()) {
+            throw new IllegalStateException("tenacity already used this turn");
+        }
+
         Zone toBase = def.resolveTo() == null ? Zone.GRAVE : def.resolveTo();
         Zone to = KeywordOps.overrideMoveDestination(state, ctx, ps, cardId, Zone.HAND, toBase, MoveReason.PLAY);
 
         // 코스트 지불 (상태에 의한 코스트 증감 포함)
         int costBase = def.cost();
         int cost = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costBase, events, "PLAY_CARD_COST");
-        if (ps.ap() < cost) {
-            throw new IllegalStateException("not enough ap during handle (need=" + cost + ", have=" + ps.ap() + ")");
+
+        int have = ps.ap();
+        if (have < cost) {
+            boolean allowDebt = KeywordOps.allowsApDebtPayment(state, ctx, ps, cardId, cost, have);
+            if (!allowDebt) {
+                throw new IllegalStateException("not enough ap during handle (need=" + cost + ", have=" + have + ")");
+            }
+            int debt = KeywordOps.apDebtAmount(state, ctx, ps, cardId, cost, have);
+            ps.ap(0);
+            ps.tenacityDebtThisTurn(debt);
+        } else {
+            if (cost > 0) ps.ap(have - cost);
         }
-        if (cost > 0) ps.ap(ps.ap() - cost);
-// 효과 해결
+
+        // 집념 사용 처리 (턴당 1장)
+        if (KeywordOps.hasKeyword(state, ctx, cardId, "집념")) {
+            ps.usedTenacityThisTurn(true);
+        }
+
+        // 효과 해결
         CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, events);
         eff.resolve(ec);

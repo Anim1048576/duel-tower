@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.core.effect.status;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -160,6 +161,11 @@ public final class StatusOps {
             return;
         }
 
+        // Keyword may ignore TAUNT (rule: 명경은 도발 무시)
+        if (KeywordOps.ignoresTaunt(state, ctx, actor, cardId, chosenEnemy)) {
+            return;
+        }
+
         List<TargetRef> enemyCandidates;
         if (actor instanceof TargetRef.Player) {
             enemyCandidates = state.enemies().keySet().stream().map(TargetRef::ofEnemy).toList();
@@ -213,6 +219,11 @@ public final class StatusOps {
 
         // If actor-side override already diverted to non-enemy (e.g., CONFUSION), do not apply taunt.
         if (!(cur instanceof TargetRef.Enemy)) return cur;
+
+        // Keyword may ignore TAUNT (rule: 명경은 도발 무시)
+        if (KeywordOps.ignoresTaunt(state, ctx, actor, cardId, cur)) {
+            return cur;
+        }
 
         // 2) global constraints (TAUNT etc.) - give them only the opponent candidates
         List<TargetRef> enemyCandidates;

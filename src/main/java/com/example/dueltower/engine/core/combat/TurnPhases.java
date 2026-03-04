@@ -35,6 +35,8 @@ public final class TurnPhases {
             ps.swappedThisTurn(false);
             ps.cardsPlayedThisTurn(0);
             ps.usedExThisTurn(false);
+            ps.usedTenacityThisTurn(false);
+            ps.tenacityDebtThisTurn(0);
 
             int draw = (ps.hand().size() < 4) ? 2 : 1;
             ZoneOps.drawWithRefill(state, ctx, ps, draw, out);
@@ -56,7 +58,15 @@ public final class TurnPhases {
         if (actor instanceof TargetRef.Player p) {
             PlayerState ps = state.player(p.id());
             if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
-            ps.ap(ps.maxAp());
+
+            // 기본: max로 리필
+            int refill = ps.maxAp();
+
+            // 집념: 부족분만큼 턴 종료 AP 회복에서 차감 (최저 0)
+            int debt = ps.tenacityDebtThisTurn();
+            if (debt > 0) refill = Math.max(0, refill - debt);
+
+            ps.ap(refill);
         }
     }
 }

@@ -31,6 +31,11 @@ public final class PlayerState {
     /** 이번 턴에 EX 사용 여부 */
     private boolean usedExThisTurn;
 
+    /** 이번 턴에 집념(턴당 1장) 카드 사용 여부 */
+    private boolean usedTenacityThisTurn;
+    /** 집념으로 인해 발생한 AP 부채 (턴 종료 AP 회복에서 차감) */
+    private int tenacityDebtThisTurn;
+
     private PendingDecision pendingDecision;
 
     // ===== 생활 스탯(기본) =====
@@ -87,6 +92,12 @@ public final class PlayerState {
 
     public boolean usedExThisTurn() { return usedExThisTurn; }
     public void usedExThisTurn(boolean v) { this.usedExThisTurn = v; }
+
+    public boolean usedTenacityThisTurn() { return usedTenacityThisTurn; }
+    public void usedTenacityThisTurn(boolean v) { this.usedTenacityThisTurn = v; }
+
+    public int tenacityDebtThisTurn() { return tenacityDebtThisTurn; }
+    public void tenacityDebtThisTurn(int v) { this.tenacityDebtThisTurn = Math.max(0, v); }
 
     public PendingDecision pendingDecision() { return pendingDecision; }
     public void pendingDecision(PendingDecision d) { this.pendingDecision = d; }

@@ -14,6 +14,25 @@ import java.util.Map;
 public final class KeywordOps {
     private KeywordOps() {}
 
+    /**
+     * Returns the integer value for a keyword on a card definition, or 0 if not present.
+     * For flag keywords, convention is value=1.
+     */
+    public static int keywordValue(GameState state, EngineContext ctx, Ids.CardInstId cardId, String keywordId) {
+        if (cardId == null || keywordId == null) return 0;
+        CardInstance ci = state.card(cardId);
+        if (ci == null) return 0;
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return 0;
+        Integer v = kws.get(keywordId.trim());
+        return v == null ? 0 : v;
+    }
+
+    public static boolean hasKeyword(GameState state, EngineContext ctx, Ids.CardInstId cardId, String keywordId) {
+        return keywordValue(state, ctx, cardId, keywordId) != 0;
+    }
+
     public static boolean blocksDiscard(
             GameState state, EngineContext ctx, PlayerState ps, CardInstId id, DiscardReason reason
     ) {
@@ -159,5 +178,142 @@ public final class KeywordOps {
         }
 
         return cur;
+    }
+
+    /**
+     * Whether keywords on the card indicate that TAUNT should be ignored.
+     */
+    public static boolean ignoresTaunt(
+            GameState state,
+            EngineContext ctx,
+            TargetRef actor,
+            Ids.CardInstId cardId,
+            TargetRef chosenEnemy
+    ) {
+        if (cardId == null) return false;
+        CardInstance ci = state.card(cardId);
+        if (ci == null) return false;
+
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return false;
+
+        EnemyOneTargetCtx tc = new EnemyOneTargetCtx(actor, cardId, chosenEnemy);
+
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+            if (!ctx.hasKeywordEffect(rt.id())) continue;
+
+            if (ctx.keywordEffect(rt.id()).ignoresTaunt(rt, tc)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Validation hook for keywords that can modify AP payment rules.
+     */
+    public static void validateApDebtPayment(
+            GameState state,
+            EngineContext ctx,
+            PlayerState ps,
+            Ids.CardInstId cardId,
+            int cost,
+            int have,
+            List<String> errors
+    ) {
+        if (cardId == null) return;
+        CardInstance ci = state.card(cardId);
+        if (ci == null) return;
+
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return;
+
+        ApDebtCtx ac = new ApDebtCtx(ps, cardId);
+
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+            if (!ctx.hasKeywordEffect(rt.id())) continue;
+
+            ctx.keywordEffect(rt.id()).validateApDebtPayment(rt, ac, cost, have, errors);
+        }
+    }
+
+    /**
+     * Whether keywords allow playing a card even when AP is insufficient.
+     */
+    public static boolean allowsApDebtPayment(
+            GameState state,
+            EngineContext ctx,
+            PlayerState ps,
+            Ids.CardInstId cardId,
+            int cost,
+            int have
+    ) {
+        if (cardId == null) return false;
+        CardInstance ci = state.card(cardId);
+        if (ci == null) return false;
+
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return false;
+
+        ApDebtCtx ac = new ApDebtCtx(ps, cardId);
+
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+            if (!ctx.hasKeywordEffect(rt.id())) continue;
+
+            if (ctx.keywordEffect(rt.id()).allowsApDebtPayment(rt, ac, cost, have)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Compute AP debt amount from keywords. If multiple keywords return a debt, we take the maximum.
+     */
+    public static int apDebtAmount(
+            GameState state,
+            EngineContext ctx,
+            PlayerState ps,
+            Ids.CardInstId cardId,
+            int cost,
+            int have
+    ) {
+        if (cardId == null) return 0;
+        CardInstance ci = state.card(cardId);
+        if (ci == null) return 0;
+
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return 0;
+
+        ApDebtCtx ac = new ApDebtCtx(ps, cardId);
+        int best = 0;
+
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+            if (!ctx.hasKeywordEffect(rt.id())) continue;
+
+            int d = ctx.keywordEffect(rt.id()).apDebtAmount(rt, ac, cost, have);
+            if (d > best) best = d;
+        }
+        return Math.max(0, best);
     }
 }

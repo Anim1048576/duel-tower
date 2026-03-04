@@ -35,4 +35,27 @@ public interface KeywordEffect {
     default Zone overrideMoveDestination(KeywordRuntime rt, MoveCtx c, Zone currentTo) { return currentTo; }
 
     default boolean overrideExActivatable(KeywordRuntime rt, ExActivationCtx c, boolean current) { return current; }
+
+    /**
+     * Targeting rule hook: if true, global TAUNT constraints are ignored for ENEMY_ONE targeting.
+     * (Used by keyword: "명경")
+     */
+    default boolean ignoresTaunt(KeywordRuntime rt, EnemyOneTargetCtx c) { return false; }
+
+    /**
+     * AP payment hook: whether this keyword allows playing even when AP is insufficient.
+     * (Used by keyword: "집념")
+     */
+    default boolean allowsApDebtPayment(KeywordRuntime rt, ApDebtCtx c, int cost, int have) { return false; }
+
+    /**
+     * If {@link #allowsApDebtPayment} is true, return how much AP debt should be recorded.
+     * (Used by keyword: "집념")
+     */
+    default int apDebtAmount(KeywordRuntime rt, ApDebtCtx c, int cost, int have) { return 0; }
+
+    /**
+     * Validation hook for AP debt payment rules (e.g., once-per-turn constraints).
+     */
+    default void validateApDebtPayment(KeywordRuntime rt, ApDebtCtx c, int cost, int have, List<String> errors) {}
 }
