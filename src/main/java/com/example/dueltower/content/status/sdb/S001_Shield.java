@@ -21,6 +21,7 @@ public class S001_Shield implements StatusBlueprint {
                 "보호",
                 StatusKind.BUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(StatusTag.SHIELD),
                 10,
                 false,
                 """

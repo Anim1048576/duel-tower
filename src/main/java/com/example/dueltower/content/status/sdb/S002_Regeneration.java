@@ -16,6 +16,7 @@ public class S002_Regeneration implements StatusBlueprint {
                 id(), "재생",
                 StatusKind.BUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(),
                 100,
                 false,
                 """

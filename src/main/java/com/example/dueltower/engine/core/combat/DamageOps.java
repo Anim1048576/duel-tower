@@ -130,10 +130,11 @@ public final class DamageOps {
             String k = it.statusId();
 
             // Keyword-driven ignores (필중/관통)
-            if (flags != null) {
-                if (flags.ignoreEvasion() && "EVASION".equals(k)) continue;
-                if (flags.ignoreShield() && "SHIELD".equals(k)) continue;
-                if (flags.ignoreBarrier() && "BARRIER".equals(k)) continue;
+            if (flags != null && ctx.hasStatusDef(k)) {
+                StatusDefinition def = ctx.statusDef(k);
+                if (flags.ignoreEvasion() && def.hasTag(StatusTag.EVASION)) continue;
+                if (flags.ignoreShield() && def.hasTag(StatusTag.SHIELD)) continue;
+                if (flags.ignoreBarrier() && def.hasTag(StatusTag.BARRIER)) continue;
             }
 
             if (!ctx.hasStatusEffect(k)) continue;

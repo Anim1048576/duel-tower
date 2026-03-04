@@ -21,6 +21,7 @@ public class S101_Pain implements StatusBlueprint {
                 "고통",
                 StatusKind.DEBUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(),
                 50,
                 false,
                 """

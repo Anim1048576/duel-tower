@@ -17,6 +17,7 @@ public class S106_Vulnerable implements StatusBlueprint {
                 "취약",
                 StatusKind.DEBUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(),
                 5,
                 false,
                 """

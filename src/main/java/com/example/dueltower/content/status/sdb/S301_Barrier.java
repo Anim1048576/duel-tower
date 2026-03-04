@@ -17,6 +17,7 @@ public class S301_Barrier implements StatusBlueprint {
                 "방벽",
                 StatusKind.BUFF,
                 StatusScope.FACTION,
+                java.util.Set.of(StatusTag.BARRIER),
                 9,
                 false,
                 """

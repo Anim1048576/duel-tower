@@ -7,7 +7,9 @@ import com.example.dueltower.engine.model.*;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Card/command level status hooks (cost, validations, after-use hooks).
@@ -156,8 +158,8 @@ public final class StatusOps {
 
         StatusRuntime rt = new StatusRuntime(state, ctx, new ArrayList<>(), "VALIDATE");
 
-        // CONFUSION ignores TAUNT (rule: 혼란은 도발 무시)
-        if (ctx.hasStatusEffect("CONFUSION") && rt.stacks(actor, "CONFUSION") > 0) {
+        // CONFUSION-tagged statuses ignore TAUNT (rule: 혼란은 도발 무시)
+        if (hasActorOrFactionTag(rt, state, ctx, actor, StatusTag.CONFUSION)) {
             return;
         }
 
@@ -175,8 +177,8 @@ public final class StatusOps {
             enemyCandidates = List.of();
         }
 
-        // Only call hooks for status effects that opt into this rule.
-        for (String statusId : ctxStatusIds(ctx)) {
+        // Run global targeting constraints for statuses present on opponents that have TAUNT tag.
+        for (String statusId : statusIdsWithTagOnTargets(rt, ctx, enemyCandidates, StatusTag.TAUNT)) {
             if (!ctx.hasStatusEffect(statusId)) continue;
             ctx.statusEffect(statusId).validateEnemyOneTarget(rt, actor, cardId, chosenEnemy, enemyCandidates, errors);
         }
@@ -220,6 +222,11 @@ public final class StatusOps {
         // If actor-side override already diverted to non-enemy (e.g., CONFUSION), do not apply taunt.
         if (!(cur instanceof TargetRef.Enemy)) return cur;
 
+        // CONFUSION-tagged statuses ignore TAUNT even if they didn't reroute this time.
+        if (hasActorOrFactionTag(rt, state, ctx, actor, StatusTag.CONFUSION)) {
+            return cur;
+        }
+
         // Keyword may ignore TAUNT (rule: 명경은 도발 무시)
         if (KeywordOps.ignoresTaunt(state, ctx, actor, cardId, cur)) {
             return cur;
@@ -235,7 +242,7 @@ public final class StatusOps {
             enemyCandidates = List.of();
         }
 
-        for (String statusId : ctxStatusIds(ctx)) {
+        for (String statusId : statusIdsWithTagOnTargets(rt, ctx, enemyCandidates, StatusTag.TAUNT)) {
             if (!ctx.hasStatusEffect(statusId)) continue;
             TargetRef next = ctx.statusEffect(statusId).onResolveEnemyOneTarget(rt, actor, cardId, cur, enemyCandidates);
             if (next != null) cur = next;
@@ -244,12 +251,46 @@ public final class StatusOps {
         return cur;
     }
 
-    /**
-     * We currently don't have a registry of "targeting rule status IDs".
-     * Keep this list centralized so we don't sprinkle string literals across the engine.
-     */
-    private static List<String> ctxStatusIds(EngineContext ctx) {
-        // If not registered, hasStatusEffect will filter it out.
-        return List.of("TAUNT");
+    private static boolean hasActorOrFactionTag(
+            StatusRuntime rt,
+            GameState state,
+            EngineContext ctx,
+            TargetRef actor,
+            StatusTag tag
+    ) {
+        for (HookEntry it : collectActorAndFactionEntries(rt, state, ctx, actor)) {
+            String id = it.statusId();
+            if (!ctx.hasStatusDef(id)) continue;
+            if (!ctx.statusDef(id).hasTag(tag)) continue;
+            if (rt.stacks(it.owner(), id) > 0) return true;
+        }
+        return false;
     }
+
+    private static List<String> statusIdsWithTagOnTargets(
+            StatusRuntime rt,
+            EngineContext ctx,
+            List<TargetRef> targets,
+            StatusTag tag
+    ) {
+        Set<String> ids = new HashSet<>();
+        if (targets != null) {
+            for (TargetRef t : targets) {
+                StatusOwnerRef owner = StatusOwnerRef.of(t);
+                for (String statusId : rt.statusMap(owner).keySet()) {
+                    if (!ctx.hasStatusDef(statusId)) continue;
+                    if (!ctx.statusDef(statusId).hasTag(tag)) continue;
+                    if (rt.stacks(owner, statusId) <= 0) continue;
+                    ids.add(statusId);
+                }
+            }
+        }
+
+        List<String> r = new ArrayList<>(ids);
+        r.sort(Comparator
+                .comparingInt((String id) -> ctx.hasStatusDef(id) ? ctx.statusDef(id).priority() : Integer.MAX_VALUE)
+                .thenComparing(String::toString));
+        return r;
+    }
+
 }

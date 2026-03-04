@@ -20,6 +20,7 @@ public class Iris201_Status implements StatusBlueprint {
                 "축복",
                 StatusKind.NEUTRAL,
                 StatusScope.CHARACTER,
+                java.util.Set.of(),
                 999,
                 true,
                 """

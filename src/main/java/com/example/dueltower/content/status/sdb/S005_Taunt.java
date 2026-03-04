@@ -25,6 +25,7 @@ public class S005_Taunt implements StatusBlueprint {
                 "도발",
                 StatusKind.BUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(StatusTag.TAUNT),
                 50,
                 false,
                 """

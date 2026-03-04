@@ -22,6 +22,7 @@ public class S104_Destruction implements StatusBlueprint {
                 "파괴",
                 StatusKind.DEBUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(),
                 100,
                 false,
                 """

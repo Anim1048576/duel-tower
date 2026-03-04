@@ -25,6 +25,7 @@ public class S102_Stun implements StatusBlueprint {
                 "기절",
                 StatusKind.DEBUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(),
                 999,
                 false,
                 """

@@ -24,6 +24,7 @@ public class S107_Confusion implements StatusBlueprint {
                 "혼란",
                 StatusKind.DEBUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(StatusTag.CONFUSION),
                 30,
                 false,
                 """

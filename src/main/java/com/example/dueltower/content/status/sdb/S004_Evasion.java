@@ -21,6 +21,7 @@ public class S004_Evasion implements StatusBlueprint {
                 "회피",
                 StatusKind.BUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(StatusTag.EVASION),
                 1,
                 false,
                 """

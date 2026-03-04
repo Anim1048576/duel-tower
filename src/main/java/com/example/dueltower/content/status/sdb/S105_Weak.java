@@ -17,6 +17,7 @@ public class S105_Weak implements StatusBlueprint {
                 "쇠약",
                 StatusKind.DEBUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(),
                 20,
                 false,
                 """

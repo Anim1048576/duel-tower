@@ -22,6 +22,7 @@ public class S103_Pressure implements StatusBlueprint {
                 "중압",
                 StatusKind.DEBUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(),
                 100,
                 false,
                 """

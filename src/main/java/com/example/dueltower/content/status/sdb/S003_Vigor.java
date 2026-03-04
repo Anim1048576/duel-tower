@@ -17,6 +17,7 @@ public class S003_Vigor implements StatusBlueprint {
                 "활력",
                 StatusKind.BUFF,
                 StatusScope.CHARACTER,
+                java.util.Set.of(),
                 20,
                 false,
                 """
