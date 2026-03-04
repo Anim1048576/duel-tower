@@ -1,6 +1,6 @@
 package com.example.dueltower.member;
 
-import com.example.dueltower.common.util.BaseUtility;
+import com.example.dueltower.common.util.TimeUtility;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -61,12 +61,12 @@ public class Member {
     public String toString() {
         String deletedDateStr = (deletedDate == null)
                 ? "null"
-                : BaseUtility.formatTimestamp(deletedDate, "yyyy-mm-dd");
+                : TimeUtility.formatTimestamp(deletedDate, "yyyy-mm-dd");
         return "[Member]: {[id: " + id +
                 "][username: " + username +
                 "][email: " + email +
                 "][role: " + role +
-                "][createDate: " + BaseUtility.formatTimestamp(createDate, "yyyy-mm-dd") +
+                "][createDate: " + TimeUtility.formatTimestamp(createDate, "yyyy-mm-dd") +
                 "][deleted: " + deleted +
                 "][deletedDate: " + deletedDateStr + "]}";
     }

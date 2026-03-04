@@ -1,6 +1,6 @@
 package com.example.dueltower.engine.command;
 
-import com.example.dueltower.common.util.BaseUtility;
+import com.example.dueltower.common.util.DiceUtility;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
@@ -48,7 +48,7 @@ public final class StartCombatCommand implements GameCommand {
 
         Map<Integer, List<TargetRef>> byRoll = new HashMap<>();
         for (TargetRef ref : order) {
-            int roll = BaseUtility.rollDice(1, 100, rng); // 1..100
+            int roll = DiceUtility.rollDice(1, 100, rng); // 1..100
             String key = CombatState.actorKey(ref);
             cs.initiatives().put(key, roll);
             byRoll.computeIfAbsent(roll, _k -> new ArrayList<>()).add(ref);
