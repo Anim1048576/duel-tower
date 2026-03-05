@@ -234,6 +234,9 @@ MVP에서 **룰 위반 입력을 서버가 차단**해야 한다.
 
 `POST /api/sessions/{code}/command`에서 허용하는 `type` 값은 아래와 같다.
 
+요청 바디의 `expectedVersion`은 **필수**이며, 서버는 누락 시 `400 BAD_REQUEST`를 반환한다.
+낙관적 동시성 제어를 위해 클라이언트는 마지막으로 확인한 상태 버전을 항상 함께 보내야 한다.
+
 * `START_COMBAT`
 * `DRAW`
 * `END_TURN`

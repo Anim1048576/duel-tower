@@ -11,6 +11,8 @@ import java.util.List;
  * DRAW is a product rule command (not an admin/debug command):
  * it is validated with normal main-turn constraints (phase/actor/pending-decision).
  *
+ * expectedVersion is required and must be provided by clients for optimistic concurrency.
+ *
  * playerId is only the in-engine actor identifier for command execution.
  * Authorization must be derived from authenticated principal or server-side token checks.
  */
