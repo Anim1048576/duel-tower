@@ -2,6 +2,7 @@ package com.example.dueltower.engine.core.effect;
 
 import com.example.dueltower.engine.core.combat.DamageFlags;
 import com.example.dueltower.engine.core.combat.DamageOps;
+import com.example.dueltower.content.keyword.kdb.K011_Critical;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
@@ -10,6 +11,7 @@ import com.example.dueltower.engine.model.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public final class EffectOps {
 
@@ -120,6 +122,12 @@ public final class EffectOps {
     }
 
     private void applyDamage(TargetRef ref, int amount) {
+        int finalAmount = amount;
+        if (isCritical(ref, "damage")) {
+            finalAmount *= 2;
+            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! damage x2"));
+        }
+
         DamageFlags flags = KeywordOps.damageFlags(
                 ec.state(),
                 ec.ctx(),
@@ -134,20 +142,25 @@ public final class EffectOps {
                 TargetRef.ofPlayer(ec.actor()),
                 ec.actor().value(),
                 ref,
-                amount,
+                finalAmount,
                 flags
         );
     }
 
     private void applyHeal(TargetRef ref, int amount) {
+        int finalAmount = amount;
+        if (isCritical(ref, "heal")) {
+            finalAmount *= 2;
+            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! heal x2"));
+        }
         if (ref instanceof TargetRef.Player p) {
             PlayerState ps = ec.state().player(p.id());
             if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
 
-            ps.hp(ps.hp() + amount);
+            ps.hp(ps.hp() + finalAmount);
 
             ec.out().add(new GameEvent.LogAppended(
-                    ec.actor().value() + " heals " + amount + " to PLAYER:" + p.id().value() + " (hp=" + ps.hp() + "/" + ps.maxHp() + ")"
+                    ec.actor().value() + " heals " + finalAmount + " to PLAYER:" + p.id().value() + " (hp=" + ps.hp() + "/" + ps.maxHp() + ")"
             ));
             return;
         }
@@ -156,12 +169,31 @@ public final class EffectOps {
             EnemyState es = ec.state().enemy(e.id());
             if (es == null) throw new IllegalStateException("missing enemy: " + e.id().value());
 
-            es.hp(es.hp() + amount);
+            es.hp(es.hp() + finalAmount);
 
             ec.out().add(new GameEvent.LogAppended(
-                    ec.actor().value() + " heals " + amount + " to ENEMY:" + e.id().value() + " (hp=" + es.hp() + "/" + es.maxHp() + ")"
+                    ec.actor().value() + " heals " + finalAmount + " to ENEMY:" + e.id().value() + " (hp=" + es.hp() + "/" + es.maxHp() + ")"
             ));
         }
+    }
+
+    private boolean isCritical(TargetRef target, String kind) {
+        int crit = KeywordOps.keywordValue(ec.state(), ec.ctx(), ec.cardId(), K011_Critical.ID);
+        if (crit <= 0) return false;
+
+        int chance = Math.max(0, Math.min(100, crit * 10));
+        if (chance == 0) return false;
+
+        long mix = ec.state().seed();
+        mix ^= (ec.state().version() * 0x9E3779B97F4A7C15L);
+        mix ^= ((long) ec.out().size() << 32);
+        if (ec.cardId() != null) mix ^= ec.cardId().value().hashCode();
+        mix ^= target.toString().hashCode();
+        mix ^= kind.hashCode();
+
+        Random rnd = new Random(mix);
+        int roll = rnd.nextInt(100) + 1;
+        return roll <= chance;
     }
 
     private void applyStatus(TargetRef ref, String key, int delta) {
