@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -43,6 +44,7 @@ public class SessionService {
 
     private final SecureRandom rnd = new SecureRandom();
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
+    private static final Pattern PASSIVE_ID_FORMAT = Pattern.compile("^P\\d{3}$");
     public SessionService(CardService cardService,
                           StatusService statusService,
                           KeywordService keywordService,
@@ -116,10 +118,19 @@ public class SessionService {
         PlayerId pid = new PlayerId(playerIdRaw.trim());
         List<String> passiveIds = parsePassiveIds(passiveIdsRaw);
 
+        log.info("join request code={} playerId={} requestedPassiveIds={}", code, pid.value(), passiveIds);
+
         return rt.withLock(() -> {
             GameState state = rt.state();
 
             if (state.players().containsKey(pid)) {
+                List<String> existingPassiveIds = state.player(pid).passiveIds();
+                if (!existingPassiveIds.equals(passiveIds)) {
+                    throw new ResponseStatusException(
+                            BAD_REQUEST,
+                            "Passives are fixed at first join and cannot be changed later. Leave passiveIds empty or resend the same values."
+                    );
+                }
                 log.debug("join is idempotent code={} playerId={}", code, pid.value());
                 return state;
             }
@@ -165,20 +176,23 @@ public class SessionService {
         // 기본값 정책: 미지정(null)이면 패시브를 자동 부여하지 않고 빈 목록으로 처리한다.
         if (passiveIdsRaw == null) return List.of();
         if (passiveIdsRaw.size() > PlayerState.MAX_PASSIVES) {
-            throw new ResponseStatusException(BAD_REQUEST, "passiveIds supports up to " + PlayerState.MAX_PASSIVES);
+            throw new ResponseStatusException(BAD_REQUEST, "passiveIds allows 0 to " + PlayerState.MAX_PASSIVES + " items.");
         }
 
         LinkedHashSet<String> normalized = new LinkedHashSet<>();
         for (String raw : passiveIdsRaw) {
             if (raw == null || raw.isBlank()) {
-                throw new ResponseStatusException(BAD_REQUEST, "passiveIds contains blank id");
+                throw new ResponseStatusException(BAD_REQUEST, "Each passiveId must be a non-empty string.");
             }
             String id = raw.trim();
+            if (!PASSIVE_ID_FORMAT.matcher(id).matches()) {
+                throw new ResponseStatusException(BAD_REQUEST, "Invalid passiveId format: " + id + " (expected P###, e.g. P001).");
+            }
             if (!passiveService.defsMap().containsKey(id)) {
-                throw new ResponseStatusException(BAD_REQUEST, "unknown passiveId: " + id);
+                throw new ResponseStatusException(BAD_REQUEST, "Unknown passiveId: " + id + ". Select a passive from the available list.");
             }
             if (!normalized.add(id)) {
-                throw new ResponseStatusException(BAD_REQUEST, "duplicate passiveId: " + id);
+                throw new ResponseStatusException(BAD_REQUEST, "Duplicate passiveId is not allowed: " + id);
             }
         }
 
