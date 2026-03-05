@@ -101,13 +101,14 @@ public class SessionController {
 
         UUID commandId = parseOrNewUuid(req.commandId());
 
-        log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} count={} discardIds={} targetPlayers={} targetEnemies={} targets={}",
+        log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} summonId={} count={} discardIds={} targetPlayers={} targetEnemies={} targets={}",
                 code,
                 req.type(),
                 (req.playerId() == null) ? null : req.playerId().trim(),
                 req.expectedVersion(),
                 commandId,
                 (req.cardId() == null) ? null : req.cardId().trim(),
+                (req.summonId() == null) ? null : req.summonId().trim(),
                 req.count(),
                 (req.discardIds() == null) ? 0 : req.discardIds().size(),
                 (req.targetPlayerIds() == null) ? 0 : req.targetPlayerIds().size(),
@@ -296,6 +297,15 @@ public class SessionController {
                 TargetSelection sel = parseTargetSelection(req);
 
                 return new UseExCommand(commandId, expectedVersion, playerId, sel);
+            }
+            case "USE_SUMMON_ACTION" -> {
+                PlayerId playerId = parsePlayerId(req.playerId());
+                if (req.summonId() == null || req.summonId().isBlank()) {
+                    throw new ResponseStatusException(BAD_REQUEST, "summonId is required");
+                }
+                Ids.SummonInstId summonId = parseSummonInstId(req.summonId(), "summonId");
+                TargetSelection sel = parseTargetSelection(req);
+                return new UseSummonActionCommand(commandId, expectedVersion, playerId, summonId, sel);
             }
             case "DISCARD_TO_HAND_LIMIT" -> {
                 PlayerId playerId = parsePlayerId(req.playerId());
