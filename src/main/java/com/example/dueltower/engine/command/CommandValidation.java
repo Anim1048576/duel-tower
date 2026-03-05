@@ -1,5 +1,6 @@
 package com.example.dueltower.engine.command;
 
+import com.example.dueltower.engine.core.combat.CombatStatuses;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 
@@ -17,6 +18,10 @@ public final class CommandValidation {
      * @return PlayerState if found, otherwise null.
      */
     public static PlayerState validateMainTurn(GameState state, PlayerId playerId, List<String> errors) {
+        return validateMainTurn(state, playerId, errors, false);
+    }
+
+    public static PlayerState validateMainTurn(GameState state, PlayerId playerId, List<String> errors, boolean allowBattleIncapacitated) {
         if (state.combat() == null) errors.add("combat not started");
 
         PlayerState ps = state.player(playerId);
@@ -34,6 +39,10 @@ public final class CommandValidation {
             if (!(cur instanceof TargetRef.Player p) || !p.id().equals(playerId)) {
                 errors.add("not your turn");
             }
+        }
+
+        if (!allowBattleIncapacitated && CombatStatuses.isBattleIncapacitated(ps)) {
+            errors.add("player is battle incapacitated");
         }
 
         if (ps.pendingDecision() != null) errors.add("pending decision exists");

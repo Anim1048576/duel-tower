@@ -4,6 +4,7 @@ import com.example.dueltower.common.util.DiceUtility;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.combat.CombatStatuses;
 import com.example.dueltower.engine.core.combat.TurnFlow;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
@@ -99,6 +100,7 @@ public final class StartCombatCommand implements GameCommand {
             ps.swappedThisTurn(false);
             ps.exCooldownUntilRound(0);
             ps.exActivatable(true);
+            ps.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 0);
 
             ZoneOps.drawWithRefill(state, ctx, ps, 4, events);
 

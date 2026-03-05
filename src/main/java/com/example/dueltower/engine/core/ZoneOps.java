@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.core;
 
 import com.example.dueltower.engine.event.GameEvent;
+import com.example.dueltower.engine.core.combat.CombatStatuses;
 import com.example.dueltower.engine.core.effect.card.FieldEffectOps;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.keyword.MoveReason;
@@ -100,12 +101,21 @@ public final class ZoneOps {
                 shuffleDeck(state, ps, events, deriveShuffleRandom(state, ps));
             }
             if (ps.deck().isEmpty()) {
+                applyBattleIncapacitatedOnDeckOut(state, ps, events);
                 return;
             }
             CardInstId top = ps.deck().removeFirst();
             ps.hand().add(top);
             state.card(top).zone(Zone.HAND);
         }
+    }
+
+    private static void applyBattleIncapacitatedOnDeckOut(GameState state, PlayerState ps, List<GameEvent> events) {
+        if (state.combat() == null) return;
+        if (CombatStatuses.isBattleIncapacitated(ps)) return;
+
+        ps.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 1);
+        events.add(new GameEvent.LogAppended(ps.playerId().value() + " becomes [전투 불능] (cannot draw: deck+grave empty)"));
     }
 
     public static void refillDeckFromGrave(GameState state, PlayerState ps, List<GameEvent> events) {

@@ -30,15 +30,15 @@ public final class TurnFlow {
 
         // 적 턴이 현재 엔진에서 직접 입력을 받을 수 없으므로, 연속된 적 턴은 자동으로 넘긴다.
         int guard = Math.max(1, cs.turnOrder().size()) * 2;
-        while (guard-- > 0 && cs.currentTurnActor() instanceof TargetRef.Enemy) {
-            TargetRef enemy = cs.currentTurnActor();
-            out.add(new GameEvent.LogAppended(CombatState.actorKey(enemy) + " turn (auto-skip: enemy AI not implemented)"));
+        while (guard-- > 0 && shouldAutoSkipTurn(state, cs.currentTurnActor())) {
+            TargetRef actor = cs.currentTurnActor();
+            out.add(new GameEvent.LogAppended(autoSkipMessage(state, actor)));
 
             cs.phase(CombatPhase.TURN_START);
-            TurnPhases.turnStart(state, ctx, enemy, out, "TURN_START");
+            TurnPhases.turnStart(state, ctx, actor, out, "TURN_START");
 
             cs.phase(CombatPhase.TURN_END);
-            TurnPhases.turnEnd(state, ctx, enemy, out, "TURN_END");
+            TurnPhases.turnEnd(state, ctx, actor, out, "TURN_END");
             advanceOne(state, cs);
         }
 
@@ -60,15 +60,15 @@ public final class TurnFlow {
         if (cs == null) throw new IllegalStateException("combat not started");
 
         int guard = Math.max(1, cs.turnOrder().size()) * 2;
-        while (guard-- > 0 && cs.currentTurnActor() instanceof TargetRef.Enemy) {
-            TargetRef enemy = cs.currentTurnActor();
-            out.add(new GameEvent.LogAppended(CombatState.actorKey(enemy) + " opens combat (auto-skip: enemy AI not implemented)"));
+        while (guard-- > 0 && shouldAutoSkipTurn(state, cs.currentTurnActor())) {
+            TargetRef actor = cs.currentTurnActor();
+            out.add(new GameEvent.LogAppended(autoSkipOpeningMessage(state, actor)));
 
             cs.phase(CombatPhase.TURN_START);
-            TurnPhases.turnStart(state, ctx, enemy, out, "TURN_START");
+            TurnPhases.turnStart(state, ctx, actor, out, "TURN_START");
 
             cs.phase(CombatPhase.TURN_END);
-            TurnPhases.turnEnd(state, ctx, enemy, out, "TURN_END");
+            TurnPhases.turnEnd(state, ctx, actor, out, "TURN_END");
             advanceOne(state, cs);
         }
 
@@ -99,5 +99,34 @@ public final class TurnFlow {
         }
 
         cs.currentTurnIndex(nextIndex);
+    }
+
+    private static boolean shouldAutoSkipTurn(GameState state, TargetRef actor) {
+        if (actor instanceof TargetRef.Enemy) return true;
+        if (actor instanceof TargetRef.Player p) {
+            PlayerState ps = state.player(p.id());
+            return CombatStatuses.isBattleIncapacitated(ps);
+        }
+        return false;
+    }
+
+    private static String autoSkipMessage(GameState state, TargetRef actor) {
+        if (actor instanceof TargetRef.Player p) {
+            PlayerState ps = state.player(p.id());
+            if (CombatStatuses.isBattleIncapacitated(ps)) {
+                return CombatState.actorKey(actor) + " turn (auto-skip: battle incapacitated)";
+            }
+        }
+        return CombatState.actorKey(actor) + " turn (auto-skip: enemy AI not implemented)";
+    }
+
+    private static String autoSkipOpeningMessage(GameState state, TargetRef actor) {
+        if (actor instanceof TargetRef.Player p) {
+            PlayerState ps = state.player(p.id());
+            if (CombatStatuses.isBattleIncapacitated(ps)) {
+                return CombatState.actorKey(actor) + " opens combat (auto-skip: battle incapacitated)";
+            }
+        }
+        return CombatState.actorKey(actor) + " opens combat (auto-skip: enemy AI not implemented)";
     }
 }
