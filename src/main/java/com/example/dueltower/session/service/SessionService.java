@@ -225,13 +225,9 @@ public class SessionService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    @Scheduled(fixedDelayString = "#{@sessionService.cleanupIntervalMillis()}")
+    @Scheduled(fixedDelayString = "${duel.session.cleanup-interval:5m}")
     public void cleanupExpiredSessions() {
         evictExpiredSessions();
-    }
-
-    public long cleanupIntervalMillis() {
-        return cleanupInterval.toMillis();
     }
 
     private void evictExpiredSessions() {
