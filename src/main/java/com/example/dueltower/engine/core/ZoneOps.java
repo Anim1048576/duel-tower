@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.core;
 
 import com.example.dueltower.engine.event.GameEvent;
+import com.example.dueltower.engine.core.effect.card.FieldEffectOps;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.keyword.MoveReason;
 import com.example.dueltower.engine.model.*;
@@ -163,6 +164,7 @@ public final class ZoneOps {
 
         boolean leavingField = from == Zone.FIELD && finalTo != Zone.FIELD;
         if (leavingField) {
+            FieldEffectOps.onLeaveField(state, ctx, ps, id, events, "MOVE_LEAVE_FIELD");
             SummonOps.destroySummonForCard(state, ps, id);
         }
 
@@ -177,6 +179,11 @@ public final class ZoneOps {
         addToZone(ps, id, finalTo);
         ci.zone(finalTo);
         events.add(new GameEvent.CardsMoved(ps.playerId().value(), from.name(), finalTo.name(), 1));
+
+        boolean enteringField = from != Zone.FIELD && finalTo == Zone.FIELD;
+        if (enteringField) {
+            FieldEffectOps.onEnterField(state, ctx, ps, id, events, "MOVE_ENTER_FIELD");
+        }
     }
 
     private static void recordMembership(GameState state, List<String> issues, Map<CardInstId, Zone> membership, PlayerState ps, CardInstId id, Zone z) {

@@ -14,6 +14,8 @@ public final class CardInstance {
 
     private Zone zone;
     private final Map<String, Integer> counters = new HashMap<>();
+    private boolean fieldEffectActive;
+    private boolean fieldEffectTransitioning;
 
     public CardInstance(CardInstId instanceId, CardDefId defId, PlayerId ownerId, Zone zone) {
         this.instanceId = instanceId;
@@ -29,4 +31,10 @@ public final class CardInstance {
     public void zone(Zone z) { this.zone = z; }
 
     public Map<String, Integer> counters() { return counters; }
+
+    public boolean fieldEffectActive() { return fieldEffectActive; }
+    public void fieldEffectActive(boolean v) { this.fieldEffectActive = v; }
+
+    public boolean fieldEffectTransitioning() { return fieldEffectTransitioning; }
+    public void fieldEffectTransitioning(boolean v) { this.fieldEffectTransitioning = v; }
 }

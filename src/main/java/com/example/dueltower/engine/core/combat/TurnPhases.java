@@ -4,6 +4,7 @@ import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.status.StatusPhases;
+import com.example.dueltower.engine.core.effect.card.FieldEffectOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.PlayerState;
@@ -32,6 +33,10 @@ public final class TurnPhases {
         if (actor instanceof TargetRef.Player p) {
             PlayerState ps = state.player(p.id());
             if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
+
+            // 우선순위 규칙: 동일 우선순위에서는 카드 정의 ID 오름차순, 그다음 인스턴스 ID 오름차순
+            // (구현은 FieldEffectOps.orderedActiveCards 참고)
+            FieldEffectOps.onTurnStart(state, ctx, ps, out, source);
 
             ps.swappedThisTurn(false);
             ps.cardsPlayedThisTurn(0);
@@ -64,6 +69,8 @@ public final class TurnPhases {
         if (actor instanceof TargetRef.Player p) {
             PlayerState ps = state.player(p.id());
             if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
+
+            FieldEffectOps.onTurnEnd(state, ctx, ps, out, source);
 
             // 기본: max로 리필
             int refill = ps.maxAp();
