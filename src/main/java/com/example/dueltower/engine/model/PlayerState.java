@@ -7,6 +7,8 @@ import com.example.dueltower.engine.model.Ids.SummonInstId;
 import java.util.*;
 
 public final class PlayerState {
+    public static final int MAX_PASSIVES = 2;
+
     private final PlayerId playerId;
 
     // ===== 카드 존 =====
@@ -55,6 +57,7 @@ public final class PlayerState {
     // ===== 상태/수치(스택) =====
     // 예: "취약"=2, "보호막"=5, "공격력증가"=3 ...
     private final Map<String, Integer> statusValues = new LinkedHashMap<>();
+    private final List<String> passiveIds = new ArrayList<>();
 
     public PlayerState(PlayerId playerId) {
         this.playerId = playerId;
@@ -161,6 +164,39 @@ public final class PlayerState {
 
     // ===== 상태 스택 =====
     public Map<String, Integer> statusValues() { return statusValues; }
+
+    /**
+     * 캐릭터 패시브 ID 목록.
+     * 외부에는 읽기 전용 뷰를 제공한다.
+     */
+    public List<String> passiveIds() { return Collections.unmodifiableList(passiveIds); }
+
+    /**
+     * 패시브를 설정한다.
+     * - 최대 2개까지 허용
+     * - 중복 ID 불가
+     */
+    public void passiveIds(Collection<String> value) {
+        Objects.requireNonNull(value, "passiveIds is required");
+
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String raw : value) {
+            if (raw == null || raw.isBlank()) {
+                throw new IllegalArgumentException("passiveIds contains blank id");
+            }
+            normalized.add(raw.trim());
+        }
+
+        if (normalized.size() != value.size()) {
+            throw new IllegalArgumentException("duplicate passiveIds are not allowed");
+        }
+        if (normalized.size() > MAX_PASSIVES) {
+            throw new IllegalArgumentException("passiveIds supports up to " + MAX_PASSIVES);
+        }
+
+        passiveIds.clear();
+        passiveIds.addAll(normalized);
+    }
 
     public int status(String key) {
         Integer v = statusValues.get(key);

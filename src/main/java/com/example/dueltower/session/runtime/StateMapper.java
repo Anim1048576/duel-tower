@@ -80,6 +80,7 @@ public final class StateMapper {
 
         return new PlayerStateDto(
                 ps.playerId().value(),
+                ps.passiveIds(),
                 ps.deck().stream().map(id -> id.value().toString()).toList(),
                 ps.hand().stream().map(id -> id.value().toString()).toList(),
                 ps.grave().stream().map(id -> id.value().toString()).toList(),

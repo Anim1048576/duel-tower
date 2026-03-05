@@ -64,7 +64,7 @@ public class SessionController {
         if (req == null || req.playerId() == null || req.playerId().isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
-        sessionService.join(code, req.playerId());
+        sessionService.join(code, req.playerId(), req.passiveIds());
 
         SessionStateDto state = sessionService.withSessionLock(code, rt -> {
             log.info("session join code={} playerId={} playersNow={}",

@@ -1,3 +1,8 @@
 package com.example.dueltower.session.dto;
 
-public record JoinSessionRequest(String playerId) {}
+import java.util.List;
+
+public record JoinSessionRequest(
+        String playerId,
+        List<String> passiveIds
+) {}
