@@ -41,6 +41,7 @@ public class SessionService {
 
     private final SecureRandom rnd = new SecureRandom();
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
+    private static final Set<String> PASSIVE_ID_REGISTRY = Set.of("P001", "P002", "P003");
 
     public SessionService(CardService cardService,
                           StatusService statusService,
@@ -102,13 +103,14 @@ public class SessionService {
      * 참가: 지금은 프리셋/DB 없이 기본 덱(12) + 기본 EX(1)을 자동 생성.
      * 같은 playerId로 다시 join하면 idempotent.
      */
-    public GameState join(String code, String playerIdRaw) {
+    public GameState join(String code, String playerIdRaw, List<String> passiveIdsRaw) {
         if (playerIdRaw == null || playerIdRaw.isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
 
         SessionRuntime rt = get(code);
         PlayerId pid = new PlayerId(playerIdRaw.trim());
+        List<String> passiveIds = parsePassiveIds(passiveIdsRaw);
 
         return rt.withLock(() -> {
             GameState state = rt.state();
@@ -119,6 +121,7 @@ public class SessionService {
             }
 
             PlayerState ps = new PlayerState(pid);
+            ps.passiveIds(passiveIds);
             state.players().put(pid, ps);
 
             // Default deck: 3x C001 + 3x C002 + 3x C003 + 3x C004
@@ -141,15 +144,41 @@ public class SessionService {
             Collections.shuffle(list, new Random(state.seed() ^ pid.value().hashCode()));
             for (CardInstId id : list) ps.deck().addLast(id);
 
-            log.debug("player joined code={} playerId={} deckSize={} exId={}",
+            log.debug("player joined code={} playerId={} deckSize={} exId={} passiveIds={}",
                     code,
                     pid.value(),
                     ps.deck().size(),
-                    (ps.exCard() == null) ? null : ps.exCard().value()
+                    (ps.exCard() == null) ? null : ps.exCard().value(),
+                    ps.passiveIds()
             );
 
             return state;
         });
+    }
+
+
+    private List<String> parsePassiveIds(List<String> passiveIdsRaw) {
+        // 기본값 정책: 미지정(null)이면 패시브를 자동 부여하지 않고 빈 목록으로 처리한다.
+        if (passiveIdsRaw == null) return List.of();
+        if (passiveIdsRaw.size() > PlayerState.MAX_PASSIVES) {
+            throw new ResponseStatusException(BAD_REQUEST, "passiveIds supports up to " + PlayerState.MAX_PASSIVES);
+        }
+
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String raw : passiveIdsRaw) {
+            if (raw == null || raw.isBlank()) {
+                throw new ResponseStatusException(BAD_REQUEST, "passiveIds contains blank id");
+            }
+            String id = raw.trim();
+            if (!PASSIVE_ID_REGISTRY.contains(id)) {
+                throw new ResponseStatusException(BAD_REQUEST, "unknown passiveId: " + id);
+            }
+            if (!normalized.add(id)) {
+                throw new ResponseStatusException(BAD_REQUEST, "duplicate passiveId: " + id);
+            }
+        }
+
+        return List.copyOf(normalized);
     }
 
     private void addCardToDeck(GameState state, PlayerState ps, CardDefId defId) {
