@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.core.effect;
 
 import com.example.dueltower.engine.core.combat.DamageFlags;
+import com.example.dueltower.engine.core.combat.CombatEntityOps;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.content.keyword.kdb.K011_Critical;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
@@ -155,28 +156,11 @@ public final class EffectOps {
             finalAmount *= 2;
             ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! heal x2"));
         }
-        if (ref instanceof TargetRef.Player p) {
-            PlayerState ps = ec.state().player(p.id());
-            if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
-
-            ps.hp(ps.hp() + finalAmount);
-
-            ec.out().add(new GameEvent.LogAppended(
-                    ec.actor().value() + " heals " + finalAmount + " to PLAYER:" + p.id().value() + " (hp=" + ps.hp() + "/" + ps.maxHp() + ")"
-            ));
-            return;
-        }
-
-        if (ref instanceof TargetRef.Enemy e) {
-            EnemyState es = ec.state().enemy(e.id());
-            if (es == null) throw new IllegalStateException("missing enemy: " + e.id().value());
-
-            es.hp(es.hp() + finalAmount);
-
-            ec.out().add(new GameEvent.LogAppended(
-                    ec.actor().value() + " heals " + finalAmount + " to ENEMY:" + e.id().value() + " (hp=" + es.hp() + "/" + es.maxHp() + ")"
-            ));
-        }
+        CombatEntityOps.adjustHp(ec.state(), ec.ctx(), ec.out(), ref, finalAmount);
+        ec.out().add(new GameEvent.LogAppended(
+                ec.actor().value() + " heals " + finalAmount + " to " + CombatEntityOps.targetLabel(ref)
+                        + " (hp=" + CombatEntityOps.hpText(ec.state(), ref) + ")"
+        ));
     }
 
     private boolean isCritical(TargetRef target, String kind) {

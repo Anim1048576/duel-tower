@@ -4,6 +4,9 @@ import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SummonInstId;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 public final class SummonState {
     private final SummonInstId id;
     private final PlayerId owner;
@@ -15,6 +18,7 @@ public final class SummonState {
     private int heal;
     private int actionCost;
     private boolean actionUsedThisTurn;
+    private final Map<String, Integer> statusValues = new LinkedHashMap<>();
 
     public SummonState(
             SummonInstId id,
@@ -62,6 +66,21 @@ public final class SummonState {
 
     public boolean actionUsedThisTurn() { return actionUsedThisTurn; }
     public void actionUsedThisTurn(boolean v) { this.actionUsedThisTurn = v; }
+
+    public Map<String, Integer> statusValues() { return statusValues; }
+
+    public void statusSet(String key, int value) {
+        if (key == null || key.isBlank()) return;
+        if (value <= 0) statusValues.remove(key);
+        else statusValues.put(key, value);
+    }
+
+    public void statusAdd(String key, int delta) {
+        if (delta == 0 || key == null || key.isBlank()) return;
+        int next = statusValues.getOrDefault(key, 0) + delta;
+        if (next <= 0) statusValues.remove(key);
+        else statusValues.put(key, next);
+    }
 
     private static int clamp(int v, int min, int max) {
         if (v < min) return min;

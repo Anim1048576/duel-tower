@@ -21,11 +21,12 @@ public final class VictoryOps {
     }
 
     public static Outcome check(GameState state) {
-        boolean anyPlayerAlive = state.players().values().stream().anyMatch(ps -> ps.hp() > 0);
-        boolean anyEnemyAlive = state.enemies().values().stream().anyMatch(es -> es.hp() > 0);
+        // 승패 주체는 플레이어/적 본체만이며, 소환체는 포함하지 않는다.
+        boolean anyPlayerPrincipalAlive = state.players().values().stream().anyMatch(ps -> ps.hp() > 0);
+        boolean anyEnemyPrincipalAlive = state.enemies().values().stream().anyMatch(es -> es.hp() > 0);
 
-        if (!anyPlayerAlive) return Outcome.PLAYERS_LOSE;
-        if (!anyEnemyAlive) return Outcome.PLAYERS_WIN;
+        if (!anyPlayerPrincipalAlive) return Outcome.PLAYERS_LOSE;
+        if (!anyEnemyPrincipalAlive) return Outcome.PLAYERS_WIN;
         return Outcome.NONE;
     }
 

@@ -39,6 +39,11 @@ public final class StatusRuntime {
                 if (es == null) throw new IllegalStateException("missing enemy: " + e.id().value());
                 return es.statusValues();
             }
+            if (who instanceof TargetRef.Summon s) {
+                SummonState ss = state.summon(s.summonId());
+                if (ss == null) throw new IllegalStateException("missing summon: " + s.summonId().value());
+                return ss.statusValues();
+            }
             throw new IllegalArgumentException("unknown character ref");
         }
 
