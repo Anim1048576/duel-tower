@@ -42,12 +42,22 @@ export type PlayerState = {
   fieldLimit: number
 }
 
+export type SummonState = {
+  summonId: string
+  owner: string
+  hp: number
+  atk: number
+  heal: number
+  actionAvailable: boolean
+}
+
 export type CombatState = {
   round: number
   turnOrder: string[]
   currentTurnIndex: number
   currentTurnPlayer: string
   phase?: string
+  summons?: SummonState[]
 }
 
 export type SessionState = {
@@ -83,6 +93,13 @@ export type JoinSessionResponse = {
   state: SessionState
 }
 
+export type TargetRef = {
+  playerId?: string
+  enemyId?: string
+  summonOwnerPlayerId?: string
+  summonInstanceId?: string
+}
+
 export type CommandRequest = {
   type: string
   commandId?: string
@@ -91,8 +108,10 @@ export type CommandRequest = {
   count?: number
   discardIds?: string[]
   cardId?: string
+  summonId?: string
   targetPlayerIds?: string[]
   targetEnemyIds?: string[]
+  targets?: TargetRef[]
 }
 
 export function normalizeCardDef(raw: any): CardDef {

@@ -4,10 +4,13 @@
   import { session } from '../stores/session'
   import { combat, ensureJoined, refreshState, startPolling, stopPolling, command } from '../stores/combat'
   import { logs, clearLogs, pushToast } from '../stores/log'
+  import type { TargetRef } from '../lib/model'
 
   let selectedCard: string | null = null
   let discardSet = new Set<string>()
   let showDebug = false
+  let selectedSummonId: string | null = null
+  let selectedTargetKey: string | null = null
 
   onMount(async () => {
     await ensureCards()
@@ -21,6 +24,10 @@
   $: cs = state?.combat
   $: me = state?.players?.[$session.meId]
   $: isMyTurn = Boolean(cs && me && cs.currentTurnPlayer === me.playerId)
+  $: summons = cs?.summons ?? []
+  $: enemyActorIds = cs
+    ? cs.turnOrder.filter((id) => !state?.players?.[id]).map((id) => (id.includes(':') ? id.split(':').slice(-1)[0] : id))
+    : []
 
   function instDef(instId: string) {
     const ci = state?.cards?.[instId]
@@ -56,11 +63,41 @@
     discardSet = next
   }
 
+  function targetKeyForPlayer(playerId: string) {
+    return `player:${playerId}`
+  }
+  function targetKeyForEnemy(enemyId: string) {
+    return `enemy:${enemyId}`
+  }
+  function targetKeyForSummon(owner: string, summonId: string) {
+    return `summon:${owner}:${summonId}`
+  }
+
+  function parseTargetKey(key: string): TargetRef | null {
+    if (key.startsWith('player:')) return { playerId: key.slice('player:'.length) }
+    if (key.startsWith('enemy:')) return { enemyId: key.slice('enemy:'.length) }
+    if (key.startsWith('summon:')) {
+      const [, owner, summonId] = key.split(':')
+      if (!owner || !summonId) return null
+      return { summonOwnerPlayerId: owner, summonInstanceId: summonId }
+    }
+    return null
+  }
+
   $: pending = me?.pendingDecision
   $: needDiscard = pending?.type === 'DISCARD_TO_HAND_LIMIT' && pending.limit != null && me
     ? Math.max(0, me.hand.length - pending.limit)
     : 0
   $: discardOk = needDiscard > 0 && discardSet.size === needDiscard
+
+  function canUseSummonAction(summonId: string) {
+    const summon = summons.find((s) => s.summonId === summonId)
+    return Boolean(isMyTurn && summon?.owner === $session.meId && summon?.actionAvailable && !pending)
+  }
+
+  function isSelectableTarget(key: string) {
+    return Boolean(selectedSummonId && canUseSummonAction(selectedSummonId)) && Boolean(parseTargetKey(key))
+  }
 
   async function doDraw(n: number) {
     await command({ type: 'DRAW', count: n })
@@ -90,6 +127,24 @@
     }
     await command({ type: 'HAND_SWAP', discardIds: [selectedCard] })
     selectedCard = null
+  }
+
+  async function doSummonAction() {
+    if (!selectedSummonId) {
+      pushToast('소환체 선택', '행동할 소환체를 선택해줘')
+      return
+    }
+    if (!selectedTargetKey) {
+      pushToast('타겟 선택', '플레이어/적/소환체 중 타겟을 선택해줘')
+      return
+    }
+    const target = parseTargetKey(selectedTargetKey)
+    if (!target) {
+      pushToast('타겟 오류', '지원하지 않는 타겟 형식')
+      return
+    }
+    await command({ type: 'USE_SUMMON_ACTION', summonId: selectedSummonId, targets: [target] })
+    selectedTargetKey = null
   }
 
   async function doDiscardToLimit() {
@@ -231,6 +286,94 @@
             </div>
           {/each}
         </div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="handArea">
+        <div class="row wrap" style="justify-content:space-between">
+          <div class="cardTitle">소환체</div>
+          <div class="hint">소환체를 선택하고 타겟을 고른 뒤 행동 사용</div>
+        </div>
+        <div class="spacer"></div>
+        <div class="cardRow">
+          {#each summons as summon (summon.summonId)}
+            <button
+              class="gcard"
+              class:isSelected={selectedSummonId === summon.summonId}
+              on:click={() => (selectedSummonId = summon.summonId)}
+            >
+              <div class="row" style="justify-content:space-between; align-items:flex-start">
+                <div class="gcardTitle mono">{summon.summonId.slice(0, 8)}</div>
+                <span class="badge">{summon.owner === $session.meId ? '내 소환체' : '상대 소환체'}</span>
+              </div>
+              <div class="gcardSub">HP {summon.hp} · ATK {summon.atk} · HEAL {summon.heal}</div>
+              <div class="choiceDesc" style="margin-top:10px">
+                행동: {summon.actionAvailable ? '가능' : '사용 완료'}
+              </div>
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="fieldArea">
+        <div class="row wrap" style="justify-content:space-between">
+          <div class="cardTitle">타겟 선택</div>
+          <span class="badge">플레이어 / 적 / 소환체</span>
+        </div>
+        <div class="spacer"></div>
+
+        <div class="hint">플레이어</div>
+        <div class="cardRow">
+          {#each Object.keys(state?.players ?? {}) as playerId (playerId)}
+            {@const key = targetKeyForPlayer(playerId)}
+            <button
+              class="btn"
+              class:primary={selectedTargetKey === key}
+              disabled={!isSelectableTarget(key)}
+              on:click={() => (selectedTargetKey = key)}
+            >
+              [P] {playerId}
+            </button>
+          {/each}
+        </div>
+
+        <div class="spacer"></div>
+        <div class="hint">적</div>
+        <div class="cardRow">
+          {#each enemyActorIds as enemyId (enemyId)}
+            {@const key = targetKeyForEnemy(enemyId)}
+            <button
+              class="btn"
+              class:primary={selectedTargetKey === key}
+              disabled={!isSelectableTarget(key)}
+              on:click={() => (selectedTargetKey = key)}
+            >
+              [E] {enemyId}
+            </button>
+          {/each}
+        </div>
+
+        <div class="spacer"></div>
+        <div class="hint">소환체</div>
+        <div class="cardRow">
+          {#each summons as summon (summon.summonId)}
+            {@const key = targetKeyForSummon(summon.owner, summon.summonId)}
+            <button
+              class="btn"
+              class:primary={selectedTargetKey === key}
+              disabled={!isSelectableTarget(key)}
+              on:click={() => (selectedTargetKey = key)}
+            >
+              [S] {summon.owner}:{summon.summonId.slice(0, 8)}
+            </button>
+          {/each}
+        </div>
+
+        <div class="spacer"></div>
+        <button class="btn primary" disabled={!selectedSummonId || !selectedTargetKey || !canUseSummonAction(selectedSummonId)} on:click={doSummonAction}>
+          소환체 행동 사용
+        </button>
       </div>
 
       {#if pending?.type === 'DISCARD_TO_HAND_LIMIT' && needDiscard > 0}
