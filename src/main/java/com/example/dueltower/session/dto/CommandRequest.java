@@ -24,6 +24,7 @@ public record CommandRequest(
         Integer count,
         List<String> discardIds,
         String cardId,
-        List<String> targetPlayerIds, // 추가
-        List<String> targetEnemyIds   // 추가
+        List<String> targetPlayerIds, // legacy
+        List<String> targetEnemyIds,  // legacy
+        List<TargetRefDto> targets
 ) {}

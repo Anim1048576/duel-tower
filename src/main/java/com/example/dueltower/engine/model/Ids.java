@@ -8,6 +8,7 @@ public final class Ids {
     public record SessionId(UUID value) {}
     public record PlayerId(String value) {}
     public record EnemyId(String value) {}
+    public record SummonInstId(java.util.UUID value) {}
     public record CardDefId(String value) {}
     public record CardInstId(UUID value) {}
 

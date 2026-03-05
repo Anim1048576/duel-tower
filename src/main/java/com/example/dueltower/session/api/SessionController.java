@@ -101,7 +101,7 @@ public class SessionController {
 
         UUID commandId = parseOrNewUuid(req.commandId());
 
-        log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} count={} discardIds={} targetPlayers={} targetEnemies={}",
+        log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} count={} discardIds={} targetPlayers={} targetEnemies={} targets={}",
                 code,
                 req.type(),
                 (req.playerId() == null) ? null : req.playerId().trim(),
@@ -111,7 +111,8 @@ public class SessionController {
                 req.count(),
                 (req.discardIds() == null) ? 0 : req.discardIds().size(),
                 (req.targetPlayerIds() == null) ? 0 : req.targetPlayerIds().size(),
-                (req.targetEnemyIds() == null) ? 0 : req.targetEnemyIds().size()
+                (req.targetEnemyIds() == null) ? 0 : req.targetEnemyIds().size(),
+                (req.targets() == null) ? 0 : req.targets().size()
         );
 
         final EngineResult res = rt.withLock(() -> {
@@ -190,6 +191,17 @@ public class SessionController {
         }
     }
 
+    private static Ids.SummonInstId parseSummonInstId(String raw, String fieldName) {
+        if (raw == null || raw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, fieldName + " is blank");
+        }
+        try {
+            return new Ids.SummonInstId(UUID.fromString(raw.trim()));
+        } catch (Exception e) {
+            throw new ResponseStatusException(BAD_REQUEST, "invalid " + fieldName + " uuid: " + raw);
+        }
+    }
+
     private static CardInstId parseSingleCardInstId(List<String> raw, String fieldName) {
         List<String> list = (raw == null) ? List.of() : raw;
         if (list.size() != 1) {
@@ -209,6 +221,28 @@ public class SessionController {
 
     private static TargetSelection parseTargetSelection(CommandRequest req) {
         List<TargetRef> targets = new ArrayList<>();
+
+        if (req.targets() != null) {
+            for (TargetRefDto dto : req.targets()) {
+                if (dto == null) continue;
+                if (dto.playerId() != null && !dto.playerId().isBlank()) {
+                    targets.add(TargetRef.ofPlayer(new PlayerId(dto.playerId().trim())));
+                    continue;
+                }
+                if (dto.enemyId() != null && !dto.enemyId().isBlank()) {
+                    targets.add(TargetRef.ofEnemy(new Ids.EnemyId(dto.enemyId().trim())));
+                    continue;
+                }
+                if (dto.summonOwnerPlayerId() != null && !dto.summonOwnerPlayerId().isBlank()
+                        && dto.summonInstanceId() != null && !dto.summonInstanceId().isBlank()) {
+                    targets.add(TargetRef.ofSummon(
+                            new PlayerId(dto.summonOwnerPlayerId().trim()),
+                            parseSummonInstId(dto.summonInstanceId(), "targets.summonInstanceId")
+                    ));
+                }
+            }
+        }
+
         if (req.targetPlayerIds() != null) {
             for (String s : req.targetPlayerIds()) {
                 if (s == null || s.isBlank()) continue;

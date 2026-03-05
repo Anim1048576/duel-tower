@@ -154,7 +154,7 @@ public final class StatusOps {
             TargetRef chosenEnemy,
             List<String> errors
     ) {
-        if (!(chosenEnemy instanceof TargetRef.Enemy)) return;
+        if (!isEnemyOneTarget(chosenEnemy)) return;
 
         StatusRuntime rt = new StatusRuntime(state, ctx, new ArrayList<>(), "VALIDATE");
 
@@ -168,14 +168,7 @@ public final class StatusOps {
             return;
         }
 
-        List<TargetRef> enemyCandidates;
-        if (actor instanceof TargetRef.Player) {
-            enemyCandidates = state.enemies().keySet().stream().map(TargetRef::ofEnemy).toList();
-        } else if (actor instanceof TargetRef.Enemy) {
-            enemyCandidates = state.players().keySet().stream().map(TargetRef::ofPlayer).toList();
-        } else {
-            enemyCandidates = List.of();
-        }
+        List<TargetRef> enemyCandidates = enemyOneCandidates(state, ctx, actor, chosenEnemy);
 
         // Run global targeting constraints for statuses present on opponents that have TAUNT tag.
         for (String statusId : statusIdsWithTagOnTargets(rt, ctx, enemyCandidates, StatusTag.TAUNT)) {
@@ -197,7 +190,7 @@ public final class StatusOps {
             List<GameEvent> out,
             String source
     ) {
-        if (!(chosenEnemy instanceof TargetRef.Enemy)) return chosenEnemy;
+        if (!isEnemyOneTarget(chosenEnemy)) return chosenEnemy;
 
         StatusRuntime rt = new StatusRuntime(state, ctx, out, source);
 
@@ -205,6 +198,7 @@ public final class StatusOps {
         List<TargetRef> allCandidates = new ArrayList<>();
         state.players().keySet().forEach(pid -> allCandidates.add(TargetRef.ofPlayer(pid)));
         state.enemies().keySet().forEach(eid -> allCandidates.add(TargetRef.ofEnemy(eid)));
+        allCandidates.addAll(allSummonTargets(state, ctx));
 
         TargetRef cur = chosenEnemy;
 
@@ -220,7 +214,7 @@ public final class StatusOps {
         }
 
         // If actor-side override already diverted to non-enemy (e.g., CONFUSION), do not apply taunt.
-        if (!(cur instanceof TargetRef.Enemy)) return cur;
+        if (!isEnemyOneTarget(cur)) return cur;
 
         // CONFUSION-tagged statuses ignore TAUNT even if they didn't reroute this time.
         if (hasActorOrFactionTag(rt, state, ctx, actor, StatusTag.CONFUSION)) {
@@ -233,14 +227,7 @@ public final class StatusOps {
         }
 
         // 2) global constraints (TAUNT etc.) - give them only the opponent candidates
-        List<TargetRef> enemyCandidates;
-        if (actor instanceof TargetRef.Player) {
-            enemyCandidates = state.enemies().keySet().stream().map(TargetRef::ofEnemy).toList();
-        } else if (actor instanceof TargetRef.Enemy) {
-            enemyCandidates = state.players().keySet().stream().map(TargetRef::ofPlayer).toList();
-        } else {
-            enemyCandidates = List.of();
-        }
+        List<TargetRef> enemyCandidates = enemyOneCandidates(state, ctx, actor, cur);
 
         for (String statusId : statusIdsWithTagOnTargets(rt, ctx, enemyCandidates, StatusTag.TAUNT)) {
             if (!ctx.hasStatusEffect(statusId)) continue;
@@ -291,6 +278,38 @@ public final class StatusOps {
                 .comparingInt((String id) -> ctx.hasStatusDef(id) ? ctx.statusDef(id).priority() : Integer.MAX_VALUE)
                 .thenComparing(String::toString));
         return r;
+    }
+
+    private static boolean isEnemyOneTarget(TargetRef ref) {
+        return (ref instanceof TargetRef.Enemy) || (ref instanceof TargetRef.Summon);
+    }
+
+    private static List<TargetRef> enemyOneCandidates(GameState state, EngineContext ctx, TargetRef actor, TargetRef chosenEnemy) {
+        List<TargetRef> candidates = new ArrayList<>();
+        if (actor instanceof TargetRef.Player p) {
+            state.enemies().keySet().forEach(eid -> candidates.add(TargetRef.ofEnemy(eid)));
+            for (TargetRef summon : allSummonTargets(state, ctx)) {
+                if (summon instanceof TargetRef.Summon s && !s.ownerId().equals(p.id())) candidates.add(summon);
+            }
+        } else if (actor instanceof TargetRef.Enemy) {
+            state.players().keySet().forEach(pid -> candidates.add(TargetRef.ofPlayer(pid)));
+            candidates.addAll(allSummonTargets(state, ctx));
+        }
+
+        if (chosenEnemy != null && candidates.stream().noneMatch(chosenEnemy::equals)) {
+            candidates.add(chosenEnemy);
+        }
+        return candidates;
+    }
+
+    private static List<TargetRef> allSummonTargets(GameState state, EngineContext ctx) {
+        List<TargetRef> summons = new ArrayList<>();
+        for (CardInstance ci : state.cardInstances().values()) {
+            if (ci.zone() != Zone.FIELD) continue;
+            if (!KeywordOps.hasKeyword(state, ctx, ci.instanceId(), "소환")) continue;
+            summons.add(TargetRef.ofSummon(ci.ownerId(), new Ids.SummonInstId(ci.instanceId().value())));
+        }
+        return summons;
     }
 
 }

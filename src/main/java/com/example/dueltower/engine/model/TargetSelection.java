@@ -17,6 +17,12 @@ public record TargetSelection(List<TargetRef> targets) {
     public PlayerId requireOnePlayer() { return TargetRef.requirePlayer(requireOne()); }
     public EnemyId requireOneEnemy() { return TargetRef.requireEnemy(requireOne()); }
 
+    public TargetRef requireOneEnemyOrSummon() {
+        TargetRef one = requireOne();
+        if (one instanceof TargetRef.Enemy || one instanceof TargetRef.Summon) return one;
+        throw new IllegalArgumentException("enemy/summon target required");
+    }
+
     public List<PlayerId> allPlayersOnly() {
         List<PlayerId> r = new ArrayList<>();
         if (targets == null) return r;
@@ -28,6 +34,13 @@ public record TargetSelection(List<TargetRef> targets) {
         List<EnemyId> r = new ArrayList<>();
         if (targets == null) return r;
         for (TargetRef t : targets) if (t instanceof TargetRef.Enemy e) r.add(e.id());
+        return r;
+    }
+
+    public List<TargetRef.Summon> allSummonsOnly() {
+        List<TargetRef.Summon> r = new ArrayList<>();
+        if (targets == null) return r;
+        for (TargetRef t : targets) if (t instanceof TargetRef.Summon s) r.add(s);
         return r;
     }
 }
