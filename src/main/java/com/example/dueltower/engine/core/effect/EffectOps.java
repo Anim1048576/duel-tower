@@ -37,10 +37,12 @@ public final class EffectOps {
             }
             TargetRef one = ec.selection().targets().get(0);
             if (t == Target.ALLY_ONE && !(one instanceof TargetRef.Player)) errors.add("ally(one player) target required");
-            if (t == Target.ENEMY_ONE && !(one instanceof TargetRef.Enemy)) errors.add("enemy(one enemy) target required");
+            if (t == Target.ENEMY_ONE && !(one instanceof TargetRef.Enemy) && !(one instanceof TargetRef.Summon)) {
+                errors.add("enemy(one enemy/summon) target required");
+            }
 
             // 도발(등) 타겟 강제 규칙 검증
-            if (one instanceof TargetRef.Enemy) {
+            if (one instanceof TargetRef.Enemy || one instanceof TargetRef.Summon) {
                 StatusOps.validateEnemyOneTarget(ec.state(), ec.ctx(), TargetRef.ofPlayer(ec.actor()), ec.cardId(), one, errors);
             }
         }
@@ -106,13 +108,13 @@ public final class EffectOps {
 
             case ALLY_ONE -> List.of(TargetRef.ofPlayer(ec.selection().requireOnePlayer()));
             case ENEMY_ONE -> {
-                TargetRef chosen = TargetRef.ofEnemy(ec.selection().requireOneEnemy());
+                TargetRef chosen = ec.selection().requireOneEnemyOrSummon();
                 TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), TargetRef.ofPlayer(ec.actor()), ec.cardId(), chosen, ec.out(), ec.actor().value());
                 yield List.of(resolved);
             }
             case ANY_ONE -> {
                 TargetRef chosen = ec.selection().requireOne();
-                if (chosen instanceof TargetRef.Enemy) {
+                if (chosen instanceof TargetRef.Enemy || chosen instanceof TargetRef.Summon) {
                     TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), TargetRef.ofPlayer(ec.actor()), ec.cardId(), chosen, ec.out(), ec.actor().value());
                     yield List.of(resolved);
                 }

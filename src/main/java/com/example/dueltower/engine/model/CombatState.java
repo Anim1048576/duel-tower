@@ -48,12 +48,14 @@ public final class CombatState {
     public static FactionId factionOf(TargetRef ref) {
         if (ref instanceof TargetRef.Player) return FactionId.PLAYERS;
         if (ref instanceof TargetRef.Enemy)  return FactionId.ENEMIES;
+        if (ref instanceof TargetRef.Summon) return FactionId.PLAYERS;
         throw new IllegalArgumentException("unknown TargetRef: " + ref);
     }
 
     public static String actorKey(TargetRef ref) {
         if (ref instanceof TargetRef.Player p) return "P:" + p.id().value();
         if (ref instanceof TargetRef.Enemy e)  return "E:" + e.id().value();
+        if (ref instanceof TargetRef.Summon s) return "S:" + s.ownerId().value() + ":" + s.summonId().value();
         throw new IllegalArgumentException("unknown TargetRef: " + ref);
     }
 
