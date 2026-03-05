@@ -31,10 +31,8 @@ public final class DrawCommand implements GameCommand {
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
         List<String> errors = new ArrayList<>();
-        PlayerState ps = state.player(playerId);
-        if (ps == null) errors.add("player not found");
+        CommandValidation.validateMainTurn(state, playerId, errors);
         if (count <= 0) errors.add("count must be positive");
-        if (ps != null && ps.pendingDecision() != null) errors.add("pending decision exists");
         return errors;
     }
 
