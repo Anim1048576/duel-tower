@@ -1,5 +1,6 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
+import com.example.dueltower.common.util.DiceUtility;
 import com.example.dueltower.content.keyword.kdb.K003_Installed;
 import com.example.dueltower.content.status.sdb.player.tig.Tig201_Status;
 import com.example.dueltower.engine.core.ZoneOps;
@@ -52,7 +53,7 @@ final class TigEffectSupport {
         long mix = ec.state().seed() ^ ec.state().version() ^ (long) ec.out().size() * 31L;
         mix ^= ec.actor().value().hashCode();
         mix ^= ec.cardId().value().hashCode();
-        return new Random(mix).nextInt(6) + 1;
+        return DiceUtility.rollDice(1, 6, new Random(mix));
     }
 
     static void log(EffectContext ec, String msg) {
