@@ -42,24 +42,29 @@ public class SessionService {
     }
 
     public SessionRuntime createSession(String gmId) {
-        String code = generateUniqueCode(8);
+        for (int attempt = 0; attempt < 10_000; attempt++) {
+            String code = generateCode(8);
 
-        EngineContext ctx = new EngineContext(
-                cardService.asMap(),
-                cardService.effectsMap(),
-                statusService.defsMap(),
-                statusService.effectsMap(),
-                keywordService.defsMap(),
-                keywordService.effectsMap()
-        );
-        GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
+            EngineContext ctx = new EngineContext(
+                    cardService.asMap(),
+                    cardService.effectsMap(),
+                    statusService.defsMap(),
+                    statusService.effectsMap(),
+                    keywordService.defsMap(),
+                    keywordService.effectsMap()
+            );
+            GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
+            SessionRuntime rt = new SessionRuntime(code, gmId, state, ctx);
 
-        SessionRuntime rt = new SessionRuntime(code, gmId, state, ctx);
-        sessions.put(code, rt);
+            if (sessions.putIfAbsent(code, rt) == null) {
+                log.debug("created session code={} gmId={} sessionId={} seed={}",
+                        code, gmId, state.sessionId().value(), state.seed());
+                return rt;
+            }
+        }
 
-        log.debug("created session code={} gmId={} sessionId={} seed={}",
-                code, gmId, state.sessionId().value(), state.seed());
-        return rt;
+        log.warn("failed to allocate session code gmId={} after max attempts", gmId);
+        throw new ResponseStatusException(SERVICE_UNAVAILABLE, "failed to allocate session code");
     }
 
     public SessionRuntime get(String code) {
@@ -139,14 +144,6 @@ public class SessionService {
         CardInstance ci = new CardInstance(instId, defId, ps.playerId(), Zone.EX);
         state.cardInstances().put(instId, ci);
         ps.exCard(instId);
-    }
-
-    private String generateUniqueCode(int len) {
-        for (int attempt = 0; attempt < 10_000; attempt++) {
-            String c = generateCode(len);
-            if (!sessions.containsKey(c)) return c;
-        }
-        throw new ResponseStatusException(SERVICE_UNAVAILABLE, "failed to allocate session code");
     }
 
     private String generateCode(int len) {
