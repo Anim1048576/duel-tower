@@ -88,6 +88,9 @@ public class SessionController {
         if (req == null || req.type() == null || req.type().isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "type is required");
         }
+        if (req.expectedVersion() == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "expectedVersion is required");
+        }
         SessionRuntime rt = sessionService.get(code);
 
         String t = req.type().trim().toUpperCase(Locale.ROOT);
@@ -112,8 +115,7 @@ public class SessionController {
         );
 
         final EngineResult res = rt.withLock(() -> {
-            long expectedVersion = (req.expectedVersion() == null) ? rt.state().version() : req.expectedVersion();
-            GameCommand cmd = toCommand(req, commandId, expectedVersion);
+            GameCommand cmd = toCommand(req, commandId, req.expectedVersion());
             return rt.apply(cmd);
         });
 
