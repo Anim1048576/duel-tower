@@ -1,6 +1,7 @@
 package com.example.dueltower.session.service;
 
 import com.example.dueltower.content.card.service.CardService;
+import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
 import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.engine.core.EngineContext;
@@ -33,6 +34,7 @@ public class SessionService {
     private final CardService cardService;
     private final StatusService statusService;
     private final KeywordService keywordService;
+    private final PassiveService passiveService;
     private final Duration sessionTtl;
     private final Duration cleanupInterval;
 
@@ -41,16 +43,16 @@ public class SessionService {
 
     private final SecureRandom rnd = new SecureRandom();
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
-    private static final Set<String> PASSIVE_ID_REGISTRY = Set.of("P001", "P002", "P003");
-
     public SessionService(CardService cardService,
                           StatusService statusService,
                           KeywordService keywordService,
+                          PassiveService passiveService,
                           @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.cardService = cardService;
         this.statusService = statusService;
         this.keywordService = keywordService;
+        this.passiveService = passiveService;
         this.sessionTtl = sessionTtl;
         this.cleanupInterval = cleanupInterval;
     }
@@ -66,7 +68,9 @@ public class SessionService {
                     statusService.defsMap(),
                     statusService.effectsMap(),
                     keywordService.defsMap(),
-                    keywordService.effectsMap()
+                    keywordService.effectsMap(),
+                    passiveService.defsMap(),
+                    passiveService.effectsMap()
             );
             GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
             SessionRuntime rt = new SessionRuntime(code, gmId, generateGmToken(), state, ctx);
@@ -170,7 +174,7 @@ public class SessionService {
                 throw new ResponseStatusException(BAD_REQUEST, "passiveIds contains blank id");
             }
             String id = raw.trim();
-            if (!PASSIVE_ID_REGISTRY.contains(id)) {
+            if (!passiveService.defsMap().containsKey(id)) {
                 throw new ResponseStatusException(BAD_REQUEST, "unknown passiveId: " + id);
             }
             if (!normalized.add(id)) {

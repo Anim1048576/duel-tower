@@ -2,10 +2,12 @@ package com.example.dueltower.engine.core;
 
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.keyword.KeywordEffect;
+import com.example.dueltower.engine.core.effect.passive.PassiveEffect;
 import com.example.dueltower.engine.core.effect.status.StatusEffect;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import com.example.dueltower.engine.model.KeywordDefinition;
+import com.example.dueltower.engine.model.PassiveDefinition;
 import com.example.dueltower.engine.model.StatusDefinition;
 
 import java.util.Map;
@@ -26,8 +28,11 @@ public final class EngineContext {
     private final Map<String, KeywordDefinition> keywordDefs;
     private final Map<String, KeywordEffect> keywordEffects;
 
+    private final Map<String, PassiveDefinition> passiveDefs;
+    private final Map<String, PassiveEffect> passiveEffects;
+
     public EngineContext(Map<CardDefId, CardDefinition> definitions, Map<CardDefId, CardEffect> effects) {
-        this(definitions, effects, Map.of(), Map.of(), Map.of(), Map.of());
+        this(definitions, effects, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
     }
 
     public EngineContext(
@@ -36,7 +41,7 @@ public final class EngineContext {
             Map<String, StatusDefinition> statusDefs,
             Map<String, StatusEffect> statusEffects
     ) {
-        this(definitions, effects, statusDefs, statusEffects, Map.of(), Map.of());
+        this(definitions, effects, statusDefs, statusEffects, Map.of(), Map.of(), Map.of(), Map.of());
     }
 
     public EngineContext(
@@ -47,12 +52,27 @@ public final class EngineContext {
             Map<String, KeywordDefinition> keywordDefs,
             Map<String, KeywordEffect> keywordEffects
     ) {
+        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, Map.of(), Map.of());
+    }
+
+    public EngineContext(
+            Map<CardDefId, CardDefinition> definitions,
+            Map<CardDefId, CardEffect> effects,
+            Map<String, StatusDefinition> statusDefs,
+            Map<String, StatusEffect> statusEffects,
+            Map<String, KeywordDefinition> keywordDefs,
+            Map<String, KeywordEffect> keywordEffects,
+            Map<String, PassiveDefinition> passiveDefs,
+            Map<String, PassiveEffect> passiveEffects
+    ) {
         this.definitions = Map.copyOf(definitions);
         this.effects = Map.copyOf(effects);
         this.statusDefs = Map.copyOf(statusDefs);
         this.statusEffects = Map.copyOf(statusEffects);
         this.keywordDefs = Map.copyOf(keywordDefs);
         this.keywordEffects = Map.copyOf(keywordEffects);
+        this.passiveDefs = Map.copyOf(passiveDefs);
+        this.passiveEffects = Map.copyOf(passiveEffects);
     }
 
     public CardDefinition def(CardDefId id) {
@@ -108,6 +128,26 @@ public final class EngineContext {
     public KeywordEffect keywordEffect(String id) {
         KeywordEffect e = keywordEffects.get(id);
         if (e == null) throw new IllegalArgumentException("missing KeywordEffect: " + id);
+        return e;
+    }
+
+    public boolean hasPassiveDef(String id) {
+        return passiveDefs.containsKey(id);
+    }
+
+    public PassiveDefinition passiveDef(String id) {
+        PassiveDefinition d = passiveDefs.get(id);
+        if (d == null) throw new IllegalArgumentException("missing PassiveDefinition: " + id);
+        return d;
+    }
+
+    public boolean hasPassiveEffect(String id) {
+        return passiveEffects.containsKey(id);
+    }
+
+    public PassiveEffect passiveEffect(String id) {
+        PassiveEffect e = passiveEffects.get(id);
+        if (e == null) throw new IllegalArgumentException("missing PassiveEffect: " + id);
         return e;
     }
 }

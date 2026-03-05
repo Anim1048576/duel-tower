@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.core.combat;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
@@ -35,13 +36,15 @@ public final class DamageOps {
         StatusRuntime rt = new StatusRuntime(state, ctx, out, source);
         int remaining = amount;
 
-        // 0) '주는 피해' 변형(공격자 상태)
+        // 0) '주는 피해' 변형 순서: passive -> status
         if (sourceRef != null) {
+            remaining = PassiveOps.onOutgoingDamage(state, ctx, out, sourceRef, target, remaining, source);
             remaining = applyOutgoing(state, ctx, rt, sourceRef, target, remaining);
         }
         if (remaining <= 0) return;
 
-        // 1) '받는 피해' 변형(대상 상태 + 대상 진영 상태)
+        // 1) '받는 피해' 변형 순서: passive -> status(대상 상태 + 대상 진영 상태)
+        remaining = PassiveOps.onIncomingDamage(state, ctx, out, sourceRef, target, remaining, source);
         remaining = applyIncoming(state, ctx, rt, sourceRef, target, remaining, f);
         if (remaining <= 0) return;
 

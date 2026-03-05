@@ -6,6 +6,7 @@ import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.keyword.ExActivationReason;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
+import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
@@ -71,13 +72,16 @@ public final class UseExCommand implements GameCommand {
         if (def.type() != CardType.EX) errors.add("not an EX card: " + def.id().value());
 
 
+        // EX 훅 순서: passive -> status
+
         // 상태에 의한 EX 사용 제한(예: 기절)
         StatusOps.validateUseEx(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
 
-        // 코스트/AP 체크 (상태에 의한 코스트 증감 포함)
+        // 코스트/AP 체크 (passive -> status 순으로 코스트 변형 적용)
         List<GameEvent> dummyOut = new ArrayList<>();
         int needBase = def.cost();
-        int need = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, dummyOut, "VALIDATE");
+        int needPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, dummyOut, "VALIDATE");
+        int need = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needPassive, dummyOut, "VALIDATE");
         int have = ps.ap();
         if (have < need) errors.add("not enough ap (need=" + need + ", have=" + have + ")");
 
@@ -107,14 +111,16 @@ public final class UseExCommand implements GameCommand {
 
         CardDefinition def = ctx.def(ci.defId());
 
-        // 코스트 지불 (상태에 의한 코스트 증감 포함)
+        // 코스트 지불 (passive -> status 순으로 코스트 변형 적용)
         int costBase = def.cost();
-        int cost = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costBase, events, "USE_EX_COST");
+        int costPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costBase, events, "USE_EX_COST");
+        int cost = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costPassive, events, "USE_EX_COST");
         if (ps.ap() < cost) {
             throw new IllegalStateException("not enough ap during handle (need=" + cost + ", have=" + ps.ap() + ")");
         }
         if (cost > 0) ps.ap(ps.ap() - cost);
-// 효과 실행
+
+        // 효과 실행
         CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, exId, selection, events);
         eff.resolve(ec);
