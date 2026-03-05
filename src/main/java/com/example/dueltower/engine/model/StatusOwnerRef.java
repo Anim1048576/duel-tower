@@ -8,7 +8,6 @@ public sealed interface StatusOwnerRef
     record Card(Ids.CardInstId id) implements StatusOwnerRef {}
 
     static StatusOwnerRef of(TargetRef who) {
-        if (who instanceof TargetRef.Summon s) return new Card(new Ids.CardInstId(s.summonId().value()));
         return new Character(who);
     }
     static StatusOwnerRef of(CombatState.FactionId id) { return new Faction(id); }

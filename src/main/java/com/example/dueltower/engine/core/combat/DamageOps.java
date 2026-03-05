@@ -46,24 +46,11 @@ public final class DamageOps {
         if (remaining <= 0) return;
 
         // 2) HP 적용
-        if (target instanceof TargetRef.Player p) {
-            PlayerState ps = state.player(p.id());
-            if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
-            ps.hp(ps.hp() - remaining);
-            out.add(new GameEvent.LogAppended(
-                    source + " deals " + remaining + " to PLAYER:" + p.id().value() + " (hp=" + ps.hp() + "/" + ps.maxHp() + ")"
-            ));
-            return;
-        }
-
-        if (target instanceof TargetRef.Enemy e) {
-            EnemyState es = state.enemy(e.id());
-            if (es == null) throw new IllegalStateException("missing enemy: " + e.id().value());
-            es.hp(es.hp() - remaining);
-            out.add(new GameEvent.LogAppended(
-                    source + " deals " + remaining + " to ENEMY:" + e.id().value() + " (hp=" + es.hp() + "/" + es.maxHp() + ")"
-            ));
-        }
+        CombatEntityOps.adjustHp(state, ctx, out, target, -remaining);
+        out.add(new GameEvent.LogAppended(
+                source + " deals " + remaining + " to " + CombatEntityOps.targetLabel(target)
+                        + " (hp=" + CombatEntityOps.hpText(state, target) + ")"
+        ));
     }
 
     private record HookEntry(StatusOwnerRef owner, String statusId, int priority) {}
