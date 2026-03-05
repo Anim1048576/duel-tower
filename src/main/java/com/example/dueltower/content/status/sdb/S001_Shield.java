@@ -34,6 +34,8 @@ public class S001_Shield implements StatusBlueprint {
     public int onIncomingDamage(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, int amount) {
         int shield = rt.stacks(owner, id());
         if (shield <= 0 || amount <= 0) return amount;
+        if (source == null) return amount;
+        if (CombatState.factionOf(source) == CombatState.factionOf(target)) return amount;
 
         int absorbed = Math.min(shield, amount);
         rt.stacksSet(owner, id(), shield - absorbed);
