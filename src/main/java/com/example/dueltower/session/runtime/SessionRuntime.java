@@ -6,6 +6,7 @@ import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
 import com.example.dueltower.engine.model.GameState;
 
+import java.time.Instant;
 import java.util.function.Supplier;
 
 /**
@@ -24,6 +25,8 @@ public final class SessionRuntime {
     private final GameEngine engine;
 
     private final Object lock = new Object();
+    private final Instant createdAt;
+    private volatile Instant lastAccessedAt;
 
     public SessionRuntime(String code, String gmId, String gmToken, GameState state, EngineContext ctx) {
         this.code = code;
@@ -32,6 +35,8 @@ public final class SessionRuntime {
         this.state = state;
         this.ctx = ctx;
         this.engine = new GameEngine();
+        this.createdAt = Instant.now();
+        this.lastAccessedAt = this.createdAt;
     }
 
     public String code() { return code; }
@@ -40,15 +45,21 @@ public final class SessionRuntime {
 
     public GameState state() { return state; }
     public EngineContext ctx() { return ctx; }
+    public Instant createdAt() { return createdAt; }
+    public Instant lastAccessedAt() { return lastAccessedAt; }
+
+    public void touchAccess() { this.lastAccessedAt = Instant.now(); }
 
     public <T> T withLock(Supplier<T> work) {
         synchronized (lock) {
+            touchAccess();
             return work.get();
         }
     }
 
     public EngineResult apply(GameCommand cmd) {
         synchronized (lock) {
+            touchAccess();
             return engine.process(state, ctx, cmd);
         }
     }
