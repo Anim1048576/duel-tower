@@ -4,6 +4,7 @@ import { load, save } from '../lib/storage'
 import type { CommandRequest, EngineResponse, SessionState } from '../lib/model'
 import { explainApiError, getSessionState, joinSession, sendCommand } from '../lib/api'
 import { session } from './session'
+import { presets } from './presets'
 import { error as logError, info as logInfo, pushEngineEvents } from './log'
 
 export type CombatStore = {
@@ -55,7 +56,9 @@ export async function ensureJoined() {
   const pid = (s.meId || '').trim()
   if (!code || !pid) return
   try {
-    await joinSession(code, pid)
+    const presetState = get(presets)
+    const selected = presetState.presets.find((p) => p.id === presetState.selectedId) ?? presetState.presets[0]
+    await joinSession(code, pid, selected?.passiveIds ?? [])
     await refreshState()
   } catch (e) {
     combat.update((c) => ({ ...c, lastError: explainApiError(e) }))

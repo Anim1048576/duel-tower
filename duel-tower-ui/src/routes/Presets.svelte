@@ -1,11 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { content, ensureCards } from '../stores/content'
-  import { presets, createPreset, deletePreset, renamePreset, selectPreset, setDeck, setEx } from '../stores/presets'
+  import { presets, createPreset, deletePreset, renamePreset, selectPreset, setDeck, setEx, setPassiveIds } from '../stores/presets'
   import { pushToast } from '../stores/log'
 
   let q = ''
   let nameDraft = ''
+
+  const passiveCandidates = [
+    { id: 'P001', name: '기본 패시브 I' },
+    { id: 'P002', name: '기본 패시브 II' },
+    { id: 'P003', name: '기본 패시브 III' },
+  ]
 
   onMount(async () => {
     await ensureCards()
@@ -49,6 +55,20 @@
     setEx(selected.id, null)
   }
 
+  function togglePassive(passiveId: string) {
+    if (!selected) return
+    const has = selected.passiveIds.includes(passiveId)
+    if (has) {
+      setPassiveIds(selected.id, selected.passiveIds.filter((id) => id !== passiveId))
+      return
+    }
+    if (selected.passiveIds.length >= 2) {
+      pushToast('패시브 제한', '패시브는 최대 2개까지 선택 가능')
+      return
+    }
+    setPassiveIds(selected.id, [...selected.passiveIds, passiveId])
+  }
+
   $: filtered = $content.cards
     .filter((c) => {
       const s = q.trim().toLowerCase()
@@ -63,7 +83,7 @@
 
   function exportJson() {
     if (!selected) return
-    const payload = { name: selected.name, deck: selected.deck, ex: selected.ex }
+    const payload = { name: selected.name, deck: selected.deck, ex: selected.ex, passiveIds: selected.passiveIds }
     navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(
       () => pushToast('프리셋 JSON 복사됨'),
       () => pushToast('복사 실패')
@@ -147,7 +167,7 @@
           <div class="turnItem" class:isActive={p.id === $presets.selectedId} on:click={() => { selectPreset(p.id); nameDraft = p.name }}>
             <div>
               <b>{p.name}</b>
-              <div class="hint">덱 {p.deck.length}/12 · EX {p.ex ? '1' : '0'}</div>
+              <div class="hint">덱 {p.deck.length}/12 · EX {p.ex ? '1' : '0'} · 패시브 {p.passiveIds.length}/2</div>
             </div>
             <span class="badge mono">{p.id.slice(0, 6)}</span>
           </div>
@@ -170,6 +190,22 @@
             <div class="v mono">{selected.ex ?? '—'}</div>
             <div class="row wrap" style="margin-top:10px">
               <button class="btn" on:click={clearEx} disabled={!selected.ex}>비우기</button>
+            </div>
+          </div>
+          <div class="kv">
+            <div class="k">패시브</div>
+            <div class="v mono">{selected.passiveIds.length ? selected.passiveIds.join(', ') : '—'}</div>
+            <div class="hint" style="margin-top:10px">최대 2개 선택</div>
+            <div class="cardRow" style="margin-top:10px">
+              {#each passiveCandidates as passive (passive.id)}
+                <button
+                  class="btn"
+                  class:primary={selected.passiveIds.includes(passive.id)}
+                  on:click={() => togglePassive(passive.id)}
+                >
+                  {passive.id} · {passive.name}
+                </button>
+              {/each}
             </div>
           </div>
           <div class="kv">

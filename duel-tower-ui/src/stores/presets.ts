@@ -7,6 +7,7 @@ export type DeckPreset = {
   name: string
   deck: string[] // card defIds
   ex: string | null
+  passiveIds: string[]
   createdAt: string
   updatedAt: string
 }
@@ -14,6 +15,12 @@ export type DeckPreset = {
 type PresetState = {
   presets: DeckPreset[]
   selectedId: string | null
+}
+
+type LegacyDeckPreset = Omit<DeckPreset, 'passiveIds'> & { passiveIds?: string[] }
+type LegacyPresetState = {
+  presets?: LegacyDeckPreset[]
+  selectedId?: string | null
 }
 
 function uid(prefix = 'pr') {
@@ -24,10 +31,28 @@ function now() {
   return new Date().toISOString()
 }
 
-const seed: PresetState = load(KEY.presets, {
+function migratePresetState(raw: LegacyPresetState): PresetState {
+  const presets = Array.isArray(raw?.presets)
+    ? raw.presets.map((p) => ({
+        id: String(p.id ?? uid()),
+        name: String(p.name ?? '새 프리셋'),
+        deck: Array.isArray(p.deck) ? p.deck.map(String).slice(0, 12) : [],
+        ex: p.ex ? String(p.ex) : null,
+        passiveIds: Array.isArray(p.passiveIds) ? p.passiveIds.map(String).slice(0, 2) : [],
+        createdAt: String(p.createdAt ?? now()),
+        updatedAt: String(p.updatedAt ?? now()),
+      }))
+    : []
+
+  const selectedId = typeof raw?.selectedId === 'string' ? raw.selectedId : null
+  return { presets, selectedId }
+}
+
+const legacySeed = load<LegacyPresetState>(KEY.presets, {
   presets: [],
   selectedId: null,
 })
+const seed: PresetState = migratePresetState(legacySeed)
 
 if (!seed.presets.length) {
   const t = now()
@@ -37,6 +62,7 @@ if (!seed.presets.length) {
       name: '기본 프리셋',
       deck: ['C001', 'C001', 'C001', 'C001', 'C001', 'C001', 'C002', 'C002', 'C002', 'C002', 'C002', 'C002'],
       ex: 'C001',
+      passiveIds: [],
       createdAt: t,
       updatedAt: t,
     },
@@ -53,7 +79,7 @@ export function selectPreset(id: string) {
 
 export function createPreset(name = '새 프리셋') {
   const t = now()
-  const p: DeckPreset = { id: uid(), name, deck: [], ex: null, createdAt: t, updatedAt: t }
+  const p: DeckPreset = { id: uid(), name, deck: [], ex: null, passiveIds: [], createdAt: t, updatedAt: t }
   presets.update((s) => ({ presets: [p, ...s.presets], selectedId: p.id }))
 }
 
@@ -83,5 +109,12 @@ export function setEx(id: string, ex: string | null) {
   presets.update((s) => ({
     ...s,
     presets: s.presets.map((p) => (p.id === id ? { ...p, ex, updatedAt: now() } : p)),
+  }))
+}
+
+export function setPassiveIds(id: string, passiveIds: string[]) {
+  presets.update((s) => ({
+    ...s,
+    presets: s.presets.map((p) => (p.id === id ? { ...p, passiveIds: passiveIds.slice(0, 2), updatedAt: now() } : p)),
   }))
 }
