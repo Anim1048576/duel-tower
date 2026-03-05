@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.keyword.DiscardReason;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
@@ -83,10 +84,8 @@ public final class HandSwapCommand implements GameCommand {
 
         ps.swappedThisTurn(true);
 
-        if (ps.hand().size() > ps.handLimit()) {
-            ps.pendingDecision(new PendingDecision.DiscardToHandLimit("hand limit exceeded", ps.handLimit()));
-            events.add(new GameEvent.PendingDecisionSet(ps.playerId().value(), "DISCARD_TO_HAND_LIMIT", "hand limit exceeded"));
-        }
+        // 손패 제한 초과 시 버림 결정 설정(단, 부동 카드만으로 초과된 경우는 제외)
+        HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, events, "hand limit exceeded");
 
         events.add(new GameEvent.LogAppended(ps.playerId().value() + " hand swaps (discard 1" + (isToken ? ", token" : ", draw 1") + ")"));
         return events;
