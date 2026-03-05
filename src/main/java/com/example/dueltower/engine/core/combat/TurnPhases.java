@@ -3,6 +3,7 @@ package com.example.dueltower.engine.core.combat;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusPhases;
 import com.example.dueltower.engine.core.effect.card.FieldEffectOps;
 import com.example.dueltower.engine.event.GameEvent;
@@ -28,6 +29,8 @@ public final class TurnPhases {
      * - (플레이어만) 손패 제한(6) 초과 시 discard-to-limit 결정 생성
      */
     public static void turnStart(GameState state, EngineContext ctx, TargetRef actor, List<GameEvent> out, String source) {
+        // 턴 시작 훅 순서: passive -> status
+        PassiveOps.turnStart(state, ctx, actor, out, source);
         StatusPhases.turnStart(state, ctx, actor, out, source);
 
         if (actor instanceof TargetRef.Player p) {
@@ -64,6 +67,8 @@ public final class TurnPhases {
      *   * 집념 등 "턴 종료 시 회복 AP에서 차감" 같은 규칙은 추후 여기서 처리하면 됨.
      */
     public static void turnEnd(GameState state, EngineContext ctx, TargetRef actor, List<GameEvent> out, String source) {
+        // 턴 종료 훅 순서: passive -> status
+        PassiveOps.turnEnd(state, ctx, actor, out, source);
         StatusPhases.turnEnd(state, ctx, actor, out, source);
 
         if (actor instanceof TargetRef.Player p) {
