@@ -2,7 +2,7 @@
   import { navigate } from '../lib/router'
   import { createSession, explainApiError, joinSession } from '../lib/api'
   import { copyToClipboard } from '../lib/clipboard'
-  import { session, setGmId, setLastError, setMeId, setSessionCode } from '../stores/session'
+  import { session, setGmId, setGmToken, setLastError, setMeId, setSessionCode } from '../stores/session'
   import { ensureCards } from '../stores/content'
   import { refreshState } from '../stores/combat'
   import { pushToast } from '../stores/log'
@@ -23,6 +23,7 @@
       const res = await createSession(meId.trim())
       setSessionCode(res.code)
       setGmId(res.gmId)
+      setGmToken(res.gmToken)
 
       // creator should also join as a player
       await joinSession(res.code, meId.trim())
@@ -45,6 +46,7 @@
       setMeId(meId)
       const code = joinCode.trim().toUpperCase()
       setSessionCode(code)
+      setGmToken('')
       await joinSession(code, meId.trim())
       await refreshState()
       pushToast('세션 참가', code)

@@ -75,6 +75,7 @@ export type EngineResponse = {
 export type CreateSessionResponse = {
   code: string
   gmId: string
+  gmToken: string
   state: SessionState
 }
 
