@@ -2,6 +2,7 @@ package com.example.dueltower.engine.model;
 
 import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
+import com.example.dueltower.engine.model.Ids.SummonInstId;
 
 import java.util.*;
 
@@ -14,6 +15,9 @@ public final class PlayerState {
     private final List<CardInstId> grave = new ArrayList<>();
     private final List<CardInstId> field = new ArrayList<>();
     private final List<CardInstId> excluded = new ArrayList<>();
+
+    private final List<SummonInstId> activeSummons = new ArrayList<>();
+    private final Map<CardInstId, SummonInstId> summonByCard = new LinkedHashMap<>();
 
     // ===== EX/턴 플래그 =====
     private CardInstId exCard;
@@ -67,6 +71,8 @@ public final class PlayerState {
     public List<CardInstId> grave() { return grave; }
     public List<CardInstId> field() { return field; }
     public List<CardInstId> excluded() { return excluded; }
+    public List<SummonInstId> activeSummons() { return activeSummons; }
+    public Map<CardInstId, SummonInstId> summonByCard() { return summonByCard; }
 
     // ===== EX =====
     public CardInstId exCard() { return exCard; }

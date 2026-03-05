@@ -304,10 +304,8 @@ public final class StatusOps {
 
     private static List<TargetRef> allSummonTargets(GameState state, EngineContext ctx) {
         List<TargetRef> summons = new ArrayList<>();
-        for (CardInstance ci : state.cardInstances().values()) {
-            if (ci.zone() != Zone.FIELD) continue;
-            if (!KeywordOps.hasKeyword(state, ctx, ci.instanceId(), "소환")) continue;
-            summons.add(TargetRef.ofSummon(ci.ownerId(), new Ids.SummonInstId(ci.instanceId().value())));
+        for (SummonState summon : state.summons().values()) {
+            summons.add(TargetRef.ofSummon(summon.owner(), summon.id()));
         }
         return summons;
     }

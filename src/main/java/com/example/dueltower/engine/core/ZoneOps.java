@@ -72,6 +72,23 @@ public final class ZoneOps {
             }
         }
 
+
+        for (PlayerState ps : state.players().values()) {
+            for (Ids.SummonInstId summonId : ps.activeSummons()) {
+                SummonState summon = state.summon(summonId);
+                if (summon == null) {
+                    issues.add("active summon missing state: " + summonId.value() + " (owner=" + ps.playerId().value() + ")");
+                    continue;
+                }
+                if (!Objects.equals(summon.owner(), ps.playerId())) {
+                    issues.add("summon owner mismatch: " + summonId.value());
+                }
+                if (!ps.field().contains(summon.sourceCardId())) {
+                    issues.add("summon source card not on field: " + summon.sourceCardId().value());
+                }
+            }
+        }
+
         return issues;
     }
 
@@ -143,6 +160,11 @@ public final class ZoneOps {
         CardDefinition def = ctx.def(ci.defId());
 
         Zone finalTo = KeywordOps.overrideMoveDestination(state, ctx, ps, id, from, to, reason);
+
+        boolean leavingField = from == Zone.FIELD && finalTo != Zone.FIELD;
+        if (leavingField) {
+            SummonOps.destroySummonForCard(state, ps, id);
+        }
 
         if (def.token() && (finalTo == Zone.DECK || finalTo == Zone.GRAVE || finalTo == Zone.EXCLUDED || finalTo == Zone.EX)) {
             removeFromZone(ps, id, from);
