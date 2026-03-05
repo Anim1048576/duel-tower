@@ -2,13 +2,16 @@ package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
 import com.example.dueltower.engine.core.effect.EffectContext;
+import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.Zone;
+import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
+@Component
 public class Tig006_Card implements CardBlueprint {
     @Override public String id() { return "Tig006_Card"; }
 
@@ -30,6 +33,11 @@ public class Tig006_Card implements CardBlueprint {
 
     @Override
     public void resolve(EffectContext ec) {
-        // TODO : 효과 구현
+        PlayerState me = ec.state().player(ec.actor());
+        if (!TigEffectSupport.discardOneFromHandExcludingSource(ec, me)) {
+            TigEffectSupport.log(ec, id() + ": discard failed, no card to discard");
+            return;
+        }
+        TigEffectSupport.destroyInstalledCards(ec, 3);
     }
 }
