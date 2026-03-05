@@ -198,6 +198,7 @@ public class SessionController {
                 return new StartCombatCommand(commandId, expectedVersion, playerId);
             }
             case "DRAW" -> {
+                // DRAW is a public product-rule command (validated by main-turn constraints in DrawCommand).
                 PlayerId playerId = parsePlayerId(req.playerId());
                 int count = (req.count() == null) ? 1 : req.count();
                 return new DrawCommand(commandId, expectedVersion, playerId, count);
