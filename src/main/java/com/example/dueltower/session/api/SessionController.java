@@ -64,12 +64,14 @@ public class SessionController {
         if (req == null || req.playerId() == null || req.playerId().isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
-        sessionService.join(code, req.playerId(), req.passiveIds());
+        List<String> requestedPassiveIds = (req.passiveIds() == null) ? List.of() : req.passiveIds();
+        sessionService.join(code, req.playerId(), requestedPassiveIds);
 
         SessionStateDto state = sessionService.withSessionLock(code, rt -> {
-            log.info("session join code={} playerId={} playersNow={}",
+            log.info("session join code={} playerId={} requestedPassiveIds={} playersNow={}",
                     code,
                     req.playerId().trim(),
+                    requestedPassiveIds,
                     rt.state().players().size()
             );
             return StateMapper.toDto(rt.code(), rt.state());
