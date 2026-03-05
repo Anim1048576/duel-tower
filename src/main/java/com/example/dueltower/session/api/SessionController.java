@@ -45,14 +45,16 @@ public class SessionController {
                 rt.state().seed()
         );
 
-        return new CreateSessionResponse(rt.code(), rt.gmId(), StateMapper.toDto(rt.code(), rt.state()));
+        SessionStateDto state = rt.withLock(() -> StateMapper.toDto(rt.code(), rt.state()));
+        return new CreateSessionResponse(rt.code(), rt.gmId(), state);
     }
 
     @GetMapping("/{code}")
     public SessionStateDto state(@PathVariable String code) {
-        SessionRuntime rt = sessionService.get(code);
-        log.debug("session state requested code={} version={}", code, rt.state().version());
-        return StateMapper.toDto(rt.code(), rt.state());
+        return sessionService.withSessionLock(code, rt -> {
+            log.debug("session state requested code={} version={}", code, rt.state().version());
+            return StateMapper.toDto(rt.code(), rt.state());
+        });
     }
 
     @PostMapping("/{code}/join")
@@ -60,16 +62,18 @@ public class SessionController {
         if (req == null || req.playerId() == null || req.playerId().isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
-        SessionRuntime rt = sessionService.get(code);
         sessionService.join(code, req.playerId());
 
-        log.info("session join code={} playerId={} playersNow={}",
-                code,
-                req.playerId().trim(),
-                rt.state().players().size()
-        );
+        SessionStateDto state = sessionService.withSessionLock(code, rt -> {
+            log.info("session join code={} playerId={} playersNow={}",
+                    code,
+                    req.playerId().trim(),
+                    rt.state().players().size()
+            );
+            return StateMapper.toDto(rt.code(), rt.state());
+        });
 
-        return new JoinSessionResponse(StateMapper.toDto(rt.code(), rt.state()));
+        return new JoinSessionResponse(state);
     }
 
     @PostMapping("/{code}/command")
@@ -117,11 +121,13 @@ public class SessionController {
                     code, req.type(), commandId, res.errors(), res.state().version(), tookMs);
         }
 
+        SessionStateDto state = rt.withLock(() -> StateMapper.toDto(rt.code(), res.state()));
+
         return new EngineResponseDto(
                 res.accepted(),
                 res.errors(),
                 StateMapper.toEventDtos(res.events()),
-                StateMapper.toDto(rt.code(), res.state())
+                state
         );
     }
 

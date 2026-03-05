@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import static org.springframework.http.HttpStatus.*;
 
@@ -65,6 +66,11 @@ public class SessionService {
         SessionRuntime rt = sessions.get(code);
         if (rt == null) throw new ResponseStatusException(NOT_FOUND, "session not found");
         return rt;
+    }
+
+    public <T> T withSessionLock(String code, Function<SessionRuntime, T> reader) {
+        SessionRuntime rt = get(code);
+        return rt.withLock(() -> reader.apply(rt));
     }
 
     /**
