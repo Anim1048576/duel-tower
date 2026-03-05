@@ -10,5 +10,15 @@ public record CombatStateDto(
         String currentTurnPlayer,
         String phase,
         Map<String, Integer> initiatives,
-        List<List<String>> initiativeTieGroups
+        List<List<String>> initiativeTieGroups,
+        List<SummonDto> summons
+) {
+    public record SummonDto(
+            String summonId,
+            String owner,
+            int hp,
+            int atk,
+            int heal,
+            boolean actionAvailable
+    ) {}
 ) {}

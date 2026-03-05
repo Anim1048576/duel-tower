@@ -36,6 +36,16 @@ public final class StateMapper {
             List<String> order = cs.turnOrder().stream()
                     .map(CombatState::actorKey)
                     .toList();
+            List<CombatStateDto.SummonDto> summons = state.summons().values().stream()
+                    .map(s -> new CombatStateDto.SummonDto(
+                            s.id().value().toString(),
+                            s.owner().value(),
+                            s.hp(),
+                            s.atk(),
+                            s.heal(),
+                            !s.actionUsedThisTurn()
+                    ))
+                    .toList();
 
             combat = new CombatStateDto(
                     cs.round(),
@@ -44,7 +54,8 @@ public final class StateMapper {
                     CombatState.actorKey(cs.currentTurnActor()),
                     cs.phase().name(),
                     Map.copyOf(cs.initiatives()),
-                    List.copyOf(cs.initiativeTieGroups())
+                    List.copyOf(cs.initiativeTieGroups()),
+                    summons
             );
         }
 

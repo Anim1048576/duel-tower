@@ -13,6 +13,12 @@ import java.util.List;
  *
  * expectedVersion is required and must be provided by clients for optimistic concurrency.
  *
+ * Target serialization rules:
+ * - Prefer `targets` over legacy targetPlayerIds/targetEnemyIds.
+ * - Player target: {"playerId":"P1"}
+ * - Enemy target: {"enemyId":"E1"}
+ * - Summon target: {"summonOwnerPlayerId":"P1","summonInstanceId":"<uuid>"}
+ *
  * playerId is only the in-engine actor identifier for command execution.
  * Authorization must be derived from authenticated principal or server-side token checks.
  */
