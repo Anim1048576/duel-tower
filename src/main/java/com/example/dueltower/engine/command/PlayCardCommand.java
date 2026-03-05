@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.SummonOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
@@ -135,6 +136,7 @@ public final class PlayCardCommand implements GameCommand {
         // 카드 이동 (HAND -> resolveTo)
         if (ps.hand().contains(cardId) && state.card(cardId) != null) {
             ZoneOps.moveToZoneOrVanishIfToken(state, ctx, ps, cardId, to, events, MoveReason.PLAY);
+            SummonOps.spawnFromCard(state, ctx, ps, cardId);
         }
 
         // 이번 턴 카드 사용 횟수 트래킹

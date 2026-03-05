@@ -6,7 +6,9 @@ import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.status.StatusPhases;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.PlayerState;
+import com.example.dueltower.engine.model.SummonState;
 import com.example.dueltower.engine.model.TargetRef;
 
 import java.util.List;
@@ -37,6 +39,10 @@ public final class TurnPhases {
             ps.usedExThisTurn(false);
             ps.usedTenacityThisTurn(false);
             ps.tenacityDebtThisTurn(0);
+            for (Ids.SummonInstId summonId : ps.activeSummons()) {
+                SummonState summon = state.summon(summonId);
+                if (summon != null) summon.actionUsedThisTurn(false);
+            }
 
             int draw = (ps.hand().size() < 4) ? 2 : 1;
             ZoneOps.drawWithRefill(state, ctx, ps, draw, out);
