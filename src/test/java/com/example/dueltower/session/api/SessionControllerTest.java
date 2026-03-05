@@ -45,6 +45,31 @@ class SessionControllerTest {
                 .andExpect(status().reason("expectedVersion is required"));
     }
 
+
+    @Test
+    void commandReturns400WhenSummonIdIsMissingForUseSummonAction() throws Exception {
+        SessionRuntime runtime = new SessionRuntime(
+                "TESTCODE",
+                "gm",
+                "gm-token",
+                new GameState(new Ids.SessionId(UUID.randomUUID()), 1L),
+                new EngineContext(Map.of(), Map.of())
+        );
+        given(sessionService.get("TESTCODE")).willReturn(runtime);
+
+        mockMvc.perform(post("/api/sessions/{code}/command", "TESTCODE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "USE_SUMMON_ACTION",
+                                  "playerId": "p1",
+                                  "expectedVersion": 1
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(status().reason("summonId is required"));
+    }
+
     @Test
     void commandExposesVersionMismatchErrorFromEngine() throws Exception {
         SessionRuntime runtime = new SessionRuntime(

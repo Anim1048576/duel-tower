@@ -6,7 +6,7 @@ import java.util.List;
  * Public command payload for {@code POST /api/sessions/{code}/command}.
  * <p>
  * Allowed {@code type} values:
- * START_COMBAT, DRAW, END_TURN, HAND_SWAP, PLAY_CARD, USE_EX, DISCARD_TO_HAND_LIMIT.
+ * START_COMBAT, DRAW, END_TURN, HAND_SWAP, PLAY_CARD, USE_EX, USE_SUMMON_ACTION, DISCARD_TO_HAND_LIMIT.
  * <p>
  * DRAW is a product rule command (not an admin/debug command):
  * it is validated with normal main-turn constraints (phase/actor/pending-decision).
@@ -24,6 +24,7 @@ public record CommandRequest(
         Integer count,
         List<String> discardIds,
         String cardId,
+        String summonId,
         List<String> targetPlayerIds, // legacy
         List<String> targetEnemyIds,  // legacy
         List<TargetRefDto> targets
