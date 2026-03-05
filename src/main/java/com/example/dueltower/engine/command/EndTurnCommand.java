@@ -26,7 +26,7 @@ public final class EndTurnCommand implements GameCommand {
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
         List<String> errors = new ArrayList<>();
-        CommandValidation.validateMainTurn(state, playerId, errors);
+        CommandValidation.validateMainTurn(state, playerId, errors, true);
         return errors;
     }
 
