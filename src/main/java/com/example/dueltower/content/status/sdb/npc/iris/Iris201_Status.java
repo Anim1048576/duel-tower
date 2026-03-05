@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class Iris201_Status implements StatusBlueprint {
-    public static final String ID = "Iris201";
+    public static final String ID = "Iris201_Status";
     @Override public String id() { return ID; }
 
     @Override
