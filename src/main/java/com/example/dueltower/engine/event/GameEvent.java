@@ -17,5 +17,5 @@ public sealed interface GameEvent permits
     record PendingDecisionSet(String playerId, String type, String reason) implements GameEvent {}
     record PendingDecisionCleared(String playerId, String type) implements GameEvent {}
 
-    record TurnAdvanced(String nextPlayerId, int round) implements GameEvent {}
+    record TurnAdvanced(String nextActorKey, int round) implements GameEvent {}
 }

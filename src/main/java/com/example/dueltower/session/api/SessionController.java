@@ -94,13 +94,12 @@ public class SessionController {
         }
 
         UUID commandId = parseOrNewUuid(req.commandId());
-        long expectedVersion = (req.expectedVersion() == null) ? rt.state().version() : req.expectedVersion();
 
         log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} count={} discardIds={} targetPlayers={} targetEnemies={}",
                 code,
                 req.type(),
                 (req.playerId() == null) ? null : req.playerId().trim(),
-                expectedVersion,
+                req.expectedVersion(),
                 commandId,
                 (req.cardId() == null) ? null : req.cardId().trim(),
                 req.count(),
@@ -109,8 +108,11 @@ public class SessionController {
                 (req.targetEnemyIds() == null) ? 0 : req.targetEnemyIds().size()
         );
 
-        GameCommand cmd = toCommand(req, commandId, expectedVersion);
-        EngineResult res = rt.apply(cmd);
+        final EngineResult res = rt.withLock(() -> {
+            long expectedVersion = (req.expectedVersion() == null) ? rt.state().version() : req.expectedVersion();
+            GameCommand cmd = toCommand(req, commandId, expectedVersion);
+            return rt.apply(cmd);
+        });
 
         long tookMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
         if (res.accepted()) {

@@ -124,7 +124,9 @@ public final class StateMapper {
         }
         if (ev instanceof GameEvent.TurnAdvanced e) {
             return new EventDto("TURN_ADVANCED", Map.of(
-                    "nextPlayerId", e.nextPlayerId(),
+                    "nextActorKey", e.nextActorKey(),
+                    // backward-compatible alias for clients that still read nextPlayerId
+                    "nextPlayerId", e.nextActorKey(),
                     "round", e.round()
             ));
         }
