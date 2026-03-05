@@ -7,10 +7,11 @@ import com.example.dueltower.engine.model.GameState;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.LongSupplier;
 
 @Slf4j
 public final class GameEngine {
@@ -18,20 +19,34 @@ public final class GameEngine {
     private static final String DUPLICATE_COMMAND = "duplicate command";
     private static final String VERSION_MISMATCH = "version mismatch";
 
-    private static final int MAX_PROCESSED_COMMAND_IDS = 10_000;
+    /**
+     * commandId dedupe는 기본적으로 세션 생존 동안 유지한다.
+     * 메모리 제한이 필요한 경우 TTL을 켜서 오래된 id를 정리할 수 있다.
+     */
+    private static final long DEDUPE_TTL_DISABLED = -1L;
 
-    private final Map<UUID, Boolean> processedCommandIds = new LinkedHashMap<>(16, 0.75f, false) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<UUID, Boolean> eldest) {
-            return size() > MAX_PROCESSED_COMMAND_IDS;
-        }
-    };
+    private final Map<UUID, Long> processedCommandIdsFirstSeenAt = new HashMap<>();
+    private final long processedCommandIdTtlMs;
+    private final LongSupplier nowMsSupplier;
+
+    public GameEngine() {
+        this(DEDUPE_TTL_DISABLED, System::currentTimeMillis);
+    }
+
+    GameEngine(long processedCommandIdTtlMs, LongSupplier nowMsSupplier) {
+        this.processedCommandIdTtlMs = processedCommandIdTtlMs;
+        this.nowMsSupplier = nowMsSupplier;
+    }
+
     public EngineResult process(GameState state, EngineContext ctx, GameCommand cmd) {
         long startNs = System.nanoTime();
         long beforeVersion = state.version();
         String cmdType = (cmd == null) ? "null" : cmd.getClass().getSimpleName();
+        long nowMs = nowMsSupplier.getAsLong();
 
-        if (processedCommandIds.containsKey(cmd.commandId())) {
+        cleanupExpiredProcessedCommandIds(nowMs);
+
+        if (processedCommandIdsFirstSeenAt.containsKey(cmd.commandId())) {
             log.debug("engine reject {} cmdId={} type={} stateVersion={}",
                     DUPLICATE_COMMAND, cmd.commandId(), cmdType, beforeVersion);
             return EngineResult.rejected(List.of("duplicate command"), state);
@@ -62,7 +77,7 @@ public final class GameEngine {
         }
 
         state.bumpVersion();
-        processedCommandIds.put(cmd.commandId(), Boolean.TRUE);
+        processedCommandIdsFirstSeenAt.put(cmd.commandId(), nowMs);
 
         // Human-friendly log lines are useful even at DEBUG.
         if (log.isDebugEnabled()) {
@@ -84,5 +99,14 @@ public final class GameEngine {
                 cmd.commandId(), cmdType, beforeVersion, state.version(), events.size(), tookMs);
 
         return EngineResult.accepted(events, state);
+    }
+
+    private void cleanupExpiredProcessedCommandIds(long nowMs) {
+        if (processedCommandIdTtlMs <= 0) {
+            return;
+        }
+
+        long expireBefore = nowMs - processedCommandIdTtlMs;
+        processedCommandIdsFirstSeenAt.entrySet().removeIf(entry -> entry.getValue() < expireBefore);
     }
 }
