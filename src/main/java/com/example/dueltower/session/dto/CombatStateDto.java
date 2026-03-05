@@ -21,4 +21,4 @@ public record CombatStateDto(
             int heal,
             boolean actionAvailable
     ) {}
-) {}
+}
