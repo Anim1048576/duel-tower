@@ -17,6 +17,7 @@ public final class SessionRuntime {
 
     private final String code;
     private final String gmId;
+    private final String gmToken;
 
     private final GameState state;
     private final EngineContext ctx;
@@ -24,9 +25,10 @@ public final class SessionRuntime {
 
     private final Object lock = new Object();
 
-    public SessionRuntime(String code, String gmId, GameState state, EngineContext ctx) {
+    public SessionRuntime(String code, String gmId, String gmToken, GameState state, EngineContext ctx) {
         this.code = code;
         this.gmId = gmId;
+        this.gmToken = gmToken;
         this.state = state;
         this.ctx = ctx;
         this.engine = new GameEngine();
@@ -34,6 +36,7 @@ public final class SessionRuntime {
 
     public String code() { return code; }
     public String gmId() { return gmId; }
+    public String gmToken() { return gmToken; }
 
     public GameState state() { return state; }
     public EngineContext ctx() { return ctx; }

@@ -88,9 +88,15 @@ export async function joinSession(code: string, playerId: string): Promise<JoinS
   })
 }
 
-export async function sendCommand(code: string, req: CommandRequest): Promise<EngineResponse> {
+export async function sendCommand(code: string, req: CommandRequest, gmToken?: string): Promise<EngineResponse> {
+  const headers: Record<string, string> = {}
+  if (gmToken && req.type?.toUpperCase() === "START_COMBAT") {
+    headers["X-GM-Token"] = gmToken
+  }
+
   return await request<EngineResponse>(`/api/sessions/${encodeURIComponent(code)}/command`, {
     method: 'POST',
+    headers,
     body: JSON.stringify(req),
   })
 }

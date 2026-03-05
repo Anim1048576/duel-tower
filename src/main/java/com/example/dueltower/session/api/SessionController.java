@@ -12,6 +12,8 @@ import com.example.dueltower.session.dto.*;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import com.example.dueltower.session.runtime.StateMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -46,7 +48,7 @@ public class SessionController {
         );
 
         SessionStateDto state = rt.withLock(() -> StateMapper.toDto(rt.code(), rt.state()));
-        return new CreateSessionResponse(rt.code(), rt.gmId(), state);
+        return new CreateSessionResponse(rt.code(), rt.gmId(), rt.gmToken(), state);
     }
 
     @GetMapping("/{code}")
@@ -77,7 +79,10 @@ public class SessionController {
     }
 
     @PostMapping("/{code}/command")
-    public EngineResponseDto command(@PathVariable String code, @RequestBody CommandRequest req) {
+    public EngineResponseDto command(@PathVariable String code,
+                                     @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                     Authentication authentication,
+                                     @RequestBody CommandRequest req) {
         long startNs = System.nanoTime();
 
         if (req == null || req.type() == null || req.type().isBlank()) {
@@ -88,9 +93,7 @@ public class SessionController {
         String t = req.type().trim().toUpperCase(Locale.ROOT);
         if ("START_COMBAT".equals(t)) {
             requirePlayer(req.playerId());
-            if (!req.playerId().trim().equals(rt.gmId())) {
-                throw new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "gm only");
-            }
+            validateStartCombatAuthority(rt, gmTokenHeader, authentication);
         }
 
         UUID commandId = parseOrNewUuid(req.commandId());
@@ -131,6 +134,33 @@ public class SessionController {
                 StateMapper.toEventDtos(res.events()),
                 state
         );
+    }
+
+    private static void validateStartCombatAuthority(SessionRuntime rt,
+                                                   String gmTokenHeader,
+                                                   Authentication authentication) {
+        if (isAuthenticatedPrincipal(authentication)) {
+            String principalName = authentication.getName();
+            if (rt.gmId().equals(principalName)) {
+                return;
+            }
+            log.warn("START_COMBAT forbidden: principal is not mapped GM for code={}", rt.code());
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "gm only");
+        }
+
+        String token = (gmTokenHeader == null) ? "" : gmTokenHeader.trim();
+        if (!token.isEmpty() && rt.gmToken().equals(token)) {
+            return;
+        }
+
+        log.warn("START_COMBAT forbidden: invalid GM authorization for code={}", rt.code());
+        throw new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "gm only");
+    }
+
+    private static boolean isAuthenticatedPrincipal(Authentication authentication) {
+        return authentication != null
+                && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
     }
 
     private static UUID parseOrNewUuid(String v) {

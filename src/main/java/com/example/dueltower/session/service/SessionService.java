@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -54,7 +55,7 @@ public class SessionService {
                     keywordService.effectsMap()
             );
             GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
-            SessionRuntime rt = new SessionRuntime(code, gmId, state, ctx);
+            SessionRuntime rt = new SessionRuntime(code, gmId, generateGmToken(), state, ctx);
 
             if (sessions.putIfAbsent(code, rt) == null) {
                 log.debug("created session code={} gmId={} sessionId={} seed={}",
@@ -150,5 +151,11 @@ public class SessionService {
         StringBuilder sb = new StringBuilder(len);
         for (int i = 0; i < len; i++) sb.append(CODE_ALPHABET[rnd.nextInt(CODE_ALPHABET.length)]);
         return sb.toString();
+    }
+
+    private String generateGmToken() {
+        byte[] bytes = new byte[32];
+        rnd.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

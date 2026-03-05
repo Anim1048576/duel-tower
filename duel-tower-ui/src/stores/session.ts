@@ -6,6 +6,7 @@ export type SessionClient = {
   mode: 'api' | 'local'
   code: string
   gmId: string
+  gmToken: string
   meId: string
   createdAt: string
   lastError?: string
@@ -23,6 +24,7 @@ const seed: SessionClient = load(KEY.session, {
   mode: 'api',
   code: '',
   gmId: '',
+  gmToken: '',
   meId: 'me',
   createdAt: now(),
 })
@@ -44,6 +46,10 @@ export function setGmId(gmId: string) {
   session.update((s) => ({ ...s, gmId: (gmId || '').trim() }))
 }
 
+export function setGmToken(gmToken: string) {
+  session.update((s) => ({ ...s, gmToken: (gmToken || '').trim() }))
+}
+
 export function setLastError(msg?: string) {
   session.update((s) => ({ ...s, lastError: msg }))
 }
@@ -53,6 +59,7 @@ export function resetSession() {
     mode: 'api',
     code: '',
     gmId: '',
+    gmToken: '',
     meId: seed.meId || randomId('p'),
     createdAt: now(),
   })
