@@ -11,10 +11,14 @@ import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SessionId;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +33,8 @@ public class SessionService {
     private final CardService cardService;
     private final StatusService statusService;
     private final KeywordService keywordService;
+    private final Duration sessionTtl;
+    private final Duration cleanupInterval;
 
     // code -> runtime (in-memory)
     private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
@@ -36,13 +42,20 @@ public class SessionService {
     private final SecureRandom rnd = new SecureRandom();
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
 
-    public SessionService(CardService cardService, StatusService statusService, KeywordService keywordService) {
+    public SessionService(CardService cardService,
+                          StatusService statusService,
+                          KeywordService keywordService,
+                          @Value("${duel.session.ttl:30m}") Duration sessionTtl,
+                          @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.cardService = cardService;
         this.statusService = statusService;
         this.keywordService = keywordService;
+        this.sessionTtl = sessionTtl;
+        this.cleanupInterval = cleanupInterval;
     }
 
     public SessionRuntime createSession(String gmId) {
+        evictExpiredSessions();
         for (int attempt = 0; attempt < 10_000; attempt++) {
             String code = generateCode(8);
 
@@ -69,8 +82,14 @@ public class SessionService {
     }
 
     public SessionRuntime get(String code) {
+        evictExpiredSessions();
         SessionRuntime rt = sessions.get(code);
         if (rt == null) throw new ResponseStatusException(NOT_FOUND, "session not found");
+        if (isExpired(rt)) {
+            sessions.remove(code, rt);
+            throw new ResponseStatusException(GONE, "session expired");
+        }
+        rt.touchAccess();
         return rt;
     }
 
@@ -157,5 +176,39 @@ public class SessionService {
         byte[] bytes = new byte[32];
         rnd.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    @Scheduled(fixedDelayString = "#{@sessionService.cleanupIntervalMillis()}")
+    public void cleanupExpiredSessions() {
+        evictExpiredSessions();
+    }
+
+    public long cleanupIntervalMillis() {
+        return cleanupInterval.toMillis();
+    }
+
+    private void evictExpiredSessions() {
+        Instant now = Instant.now();
+        int removed = 0;
+
+        for (Map.Entry<String, SessionRuntime> entry : sessions.entrySet()) {
+            SessionRuntime rt = entry.getValue();
+            Instant expirationBoundary = rt.lastAccessedAt().plus(sessionTtl);
+            if (expirationBoundary.isAfter(now)) {
+                continue;
+            }
+
+            if (sessions.remove(entry.getKey(), rt)) {
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            log.info("expired session cleanup removed={} ttl={} interval={}", removed, sessionTtl, cleanupInterval);
+        }
+    }
+
+    private boolean isExpired(SessionRuntime rt) {
+        return !rt.lastAccessedAt().plus(sessionTtl).isAfter(Instant.now());
     }
 }
