@@ -36,6 +36,7 @@ export type PlayerState = {
   field: string[]
   excluded: string[]
   exCard: string | null
+  passiveIds: string[]
   exOnCooldown: boolean
   pendingDecision: PendingDecision | null
   handLimit: number

@@ -231,6 +231,7 @@
           <div class="kv"><div class="k">Hand</div><div class="v">{me.hand.length}/{me.handLimit}</div></div>
           <div class="kv"><div class="k">Grave</div><div class="v">{me.grave.length}</div></div>
           <div class="kv"><div class="k">Field</div><div class="v">{me.field.length}/{me.fieldLimit}</div></div>
+          <div class="kv"><div class="k">Passives</div><div class="v mono">{me.passiveIds?.length ? me.passiveIds.join(', ') : '—'}</div></div>
         </div>
 
         <div class="spacer"></div>

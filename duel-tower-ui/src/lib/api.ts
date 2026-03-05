@@ -81,10 +81,10 @@ export async function getSessionState(code: string): Promise<SessionState> {
   return await request<SessionState>(`/api/sessions/${encodeURIComponent(code)}`)
 }
 
-export async function joinSession(code: string, playerId: string): Promise<JoinSessionResponse> {
+export async function joinSession(code: string, playerId: string, passiveIds?: string[]): Promise<JoinSessionResponse> {
   return await request<JoinSessionResponse>(`/api/sessions/${encodeURIComponent(code)}/join`, {
     method: 'POST',
-    body: JSON.stringify({ playerId }),
+    body: JSON.stringify({ playerId, passiveIds }),
   })
 }
 

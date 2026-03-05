@@ -113,7 +113,7 @@
                     <span class="badge ok">GM</span>
                   {/if}
                 </div>
-                <div class="hint">덱 {p.deck.length} · 손 {p.hand.length} · 묘지 {p.grave.length} · EX {p.exCard ? '1' : '0'}</div>
+                <div class="hint">덱 {p.deck.length} · 손 {p.hand.length} · 묘지 {p.grave.length} · EX {p.exCard ? '1' : '0'} · 패시브 {(p.passiveIds?.length ?? 0) ? p.passiveIds.join(', ') : '—'}</div>
               </div>
               {#if p.pendingDecision}
                 <span class="badge no">결정 필요</span>

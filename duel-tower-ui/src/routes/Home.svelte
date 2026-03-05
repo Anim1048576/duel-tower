@@ -6,6 +6,7 @@
   import { ensureCards } from '../stores/content'
   import { refreshState } from '../stores/combat'
   import { pushToast } from '../stores/log'
+  import { presets } from '../stores/presets'
 
   let meId = ''
   let joinCode = ''
@@ -13,6 +14,8 @@
 
   $: if ($session.meId && meId === '') meId = $session.meId
   $: if ($session.code && joinCode === '') joinCode = $session.code
+
+  $: selectedPreset = $presets.presets.find((p) => p.id === $presets.selectedId) ?? $presets.presets[0]
 
   async function doCreate() {
     busy = true
@@ -26,7 +29,7 @@
       setGmToken(res.gmToken)
 
       // creator should also join as a player
-      await joinSession(res.code, meId.trim())
+      await joinSession(res.code, meId.trim(), selectedPreset?.passiveIds ?? [])
       await refreshState()
       pushToast('세션 생성', res.code)
       navigate('/lobby')
@@ -47,7 +50,7 @@
       const code = joinCode.trim().toUpperCase()
       setSessionCode(code)
       setGmToken('')
-      await joinSession(code, meId.trim())
+      await joinSession(code, meId.trim(), selectedPreset?.passiveIds ?? [])
       await refreshState()
       pushToast('세션 참가', code)
       navigate('/lobby')
