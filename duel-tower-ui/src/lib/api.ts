@@ -39,7 +39,7 @@ export type CharacterProfileResponse = {
   id: number
   name: string
   gender: CharacterGender
-  age: number
+  age: number | null
   wish: string
   disposition: string
   oneLiner: string
@@ -48,8 +48,8 @@ export type CharacterProfileResponse = {
   technique: number
   sense: number
   willpower: number
-  trait1: string
-  trait2: string
+  trait1: string | null
+  trait2: string | null
   ownedCards: string
   currentSkillDeck: string
   exCard: string
@@ -60,7 +60,7 @@ export type CharacterProfileResponse = {
 export type CharacterProfileRequest = {
   name: string
   gender: CharacterGender
-  age: number
+  age: number | null
   wish: string
   disposition: string
   oneLiner: string
@@ -69,8 +69,8 @@ export type CharacterProfileRequest = {
   technique: number
   sense: number
   willpower: number
-  trait1: string
-  trait2: string
+  trait1: string | null
+  trait2: string | null
   ownedCards: string
   currentSkillDeck: string
   exCard: string

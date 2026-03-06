@@ -62,7 +62,7 @@
         <div class="panelTitle">기본 정보</div>
         <div class="kv"><span>이름</span><b>{profile.name}</b></div>
         <div class="kv"><span>성별</span><b>{genderLabel(profile.gender)}</b></div>
-        <div class="kv"><span>나이</span><b>{profile.age}</b></div>
+        <div class="kv"><span>나이</span><b>{profile.age == null ? "미지정" : `${profile.age}`}</b></div>
         <div class="kv"><span>성향</span><b>{profile.disposition}</b></div>
         <div class="kv"><span>소원</span><b>{profile.wish}</b></div>
       </section>
@@ -91,8 +91,8 @@
 
       <section class="panel">
         <div class="panelTitle">특성 / 덱 데이터</div>
-        <div class="kv"><span>Trait 1</span><b>{profile.trait1}</b></div>
-        <div class="kv"><span>Trait 2</span><b>{profile.trait2}</b></div>
+        <div class="kv"><span>Trait 1</span><b>{profile.trait1 ?? "-"}</b></div>
+        <div class="kv"><span>Trait 2</span><b>{profile.trait2 ?? "-"}</b></div>
         <div class="kv"><span>Owned Cards</span><b>{safeJsonSummary(profile.ownedCards)}</b></div>
         <div class="kv"><span>Current Skill Deck</span><b>{safeJsonSummary(profile.currentSkillDeck)}</b></div>
         <div class="kv"><span>EX Card</span><b>{safeJsonSummary(profile.exCard)}</b></div>

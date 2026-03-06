@@ -54,8 +54,8 @@ public class CharacterProfileService {
                 .technique(req.technique())
                 .sense(req.sense())
                 .willpower(req.willpower())
-                .trait1(req.trait1().trim())
-                .trait2(req.trait2().trim())
+                .trait1(normalizeOptionalText(req.trait1()))
+                .trait2(normalizeOptionalText(req.trait2()))
                 .ownedCards(req.ownedCards().trim())
                 .currentSkillDeck(req.currentSkillDeck().trim())
                 .exCard(req.exCard().trim())
@@ -80,8 +80,8 @@ public class CharacterProfileService {
         profile.setTechnique(req.technique());
         profile.setSense(req.sense());
         profile.setWillpower(req.willpower());
-        profile.setTrait1(req.trait1().trim());
-        profile.setTrait2(req.trait2().trim());
+        profile.setTrait1(normalizeOptionalText(req.trait1()));
+        profile.setTrait2(normalizeOptionalText(req.trait2()));
         profile.setOwnedCards(req.ownedCards().trim());
         profile.setCurrentSkillDeck(req.currentSkillDeck().trim());
         profile.setExCard(req.exCard().trim());
@@ -140,20 +140,52 @@ public class CharacterProfileService {
         if (req.gender() == null) {
             throw new ResponseStatusException(BAD_REQUEST, "gender is required");
         }
-        requireNumber(req.age(), "age is required");
         requireText(req.wish(), "wish is required");
-        requireText(req.disposition(), "disposition is required");
+        validateDisposition(req.disposition());
         requireText(req.oneLiner(), "oneLiner is required");
         requireText(req.story(), "story is required");
         requireNumber(req.physical(), "physical is required");
         requireNumber(req.technique(), "technique is required");
         requireNumber(req.sense(), "sense is required");
         requireNumber(req.willpower(), "willpower is required");
-        requireText(req.trait1(), "trait1 is required");
-        requireText(req.trait2(), "trait2 is required");
+        validateTraits(req.trait1(), req.trait2());
         requireText(req.ownedCards(), "ownedCards is required");
         requireText(req.currentSkillDeck(), "currentSkillDeck is required");
         requireText(req.exCard(), "exCard is required");
+    }
+
+
+    private static void validateDisposition(String disposition) {
+        requireText(disposition, "disposition is required");
+        String[] parts = disposition.trim().split("/");
+        if (parts.length != 2) {
+            throw new ResponseStatusException(BAD_REQUEST, "disposition must be in the format axis1/axis2 (e.g. 질서/선)");
+        }
+
+        String lawChaos = parts[0].trim();
+        String goodEvil = parts[1].trim();
+
+        if (!(lawChaos.equals("질서") || lawChaos.equals("중립") || lawChaos.equals("혼돈"))
+                || !(goodEvil.equals("선") || goodEvil.equals("중용") || goodEvil.equals("악"))) {
+            throw new ResponseStatusException(BAD_REQUEST, "disposition must combine one of [질서, 중립, 혼돈] and one of [선, 중용, 악]");
+        }
+    }
+
+    private static void validateTraits(String trait1, String trait2) {
+        String normalizedTrait1 = normalizeOptionalText(trait1);
+        String normalizedTrait2 = normalizeOptionalText(trait2);
+
+        if (normalizedTrait1 == null && normalizedTrait2 != null) {
+            throw new ResponseStatusException(BAD_REQUEST, "trait2 cannot be set when trait1 is empty");
+        }
+    }
+
+    private static String normalizeOptionalText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private static void requireText(String value, String message) {
