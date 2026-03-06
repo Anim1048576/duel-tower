@@ -113,8 +113,9 @@ public final class TurnFlow {
                     ps.exCooldownUntilRound(0);
                 }
             }
+            final int roundForCooldownCheck = nextRound;
             state.enemies().values().forEach(es -> {
-                if (es.exCooldownUntilRound() > 0 && nextRound > es.exCooldownUntilRound()) {
+                if (es.exCooldownUntilRound() > 0 && roundForCooldownCheck > es.exCooldownUntilRound()) {
                     es.exCooldownUntilRound(0);
                 }
             });
