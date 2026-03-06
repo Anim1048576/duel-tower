@@ -65,7 +65,7 @@ public class SessionController {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
         List<String> requestedPassiveIds = (req.passiveIds() == null) ? List.of() : req.passiveIds();
-        sessionService.join(code, req.playerId(), requestedPassiveIds);
+        sessionService.join(code, req.playerId(), requestedPassiveIds, req.presetDeckCardIds(), req.presetExCardId(), req.ownedCards());
 
         SessionStateDto state = sessionService.withSessionLock(code, rt -> {
             log.info("session join code={} playerId={} requestedPassiveIds={} playersNow={}",
@@ -80,6 +80,21 @@ public class SessionController {
         return new JoinSessionResponse(state);
     }
 
+
+
+    @PostMapping("/{code}/players/{playerId}/deck")
+    public SessionStateDto updateDeck(@PathVariable String code,
+                                      @PathVariable String playerId,
+                                      Authentication authentication,
+                                      @RequestBody UpdateSessionDeckRequest req) {
+        if (req == null || req.deckCardIds() == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "deckCardIds is required");
+        }
+
+        String actorPlayerId = resolveActorPlayerId(authentication, playerId);
+        sessionService.updateDeck(code, actorPlayerId, playerId, req.deckCardIds());
+        return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+    }
     @PostMapping("/{code}/command")
     public EngineResponseDto command(@PathVariable String code,
                                      @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
@@ -140,6 +155,14 @@ public class SessionController {
                 StateMapper.toEventDtos(res.events()),
                 state
         );
+    }
+
+
+    private static String resolveActorPlayerId(Authentication authentication, String fallbackPlayerId) {
+        if (isAuthenticatedPrincipal(authentication)) {
+            return authentication.getName();
+        }
+        return fallbackPlayerId;
     }
 
     private static void validateStartCombatAuthority(SessionRuntime rt,

@@ -1,5 +1,7 @@
 package com.example.dueltower.engine.model;
 
+import com.example.dueltower.content.card.model.OwnedCard;
+
 import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SummonInstId;
@@ -8,6 +10,7 @@ import java.util.*;
 
 public final class PlayerState {
     public static final int MAX_PASSIVES = 2;
+    public static final int MAX_OWNED_CARDS = 20;
 
     private final PlayerId playerId;
 
@@ -58,6 +61,7 @@ public final class PlayerState {
     // 예: "취약"=2, "보호막"=5, "공격력증가"=3 ...
     private final Map<String, Integer> statusValues = new LinkedHashMap<>();
     private final List<String> passiveIds = new ArrayList<>();
+    private final List<OwnedCard> ownedCards = new ArrayList<>();
 
     public PlayerState(PlayerId playerId) {
         this.playerId = playerId;
@@ -196,6 +200,27 @@ public final class PlayerState {
 
         passiveIds.clear();
         passiveIds.addAll(normalized);
+    }
+
+
+    /**
+     * 보유 카드 슬롯 목록(최대 20).
+     */
+    public List<OwnedCard> ownedCards() { return Collections.unmodifiableList(ownedCards); }
+
+    public void ownedCards(Collection<OwnedCard> value) {
+        Objects.requireNonNull(value, "ownedCards is required");
+        if (value.size() > MAX_OWNED_CARDS) {
+            throw new IllegalArgumentException("ownedCards supports up to " + MAX_OWNED_CARDS);
+        }
+
+        ownedCards.clear();
+        for (OwnedCard card : value) {
+            if (card == null || card.cardId() == null || card.cardId().isBlank()) {
+                throw new IllegalArgumentException("ownedCards contains invalid cardId");
+            }
+            ownedCards.add(new OwnedCard(card.cardId().trim(), card.weakened()));
+        }
     }
 
     public int status(String key) {

@@ -20,6 +20,7 @@ public final class GameState {
     private final Map<SummonInstId, SummonState> summons = new HashMap<>();
 
     private CombatState combat;
+    private NodeState nodeState = NodeState.NON_COMBAT;
 
     public GameState(SessionId sessionId, long seed) {
         this.sessionId = sessionId;
@@ -53,5 +54,11 @@ public final class GameState {
     }
 
     public CombatState combat() { return combat; }
-    public void combat(CombatState c) { this.combat = c; }
+    public void combat(CombatState c) {
+        this.combat = c;
+        this.nodeState = (c == null) ? NodeState.NON_COMBAT : NodeState.COMBAT;
+    }
+
+    public NodeState nodeState() { return nodeState; }
+    public void nodeState(NodeState nodeState) { this.nodeState = nodeState; }
 }

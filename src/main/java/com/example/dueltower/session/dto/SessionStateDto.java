@@ -7,6 +7,7 @@ public record SessionStateDto(
         String sessionId,
         long version,
         long seed,
+        String nodeState,
         Map<String, PlayerStateDto> players,
         CombatStateDto combat,
         Map<String, CardInstanceDto> cards
