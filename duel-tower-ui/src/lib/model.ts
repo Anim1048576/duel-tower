@@ -52,6 +52,41 @@ export type SummonState = {
   actionAvailable: boolean
 }
 
+export type CombatTarget = {
+  type: 'player' | 'summon'
+  playerId: string
+  summonId?: string
+}
+
+export type ActionDescriptor = {
+  id: string
+  kind: 'play' | 'useEx' | 'summon'
+  label: string
+  commandType: 'PLAY_CARD' | 'USE_EX' | 'USE_SUMMON_ACTION'
+  sourcePlayerId: string
+  cardId?: string
+  summonId?: string
+  requiresTarget: boolean
+  validTargets: CombatTarget[]
+  disabledReason?: string
+}
+
+export type ResolutionLog = {
+  id: string
+  at: string
+  level: 'info' | 'warn' | 'error'
+  summary: string
+  breakdown: string
+}
+
+export type CharacterView = PlayerState & {
+  availableActions: ActionDescriptor[]
+}
+
+export type CombatSnapshot = CombatState & {
+  availableActions: ActionDescriptor[]
+}
+
 export type CombatState = {
   round: number
   turnOrder: string[]
@@ -61,15 +96,18 @@ export type CombatState = {
   summons?: SummonState[]
 }
 
-export type SessionState = {
+export type SessionSnapshot = {
   sessionCode: string
   sessionId: string
   version: number
   seed: number
-  players: Record<string, PlayerState>
-  combat: CombatState | null
+  players: Record<string, CharacterView>
+  combat: CombatSnapshot | null
   cards: Record<string, CardInstance>
 }
+
+// Backward-compat alias while migrating views.
+export type SessionState = SessionSnapshot
 
 export type EngineEvent = {
   type: string
@@ -80,18 +118,19 @@ export type EngineResponse = {
   accepted: boolean
   errors: string[]
   events: EngineEvent[]
-  state: SessionState
+  state: SessionSnapshot
+  resolutionLogs?: ResolutionLog[]
 }
 
 export type CreateSessionResponse = {
   code: string
   gmId: string
   gmToken: string
-  state: SessionState
+  state: SessionSnapshot
 }
 
 export type JoinSessionResponse = {
-  state: SessionState
+  state: SessionSnapshot
 }
 
 export type TargetRef = {

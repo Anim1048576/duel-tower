@@ -1,14 +1,15 @@
 import { writable, get } from 'svelte/store'
 import { KEY } from '../lib/keys'
 import { load, save } from '../lib/storage'
-import type { CommandRequest, EngineResponse, SessionState } from '../lib/model'
+import type { CommandRequest, EngineResponse, ResolutionLog, SessionSnapshot } from '../lib/model'
 import { explainApiError, getSessionState, joinSession, sendCommand } from '../lib/api'
 import { session } from './session'
 import { presets } from './presets'
 import { error as logError, info as logInfo, pushEngineEvents } from './log'
 
 export type CombatStore = {
-  state: SessionState | null
+  state: SessionSnapshot | null
+  lastResolutionLogs: ResolutionLog[]
   lastSyncAt?: string
   lastError?: string
   polling: boolean
@@ -16,6 +17,7 @@ export type CombatStore = {
 
 const seed: CombatStore = load(KEY.combat, {
   state: null,
+  lastResolutionLogs: [],
   polling: false,
 })
 
@@ -82,7 +84,13 @@ export async function command(req: Omit<CommandRequest, 'playerId'> & { playerId
       logInfo('커맨드', req.type)
     }
     if (res.events?.length) pushEngineEvents(res.events)
-    combat.update((c) => ({ ...c, state: res.state, lastError: undefined, lastSyncAt: new Date().toISOString() }))
+    combat.update((c) => ({
+      ...c,
+      state: res.state,
+      lastResolutionLogs: res.resolutionLogs ?? [],
+      lastError: undefined,
+      lastSyncAt: new Date().toISOString(),
+    }))
     return res
   } catch (e) {
     logError('API 오류', explainApiError(e))

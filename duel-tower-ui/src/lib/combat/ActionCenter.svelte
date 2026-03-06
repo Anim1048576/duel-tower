@@ -13,7 +13,7 @@
   <div class="boardTop">
     <div>
       <div class="panelTitle">ActionCenter</div>
-      <div class="hint">행동 선택 → 대상 선택 → 확정</div>
+      <div class="hint">행동 선택 → validTargets 하이라이트 → 확정</div>
     </div>
     <div class="badge">{stage.toUpperCase()}</div>
   </div>
@@ -29,12 +29,15 @@
       {#if action.requiresTarget}
         <div class="hint">대상: {action.target ? `${action.target.type} · ${action.target.playerId}${action.target.summonId ? `/${action.target.summonId}` : ''}` : '미선택'}</div>
       {/if}
+      {#if action.disabledReason}
+        <div class="hint" style="color: var(--danger)">{action.disabledReason}</div>
+      {/if}
     </div>
   {/if}
 
   <div class="spacer"></div>
   <div class="row" style="justify-content:flex-end">
     <button class="btn" disabled={busy || stage === 'idle'} on:click={() => dispatch('cancel')}>취소</button>
-    <button class="btn primary" disabled={busy || stage !== 'confirming'} on:click={() => dispatch('confirm')}>확정</button>
+    <button class="btn primary" disabled={busy || stage !== 'confirming' || Boolean(action?.disabledReason)} on:click={() => dispatch('confirm')}>확정</button>
   </div>
 </section>
