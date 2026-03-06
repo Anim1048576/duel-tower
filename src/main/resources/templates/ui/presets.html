@@ -16,6 +16,24 @@
 
       <div class="spacer"></div>
 
+      <div class="row wrap presetToolbar">
+        <input class="input presetSearch" id="presetSearch" placeholder="캐릭터 이름/카드명 검색" />
+        <select class="input presetSort" id="presetSort" aria-label="정렬">
+          <option value="selected">선택된 프리셋 우선</option>
+          <option value="name">이름순</option>
+          <option value="newest">최근 생성순</option>
+        </select>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="row wrap">
+        <div class="pill">전체: <span id="presetCount">0</span></div>
+        <div class="pill">규격 충족(12+EX): <span id="presetValidCount">0</span></div>
+      </div>
+
+      <div class="spacer"></div>
+
       <div class="grid3" id="presetGrid">
         <!-- rendered by JS -->
       </div>
