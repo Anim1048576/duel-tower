@@ -4,27 +4,45 @@
     createCharacterProfile,
     deleteCharacterProfile,
     explainApiError,
+    listCardDefs,
     listCharacterProfiles,
+    type CardDef,
     type CharacterGender,
     type CharacterProfileRequest,
     type CharacterProfileResponse,
     updateCharacterProfile,
   } from '../lib/api'
 
+  type AxisLawChaos = '질서' | '중립' | '혼돈'
+  type AxisMoral = '선' | '중용' | '악'
+
+  const DISPOSITION_AXIS_1: AxisLawChaos[] = ['질서', '중립', '혼돈']
+  const DISPOSITION_AXIS_2: AxisMoral[] = ['선', '중용', '악']
+  const TRAIT_OPTIONS = [
+    '강인함',
+    '민첩',
+    '집중력',
+    '전략가',
+    '낙천가',
+    '냉철함',
+    '수호자',
+    '개척자',
+  ]
+
   const emptyForm: CharacterProfileRequest = {
     name: '',
     gender: 'OTHER',
-    age: 17,
+    age: null,
     wish: '',
-    disposition: '',
+    disposition: '중립/중용',
     oneLiner: '',
     story: '',
     physical: 1,
     technique: 1,
     sense: 1,
     willpower: 1,
-    trait1: '',
-    trait2: '',
+    trait1: null,
+    trait2: null,
     ownedCards: '[]',
     currentSkillDeck: '[]',
     exCard: '{}',
@@ -35,8 +53,19 @@
   let deleting = false
   let error = ''
   let profiles: CharacterProfileResponse[] = []
+  let cardDefs: CardDef[] = []
   let selectedId: number | null = null
   let form: CharacterProfileRequest = { ...emptyForm }
+
+  let dispositionAxis1: AxisLawChaos = '중립'
+  let dispositionAxis2: AxisMoral = '중용'
+  let noAge = true
+  let selectedTraits: string[] = []
+  let selectedOwnedCards: string[] = []
+  let selectedDeckCards: string[] = []
+  let selectedExCardId = ''
+
+  $: cardOptions = cardDefs.map((card) => ({ id: card.id, label: `${card.id} · ${card.name}` }))
 
   function cloneForm(p: CharacterProfileResponse): CharacterProfileRequest {
     return {
@@ -59,14 +88,69 @@
     }
   }
 
+  function parseDisposition(disposition: string): [AxisLawChaos, AxisMoral] {
+    const [raw1, raw2] = disposition.split('/').map((v) => v.trim())
+    const axis1 = DISPOSITION_AXIS_1.includes(raw1 as AxisLawChaos) ? (raw1 as AxisLawChaos) : '중립'
+    const axis2 = DISPOSITION_AXIS_2.includes(raw2 as AxisMoral) ? (raw2 as AxisMoral) : '중용'
+    return [axis1, axis2]
+  }
+
+  function parseIdArray(raw: string): string[] {
+    try {
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return []
+      return parsed.map(String).filter((id) => id.trim().length > 0)
+    } catch {
+      return []
+    }
+  }
+
+  function parseExCardId(raw: string): string {
+    try {
+      const parsed = JSON.parse(raw)
+      if (typeof parsed === 'string') return parsed
+      if (parsed && typeof parsed === 'object' && typeof parsed.id === 'string') return parsed.id
+      return ''
+    } catch {
+      return ''
+    }
+  }
+
+  function syncUiFromForm() {
+    const [a1, a2] = parseDisposition(form.disposition)
+    dispositionAxis1 = a1
+    dispositionAxis2 = a2
+    noAge = form.age == null
+    selectedTraits = [form.trait1, form.trait2].filter((v): v is string => Boolean(v && v.trim()))
+    selectedOwnedCards = parseIdArray(form.ownedCards)
+    selectedDeckCards = parseIdArray(form.currentSkillDeck)
+    selectedExCardId = parseExCardId(form.exCard)
+  }
+
+  function syncFormFromUi() {
+    form = {
+      ...form,
+      disposition: `${dispositionAxis1}/${dispositionAxis2}`,
+      age: noAge ? null : form.age ?? 0,
+      trait1: selectedTraits[0] ?? null,
+      trait2: selectedTraits[1] ?? null,
+      ownedCards: JSON.stringify(selectedOwnedCards),
+      currentSkillDeck: JSON.stringify(selectedDeckCards),
+      exCard: selectedExCardId ? JSON.stringify({ id: selectedExCardId }) : '{}',
+    }
+  }
+
   async function refresh() {
     loading = true
     error = ''
     try {
-      profiles = await listCharacterProfiles()
+      const [profilesRes, cardsRes] = await Promise.all([listCharacterProfiles(), listCardDefs()])
+      profiles = profilesRes
+      cardDefs = cardsRes
       if (selectedId && !profiles.some((p) => p.id === selectedId)) {
         selectedId = null
         form = { ...emptyForm }
+        syncUiFromForm()
       }
     } catch (e) {
       error = explainApiError(e)
@@ -80,16 +164,19 @@
     if (!found) return
     selectedId = found.id
     form = cloneForm(found)
+    syncUiFromForm()
   }
 
   function resetToNew() {
     selectedId = null
     form = { ...emptyForm }
+    syncUiFromForm()
   }
 
   async function saveProfile() {
     saving = true
     error = ''
+    syncFormFromUi()
     try {
       if (selectedId) {
         await updateCharacterProfile(selectedId, form)
@@ -100,7 +187,10 @@
       await refresh()
       if (selectedId) {
         const found = profiles.find((p) => p.id === selectedId)
-        if (found) form = cloneForm(found)
+        if (found) {
+          form = cloneForm(found)
+          syncUiFromForm()
+        }
       }
     } catch (e) {
       error = explainApiError(e)
@@ -130,11 +220,47 @@
   }
 
   function updateGender(value: string) {
-    const next = value as CharacterGender
-    form = { ...form, gender: next }
+    form = { ...form, gender: value as CharacterGender }
   }
 
-  onMount(refresh)
+  function toggleTrait(trait: string) {
+    if (selectedTraits.includes(trait)) {
+      selectedTraits = selectedTraits.filter((t) => t !== trait)
+      syncFormFromUi()
+      return
+    }
+    if (selectedTraits.length >= 2) return
+    selectedTraits = [...selectedTraits, trait]
+    syncFormFromUi()
+  }
+
+  function toggleCardSelection(kind: 'owned' | 'deck', id: string) {
+    const source = kind === 'owned' ? selectedOwnedCards : selectedDeckCards
+    const exists = source.includes(id)
+    const next = exists ? source.filter((v) => v !== id) : [...source, id]
+
+    if (kind === 'owned') selectedOwnedCards = next
+    else selectedDeckCards = next
+
+    syncFormFromUi()
+  }
+
+  function updateExCard(value: string) {
+    selectedExCardId = value
+    syncFormFromUi()
+  }
+
+  function toggleNoAge(checked: boolean) {
+    noAge = checked
+    if (checked) form = { ...form, age: null }
+    else if (form.age == null) form = { ...form, age: 0 }
+    syncFormFromUi()
+  }
+
+  onMount(async () => {
+    await refresh()
+    syncUiFromForm()
+  })
 </script>
 
 <div class="page">
@@ -153,7 +279,7 @@
         {#each profiles as p (p.id)}
           <button class="item" class:active={p.id === selectedId} on:click={() => selectProfile(p.id)}>
             <b>#{p.id} {p.name}</b>
-            <span>{p.gender} · {p.age}세</span>
+            <span>{p.gender} · {p.age == null ? '나이 미지정' : `${p.age}세`}</span>
           </button>
         {/each}
       </div>
@@ -186,8 +312,30 @@
           <option value="OTHER">OTHER</option>
         </select>
       </label>
-      <label>나이 <input class="input" type="number" value={form.age} on:input={(e) => updateNumberField('age', (e.currentTarget as HTMLInputElement).value)} /></label>
-      <label>성향 <input class="input" bind:value={form.disposition} /></label>
+
+      <label>나이
+        <input class="input" type="number" value={form.age ?? ''} disabled={noAge} on:input={(e) => updateNumberField('age', (e.currentTarget as HTMLInputElement).value)} />
+      </label>
+      <label class="checkboxLabel">
+        <span>나이 미지정</span>
+        <input type="checkbox" checked={noAge} on:change={(e) => toggleNoAge((e.currentTarget as HTMLInputElement).checked)} />
+      </label>
+
+      <label>성향(질서/중립/혼돈)
+        <select class="input" bind:value={dispositionAxis1} on:change={() => syncFormFromUi()}>
+          {#each DISPOSITION_AXIS_1 as axis}
+            <option value={axis}>{axis}</option>
+          {/each}
+        </select>
+      </label>
+      <label>성향(선/중용/악)
+        <select class="input" bind:value={dispositionAxis2} on:change={() => syncFormFromUi()}>
+          {#each DISPOSITION_AXIS_2 as axis}
+            <option value={axis}>{axis}</option>
+          {/each}
+        </select>
+      </label>
+
       <label class="full">소원 <input class="input" bind:value={form.wish} /></label>
       <label class="full">한줄 대사 <input class="input" bind:value={form.oneLiner} /></label>
       <label class="full">스토리 <textarea class="textarea" rows="4" bind:value={form.story}></textarea></label>
@@ -197,11 +345,55 @@
       <label>Sense <input class="input" type="number" value={form.sense} on:input={(e) => updateNumberField('sense', (e.currentTarget as HTMLInputElement).value)} /></label>
       <label>Willpower <input class="input" type="number" value={form.willpower} on:input={(e) => updateNumberField('willpower', (e.currentTarget as HTMLInputElement).value)} /></label>
 
-      <label>Trait 1 <input class="input" bind:value={form.trait1} /></label>
-      <label>Trait 2 <input class="input" bind:value={form.trait2} /></label>
-      <label class="full">Owned Cards(JSON) <textarea class="textarea" rows="3" bind:value={form.ownedCards}></textarea></label>
-      <label class="full">Current Skill Deck(JSON) <textarea class="textarea" rows="3" bind:value={form.currentSkillDeck}></textarea></label>
-      <label class="full">EX Card(JSON) <textarea class="textarea" rows="3" bind:value={form.exCard}></textarea></label>
+      <div class="full block">
+        <div class="blockTitle">캐릭터 특성 (최대 2개)</div>
+        <div class="chipWrap">
+          {#each TRAIT_OPTIONS as trait}
+            <button
+              type="button"
+              class="chip"
+              class:active={selectedTraits.includes(trait)}
+              disabled={!selectedTraits.includes(trait) && selectedTraits.length >= 2}
+              on:click={() => toggleTrait(trait)}
+            >
+              {trait}
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <div class="full block">
+        <div class="blockTitle">보유 카드 선택</div>
+        <div class="checkGrid">
+          {#each cardOptions as card}
+            <label class="checkItem">
+              <input type="checkbox" checked={selectedOwnedCards.includes(card.id)} on:change={() => toggleCardSelection('owned', card.id)} />
+              <span>{card.label}</span>
+            </label>
+          {/each}
+        </div>
+      </div>
+
+      <div class="full block">
+        <div class="blockTitle">현재 스킬 덱 선택</div>
+        <div class="checkGrid">
+          {#each cardOptions as card}
+            <label class="checkItem">
+              <input type="checkbox" checked={selectedDeckCards.includes(card.id)} on:change={() => toggleCardSelection('deck', card.id)} />
+              <span>{card.label}</span>
+            </label>
+          {/each}
+        </div>
+      </div>
+
+      <label class="full">EX 카드
+        <select class="input" value={selectedExCardId} on:change={(e) => updateExCard((e.currentTarget as HTMLSelectElement).value)}>
+          <option value="">선택 안 함</option>
+          {#each cardOptions as card}
+            <option value={card.id}>{card.label}</option>
+          {/each}
+        </select>
+      </label>
     </div>
   </section>
 </div>
@@ -217,10 +409,21 @@
   .formPanel{display:flex;flex-direction:column;gap:12px}
   .formGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-muted)}
+  .checkboxLabel{justify-content:flex-end}
+  .checkboxLabel input{width:16px;height:16px}
   .full{grid-column:1 / -1}
+  .block{display:flex;flex-direction:column;gap:8px}
+  .blockTitle{font-size:12px;color:var(--text-muted)}
+  .chipWrap{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--text);border-radius:999px;padding:6px 10px;font-size:12px}
+  .chip.active{border-color:rgba(114,220,255,.6);background:rgba(114,220,255,.14)}
+  .chip:disabled{opacity:.45}
+  .checkGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:220px;overflow:auto;padding:8px;border:1px solid var(--line);border-radius:10px}
+  .checkItem{display:flex;align-items:center;gap:8px;color:var(--text);font-size:12px}
 
   @media (max-width: 900px){
     .page{grid-template-columns:1fr}
     .formGrid{grid-template-columns:1fr}
+    .checkGrid{grid-template-columns:1fr}
   }
 </style>

@@ -8,7 +8,7 @@ public record CharacterProfileResponse(
         Long id,
         String name,
         CharacterGender gender,
-        int age,
+        Integer age,
         String wish,
         String disposition,
         String oneLiner,

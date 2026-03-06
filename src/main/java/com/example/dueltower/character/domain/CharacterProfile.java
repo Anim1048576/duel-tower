@@ -28,8 +28,8 @@ public class CharacterProfile {
     @Column(nullable = false, length = 20)
     private CharacterGender gender;
 
-    @Column(nullable = false)
-    private int age;
+    @Column
+    private Integer age;
 
     @Column(nullable = false, length = 255)
     private String wish;
@@ -57,11 +57,11 @@ public class CharacterProfile {
     @Column(nullable = false)
     private int willpower;
 
-    /** 캐릭터 특성 2개 */
-    @Column(nullable = false, length = 100)
+    /** 캐릭터 특성 0~2개 */
+    @Column(length = 100)
     private String trait1;
 
-    @Column(nullable = false, length = 100)
+    @Column(length = 100)
     private String trait2;
 
     /** 보유 카드 현황(JSON 문자열) */
