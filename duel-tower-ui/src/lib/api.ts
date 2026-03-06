@@ -83,9 +83,29 @@ export function explainApiError(e: unknown) {
   if (!err) return 'Unknown error'
 
   const status = err.status
-  const msg = (err.body && (err.body.message || err.body.error)) || err.message
+  const rawMsg = (err.body && (err.body.message || err.body.error)) || err.message
+  const msg = normalizeApiErrorMessage(status, rawMsg)
   const detail = err.body && err.body.path ? ` (${err.body.path})` : ''
   return status ? `${status} · ${msg}${detail}` : String(msg)
+}
+
+function normalizeApiErrorMessage(status: number | undefined, message: unknown): string {
+  const msg = String(message || '')
+
+  if (status === 401) {
+    if (msg === 'player authorization required' || msg === 'Full authentication is required to access this resource') {
+      return 'player authorization required'
+    }
+    if (msg === 'gm only' || msg === 'gm authorization required') {
+      return 'gm authorization required'
+    }
+  }
+
+  if (status === 403 && msg === 'gm only') {
+    return 'gm authorization required'
+  }
+
+  return msg
 }
 
 export async function listCardDefs(): Promise<CardDef[]> {

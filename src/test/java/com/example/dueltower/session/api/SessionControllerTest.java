@@ -142,4 +142,54 @@ class SessionControllerTest {
                 .andExpect(status().reason("players may only edit their own deck"));
     }
 
+
+
+    @Test
+    void commandReturns401WhenPlayerTokenIsMissingForPlayerCommand() throws Exception {
+        SessionRuntime runtime = new SessionRuntime(
+                "TESTCODE",
+                "gm",
+                "gm-token",
+                new GameState(new Ids.SessionId(UUID.randomUUID()), 1L),
+                new EngineContext(Map.of(), Map.of())
+        );
+        given(sessionService.get("TESTCODE")).willReturn(runtime);
+
+        mockMvc.perform(post("/api/sessions/{code}/command", "TESTCODE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "DRAW",
+                                  "playerId": "p1",
+                                  "expectedVersion": 1
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(status().reason("player authorization required"));
+    }
+
+    @Test
+    void commandReturns401WhenGmTokenIsMissingForStartCombat() throws Exception {
+        SessionRuntime runtime = new SessionRuntime(
+                "TESTCODE",
+                "gm",
+                "gm-token",
+                new GameState(new Ids.SessionId(UUID.randomUUID()), 1L),
+                new EngineContext(Map.of(), Map.of())
+        );
+        given(sessionService.get("TESTCODE")).willReturn(runtime);
+
+        mockMvc.perform(post("/api/sessions/{code}/command", "TESTCODE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "START_COMBAT",
+                                  "playerId": "p1",
+                                  "expectedVersion": 1
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(status().reason("gm authorization required"));
+    }
+
 }
