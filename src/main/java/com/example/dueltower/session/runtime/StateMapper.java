@@ -88,9 +88,11 @@ public final class StateMapper {
     private static PlayerStateDto toDto(PlayerState ps, int currentRound) {
         PendingDecisionDto pending = null;
         if (ps.pendingDecision() instanceof PendingDecision.DiscardToHandLimit dt) {
-            pending = new PendingDecisionDto("DISCARD_TO_HAND_LIMIT", dt.reason(), dt.limit(), null);
+            pending = new PendingDecisionDto("DISCARD_TO_HAND_LIMIT", dt.reason(), dt.limit(), null, null, null);
         } else if (ps.pendingDecision() instanceof PendingDecision.SearchPick sp) {
-            pending = new PendingDecisionDto("SEARCH_PICK", sp.reason(), null, sp.pickCount());
+            pending = new PendingDecisionDto("SEARCH_PICK", sp.reason(), null, sp.pickCount(), null, null);
+        } else if (ps.pendingDecision() instanceof PendingDecision.InitiativeTieOrder it) {
+            pending = new PendingDecisionDto("INITIATIVE_TIE_ORDER", it.reason(), null, null, it.groupIndex(), List.copyOf(it.actorKeys()));
         }
 
         return new PlayerStateDto(
