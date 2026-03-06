@@ -382,6 +382,10 @@
   const initPresets = () => {
     const grid = $('#presetGrid');
     const btnNew = $('#btnNewPreset');
+    const presetSearch = $('#presetSearch');
+    const presetSort = $('#presetSort');
+    const presetCount = $('#presetCount');
+    const presetValidCount = $('#presetValidCount');
 
     const modal = $('#presetModal');
     const closeBtn = $('#presetModalClose');
@@ -395,16 +399,43 @@
 
     let editingId = null;
 
+    const isValidPreset = (p) => {
+      const deck = (p.deckText || '').split(',').map(s => s.trim()).filter(Boolean);
+      return deck.length === 12 && String(p.ex || '').trim().length > 0;
+    };
+
+    const normalized = (s) => String(s || '').toLowerCase();
+
     const render = () => {
       const presets = load(KEY.presets, []);
       const selected = load(KEY.selectedPreset, null);
+      const query = normalized(presetSearch?.value || '').trim();
+      const sort = presetSort?.value || 'selected';
+      const sorted = [...presets];
+
+      if (sort === 'name') {
+        sorted.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
+      } else if (sort === 'selected') {
+        sorted.sort((a, b) => (b.id === selected ? 1 : 0) - (a.id === selected ? 1 : 0));
+      }
+
+      const filtered = query
+        ? sorted.filter((p) => normalized(p.name).includes(query) || normalized(p.deckText).includes(query))
+        : sorted;
+
+      if (presetCount) presetCount.textContent = String(filtered.length);
+      if (presetValidCount) presetValidCount.textContent = String(filtered.filter(isValidPreset).length);
 
       if (grid) {
         grid.innerHTML = '';
-        presets.forEach(p => {
+        if (filtered.length === 0) {
+          grid.innerHTML = '<div class="card"><div class="muted">검색 결과가 없습니다.</div></div>';
+        }
+        filtered.forEach(p => {
           const card = document.createElement('div');
-          card.className = 'card';
+          card.className = 'card presetCard';
           const deckCount = p.deckText.split(',').map(s => s.trim()).filter(Boolean).length;
+          const valid = isValidPreset(p);
           card.innerHTML = `
             <div class="row">
               <div>
@@ -412,7 +443,12 @@
                 <div class="muted">덱 ${deckCount}/12 · EX ${escapeHtml(p.ex || '—')}</div>
               </div>
               <div class="grow"></div>
-              ${p.id === selected ? '<span class="badge ok">선택됨</span>' : '<span class="badge"> </span>'}
+              ${p.id === selected ? '<span class="badge ok">선택됨</span>' : '<span class="badge">미선택</span>'}
+            </div>
+            <div class="spacer"></div>
+            <div class="row wrap" style="gap:6px">
+              <span class="badge ${valid ? 'ok' : 'no'}">${valid ? '규격 충족' : '규격 미달'}</span>
+              <span class="badge">${deckCount}장</span>
             </div>
             <div class="spacer"></div>
             <div class="muted" style="font-size:12px; line-height:1.5">${escapeHtml(p.deckText)}</div>
@@ -493,6 +529,8 @@
     btnNew?.addEventListener('click', openNew);
     closeBtn?.addEventListener('click', close);
     cancelBtn?.addEventListener('click', close);
+    presetSearch?.addEventListener('input', render);
+    presetSort?.addEventListener('change', render);
 
     modal?.addEventListener('click', (e) => {
       if (e.target === modal) close();
