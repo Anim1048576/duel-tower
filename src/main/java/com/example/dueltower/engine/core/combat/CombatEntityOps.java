@@ -14,7 +14,12 @@ public final class CombatEntityOps {
     public static void adjustHp(GameState state, EngineContext ctx, List<GameEvent> out, TargetRef ref, int delta) {
         if (ref instanceof TargetRef.Player p) {
             PlayerState ps = requirePlayer(state, p.id());
+            int before = ps.hp();
             ps.hp(ps.hp() + delta);
+            if (state.combat() != null && before > 0 && ps.hp() <= 0 && !CombatStatuses.isBattleIncapacitated(ps)) {
+                ps.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 1);
+                out.add(new GameEvent.LogAppended(p.id().value() + " becomes [전투 불능] (hp reached 0)"));
+            }
             postHpChanged(state, ctx, out, ref);
             return;
         }

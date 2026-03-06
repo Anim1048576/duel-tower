@@ -41,7 +41,7 @@ public final class CommandValidation {
             }
         }
 
-        if (!allowBattleIncapacitated && CombatStatuses.isBattleIncapacitated(ps)) {
+        if (!allowBattleIncapacitated && (CombatStatuses.isBattleIncapacitated(ps) || ps.hp() <= 0)) {
             errors.add("player is battle incapacitated");
         }
 
