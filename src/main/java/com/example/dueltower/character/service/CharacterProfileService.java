@@ -57,7 +57,7 @@ public class CharacterProfileService {
                 .trait1(normalizeOptionalText(req.trait1()))
                 .trait2(normalizeOptionalText(req.trait2()))
                 .ownedCards(req.ownedCards().trim())
-                .currentSkillDeck(req.currentSkillDeck().trim())
+                .currentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()))
                 .exCard(req.exCard().trim())
                 .build();
 
@@ -83,7 +83,7 @@ public class CharacterProfileService {
         profile.setTrait1(normalizeOptionalText(req.trait1()));
         profile.setTrait2(normalizeOptionalText(req.trait2()));
         profile.setOwnedCards(req.ownedCards().trim());
-        profile.setCurrentSkillDeck(req.currentSkillDeck().trim());
+        profile.setCurrentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()));
         profile.setExCard(req.exCard().trim());
         return toResponse(profile);
     }
@@ -150,7 +150,6 @@ public class CharacterProfileService {
         requireNumber(req.willpower(), "willpower is required");
         validateTraits(req.trait1(), req.trait2());
         requireText(req.ownedCards(), "ownedCards is required");
-        requireText(req.currentSkillDeck(), "currentSkillDeck is required");
         requireText(req.exCard(), "exCard is required");
     }
 
@@ -178,6 +177,18 @@ public class CharacterProfileService {
         if (normalizedTrait1 == null && normalizedTrait2 != null) {
             throw new ResponseStatusException(BAD_REQUEST, "trait2 cannot be set when trait1 is empty");
         }
+    }
+
+
+    private static List<String> normalizeCurrentSkillDeck(List<String> deckPresetIds) {
+        if (deckPresetIds == null) {
+            return null;
+        }
+
+        return deckPresetIds.stream()
+                .map(value -> value == null ? "" : value.trim())
+                .filter(value -> !value.isEmpty())
+                .toList();
     }
 
     private static String normalizeOptionalText(String value) {

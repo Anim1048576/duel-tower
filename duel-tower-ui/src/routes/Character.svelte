@@ -15,7 +15,13 @@
     return '기타'
   }
 
-  function safeJsonSummary(raw: string) {
+  function safeJsonSummary(raw: unknown) {
+    if (raw == null) return '-'
+    if (Array.isArray(raw)) return `배열 ${raw.length}개 항목`
+    if (typeof raw === 'object') return `객체 ${Object.keys(raw as Record<string, unknown>).length}개 키`
+
+    if (typeof raw !== 'string') return String(raw)
+
     try {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) return `배열 ${parsed.length}개 항목`
@@ -90,9 +96,9 @@
       </section>
 
       <section class="panel">
-        <div class="panelTitle">특성 / 덱 데이터</div>
-        <div class="kv"><span>Trait 1</span><b>{profile.trait1 ?? "-"}</b></div>
-        <div class="kv"><span>Trait 2</span><b>{profile.trait2 ?? "-"}</b></div>
+        <div class="panelTitle">패시브 / 덱 데이터</div>
+        <div class="kv"><span>Passive 1</span><b>{profile.trait1 ?? "-"}</b></div>
+        <div class="kv"><span>Passive 2</span><b>{profile.trait2 ?? "-"}</b></div>
         <div class="kv"><span>Owned Cards</span><b>{safeJsonSummary(profile.ownedCards)}</b></div>
         <div class="kv"><span>Current Skill Deck</span><b>{safeJsonSummary(profile.currentSkillDeck)}</b></div>
         <div class="kv"><span>EX Card</span><b>{safeJsonSummary(profile.exCard)}</b></div>

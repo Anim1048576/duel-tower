@@ -2,6 +2,8 @@ package com.example.dueltower.character.dto;
 
 import com.example.dueltower.character.domain.CharacterGender;
 
+import java.util.List;
+
 import java.sql.Timestamp;
 
 public record CharacterProfileResponse(
@@ -20,7 +22,7 @@ public record CharacterProfileResponse(
         String trait1,
         String trait2,
         String ownedCards,
-        String currentSkillDeck,
+        List<String> currentSkillDeck,
         String exCard,
         CombatStatsDto combatStats,
         Timestamp createDate,

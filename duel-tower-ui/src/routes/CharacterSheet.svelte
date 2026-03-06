@@ -6,10 +6,12 @@
     explainApiError,
     listCardDefs,
     listCharacterProfiles,
+    listPassives,
     type CardDef,
     type CharacterGender,
     type CharacterProfileRequest,
     type CharacterProfileResponse,
+    type PassiveDefinition,
     updateCharacterProfile,
   } from '../lib/api'
 
@@ -18,17 +20,6 @@
 
   const DISPOSITION_AXIS_1: AxisLawChaos[] = ['질서', '중립', '혼돈']
   const DISPOSITION_AXIS_2: AxisMoral[] = ['선', '중용', '악']
-  const TRAIT_OPTIONS = [
-    '강인함',
-    '민첩',
-    '집중력',
-    '전략가',
-    '낙천가',
-    '냉철함',
-    '수호자',
-    '개척자',
-  ]
-
   const emptyForm: CharacterProfileRequest = {
     name: '',
     gender: 'OTHER',
@@ -44,7 +35,7 @@
     trait1: null,
     trait2: null,
     ownedCards: '[]',
-    currentSkillDeck: '[]',
+    currentSkillDeck: null,
     exCard: '{}',
   }
 
@@ -54,6 +45,7 @@
   let error = ''
   let profiles: CharacterProfileResponse[] = []
   let cardDefs: CardDef[] = []
+  let passiveDefs: PassiveDefinition[] = []
   let selectedId: number | null = null
   let form: CharacterProfileRequest = { ...emptyForm }
 
@@ -62,10 +54,14 @@
   let noAge = true
   let selectedTraits: string[] = []
   let selectedOwnedCards: string[] = []
-  let selectedDeckCards: string[] = []
   let selectedExCardId = ''
 
   $: cardOptions = cardDefs.map((card) => ({ id: card.id, label: `${card.id} · ${card.name}` }))
+  $: passiveOptions = passiveDefs.map((passive) => ({
+    id: passive.id,
+    label: `${passive.id} · ${passive.name}`,
+    description: passive.description ?? '',
+  }))
 
   function cloneForm(p: CharacterProfileResponse): CharacterProfileRequest {
     return {
@@ -123,7 +119,6 @@
     noAge = form.age == null
     selectedTraits = [form.trait1, form.trait2].filter((v): v is string => Boolean(v && v.trim()))
     selectedOwnedCards = parseIdArray(form.ownedCards)
-    selectedDeckCards = parseIdArray(form.currentSkillDeck)
     selectedExCardId = parseExCardId(form.exCard)
   }
 
@@ -135,7 +130,6 @@
       trait1: selectedTraits[0] ?? null,
       trait2: selectedTraits[1] ?? null,
       ownedCards: JSON.stringify(selectedOwnedCards),
-      currentSkillDeck: JSON.stringify(selectedDeckCards),
       exCard: selectedExCardId ? JSON.stringify({ id: selectedExCardId }) : '{}',
     }
   }
@@ -144,9 +138,10 @@
     loading = true
     error = ''
     try {
-      const [profilesRes, cardsRes] = await Promise.all([listCharacterProfiles(), listCardDefs()])
+      const [profilesRes, cardsRes, passivesRes] = await Promise.all([listCharacterProfiles(), listCardDefs(), listPassives()])
       profiles = profilesRes
       cardDefs = cardsRes
+      passiveDefs = passivesRes
       if (selectedId && !profiles.some((p) => p.id === selectedId)) {
         selectedId = null
         form = { ...emptyForm }
@@ -234,14 +229,9 @@
     syncFormFromUi()
   }
 
-  function toggleCardSelection(kind: 'owned' | 'deck', id: string) {
-    const source = kind === 'owned' ? selectedOwnedCards : selectedDeckCards
-    const exists = source.includes(id)
-    const next = exists ? source.filter((v) => v !== id) : [...source, id]
-
-    if (kind === 'owned') selectedOwnedCards = next
-    else selectedDeckCards = next
-
+  function toggleOwnedCardSelection(id: string) {
+    const exists = selectedOwnedCards.includes(id)
+    selectedOwnedCards = exists ? selectedOwnedCards.filter((v) => v !== id) : [...selectedOwnedCards, id]
     syncFormFromUi()
   }
 
@@ -346,19 +336,24 @@
       <label>Willpower <input class="input" type="number" value={form.willpower} on:input={(e) => updateNumberField('willpower', (e.currentTarget as HTMLInputElement).value)} /></label>
 
       <div class="full block">
-        <div class="blockTitle">캐릭터 특성 (최대 2개)</div>
+        <div class="blockTitle">캐릭터 패시브 (최대 2개)</div>
         <div class="chipWrap">
-          {#each TRAIT_OPTIONS as trait}
-            <button
-              type="button"
-              class="chip"
-              class:active={selectedTraits.includes(trait)}
-              disabled={!selectedTraits.includes(trait) && selectedTraits.length >= 2}
-              on:click={() => toggleTrait(trait)}
-            >
-              {trait}
-            </button>
-          {/each}
+          {#if passiveOptions.length === 0}
+            <div class="hint">등록된 패시브가 없습니다.</div>
+          {:else}
+            {#each passiveOptions as passive}
+              <button
+                type="button"
+                class="chip"
+                class:active={selectedTraits.includes(passive.id)}
+                disabled={!selectedTraits.includes(passive.id) && selectedTraits.length >= 2}
+                on:click={() => toggleTrait(passive.id)}
+                title={passive.description}
+              >
+                {passive.label}
+              </button>
+            {/each}
+          {/if}
         </div>
       </div>
 
@@ -367,24 +362,13 @@
         <div class="checkGrid">
           {#each cardOptions as card}
             <label class="checkItem">
-              <input type="checkbox" checked={selectedOwnedCards.includes(card.id)} on:change={() => toggleCardSelection('owned', card.id)} />
+              <input type="checkbox" checked={selectedOwnedCards.includes(card.id)} on:change={() => toggleOwnedCardSelection(card.id)} />
               <span>{card.label}</span>
             </label>
           {/each}
         </div>
       </div>
 
-      <div class="full block">
-        <div class="blockTitle">현재 스킬 덱 선택</div>
-        <div class="checkGrid">
-          {#each cardOptions as card}
-            <label class="checkItem">
-              <input type="checkbox" checked={selectedDeckCards.includes(card.id)} on:change={() => toggleCardSelection('deck', card.id)} />
-              <span>{card.label}</span>
-            </label>
-          {/each}
-        </div>
-      </div>
 
       <label class="full">EX 카드
         <select class="input" value={selectedExCardId} on:change={(e) => updateExCard((e.currentTarget as HTMLSelectElement).value)}>

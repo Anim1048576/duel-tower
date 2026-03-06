@@ -51,7 +51,7 @@ export type CharacterProfileResponse = {
   trait1: string | null
   trait2: string | null
   ownedCards: string
-  currentSkillDeck: string
+  currentSkillDeck: string[] | null
   exCard: string
   combatStats: CombatStats
   createDate: string
@@ -72,7 +72,7 @@ export type CharacterProfileRequest = {
   trait1: string | null
   trait2: string | null
   ownedCards: string
-  currentSkillDeck: string
+  currentSkillDeck: string[] | null
   exCard: string
 }
 
