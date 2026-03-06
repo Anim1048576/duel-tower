@@ -21,10 +21,12 @@ public class DeckService {
 
     private final DeckRepository deckRepository;
     private final CardService cardService;
+    private final DeckLimitPolicy deckLimitPolicy;
 
-    public DeckService(DeckRepository deckRepository, CardService cardService) {
+    public DeckService(DeckRepository deckRepository, CardService cardService, DeckLimitPolicy deckLimitPolicy) {
         this.deckRepository = deckRepository;
         this.cardService = cardService;
+        this.deckLimitPolicy = deckLimitPolicy;
     }
 
     @Transactional
@@ -73,7 +75,7 @@ public class DeckService {
 
     /**
      * 덱에 카드를 누적 추가한다.
-     * - PLAYER 덱은 총합 12장을 초과할 수 없고, 동일 카드는 3장을 초과할 수 없다.
+     * - PLAYER 덱은 총합 상한과 카드별 매수 제한(카드별 오버라이드 가능)을 검증한다.
      * - ENEMY 덱은 제약 없음
      */
     @Transactional
@@ -101,15 +103,7 @@ public class DeckService {
 
         // constraints (PLAYER only, partial)
         if (deck.getType() == DeckType.PLAYER) {
-            int total = current.values().stream().mapToInt(Integer::intValue).sum();
-            if (total > 12) {
-                throw new ResponseStatusException(BAD_REQUEST, "player deck cannot exceed 12 cards (got " + total + ")");
-            }
-            for (var e : current.entrySet()) {
-                if (e.getValue() > 3) {
-                    throw new ResponseStatusException(BAD_REQUEST, "player deck: max 3 copies per card (" + e.getKey() + "=" + e.getValue() + ")");
-                }
-            }
+            deckLimitPolicy.validatePlayerDeckUpTo(current);
         }
 
         // to entities & persist
@@ -197,15 +191,7 @@ public class DeckService {
 
         // 3) constraints (PLAYER only)
         if (type == DeckType.PLAYER) {
-            int total = merged.values().stream().mapToInt(Integer::intValue).sum();
-            if (total != 12) {
-                throw new ResponseStatusException(BAD_REQUEST, "player deck must have exactly 12 cards (got " + total + ")");
-            }
-            for (var e : merged.entrySet()) {
-                if (e.getValue() > 3) {
-                    throw new ResponseStatusException(BAD_REQUEST, "player deck: max 3 copies per card (" + e.getKey() + "=" + e.getValue() + ")");
-                }
-            }
+            deckLimitPolicy.validatePlayerDeckExact(merged);
         }
 
         return toEntities(merged);
