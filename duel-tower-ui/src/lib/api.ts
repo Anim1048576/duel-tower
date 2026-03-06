@@ -4,6 +4,7 @@ import type {
   CreateSessionResponse,
   EngineResponse,
   JoinSessionResponse,
+  OwnedCard,
   SessionSnapshot,
 } from './model'
 
@@ -126,10 +127,26 @@ export async function getSessionState(code: string): Promise<SessionSnapshot> {
   return adaptSessionSnapshot(raw)
 }
 
-export async function joinSession(code: string, playerId: string, passiveIds?: string[]): Promise<JoinSessionResponse> {
+export async function joinSession(
+  code: string,
+  playerId: string,
+  passiveIds?: string[],
+  presetDeckCardIds?: string[] | null,
+  presetExCardId?: string | null,
+  ownedCards?: OwnedCard[] | null,
+): Promise<JoinSessionResponse> {
+  const hasPresetDeck = Array.isArray(presetDeckCardIds) && presetDeckCardIds.length > 0
+  const hasPresetEx = typeof presetExCardId === 'string' && presetExCardId.trim().length > 0
+
   const raw = await request<any>(`/api/sessions/${encodeURIComponent(code)}/join`, {
     method: 'POST',
-    body: JSON.stringify({ playerId, passiveIds }),
+    body: JSON.stringify({
+      playerId,
+      passiveIds,
+      presetDeckCardIds: hasPresetDeck ? presetDeckCardIds : undefined,
+      presetExCardId: hasPresetEx ? presetExCardId : undefined,
+      ownedCards,
+    }),
   })
   return { ...raw, state: adaptSessionSnapshot(raw?.state ?? {}) }
 }

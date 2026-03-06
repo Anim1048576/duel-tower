@@ -155,6 +155,11 @@ export type CommandRequest = {
   targets?: TargetRef[]
 }
 
+export type OwnedCard = {
+  cardId: string
+  weakened: boolean
+}
+
 export function normalizeCardDef(raw: any): CardDef {
   // Backend CardDefinition serializes id as { value: 'C001' }
   const id = String(raw?.id?.value ?? raw?.id ?? '')

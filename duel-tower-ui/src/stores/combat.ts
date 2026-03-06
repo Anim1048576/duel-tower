@@ -60,7 +60,13 @@ export async function ensureJoined() {
   try {
     const presetState = get(presets)
     const selected = presetState.presets.find((p) => p.id === presetState.selectedId) ?? presetState.presets[0]
-    const joinRes = await joinSession(code, pid, selected?.passiveIds ?? [])
+    const joinRes = await joinSession(
+      code,
+      pid,
+      selected?.passiveIds ?? [],
+      selected?.deck?.length ? selected.deck : undefined,
+      selected?.ex ?? undefined,
+    )
     setPlayerToken(joinRes.playerToken)
     await refreshState()
   } catch (e) {
