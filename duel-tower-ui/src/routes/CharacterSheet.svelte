@@ -1,128 +1,226 @@
 <script lang="ts">
-  import ResourceBar from '../lib/components/ResourceBar.svelte'
-  import DetailDrawer, { type DetailItem } from '../lib/components/DetailDrawer.svelte'
-  import DetailPill from '../lib/components/DetailPill.svelte'
+  import { onMount } from 'svelte'
+  import {
+    createCharacterProfile,
+    deleteCharacterProfile,
+    explainApiError,
+    listCharacterProfiles,
+    type CharacterGender,
+    type CharacterProfileRequest,
+    type CharacterProfileResponse,
+    updateCharacterProfile,
+  } from '../lib/api'
 
-  const profile = {
-    name: '티그',
-    className: '스트라이커',
-    level: 18,
-    region: '재의 평원',
+  const emptyForm: CharacterProfileRequest = {
+    name: '',
+    gender: 'OTHER',
+    age: 17,
+    wish: '',
+    disposition: '',
+    oneLiner: '',
+    story: '',
+    physical: 1,
+    technique: 1,
+    sense: 1,
+    willpower: 1,
+    trait1: '',
+    trait2: '',
+    ownedCards: '[]',
+    currentSkillDeck: '[]',
+    exCard: '{}',
   }
 
-  const lifeStats = [
-    { label: '체력', value: 68, max: 100 },
-    { label: '집중', value: 42, max: 60 },
-    { label: '기동력', value: 24, max: 30 },
-  ]
+  let loading = false
+  let saving = false
+  let deleting = false
+  let error = ''
+  let profiles: CharacterProfileResponse[] = []
+  let selectedId: number | null = null
+  let form: CharacterProfileRequest = { ...emptyForm }
 
-  const combatStats = [
-    { label: '공격력', value: 32, max: 50 },
-    { label: '방어력', value: 21, max: 40 },
-    { label: '치명률', value: 17, max: 30 },
-  ]
+  function cloneForm(p: CharacterProfileResponse): CharacterProfileRequest {
+    return {
+      name: p.name,
+      gender: p.gender,
+      age: p.age,
+      wish: p.wish,
+      disposition: p.disposition,
+      oneLiner: p.oneLiner,
+      story: p.story,
+      physical: p.physical,
+      technique: p.technique,
+      sense: p.sense,
+      willpower: p.willpower,
+      trait1: p.trait1,
+      trait2: p.trait2,
+      ownedCards: p.ownedCards,
+      currentSkillDeck: p.currentSkillDeck,
+      exCard: p.exCard,
+    }
+  }
 
-  const traits: DetailItem[] = [
-    { kind: 'status', name: '강심장', summary: '공포 내성 +25%', description: '제어 효과에 대한 내성이 높아지며 전투 시작 시 저항을 1회 획득합니다.', tags: ['패시브', '생존'] },
-    { kind: 'status', name: '속전속결', summary: '턴 종료 시 기동력 회복', description: '이번 턴에 공격 카드를 2장 이상 사용했다면 기동력을 3 회복합니다.', tags: ['패시브', '템포'] },
-  ]
+  async function refresh() {
+    loading = true
+    error = ''
+    try {
+      profiles = await listCharacterProfiles()
+      if (selectedId && !profiles.some((p) => p.id === selectedId)) {
+        selectedId = null
+        form = { ...emptyForm }
+      }
+    } catch (e) {
+      error = explainApiError(e)
+    } finally {
+      loading = false
+    }
+  }
 
-  const deckSummary: DetailItem[] = [
-    { kind: 'card', name: '급소 찌르기', summary: '비용 1 · 단일 대상 12 피해', description: '대상에게 12 피해를 주고 약화가 있다면 4 추가 피해를 줍니다.', tags: ['공격', '콤보'], stats: [{ label: '코스트', value: 1 }, { label: '희귀도', value: '일반' }] },
-    { kind: 'card', name: '수비 태세', summary: '비용 1 · 방어 10', description: '방어를 10 획득하고 다음 턴 시작 시 집중을 2 회복합니다.', tags: ['방어', '유지'], stats: [{ label: '코스트', value: 1 }, { label: '희귀도', value: '일반' }] },
-    { kind: 'card', name: '추격 베기', summary: '비용 2 · 연타', description: '8 피해를 2회 가합니다. 적이 약화 상태면 추가로 1회 타격합니다.', tags: ['공격', '연타'], stats: [{ label: '코스트', value: 2 }, { label: '희귀도', value: '희귀' }] },
-  ]
+  function selectProfile(id: number) {
+    const found = profiles.find((p) => p.id === id)
+    if (!found) return
+    selectedId = found.id
+    form = cloneForm(found)
+  }
 
-  const statuses: DetailItem[] = [
-    { kind: 'status', name: '재생', summary: '턴 시작 시 체력 4 회복', description: '다음 3턴 동안 턴 시작 시 체력을 4 회복합니다.', tags: ['버프'], stats: [{ label: '남은 턴', value: 3 }] },
-    { kind: 'status', name: '출혈', summary: '카드 사용 시 피해 2', description: '카드를 사용할 때마다 2 고정 피해를 받습니다.', tags: ['디버프'], stats: [{ label: '중첩', value: 2 }] },
-  ]
+  function resetToNew() {
+    selectedId = null
+    form = { ...emptyForm }
+  }
 
-  let selectedItem: DetailItem | null = null
+  async function saveProfile() {
+    saving = true
+    error = ''
+    try {
+      if (selectedId) {
+        await updateCharacterProfile(selectedId, form)
+      } else {
+        const created = await createCharacterProfile(form)
+        selectedId = created.id
+      }
+      await refresh()
+      if (selectedId) {
+        const found = profiles.find((p) => p.id === selectedId)
+        if (found) form = cloneForm(found)
+      }
+    } catch (e) {
+      error = explainApiError(e)
+    } finally {
+      saving = false
+    }
+  }
+
+  async function removeProfile() {
+    if (!selectedId) return
+    deleting = true
+    error = ''
+    try {
+      await deleteCharacterProfile(selectedId)
+      resetToNew()
+      await refresh()
+    } catch (e) {
+      error = explainApiError(e)
+    } finally {
+      deleting = false
+    }
+  }
+
+  function updateNumberField<K extends 'age' | 'physical' | 'technique' | 'sense' | 'willpower'>(key: K, value: string) {
+    const parsed = Number(value)
+    form = { ...form, [key]: Number.isFinite(parsed) ? parsed : 0 }
+  }
+
+  function updateGender(value: string) {
+    const next = value as CharacterGender
+    form = { ...form, gender: next }
+  }
+
+  onMount(refresh)
 </script>
 
 <div class="page">
-  <section class="panel">
-    <div class="panelTitle">프로필</div>
-    <div class="profileGrid">
-      <div><b>{profile.name}</b></div>
-      <div>직업: {profile.className}</div>
-      <div>레벨: {profile.level}</div>
-      <div>지역: {profile.region}</div>
+  <section class="panel listPanel">
+    <div class="row top">
+      <div class="panelTitle">Character 목록</div>
+      <button class="btn" on:click={refresh} disabled={loading}>새로고침</button>
     </div>
+
+    {#if loading}
+      <div class="hint">로딩 중...</div>
+    {:else if profiles.length === 0}
+      <div class="hint">등록된 캐릭터가 없습니다.</div>
+    {:else}
+      <div class="list">
+        {#each profiles as p (p.id)}
+          <button class="item" class:active={p.id === selectedId} on:click={() => selectProfile(p.id)}>
+            <b>#{p.id} {p.name}</b>
+            <span>{p.gender} · {p.age}세</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
+
+    <button class="btn primary" on:click={resetToNew}>신규 캐릭터 작성</button>
   </section>
 
-  <section class="panel">
-    <div class="panelTitle">생활능력</div>
-    <div class="statsGrid">
-      {#each lifeStats as stat (stat.label)}
-        <ResourceBar label={stat.label} value={stat.value} max={stat.max} />
-      {/each}
+  <section class="panel formPanel">
+    <div class="row top">
+      <div class="panelTitle">Character Sheet</div>
+      <div class="row">
+        {#if selectedId}
+          <button class="btn danger" on:click={removeProfile} disabled={deleting || saving}>삭제</button>
+        {/if}
+        <button class="btn primary" on:click={saveProfile} disabled={saving || deleting}>{selectedId ? '수정 저장' : '신규 저장'}</button>
+      </div>
     </div>
-  </section>
 
-  <section class="panel">
-    <div class="panelTitle">전투능력</div>
-    <div class="statsGrid">
-      {#each combatStats as stat (stat.label)}
-        <ResourceBar label={stat.label} value={stat.value} max={stat.max} />
-      {/each}
+    {#if error}
+      <div class="hint">오류: {error}</div>
+    {/if}
+
+    <div class="formGrid">
+      <label>이름 <input class="input" bind:value={form.name} /></label>
+      <label>성별
+        <select class="input" value={form.gender} on:change={(e) => updateGender((e.currentTarget as HTMLSelectElement).value)}>
+          <option value="MALE">MALE</option>
+          <option value="FEMALE">FEMALE</option>
+          <option value="OTHER">OTHER</option>
+        </select>
+      </label>
+      <label>나이 <input class="input" type="number" value={form.age} on:input={(e) => updateNumberField('age', (e.currentTarget as HTMLInputElement).value)} /></label>
+      <label>성향 <input class="input" bind:value={form.disposition} /></label>
+      <label class="full">소원 <input class="input" bind:value={form.wish} /></label>
+      <label class="full">한줄 대사 <input class="input" bind:value={form.oneLiner} /></label>
+      <label class="full">스토리 <textarea class="textarea" rows="4" bind:value={form.story}></textarea></label>
+
+      <label>Physical <input class="input" type="number" value={form.physical} on:input={(e) => updateNumberField('physical', (e.currentTarget as HTMLInputElement).value)} /></label>
+      <label>Technique <input class="input" type="number" value={form.technique} on:input={(e) => updateNumberField('technique', (e.currentTarget as HTMLInputElement).value)} /></label>
+      <label>Sense <input class="input" type="number" value={form.sense} on:input={(e) => updateNumberField('sense', (e.currentTarget as HTMLInputElement).value)} /></label>
+      <label>Willpower <input class="input" type="number" value={form.willpower} on:input={(e) => updateNumberField('willpower', (e.currentTarget as HTMLInputElement).value)} /></label>
+
+      <label>Trait 1 <input class="input" bind:value={form.trait1} /></label>
+      <label>Trait 2 <input class="input" bind:value={form.trait2} /></label>
+      <label class="full">Owned Cards(JSON) <textarea class="textarea" rows="3" bind:value={form.ownedCards}></textarea></label>
+      <label class="full">Current Skill Deck(JSON) <textarea class="textarea" rows="3" bind:value={form.currentSkillDeck}></textarea></label>
+      <label class="full">EX Card(JSON) <textarea class="textarea" rows="3" bind:value={form.exCard}></textarea></label>
     </div>
-  </section>
-
-  <section class="panel desktopOnly">
-    <div class="panelTitle">특성</div>
-    <div class="chips">
-      {#each traits as trait (trait.name)}
-        <DetailPill item={trait} on:select={(e) => (selectedItem = e.detail.item)} />
-      {/each}
-    </div>
-  </section>
-
-  <section class="panel desktopOnly">
-    <div class="panelTitle">덱 요약</div>
-    <div class="chips">
-      {#each deckSummary as card (card.name)}
-        <DetailPill item={card} tone="info" on:select={(e) => (selectedItem = e.detail.item)} />
-      {/each}
-    </div>
-  </section>
-
-  <section class="panel">
-    <div class="panelTitle">상태</div>
-    <div class="chips">
-      {#each statuses as status (status.name)}
-        <DetailPill item={status} tone={status.name === '출혈' ? 'danger' : 'ok'} on:select={(e) => (selectedItem = e.detail.item)} />
-      {/each}
-    </div>
-  </section>
-
-  <section class="panel mobileOnly">
-    <div class="panelTitle">모바일 축약 뷰</div>
-    <ul class="compactList">
-      <li>핵심 수치: 체력 68 / 집중 42</li>
-      <li>현재 상태: 재생, 출혈</li>
-      <li>최근 로그: 추격 베기 사용 · 16 피해</li>
-    </ul>
   </section>
 </div>
 
-<DetailDrawer open={Boolean(selectedItem)} item={selectedItem} on:close={() => (selectedItem = null)} />
-
 <style>
-  .page{display:flex;flex-direction:column;gap:12px}
-  .profileGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .statsGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-  .chips{display:flex;gap:8px;flex-wrap:wrap}
-  .compactList{margin:0;padding-left:18px;color:var(--text-muted)}
-  .mobileOnly{display:none}
+  .page{display:grid;grid-template-columns:320px 1fr;gap:12px}
+  .top{justify-content:space-between}
+  .listPanel{display:flex;flex-direction:column;gap:10px}
+  .list{display:flex;flex-direction:column;gap:8px;max-height:520px;overflow:auto}
+  .item{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:10px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--text)}
+  .item.active{border-color:rgba(114,220,255,.5);background:rgba(114,220,255,.1)}
+  .item span{color:var(--text-muted);font-size:12px}
+  .formPanel{display:flex;flex-direction:column;gap:12px}
+  .formGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-muted)}
+  .full{grid-column:1 / -1}
 
   @media (max-width: 900px){
-    .statsGrid{grid-template-columns:1fr}
-  }
-
-  @media (max-width: 700px){
-    .desktopOnly{display:none}
-    .mobileOnly{display:block}
+    .page{grid-template-columns:1fr}
+    .formGrid{grid-template-columns:1fr}
   }
 </style>

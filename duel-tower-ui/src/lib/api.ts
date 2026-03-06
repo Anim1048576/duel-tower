@@ -27,6 +27,55 @@ export type CreateDeckRequest = { name?: string | null; type: DeckType; cards?: 
 export type UpdateDeckRequest = { name?: string | null; type?: DeckType | null; cards?: DeckCardSpec[] | null }
 export type AddDeckCardsRequest = { cards?: DeckCardSpec[] | null }
 
+// Character Profile API models (DB-backed)
+export type CharacterGender = 'MALE' | 'FEMALE' | 'OTHER'
+export type CombatStats = {
+  maxHp: number
+  maxAp: number
+  attackPower: number
+  healPower: number
+}
+export type CharacterProfileResponse = {
+  id: number
+  name: string
+  gender: CharacterGender
+  age: number
+  wish: string
+  disposition: string
+  oneLiner: string
+  story: string
+  physical: number
+  technique: number
+  sense: number
+  willpower: number
+  trait1: string
+  trait2: string
+  ownedCards: string
+  currentSkillDeck: string
+  exCard: string
+  combatStats: CombatStats
+  createDate: string
+  updateDate: string
+}
+export type CharacterProfileRequest = {
+  name: string
+  gender: CharacterGender
+  age: number
+  wish: string
+  disposition: string
+  oneLiner: string
+  story: string
+  physical: number
+  technique: number
+  sense: number
+  willpower: number
+  trait1: string
+  trait2: string
+  ownedCards: string
+  currentSkillDeck: string
+  exCard: string
+}
+
 type ApiError = Error & { status?: number; body?: any }
 
 type RequestAuthOptions = {
@@ -231,4 +280,34 @@ export async function addDeckCards(id: number, req: AddDeckCardsRequest): Promis
     method: 'POST',
     body: JSON.stringify(req),
   })
+}
+
+// ------------------
+// Character Profile API
+// ------------------
+
+export async function listCharacterProfiles(): Promise<CharacterProfileResponse[]> {
+  return await request<CharacterProfileResponse[]>('/api/content/characters')
+}
+
+export async function getCharacterProfile(id: number): Promise<CharacterProfileResponse> {
+  return await request<CharacterProfileResponse>(`/api/content/characters/${id}`)
+}
+
+export async function createCharacterProfile(req: CharacterProfileRequest): Promise<CharacterProfileResponse> {
+  return await request<CharacterProfileResponse>('/api/content/characters', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  })
+}
+
+export async function updateCharacterProfile(id: number, req: CharacterProfileRequest): Promise<CharacterProfileResponse> {
+  return await request<CharacterProfileResponse>(`/api/content/characters/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(req),
+  })
+}
+
+export async function deleteCharacterProfile(id: number): Promise<void> {
+  await request<void>(`/api/content/characters/${id}`, { method: 'DELETE' })
 }
