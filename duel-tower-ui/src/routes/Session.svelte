@@ -28,7 +28,13 @@
       setSessionCode(res.code)
       setGmId(res.gmId)
       setGmToken(res.gmToken)
-      const joinRes = await joinSession(res.code, meId.trim(), selectedPreset?.passiveIds ?? [])
+      const joinRes = await joinSession(
+        res.code,
+        meId.trim(),
+        selectedPreset?.passiveIds ?? [],
+        selectedPreset?.deck?.length ? selectedPreset.deck : undefined,
+        selectedPreset?.ex ?? undefined,
+      )
       setPlayerToken(joinRes.playerToken)
       await refreshState()
       pushToast('세션 생성', res.code)
@@ -50,7 +56,13 @@
       const code = joinCode.trim().toUpperCase()
       setSessionCode(code)
       setGmToken('')
-      const joinRes = await joinSession(code, meId.trim(), selectedPreset?.passiveIds ?? [])
+      const joinRes = await joinSession(
+        code,
+        meId.trim(),
+        selectedPreset?.passiveIds ?? [],
+        selectedPreset?.deck?.length ? selectedPreset.deck : undefined,
+        selectedPreset?.ex ?? undefined,
+      )
       setPlayerToken(joinRes.playerToken)
       await refreshState()
       pushToast('세션 참가', code)
