@@ -62,7 +62,7 @@
         <div class="panelTitle">기본 정보</div>
         <div class="kv"><span>이름</span><b>{profile.name}</b></div>
         <div class="kv"><span>성별</span><b>{genderLabel(profile.gender)}</b></div>
-        <div class="kv"><span>나이</span><b>{profile.age == null ? "미지정" : `${profile.age}`}</b></div>
+        <div class="kv"><span>나이</span><b>{profile.age == null ? "불명" : `${profile.age}`}</b></div>
         <div class="kv"><span>성향</span><b>{profile.disposition}</b></div>
         <div class="kv"><span>소원</span><b>{profile.wish}</b></div>
       </section>
