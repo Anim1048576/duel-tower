@@ -4,6 +4,7 @@
   import Session from './routes/Session.svelte'
   import Lobby from './routes/Lobby.svelte'
   import Character from './routes/Character.svelte'
+  import CharacterSheet from './routes/CharacterSheet.svelte'
   import Node from './routes/Node.svelte'
   import Combat from './routes/Combat.svelte'
   import DeckEdit from './routes/DeckEdit.svelte'
@@ -57,6 +58,7 @@
     { path: '/session', label: 'Session', phases: ['session', 'lobby', 'adventure', 'combat', 'results'] },
     { path: '/lobby', label: 'Lobby', phases: ['lobby', 'adventure', 'combat', 'results'] },
     { path: '/character/1', label: 'Character', phases: ['lobby', 'adventure'] },
+    { path: '/character-sheet', label: 'Character Sheet', phases: ['lobby', 'adventure'] },
     { path: '/node', label: 'Node', phases: ['adventure'] },
     { path: '/combat', label: 'Combat', phases: ['combat', 'lobby'], disabledReason: !inCombat ? '전투 시작 전: 레이아웃 미리보기만 가능' : '' },
     { path: '/deck-edit', label: 'Deck Edit', phases: ['lobby', 'adventure'] },
@@ -117,6 +119,8 @@
       <Lobby />
     {:else if $route.startsWith('/character/')}
       <Character id={$route.split('/')[2] || ''} />
+    {:else if $route === '/character-sheet'}
+      <CharacterSheet />
     {:else if $route === '/node'}
       <Node />
     {:else if $route === '/combat'}
