@@ -115,6 +115,45 @@ public final class PassiveOps {
         return Math.max(cur, 0);
     }
 
+
+    public static int onOutgoingHeal(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef source,
+            TargetRef target,
+            int amount,
+            String hookSource
+    ) {
+        PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
+        int cur = amount;
+        for (HookEntry it : collectEntries(state, ctx, source)) {
+            if (!ctx.hasPassiveEffect(it.passiveId())) continue;
+            cur = ctx.passiveEffect(it.passiveId()).onOutgoingHeal(rt, source, target, cur);
+            if (cur <= 0) return 0;
+        }
+        return Math.max(cur, 0);
+    }
+
+    public static int onIncomingHeal(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef source,
+            TargetRef target,
+            int amount,
+            String hookSource
+    ) {
+        PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
+        int cur = amount;
+        for (HookEntry it : collectEntries(state, ctx, target)) {
+            if (!ctx.hasPassiveEffect(it.passiveId())) continue;
+            cur = ctx.passiveEffect(it.passiveId()).onIncomingHeal(rt, source, target, cur);
+            if (cur <= 0) return 0;
+        }
+        return Math.max(cur, 0);
+    }
+
     public static void turnStart(GameState state, EngineContext ctx, TargetRef owner, List<GameEvent> out, String source) {
         PassiveRuntime rt = new PassiveRuntime(state, ctx, out, source);
         for (HookEntry it : collectEntries(state, ctx, owner)) {

@@ -17,6 +17,16 @@ public interface StatusEffect {
         return amount;
     }
 
+    /** 상태가 '받는 회복'을 변형할 수 있는 훅 */
+    default int onIncomingHeal(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, int amount) {
+        return amount;
+    }
+
+    /** 상태가 '주는 회복'을 변형할 수 있는 훅 */
+    default int onOutgoingHeal(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, int amount) {
+        return amount;
+    }
+
 
 /**
  * 상태가 '카드 코스트'를 변형할 수 있는 훅.

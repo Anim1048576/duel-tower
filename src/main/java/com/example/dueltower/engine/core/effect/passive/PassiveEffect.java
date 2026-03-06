@@ -15,6 +15,14 @@ public interface PassiveEffect {
         return amount;
     }
 
+    default int onIncomingHeal(PassiveRuntime rt, TargetRef source, TargetRef target, int amount) {
+        return amount;
+    }
+
+    default int onOutgoingHeal(PassiveRuntime rt, TargetRef source, TargetRef target, int amount) {
+        return amount;
+    }
+
     default int onCost(PassiveRuntime rt, TargetRef actor, CardInstance ci, CardDefinition def, int currentCost) {
         return currentCost;
     }
