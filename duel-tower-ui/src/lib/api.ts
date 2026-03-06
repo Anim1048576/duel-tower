@@ -176,6 +176,26 @@ export async function sendCommand(
   return adaptEngineResponse(raw)
 }
 
+export async function updateSessionDeck(
+  code: string,
+  playerId: string,
+  deckCardIds: string[],
+  playerToken?: string,
+): Promise<SessionSnapshot> {
+  const raw = await request<any>(
+    `/api/sessions/${encodeURIComponent(code)}/players/${encodeURIComponent(playerId)}/deck`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ deckCardIds }),
+    },
+    {
+      playerToken,
+      includePlayerToken: true,
+    },
+  )
+  return adaptSessionSnapshot(raw)
+}
+
 // ------------------
 // Deck API
 // ------------------
