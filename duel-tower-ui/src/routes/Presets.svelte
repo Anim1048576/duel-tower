@@ -32,13 +32,49 @@
     missingSkillIcons = { ...missingSkillIcons, [src]: true }
   }
 
+  function buildDeckCountEntries(deck: string[]) {
+    const counts = new Map<string, number>()
+    for (const defId of deck) {
+      counts.set(defId, (counts.get(defId) ?? 0) + 1)
+    }
+    return [...counts.entries()].map(([defId, count]) => ({
+      defId,
+      count,
+      name: $content.cardsById[defId]?.name ?? defId,
+    }))
+  }
+
+  function validateDeckConstraints(deck: string[], options?: { requireExactTotal?: boolean }) {
+    if (deck.length > 12) {
+      return `일반 스킬 덱은 12장 고정이다. 현재 ${deck.length}장.`
+    }
+
+    if (options?.requireExactTotal && deck.length !== 12) {
+      return `일반 스킬 덱은 12장 고정이다. 현재 ${deck.length}장.`
+    }
+
+    const duplicateViolations = buildDeckCountEntries(deck)
+      .filter(({ count }) => count > 3)
+      .map(({ name, count }) => `${name} × ${count}`)
+
+    if (duplicateViolations.length) {
+      return `중복 제한(최대 3장) 위반: ${duplicateViolations.join(', ')}`
+    }
+
+    return ''
+  }
+
+  $: deckCountEntries = selected ? buildDeckCountEntries(selected.deck) : []
+
   function addToDeck(defId: string) {
     if (!selected) return
-    if (selected.deck.length >= 12) {
-      pushToast('덱 제한', '덱은 12장')
+    const nextDeck = [...selected.deck, defId]
+    const validationMessage = validateDeckConstraints(nextDeck)
+    if (validationMessage) {
+      pushToast('덱 검증 실패', validationMessage)
       return
     }
-    setDeck(selected.id, [...selected.deck, defId])
+    setDeck(selected.id, nextDeck)
   }
 
   function removeFromDeck(idx: number) {
@@ -92,6 +128,11 @@
 
   function exportJson() {
     if (!selected) return
+    const validationMessage = validateDeckConstraints(selected.deck, { requireExactTotal: true })
+    if (validationMessage) {
+      pushToast('덱 검증 실패', validationMessage)
+      return
+    }
     const payload = { name: selected.name, deck: selected.deck, ex: selected.ex, passiveIds: selected.passiveIds }
     navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(
       () => pushToast('프리셋 JSON 복사됨'),
@@ -252,6 +293,15 @@
         <div class="spacer"></div>
         <div class="cardTitle">덱 (클릭해서 제거)</div>
         <div class="spacer"></div>
+        {#if deckCountEntries.length}
+          <div class="row wrap" style="gap:8px; margin-bottom:10px">
+            {#each deckCountEntries as entry (entry.defId)}
+              <span class="badge" style={entry.count > 3 ? 'border-color:#ff5d74;color:#ff5d74;background:rgba(255,93,116,.1)' : ''}>
+                {entry.name} × {entry.count}
+              </span>
+            {/each}
+          </div>
+        {/if}
         <div class="cardRow">
           {#each selected.deck as defId, i (defId + ':' + i)}
             <button class="btn" on:click={() => removeFromDeck(i)}>
