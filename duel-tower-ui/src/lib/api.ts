@@ -27,6 +27,13 @@ export type AddDeckCardsRequest = { cards?: DeckCardSpec[] | null }
 
 type ApiError = Error & { status?: number; body?: any }
 
+type RequestAuthOptions = {
+  gmToken?: string
+  playerToken?: string
+  includeGmToken?: boolean
+  includePlayerToken?: boolean
+}
+
 async function readJson(res: Response) {
   const text = await res.text()
   if (!text) return null
@@ -37,11 +44,26 @@ async function readJson(res: Response) {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+function createAuthHeaders(auth?: RequestAuthOptions): Record<string, string> {
+  const headers: Record<string, string> = {}
+
+  if (auth?.includeGmToken && auth.gmToken) {
+    headers['X-GM-Token'] = auth.gmToken
+  }
+
+  if (auth?.includePlayerToken && auth.playerToken) {
+    headers['X-Player-Token'] = auth.playerToken
+  }
+
+  return headers
+}
+
+async function request<T>(path: string, init?: RequestInit, auth?: RequestAuthOptions): Promise<T> {
   const res = await fetch(path, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...createAuthHeaders(auth),
       ...(init?.headers ?? {}),
     },
   })
@@ -92,16 +114,20 @@ export async function joinSession(code: string, playerId: string, passiveIds?: s
   return { ...raw, state: adaptSessionSnapshot(raw?.state ?? {}) }
 }
 
-export async function sendCommand(code: string, req: CommandRequest, gmToken?: string): Promise<EngineResponse> {
-  const headers: Record<string, string> = {}
-  if (gmToken && req.type?.toUpperCase() === "START_COMBAT") {
-    headers["X-GM-Token"] = gmToken
-  }
-
+export async function sendCommand(
+  code: string,
+  req: CommandRequest,
+  gmToken?: string,
+  playerToken?: string,
+): Promise<EngineResponse> {
   const raw = await request<any>(`/api/sessions/${encodeURIComponent(code)}/command`, {
     method: 'POST',
-    headers,
     body: JSON.stringify(req),
+  }, {
+    gmToken,
+    playerToken,
+    includeGmToken: req.type?.toUpperCase() === 'START_COMBAT',
+    includePlayerToken: true,
   })
   return adaptEngineResponse(raw)
 }
