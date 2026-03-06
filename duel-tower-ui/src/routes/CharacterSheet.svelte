@@ -56,7 +56,12 @@
   let selectedOwnedCardCounts: Record<string, number> = {}
   let selectedExCardId = ''
 
-  $: cardOptions = cardDefs.map((card) => ({ id: card.id, label: `${card.id} · ${card.name}` }))
+  $: skillCardOptions = cardDefs
+    .filter((card) => card.type === 'SKILL')
+    .map((card) => ({ id: card.id, label: `${card.id} · ${card.name}` }))
+  $: exCardOptions = cardDefs
+    .filter((card) => card.type === 'EX')
+    .map((card) => ({ id: card.id, label: `${card.id} · ${card.name}` }))
   $: passiveOptions = passiveDefs.map((passive) => ({
     id: passive.id,
     label: `${passive.id} · ${passive.name}`,
@@ -105,7 +110,7 @@
     return cardIds.reduce<Record<string, number>>((acc, id) => {
       const key = id.trim()
       if (!key) return acc
-      acc[key] = (acc[key] ?? 0) + 1
+      acc[key] = Math.min(3, (acc[key] ?? 0) + 1)
       return acc
     }, {})
   }
@@ -132,12 +137,21 @@
 
   function syncUiFromForm() {
     const [a1, a2] = parseDisposition(form.disposition)
+    const skillCardIdSet = new Set(cardDefs.filter((card) => card.type === 'SKILL').map((card) => card.id))
+    const exCardIdSet = new Set(cardDefs.filter((card) => card.type === 'EX').map((card) => card.id))
+
     dispositionAxis1 = a1
     dispositionAxis2 = a2
     noAge = form.age == null
     selectedTraits = [form.trait1, form.trait2].filter((v): v is string => Boolean(v && v.trim()))
-    selectedOwnedCardCounts = toOwnedCardCountMap(parseIdArray(form.ownedCards))
-    selectedExCardId = parseExCardId(form.exCard)
+
+    const rawOwnedCardCounts = toOwnedCardCountMap(parseIdArray(form.ownedCards))
+    selectedOwnedCardCounts = Object.fromEntries(
+      Object.entries(rawOwnedCardCounts).filter(([id]) => (skillCardIdSet.size === 0 ? true : skillCardIdSet.has(id))),
+    )
+
+    const parsedExCardId = parseExCardId(form.exCard)
+    selectedExCardId = exCardIdSet.size === 0 || exCardIdSet.has(parsedExCardId) ? parsedExCardId : ''
   }
 
   function syncFormFromUi() {
@@ -249,7 +263,7 @@
 
   function updateOwnedCardCount(id: string, rawValue: string) {
     const parsed = Number(rawValue)
-    const nextCount = Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0
+    const nextCount = Number.isFinite(parsed) ? Math.min(3, Math.max(0, Math.floor(parsed))) : 0
     if (nextCount === 0) {
       const { [id]: _, ...rest } = selectedOwnedCardCounts
       selectedOwnedCardCounts = rest
@@ -387,15 +401,16 @@
       </div>
 
       <div class="full block">
-        <div class="blockTitle">보유 카드 선택</div>
+        <div class="blockTitle">보유 카드 선택 (카드당 최대 3장)</div>
         <div class="checkGrid">
-          {#each cardOptions as card}
+          {#each skillCardOptions as card}
             <div class="checkItem">
               <span>{card.label}</span>
               <input
-                class="countInput"
+                class="input countInput"
                 type="number"
                 min="0"
+                max="3"
                 step="1"
                 value={selectedOwnedCardCounts[card.id] ?? 0}
                 on:input={(e) => updateOwnedCardCount(card.id, (e.currentTarget as HTMLInputElement).value)}
@@ -409,7 +424,7 @@
       <label class="full">EX 카드
         <select class="input" value={selectedExCardId} on:change={(e) => updateExCard((e.currentTarget as HTMLSelectElement).value)}>
           <option value="">선택 안 함</option>
-          {#each cardOptions as card}
+          {#each exCardOptions as card}
             <option value={card.id}>{card.label}</option>
           {/each}
         </select>
