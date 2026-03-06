@@ -26,6 +26,8 @@ export type PendingDecision = {
   reason?: string
   limit?: number
   pickCount?: number
+  groupIndex?: number
+  actorKeys?: string[]
 }
 
 export type PlayerState = {
@@ -153,6 +155,8 @@ export type CommandRequest = {
   targetPlayerIds?: string[]
   targetEnemyIds?: string[]
   targets?: TargetRef[]
+  tieGroupIndex?: number
+  orderedActorKeys?: string[]
 }
 
 export type OwnedCard = {

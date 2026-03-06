@@ -8,6 +8,8 @@
 
   export let summons: TeamSummon[] = []
   export let actionBySummonId: Record<string, ActionDescriptor | undefined> = {}
+  export let actionLocked = false
+  export let lockReason = ''
 </script>
 
 <section class="panel">
@@ -30,8 +32,8 @@
           </div>
           <div class="hint">ATK {s.atk} · HEAL {s.heal} · owner {s.owner}</div>
           <div class="spacer"></div>
-          <button class="btn" disabled={Boolean(action?.disabledReason)} title={action?.disabledReason ?? ''} on:click={() => action && dispatch('summonAction', { action })}>소환 행동</button>
-          <DisabledReason show={Boolean(action?.disabledReason)} reason={action?.disabledReason ?? ''} />
+          <button class="btn" disabled={actionLocked || Boolean(action?.disabledReason)} title={lockReason || action?.disabledReason || ''} on:click={() => action && dispatch('summonAction', { action })}>소환 행동</button>
+          <DisabledReason show={actionLocked || Boolean(action?.disabledReason)} reason={lockReason || action?.disabledReason || ''} />
         </div>
       {/each}
     </div>
