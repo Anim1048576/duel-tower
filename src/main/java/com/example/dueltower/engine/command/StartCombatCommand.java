@@ -6,6 +6,7 @@ import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.combat.CombatStatuses;
 import com.example.dueltower.engine.core.combat.TurnFlow;
+import com.example.dueltower.engine.core.effect.status.StatusPhases;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -29,7 +30,10 @@ public final class StartCombatCommand implements GameCommand {
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
         List<String> errors = new ArrayList<>();
-        if (state.combat() != null) errors.add("combat already started");
+        CombatState existing = state.combat();
+        if (existing != null && existing.phase() != CombatPhase.END) {
+            errors.add("combat already started");
+        }
         if (state.players().isEmpty()) errors.add("no players joined");
         return errors;
     }
@@ -37,6 +41,8 @@ public final class StartCombatCommand implements GameCommand {
     @Override
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         List<GameEvent> events = new ArrayList<>();
+
+        resetBeforeCombatStart(state, ctx, events);
 
         // 1) 참가자 목록(플레이어 + 적)
         List<TargetRef> order = new ArrayList<>();
@@ -98,9 +104,11 @@ public final class StartCombatCommand implements GameCommand {
             if (ps == null) continue;
 
             ps.swappedThisTurn(false);
-            ps.exCooldownUntilRound(0);
-            ps.exActivatable(true);
-            ps.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 0);
+            ps.cardsPlayedThisTurn(0);
+            ps.usedExThisTurn(false);
+            ps.usedTenacityThisTurn(false);
+            ps.tenacityDebtThisTurn(0);
+            ps.ap(ps.maxAp());
 
             ZoneOps.drawWithRefill(state, ctx, ps, 4, events);
 
@@ -139,5 +147,58 @@ public final class StartCombatCommand implements GameCommand {
             sb.append(order.get(i).value());
         }
         return sb.toString();
+    }
+
+    private static void resetBeforeCombatStart(GameState state, EngineContext ctx, List<GameEvent> events) {
+        if (state.combat() == null) {
+            return;
+        }
+
+        StatusPhases.combatEndCleanup(state, ctx);
+
+        for (PlayerState ps : state.players().values()) {
+            resetPlayerForCombat(ps, state);
+        }
+
+        state.combat(null);
+        events.add(new GameEvent.LogAppended("combat state reset"));
+    }
+
+    private static void resetPlayerForCombat(PlayerState ps, GameState state) {
+        List<Ids.CardInstId> toDeck = new ArrayList<>();
+        toDeck.addAll(ps.hand());
+        toDeck.addAll(ps.grave());
+        toDeck.addAll(ps.field());
+        toDeck.addAll(ps.excluded());
+
+        ps.hand().clear();
+        ps.grave().clear();
+        ps.field().clear();
+        ps.excluded().clear();
+
+        for (Ids.CardInstId id : toDeck) {
+            CardInstance ci = state.card(id);
+            if (ci != null) {
+                ci.zone(Zone.DECK);
+            }
+            ps.deck().addLast(id);
+        }
+
+        ps.pendingDecision(null);
+        ps.swappedThisTurn(false);
+        ps.cardsPlayedThisTurn(0);
+        ps.usedExThisTurn(false);
+        ps.usedTenacityThisTurn(false);
+        ps.tenacityDebtThisTurn(0);
+        ps.exCooldownUntilRound(0);
+        ps.exActivatable(true);
+        ps.ap(ps.maxAp());
+        ps.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 0);
+
+        for (Ids.SummonInstId summonId : new ArrayList<>(ps.activeSummons())) {
+            state.summons().remove(summonId);
+        }
+        ps.activeSummons().clear();
+        ps.summonByCard().clear();
     }
 }
