@@ -34,7 +34,7 @@ public final class EndTurnCommand implements GameCommand {
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         List<GameEvent> events = new ArrayList<>();
 
-        TurnFlow.endCurrentAndAdvanceToNextPlayer(state, ctx, events);
+        TurnFlow.endCurrentAndAdvance(state, ctx, events);
 
         CombatState cs = state.combat();
         events.add(new GameEvent.TurnAdvanced(CombatState.actorKey(cs.currentTurnActor()), cs.round()));
