@@ -2,7 +2,7 @@ package com.example.dueltower.character.domain;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
-import tools.jackson.core.JsonProcessingException;
+import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -20,7 +20,7 @@ public class ListStringJsonConverter implements AttributeConverter<List<String>,
         }
         try {
             return MAPPER.writeValueAsString(attribute);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to serialize List<String> as JSON", e);
         }
     }
@@ -32,7 +32,7 @@ public class ListStringJsonConverter implements AttributeConverter<List<String>,
         }
         try {
             return MAPPER.readValue(dbData, new TypeReference<>() {});
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to deserialize JSON as List<String>", e);
         }
     }
