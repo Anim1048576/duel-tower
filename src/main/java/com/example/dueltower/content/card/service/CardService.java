@@ -13,6 +13,7 @@ public class CardService {
     private final List<CardDefinition> all;
     private final Map<CardDefId, CardDefinition> byId;
     private final Map<CardDefId, CardEffect> effectsById;
+    private final Map<CardDefId, Integer> maxDeckCopiesById;
 
     public CardService(List<CardBlueprint> blueprints) {
         // Spring 주입 순서는 보장되지 않으니, 항상 정렬해서 노출
@@ -22,6 +23,7 @@ public class CardService {
 
         Map<CardDefId, CardDefinition> m = new HashMap<>();
         Map<CardDefId, CardEffect> e = new HashMap<>();
+        Map<CardDefId, Integer> deckLimits = new HashMap<>();
         List<CardDefinition> defs = new ArrayList<>();
 
         for (CardBlueprint bp : sorted) {
@@ -41,12 +43,20 @@ public class CardService {
             if (prevEff != null) {
                 throw new IllegalStateException("duplicate card effect id: " + def.id().value());
             }
+            Integer maxDeckCopies = bp.maxDeckCopies();
+            if (maxDeckCopies != null) {
+                if (maxDeckCopies < 1) {
+                    throw new IllegalStateException("invalid maxDeckCopies for " + def.id().value() + ": " + maxDeckCopies);
+                }
+                deckLimits.put(def.id(), maxDeckCopies);
+            }
             defs.add(def);
         }
 
         this.all = List.copyOf(defs);
         this.byId = Map.copyOf(m);
         this.effectsById = Map.copyOf(e);
+        this.maxDeckCopiesById = Map.copyOf(deckLimits);
     }
 
     /** API 용: 전체 목록 */
@@ -62,5 +72,10 @@ public class CardService {
     /** 엔진용: 카드 ID -> 실제 효과 구현체(CardBlueprint) */
     public Map<CardDefId, CardEffect> effectsMap() {
         return effectsById;
+    }
+
+    /** 덱 구성 시 카드별 허용 최대 매수. 오버라이드가 없으면 null */
+    public Integer maxDeckCopies(CardDefId id) {
+        return maxDeckCopiesById.get(id);
     }
 }
