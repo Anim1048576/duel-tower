@@ -314,6 +314,22 @@ public class SessionController {
                 List<CardInstId> ids = parseCardInstIds(req.discardIds(), "discardIds");
                 return new DiscardToHandLimitCommand(commandId, expectedVersion, playerId, ids);
             }
+            case "RESOLVE_INITIATIVE_TIE" -> {
+                PlayerId playerId = parsePlayerId(req.playerId());
+                if (req.tieGroupIndex() == null) {
+                    throw new ResponseStatusException(BAD_REQUEST, "tieGroupIndex is required");
+                }
+                if (req.orderedActorKeys() == null || req.orderedActorKeys().isEmpty()) {
+                    throw new ResponseStatusException(BAD_REQUEST, "orderedActorKeys is required");
+                }
+                return new ResolveInitiativeTieCommand(
+                        commandId,
+                        expectedVersion,
+                        playerId,
+                        req.tieGroupIndex(),
+                        req.orderedActorKeys()
+                );
+            }
             default -> throw new ResponseStatusException(BAD_REQUEST, "unknown command type: " + req.type());
         }
     }

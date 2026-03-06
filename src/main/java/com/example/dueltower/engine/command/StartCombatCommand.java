@@ -117,8 +117,13 @@ public final class StartCombatCommand implements GameCommand {
             events.add(new GameEvent.LogAppended(ps.playerId().value() + " draws 4 (combat start)"));
         }
 
-        // 2.5) 첫 턴 시작 처리(드로우 규칙/턴 플래그 초기화 등)
-        TurnFlow.initializeFirstTurn(state, ctx, events);
+        // 2.5) 동률 결정을 먼저 처리하거나(있으면), 즉시 첫 턴을 시작한다.
+        if (!cs.initiativeTieGroups().isEmpty()) {
+            cs.phase(CombatPhase.INITIATIVE_TIE_DECISION);
+            markInitiativeTiePendingDecisions(state, cs, events);
+        } else {
+            TurnFlow.initializeFirstTurn(state, ctx, events);
+        }
 
         // 3) 로그 + 현재 턴 알림 이벤트
         for (TargetRef ref : order) {
@@ -134,18 +139,29 @@ public final class StartCombatCommand implements GameCommand {
                 .collect(java.util.stream.Collectors.joining(","));
 
         events.add(new GameEvent.LogAppended(actorId.value() + " starts combat. order=" + orderStr));
-        events.add(new GameEvent.TurnAdvanced(CombatState.actorKey(cs.currentTurnActor()), cs.round()));
+        if (cs.phase() == CombatPhase.MAIN) {
+            events.add(new GameEvent.TurnAdvanced(CombatState.actorKey(cs.currentTurnActor()), cs.round()));
+        }
 
         return events;
     }
 
-    private static String join(List<Ids.PlayerId> order) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < order.size(); i++) {
-            if (i > 0) sb.append(",");
-            sb.append(order.get(i).value());
+    private static void markInitiativeTiePendingDecisions(GameState state, CombatState cs, List<GameEvent> events) {
+        for (int idx = 0; idx < cs.initiativeTieGroups().size(); idx++) {
+            List<String> group = cs.initiativeTieGroups().get(idx);
+            for (String actorKey : group) {
+                if (!actorKey.startsWith("P:")) continue;
+                Ids.PlayerId pid = new Ids.PlayerId(actorKey.substring(2));
+                PlayerState ps = state.player(pid);
+                if (ps == null) continue;
+                ps.pendingDecision(new PendingDecision.InitiativeTieOrder(
+                        "resolve initiative tie order",
+                        idx,
+                        List.copyOf(group)
+                ));
+                events.add(new GameEvent.PendingDecisionSet(pid.value(), "INITIATIVE_TIE_ORDER", "resolve initiative tie order"));
+            }
         }
-        return sb.toString();
     }
 
     private static void resetBeforeCombatStart(GameState state, EngineContext ctx, List<GameEvent> events) {

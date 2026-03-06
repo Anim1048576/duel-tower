@@ -69,6 +69,7 @@ public final class VictoryOps {
     private static String decisionType(PendingDecision pd) {
         if (pd instanceof PendingDecision.DiscardToHandLimit) return "DISCARD_TO_HAND_LIMIT";
         if (pd instanceof PendingDecision.SearchPick) return "SEARCH_PICK";
+        if (pd instanceof PendingDecision.InitiativeTieOrder) return "INITIATIVE_TIE_ORDER";
         return "UNKNOWN";
     }
 }
