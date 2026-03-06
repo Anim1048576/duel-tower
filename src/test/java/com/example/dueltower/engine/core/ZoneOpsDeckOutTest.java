@@ -50,6 +50,18 @@ class ZoneOpsDeckOutTest {
         assertThat(cmd.validate(f.state, f.ctx)).contains("player is battle incapacitated");
     }
 
+
+    @Test
+    void drawCommandValidation_rejectsZeroHpPlayerEvenWithoutStatus() {
+        Fixture f = new Fixture(true);
+        f.player.hp(0);
+        f.player.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 0);
+
+        DrawCommand cmd = new DrawCommand(UUID.randomUUID(), 0L, f.playerId, 1);
+
+        assertThat(cmd.validate(f.state, f.ctx)).contains("player is battle incapacitated");
+    }
+
     private static final class Fixture {
         final GameState state = new GameState(new SessionId(UUID.randomUUID()), 1L);
         final PlayerId playerId = new PlayerId("p1");
