@@ -176,4 +176,21 @@ class SessionServiceTest {
         assertEquals("403 FORBIDDEN \"deck can only be edited in non-combat nodes\"", ex.getMessage());
     }
 
+    @Test
+    void updateDeckRejectsWhenActorTargetsAnotherPlayer() {
+        String code = sessionService.createSession("gm").code();
+        sessionService.join(code, "p1", List.of("P001"), null, null, null);
+        sessionService.join(code, "p2", List.of("P002"), null, null, null);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> sessionService.updateDeck(code, "p2", "p1", List.of(
+                        "C001", "C001", "C001",
+                        "C002", "C002", "C002",
+                        "C003", "C003", "C003",
+                        "C004", "C004", "C004"
+                )));
+
+        assertEquals("403 FORBIDDEN \"players may only edit their own deck\"", ex.getMessage());
+    }
+
 }

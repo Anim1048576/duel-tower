@@ -7,6 +7,9 @@ import com.example.dueltower.engine.core.GameEngine;
 import com.example.dueltower.engine.model.GameState;
 
 import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -19,6 +22,8 @@ public final class SessionRuntime {
     private final String code;
     private final String gmId;
     private final String gmToken;
+    private final Map<String, String> playerTokensByPlayerId = new ConcurrentHashMap<>();
+    private final Map<String, String> playerIdByToken = new ConcurrentHashMap<>();
 
     private final GameState state;
     private final EngineContext ctx;
@@ -42,6 +47,18 @@ public final class SessionRuntime {
     public String code() { return code; }
     public String gmId() { return gmId; }
     public String gmToken() { return gmToken; }
+
+    public String issuePlayerToken(String playerId) {
+        return playerTokensByPlayerId.computeIfAbsent(playerId, ignored -> {
+            String token = UUID.randomUUID().toString();
+            playerIdByToken.put(token, playerId);
+            return token;
+        });
+    }
+
+    public String findPlayerIdByToken(String token) {
+        return playerIdByToken.get(token);
+    }
 
     public GameState state() { return state; }
     public EngineContext ctx() { return ctx; }

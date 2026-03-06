@@ -157,6 +157,29 @@ public class SessionService {
         });
     }
 
+    public String issuePlayerToken(String code, String playerIdRaw) {
+        if (playerIdRaw == null || playerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
+        }
+        SessionRuntime rt = get(code);
+        String playerId = playerIdRaw.trim();
+        return rt.withLock(() -> {
+            if (!rt.state().players().containsKey(new PlayerId(playerId))) {
+                throw new ResponseStatusException(NOT_FOUND, "player not found");
+            }
+            return rt.issuePlayerToken(playerId);
+        });
+    }
+
+    public String resolvePlayerIdByToken(String code, String playerTokenRaw) {
+        if (playerTokenRaw == null || playerTokenRaw.isBlank()) {
+            return null;
+        }
+        SessionRuntime rt = get(code);
+        String token = playerTokenRaw.trim();
+        return rt.withLock(() -> rt.findPlayerIdByToken(token));
+    }
+
     public GameState updateDeck(String code,
                                 String actorPlayerIdRaw,
                                 String targetPlayerIdRaw,

@@ -95,4 +95,51 @@ class SessionControllerTest {
                 .andExpect(jsonPath("$.accepted").value(false))
                 .andExpect(jsonPath("$.errors[0]").value("version mismatch"));
     }
+    @Test
+    void commandRejectsWhenActorDoesNotMatchRequestedPlayer() throws Exception {
+        SessionRuntime runtime = new SessionRuntime(
+                "TESTCODE",
+                "gm",
+                "gm-token",
+                new GameState(new Ids.SessionId(UUID.randomUUID()), 1L),
+                new EngineContext(Map.of(), Map.of())
+        );
+        given(sessionService.get("TESTCODE")).willReturn(runtime);
+        given(sessionService.resolvePlayerIdByToken("TESTCODE", "token-p2")).willReturn("p2");
+
+        mockMvc.perform(post("/api/sessions/{code}/command", "TESTCODE")
+                        .header("X-Player-Token", "token-p2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "DRAW",
+                                  "playerId": "p1",
+                                  "expectedVersion": 1
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(status().reason("playerId mismatch"));
+    }
+
+    @Test
+    void updateDeckRejectsWhenTokenOwnerDiffersFromPathPlayerId() throws Exception {
+        given(sessionService.resolvePlayerIdByToken("TESTCODE", "token-p2")).willReturn("p2");
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", "TESTCODE", "p1")
+                        .header("X-Player-Token", "token-p2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "deckCardIds": [
+                                    "C001", "C001", "C001",
+                                    "C002", "C002", "C002",
+                                    "C003", "C003", "C003",
+                                    "C004", "C004", "C004"
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(status().reason("players may only edit their own deck"));
+    }
+
 }
