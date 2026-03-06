@@ -9,6 +9,8 @@
   export let card: CardInstance | null = null
   export let cardDef: CardDef | null = null
   export let action: ActionDescriptor | null = null
+  export let actionLocked = false
+  export let lockReason = ''
 </script>
 
 <section class="panel">
@@ -19,8 +21,8 @@
   {:else}
     <CardSummaryTile def={cardDef} instance={card} on:inspect={(e) => dispatch('inspect', e.detail)}>
       <div class="spacer"></div>
-      <button class="btn" disabled={Boolean(action?.disabledReason)} title={action?.disabledReason ?? ''} on:click={() => action && dispatch('useEx', { action })}>EX 사용</button>
-      <DisabledReason show={Boolean(action?.disabledReason)} reason={action?.disabledReason ?? ''} />
+      <button class="btn" disabled={actionLocked || Boolean(action?.disabledReason)} title={lockReason || action?.disabledReason || ''} on:click={() => action && dispatch('useEx', { action })}>EX 사용</button>
+      <DisabledReason show={actionLocked || Boolean(action?.disabledReason)} reason={lockReason || action?.disabledReason || ''} />
     </CardSummaryTile>
   {/if}
 </section>
