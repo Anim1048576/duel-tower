@@ -255,5 +255,11 @@ MVP에서 **룰 위반 입력을 서버가 차단**해야 한다.
 * `PLAY_CARD`
 * `USE_EX`
 * `DISCARD_TO_HAND_LIMIT`
+* `RESOLVE_INITIATIVE_TIE`
+
+동률 해결(`RESOLVE_INITIATIVE_TIE`) 커맨드는 아래 필드를 **필수**로 포함해야 한다.
+
+* `tieGroupIndex`: `INITIATIVE_TIE_ORDER` pending decision에서 받은 동률 그룹 인덱스
+* `orderedActorKeys`: 사용자 확정 순서(배열 길이/원소는 해당 동률 그룹과 일치해야 함)
 
 `DRAW`는 **관리/디버그 커맨드가 아닌 제품 룰 커맨드**다. 따라서 일반 커맨드 엔드포인트에서 사용되며, 메인 턴 제약(전투 시작 여부, MAIN 페이즈, 현재 턴 플레이어, pending decision 없음)을 동일하게 검증한다.

@@ -86,6 +86,8 @@ export async function command(req: Omit<CommandRequest, 'playerId'> & { playerId
   const playerId = (req.playerId || s.meId || '').trim()
   const expectedVersion = req.expectedVersion ?? currentCombat.state?.version
   try {
+    // Spread req as-is so command-specific optional fields (e.g. tieGroupIndex/orderedActorKeys)
+    // are forwarded without mutation.
     const res: EngineResponse = await sendCommand(code, { ...req, playerId, expectedVersion }, s.gmToken, s.playerToken)
     if (!res.accepted) {
       logError('커맨드 거부', (res.errors || []).join('\n') || 'unknown')

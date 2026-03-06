@@ -144,6 +144,9 @@ export type TargetRef = {
 }
 
 export type CommandRequest = {
+  /**
+   * API command type (e.g. START_COMBAT, PLAY_CARD, RESOLVE_INITIATIVE_TIE)
+   */
   type: string
   commandId?: string
   expectedVersion?: number
@@ -155,7 +158,13 @@ export type CommandRequest = {
   targetPlayerIds?: string[]
   targetEnemyIds?: string[]
   targets?: TargetRef[]
+  /**
+   * Required when type === 'RESOLVE_INITIATIVE_TIE': pending tie group index from INITIATIVE_TIE_ORDER.
+   */
   tieGroupIndex?: number
+  /**
+   * Required when type === 'RESOLVE_INITIATIVE_TIE': final actor key order chosen by the user.
+   */
   orderedActorKeys?: string[]
 }
 
