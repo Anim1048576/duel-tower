@@ -32,8 +32,8 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // JSON API
-                        .requestMatchers("/api/sessions/*/command").authenticated()
-                        .requestMatchers("/api/sessions/*/players/*/deck").authenticated()
+                        .requestMatchers("/api/sessions/*/command").permitAll()
+                        .requestMatchers("/api/sessions/*/players/*/deck").permitAll()
                         .requestMatchers("/api/**").permitAll()
 
                         // 나머지도 일단 전부 허용 (필요해지면 여기서부터 잠그면 됨)

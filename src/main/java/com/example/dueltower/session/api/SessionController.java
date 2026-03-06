@@ -12,8 +12,6 @@ import com.example.dueltower.session.dto.*;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import com.example.dueltower.session.runtime.StateMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -24,6 +22,8 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
+import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @RestController
 @RequestMapping("/api/sessions")
@@ -98,15 +98,14 @@ public class SessionController {
     public SessionStateDto updateDeck(@PathVariable String code,
                                       @PathVariable String playerId,
                                       @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
-                                      Authentication authentication,
                                       @RequestBody UpdateSessionDeckRequest req) {
         if (req == null || req.deckCardIds() == null) {
             throw new ResponseStatusException(BAD_REQUEST, "deckCardIds is required");
         }
 
-        String actorPlayerId = resolveActorPlayerId(code, authentication, playerTokenHeader);
+        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
         if (!playerId.equals(actorPlayerId)) {
-            throw new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "players may only edit their own deck");
+            throw new ResponseStatusException(FORBIDDEN, "players may only edit their own deck");
         }
         sessionService.updateDeck(code, actorPlayerId, playerId, req.deckCardIds());
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
@@ -115,7 +114,6 @@ public class SessionController {
     public EngineResponseDto command(@PathVariable String code,
                                      @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
                                      @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
-                                     Authentication authentication,
                                      @RequestBody CommandRequest req) {
         long startNs = System.nanoTime();
 
@@ -130,14 +128,14 @@ public class SessionController {
         String t = req.type().trim().toUpperCase(Locale.ROOT);
         if ("START_COMBAT".equals(t)) {
             requirePlayer(req.playerId());
-            validateStartCombatAuthority(rt, gmTokenHeader, authentication);
+            validateStartCombatAuthority(rt, gmTokenHeader);
         }
 
         if (PLAYER_AUTH_REQUIRED_TYPES.contains(t)) {
             requirePlayer(req.playerId());
-            String actorPlayerId = resolveActorPlayerId(code, authentication, playerTokenHeader);
+            String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
             if (!req.playerId().trim().equals(actorPlayerId)) {
-                throw new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "playerId mismatch");
+                throw new ResponseStatusException(FORBIDDEN, "playerId mismatch");
             }
         }
 
@@ -183,46 +181,23 @@ public class SessionController {
     }
 
 
-    private String resolveActorPlayerId(String code,
-                                        Authentication authentication,
-                                        String playerTokenHeader) {
-        if (isAuthenticatedPrincipal(authentication)) {
-            return authentication.getName();
-        }
-
+    private String resolveActorPlayerId(String code, String playerTokenHeader) {
         String mappedPlayerId = sessionService.resolvePlayerIdByToken(code, playerTokenHeader);
         if (mappedPlayerId != null && !mappedPlayerId.isBlank()) {
             return mappedPlayerId;
         }
 
-        throw new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "player authorization required");
+        throw new ResponseStatusException(UNAUTHORIZED, "player authorization required");
     }
 
-    private static void validateStartCombatAuthority(SessionRuntime rt,
-                                                   String gmTokenHeader,
-                                                   Authentication authentication) {
-        if (isAuthenticatedPrincipal(authentication)) {
-            String principalName = authentication.getName();
-            if (rt.gmId().equals(principalName)) {
-                return;
-            }
-            log.warn("START_COMBAT forbidden: principal is not mapped GM for code={}", rt.code());
-            throw new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "gm only");
-        }
-
+    private static void validateStartCombatAuthority(SessionRuntime rt, String gmTokenHeader) {
         String token = (gmTokenHeader == null) ? "" : gmTokenHeader.trim();
         if (!token.isEmpty() && rt.gmToken().equals(token)) {
             return;
         }
 
-        log.warn("START_COMBAT forbidden: invalid GM authorization for code={}", rt.code());
-        throw new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "gm only");
-    }
-
-    private static boolean isAuthenticatedPrincipal(Authentication authentication) {
-        return authentication != null
-                && authentication.isAuthenticated()
-                && !(authentication instanceof AnonymousAuthenticationToken);
+        log.warn("START_COMBAT unauthorized: invalid GM token for code={}", rt.code());
+        throw new ResponseStatusException(UNAUTHORIZED, "gm authorization required");
     }
 
     private static UUID parseOrNewUuid(String v) {
