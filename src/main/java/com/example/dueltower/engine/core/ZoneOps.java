@@ -145,6 +145,58 @@ public final class ZoneOps {
         ps.grave().add(id);
     }
 
+    /**
+     * Create a card instance directly in a specific zone.
+     *
+     * <p>This is a low-level helper for game setup/runtime initialization.
+     * For runtime token generation in card effects, use {@link #createTokenInZone(GameState, EngineContext, PlayerState, Ids.CardDefId, Zone, List)}.
+     */
+    public static CardInstId createCardInZone(GameState state, PlayerState ps, Ids.CardDefId defId, Zone zone) {
+        if (state == null || ps == null || defId == null || zone == null) return null;
+
+        CardInstId instId = Ids.newCardInstId();
+        CardInstance ci = new CardInstance(instId, defId, ps.playerId(), zone);
+        state.cardInstances().put(instId, ci);
+        addToZone(ps, instId, zone);
+        return instId;
+    }
+
+    /**
+     * Create a token card into HAND/FIELD with centralized zone-capacity validation.
+     *
+     * <p>Policy:
+     * <ul>
+     *   <li>토큰 생성은 HAND/FIELD만 허용한다.</li>
+     *   <li>HAND는 handLimit, FIELD는 fieldLimit를 초과할 수 없다.</li>
+     *   <li>생성된 토큰은 일반 카드와 동일하게 이동하되,
+     *       DECK/GRAVE/EXCLUDED/EX로 이동하려 할 때는
+     *       {@link #moveToZoneOrVanishIfToken(GameState, EngineContext, PlayerState, CardInstId, Zone, List, MoveReason)} 규칙에 따라 소멸한다.</li>
+     * </ul>
+     */
+    public static CardInstId createTokenInZone(
+            GameState state,
+            EngineContext ctx,
+            PlayerState ps,
+            Ids.CardDefId defId,
+            Zone zone,
+            List<GameEvent> events
+    ) {
+        if (state == null || ctx == null || ps == null || defId == null || zone == null) return null;
+
+        CardDefinition def = ctx.def(defId);
+        if (def == null || !def.token()) {
+            throw new IllegalArgumentException("createTokenInZone requires token card definition: " + (defId == null ? "<null>" : defId.value()));
+        }
+
+        if (!canCreateTokenInZone(ps, zone, events)) return null;
+
+        CardInstId instId = createCardInZone(state, ps, defId, zone);
+        if (events != null && instId != null) {
+            events.add(new GameEvent.LogAppended(ps.playerId().value() + " created token " + defId.value() + " in " + zone.name()));
+        }
+        return instId;
+    }
+
     // 기존 시그니처는 호환용으로 남겨둠 (from은 무시하고 CardInstance.zone()을 기준으로 처리)
     public static void moveToZoneOrVanishIfToken(GameState state, EngineContext ctx, PlayerState ps, CardInstId id, Zone from, Zone to, List<GameEvent> events) {
         moveToZoneOrVanishIfToken(state, ctx, ps, id, to, events, MoveReason.OTHER);
@@ -193,6 +245,35 @@ public final class ZoneOps {
         boolean enteringField = from != Zone.FIELD && finalTo == Zone.FIELD;
         if (enteringField) {
             FieldEffectOps.onEnterField(state, ctx, ps, id, events, "MOVE_ENTER_FIELD");
+        }
+    }
+
+    private static boolean canCreateTokenInZone(PlayerState ps, Zone zone, List<GameEvent> events) {
+        switch (zone) {
+            case HAND -> {
+                if (ps.hand().size() >= ps.handLimit()) {
+                    if (events != null) {
+                        events.add(new GameEvent.LogAppended(ps.playerId().value() + " token creation rejected: hand is full (" + ps.hand().size() + "/" + ps.handLimit() + ")"));
+                    }
+                    return false;
+                }
+                return true;
+            }
+            case FIELD -> {
+                if (ps.field().size() >= ps.fieldLimit()) {
+                    if (events != null) {
+                        events.add(new GameEvent.LogAppended(ps.playerId().value() + " token creation rejected: field is full (" + ps.field().size() + "/" + ps.fieldLimit() + ")"));
+                    }
+                    return false;
+                }
+                return true;
+            }
+            default -> {
+                if (events != null) {
+                    events.add(new GameEvent.LogAppended(ps.playerId().value() + " token creation rejected: unsupported zone " + zone.name()));
+                }
+                return false;
+            }
         }
     }
 
