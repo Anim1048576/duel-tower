@@ -4,6 +4,8 @@ import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CharacterCombatStatCalculatorTest {
@@ -27,7 +29,7 @@ class CharacterCombatStatCalculatorTest {
                 .trait1("특성1")
                 .trait2("특성2")
                 .ownedCards("[]")
-                .currentSkillDeck("[]")
+                .currentSkillDeck(List.of())
                 .exCard("{}")
                 .build();
 
@@ -56,7 +58,7 @@ class CharacterCombatStatCalculatorTest {
                 .trait1("특성1")
                 .trait2("특성2")
                 .ownedCards("[]")
-                .currentSkillDeck("[]")
+                .currentSkillDeck(List.of())
                 .exCard("{}")
                 .build();
 

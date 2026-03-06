@@ -6,6 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Timestamp;
+import java.util.List;
 
 @Getter
 @Setter
@@ -69,10 +70,10 @@ public class CharacterProfile {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String ownedCards;
 
-    /** 현재 스킬 덱 구성(JSON 문자열) */
-    @Lob
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String currentSkillDeck;
+    /** 현재 스킬 덱 프리셋 ID 목록 */
+    @Convert(converter = ListStringJsonConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private List<String> currentSkillDeck;
 
     /** EX 카드 정보(JSON 문자열) */
     @Lob

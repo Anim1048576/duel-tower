@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -50,6 +52,21 @@ class CharacterProfileServiceTest {
         assertNull(response.trait2());
     }
 
+
+    @Test
+    void createAllowsNullCurrentSkillDeck() {
+        CharacterProfileRequest req = validRequest(20, "강인함", null, "질서/선");
+        req = new CharacterProfileRequest(
+                req.name(), req.gender(), req.age(), req.wish(), req.disposition(), req.oneLiner(), req.story(),
+                req.physical(), req.technique(), req.sense(), req.willpower(),
+                req.trait1(), req.trait2(), req.ownedCards(), null, req.exCard()
+        );
+
+        CharacterProfileResponse response = service.create(req);
+
+        assertNull(response.currentSkillDeck());
+    }
+
     @Test
     void createRejectsTrait2WithoutTrait1() {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
@@ -82,7 +99,7 @@ class CharacterProfileServiceTest {
                 trait1,
                 trait2,
                 "{\"cards\":[\"C001\"]}",
-                "{\"deck\":[\"C001\"]}",
+                List.of("D001", "D002"),
                 "{\"id\":\"EX001\"}"
         );
     }

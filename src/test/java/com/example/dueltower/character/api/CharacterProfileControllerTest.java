@@ -52,7 +52,7 @@ class CharacterProfileControllerTest {
                 "강심장",
                 "속전속결",
                 "{\"cards\":[\"C001\"]}",
-                "{\"deck\":[\"C001\"]}",
+                List.of("D001", "D002"),
                 "{\"id\":\"EX001\"}",
                 new CombatStatsDto(87, 4, 25, 24),
                 Timestamp.valueOf("2026-01-01 00:00:00"),
