@@ -3,7 +3,7 @@ import { KEY } from '../lib/keys'
 import { load, save } from '../lib/storage'
 import type { CommandRequest, EngineResponse, ResolutionLog, SessionSnapshot } from '../lib/model'
 import { explainApiError, getSessionState, joinSession, sendCommand } from '../lib/api'
-import { session } from './session'
+import { session, setPlayerToken } from './session'
 import { presets } from './presets'
 import { error as logError, info as logInfo, pushEngineEvents } from './log'
 
@@ -60,7 +60,8 @@ export async function ensureJoined() {
   try {
     const presetState = get(presets)
     const selected = presetState.presets.find((p) => p.id === presetState.selectedId) ?? presetState.presets[0]
-    await joinSession(code, pid, selected?.passiveIds ?? [])
+    const joinRes = await joinSession(code, pid, selected?.passiveIds ?? [])
+    setPlayerToken(joinRes.playerToken)
     await refreshState()
   } catch (e) {
     combat.update((c) => ({ ...c, lastError: explainApiError(e) }))

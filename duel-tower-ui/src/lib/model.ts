@@ -130,6 +130,7 @@ export type CreateSessionResponse = {
 }
 
 export type JoinSessionResponse = {
+  playerToken: string
   state: SessionSnapshot
 }
 
