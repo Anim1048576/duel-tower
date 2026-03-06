@@ -27,9 +27,16 @@
   $: gmHint = $session.gmId ? `GM: ${$session.gmId}` : 'GM 정보: (이 브라우저에서 만든 세션이 아니면 알 수 없음)'
 
   async function doStartCombat() {
+    const expectedVersion = $combat.state?.version
+    if (expectedVersion == null) {
+      pushToast('상태 동기화 필요')
+      await refreshState()
+      return
+    }
+
     busy = true
     try {
-      const res = await command({ type: 'START_COMBAT' })
+      const res = await command({ type: 'START_COMBAT', expectedVersion })
       if (res?.accepted) {
         pushToast('전투 시작', '전투 화면으로 이동')
         navigate('/combat')
