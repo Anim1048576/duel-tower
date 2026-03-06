@@ -7,6 +7,7 @@ export type SessionClient = {
   code: string
   gmId: string
   gmToken: string
+  playerToken: string
   meId: string
   createdAt: string
   lastError?: string
@@ -20,16 +21,23 @@ function randomId(prefix = 'p') {
   return `${prefix}-${Math.random().toString(16).slice(2, 6)}${Math.random().toString(16).slice(2, 6)}`
 }
 
-const seed: SessionClient = load(KEY.session, {
-  mode: 'api',
-  code: '',
-  gmId: '',
-  gmToken: '',
-  meId: 'me',
-  createdAt: now(),
-})
+const seed: SessionClient = (() => {
+  const loaded = load(KEY.session, {
+    mode: 'api',
+    code: '',
+    gmId: '',
+    gmToken: '',
+    playerToken: '',
+    meId: 'me',
+    createdAt: now(),
+  }) as SessionClient & { playerToken?: string }
 
-if (!seed.meId) seed.meId = randomId('p')
+  return {
+    ...loaded,
+    playerToken: (loaded.playerToken || '').trim(),
+    meId: loaded.meId || randomId('p'),
+  }
+})()
 
 export const session = writable<SessionClient>(seed)
 session.subscribe((v) => save(KEY.session, v))
@@ -50,6 +58,10 @@ export function setGmToken(gmToken: string) {
   session.update((s) => ({ ...s, gmToken: (gmToken || '').trim() }))
 }
 
+export function setPlayerToken(playerToken: string) {
+  session.update((s) => ({ ...s, playerToken: (playerToken || '').trim() }))
+}
+
 export function setLastError(msg?: string) {
   session.update((s) => ({ ...s, lastError: msg }))
 }
@@ -60,6 +72,7 @@ export function resetSession() {
     code: '',
     gmId: '',
     gmToken: '',
+    playerToken: '',
     meId: seed.meId || randomId('p'),
     createdAt: now(),
   })

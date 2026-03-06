@@ -3,7 +3,7 @@
   import { createSession, explainApiError, joinSession } from '../lib/api'
   import { copyToClipboard } from '../lib/clipboard'
   import PageSkeleton from '../lib/PageSkeleton.svelte'
-  import { session, setGmId, setGmToken, setLastError, setMeId, setSessionCode } from '../stores/session'
+  import { session, setGmId, setGmToken, setLastError, setMeId, setPlayerToken, setSessionCode } from '../stores/session'
   import { ensureCards } from '../stores/content'
   import { refreshState } from '../stores/combat'
   import { pushToast } from '../stores/log'
@@ -28,7 +28,8 @@
       setSessionCode(res.code)
       setGmId(res.gmId)
       setGmToken(res.gmToken)
-      await joinSession(res.code, meId.trim(), selectedPreset?.passiveIds ?? [])
+      const joinRes = await joinSession(res.code, meId.trim(), selectedPreset?.passiveIds ?? [])
+      setPlayerToken(joinRes.playerToken)
       await refreshState()
       pushToast('세션 생성', res.code)
       navigate('/lobby')
@@ -49,7 +50,8 @@
       const code = joinCode.trim().toUpperCase()
       setSessionCode(code)
       setGmToken('')
-      await joinSession(code, meId.trim(), selectedPreset?.passiveIds ?? [])
+      const joinRes = await joinSession(code, meId.trim(), selectedPreset?.passiveIds ?? [])
+      setPlayerToken(joinRes.playerToken)
       await refreshState()
       pushToast('세션 참가', code)
       navigate('/lobby')
