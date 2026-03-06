@@ -70,6 +70,7 @@ export async function ensureJoined() {
 
 export async function command(req: Omit<CommandRequest, 'playerId'> & { playerId?: string }): Promise<EngineResponse | null> {
   const s = get(session)
+  const currentCombat = get(combat)
   const code = (s.code || '').trim()
   if (!code) {
     logError('세션 코드 없음', '홈에서 세션 만들기/참가를 먼저 해줘')
@@ -77,8 +78,9 @@ export async function command(req: Omit<CommandRequest, 'playerId'> & { playerId
   }
 
   const playerId = (req.playerId || s.meId || '').trim()
+  const expectedVersion = req.expectedVersion ?? currentCombat.state?.version
   try {
-    const res: EngineResponse = await sendCommand(code, { ...req, playerId }, s.gmToken, s.playerToken)
+    const res: EngineResponse = await sendCommand(code, { ...req, playerId, expectedVersion }, s.gmToken, s.playerToken)
     if (!res.accepted) {
       logError('커맨드 거부', (res.errors || []).join('\n') || 'unknown')
     } else {
