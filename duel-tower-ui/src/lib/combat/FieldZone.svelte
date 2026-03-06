@@ -1,11 +1,12 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
-  import type { CardInstance } from '../model'
+  import type { CardDef, CardInstance } from '../model'
+  import CardSummaryTile from '../components/CardSummaryTile.svelte'
 
   const dispatch = createEventDispatcher<{ inspect: { cardId: string } }>()
 
   export let cards: CardInstance[] = []
-  export let cardDefs: Record<string, { name?: string }> = {}
+  export let cardDefs: Record<string, CardDef> = {}
 </script>
 
 <section class="panel">
@@ -19,10 +20,7 @@
   {:else}
     <div class="cardRow">
       {#each cards as c (c.instanceId)}
-        <button class="gcard" on:click={() => dispatch('inspect', { cardId: c.instanceId })}>
-          <div class="gcardTitle">{cardDefs[c.defId]?.name ?? c.defId}</div>
-          <div class="gcardSub mono">{c.instanceId}</div>
-        </button>
+        <CardSummaryTile def={cardDefs[c.defId]} instance={c} on:inspect={(e) => dispatch('inspect', e.detail)} />
       {/each}
     </div>
   {/if}

@@ -9,6 +9,26 @@
   --primary:#5dd6ff;
   --danger:#ff5d74;
   --ok:#6dffb1;
+
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+
+  --surface-1: rgba(17,27,39,.92);
+  --surface-2: rgba(0,0,0,.14);
+  --line-default: var(--line);
+  --line-info: rgba(93,214,255,.35);
+  --line-danger: rgba(255,93,116,.35);
+  --line-ok: rgba(109,255,177,.35);
+
+  --text-muted: var(--muted);
+  --state-info: rgba(93,214,255,.95);
+  --state-info-bg: rgba(93,214,255,.08);
+  --state-danger: rgba(255,93,116,.95);
+  --state-danger-bg: rgba(255,93,116,.08);
+  --state-ok: rgba(109,255,177,.95);
+  --state-ok-bg: rgba(109,255,177,.08);
+
   --shadow: 0 10px 30px rgba(0,0,0,.35);
   --radius: 16px;
 }

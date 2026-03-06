@@ -13,7 +13,8 @@
   import ExZone from '../lib/combat/ExZone.svelte'
   import FieldZone from '../lib/combat/FieldZone.svelte'
   import SummonZone from '../lib/combat/SummonZone.svelte'
-  import CardDetailDrawer from '../lib/combat/CardDetailDrawer.svelte'
+  import CardDetailDrawer from '../lib/components/CardDetailDrawer.svelte'
+  import LogLineItem from '../lib/components/LogLineItem.svelte'
   import type { ActionStage, CombatTarget, PendingAction } from '../lib/combat/types'
 
   let busy = false
@@ -172,7 +173,7 @@
 
   <div class="layoutBottom">
     <HandZone cards={handCards} cardDefs={$content.cardsById} disabled={!inCombat || stage !== 'idle'} on:inspect={(e) => (selectedCardId = e.detail.cardId)} on:play={(e) => onPlay(e.detail.cardId)} />
-    <ExZone card={exCard} cardName={exCard ? $content.cardsById[exCard.defId]?.name ?? exCard.defId : '—'} disabled={!inCombat || stage !== 'idle'} on:inspect={(e) => (selectedCardId = e.detail.cardId)} on:useEx={(e) => onUseEx(e.detail.cardId)} />
+    <ExZone card={exCard} cardDef={exCard ? $content.cardsById[exCard.defId] ?? null : null} disabled={!inCombat || stage !== 'idle'} on:inspect={(e) => (selectedCardId = e.detail.cardId)} on:useEx={(e) => onUseEx(e.detail.cardId)} />
     <FieldZone cards={fieldCards} cardDefs={$content.cardsById} on:inspect={(e) => (selectedCardId = e.detail.cardId)} />
     <SummonZone summons={allySummons} ownerId={me?.playerId ?? ''} disabled={!inCombat || stage !== 'idle'} on:summonAction={(e) => onSummonAction(e.detail.summonId, e.detail.ownerId)} />
   </div>
@@ -187,10 +188,7 @@
           <div class="hint">로그 없음</div>
         {:else}
           {#each $logs.slice(0, 20) as item (item.id)}
-            <div class="logItem">
-              <div class="logHead">{item.at} · {item.level}</div>
-              <div class="logBody">{item.title}{item.message ? ` · ${item.message}` : ''}</div>
-            </div>
+            <LogLineItem at={item.at} level={item.level} title={item.title} message={item.message ?? ''} />
           {/each}
         {/if}
       </div>

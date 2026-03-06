@@ -1,6 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
   import type { TeamPlayer, TeamSide, CombatTarget, TeamSummon } from './types'
+  import CharacterPanel from '../components/CharacterPanel.svelte'
+  import StatusBadge from '../components/StatusBadge.svelte'
 
   const dispatch = createEventDispatcher<{ selectTarget: CombatTarget }>()
 
@@ -26,20 +28,8 @@
   {:else}
     <div class="stack">
       {#each players as p (p.playerId)}
-        <button
-          class="unit"
-          class:isTargetable={targetable}
-          class:isSelected={selectedTarget === targetKey({ type: 'player', playerId: p.playerId })}
-          disabled={!targetable}
-          on:click={() => dispatch('selectTarget', { type: 'player', playerId: p.playerId })}
-        >
-          <div class="rowLine">
-            <b class="mono">{p.playerId}</b>
-            {#if p.pendingDecision}
-              <span class="badge no">결정 필요</span>
-            {/if}
-          </div>
-          <div class="hint">핸드 {p.hand.length} · 필드 {p.field.length} · 묘지 {p.grave.length}</div>
+        <button class="unit" class:isTargetable={targetable} class:isSelected={selectedTarget === targetKey({ type: 'player', playerId: p.playerId })} disabled={!targetable} on:click={() => dispatch('selectTarget', { type: 'player', playerId: p.playerId })}>
+          <CharacterPanel player={p} />
         </button>
       {/each}
     </div>
@@ -50,16 +40,10 @@
     <div class="hint">소환수</div>
     <div class="stack">
       {#each summons as s (`${s.owner}:${s.summonId}`)}
-        <button
-          class="unit"
-          class:isTargetable={targetable}
-          class:isSelected={selectedTarget === targetKey({ type: 'summon', playerId: s.owner, summonId: s.summonId })}
-          disabled={!targetable}
-          on:click={() => dispatch('selectTarget', { type: 'summon', playerId: s.owner, summonId: s.summonId })}
-        >
+        <button class="unit" class:isTargetable={targetable} class:isSelected={selectedTarget === targetKey({ type: 'summon', playerId: s.owner, summonId: s.summonId })} disabled={!targetable} on:click={() => dispatch('selectTarget', { type: 'summon', playerId: s.owner, summonId: s.summonId })}>
           <div class="rowLine">
             <b>{s.summonId}</b>
-            <span class="badge">{s.owner}</span>
+            <StatusBadge label={s.owner} />
           </div>
           <div class="hint">HP {s.hp} · ATK {s.atk} · HEAL {s.heal}</div>
         </button>
@@ -71,10 +55,10 @@
 <style>
   .zone{min-height:300px}
   .stack{display:flex; flex-direction:column; gap:8px}
-  .unit{width:100%; text-align:left; padding:10px; border:1px solid var(--line); border-radius:14px; background: rgba(0,0,0,.12); color:inherit}
+  .unit{width:100%; text-align:left; padding:0; border:1px solid var(--line); border-radius:14px; background: rgba(0,0,0,.12); color:inherit}
   .unit:disabled{opacity:.9}
   .unit.isTargetable{cursor:pointer}
   .unit.isTargetable:hover{border-color: rgba(93,214,255,.35)}
   .unit.isSelected{outline:2px solid rgba(93,214,255,.55)}
-  .rowLine{display:flex; justify-content:space-between; align-items:center; gap:8px}
+  .rowLine{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 10px 0}
 </style>

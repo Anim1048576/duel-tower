@@ -10,7 +10,10 @@
     type DeckResponse,
     type DeckType,
   } from '../lib/api'
-  import CardTile from '../lib/components/CardTile.svelte'
+  import CardSummaryTile from '../lib/components/CardSummaryTile.svelte'
+  import StatusBadge from '../lib/components/StatusBadge.svelte'
+  import LogLineItem from '../lib/components/LogLineItem.svelte'
+  import { requestConfirm } from '../stores/ui'
   import { content, ensureCards } from '../stores/content'
   import { pushToast } from '../stores/log'
 
@@ -125,7 +128,8 @@
 
   async function doDelete() {
     if (!deck) return
-    if (!confirm(`덱 ${deck.id}를 삭제할까?`)) return
+    const ok = await requestConfirm({ title: `덱 ${deck.id} 삭제`, message: '삭제 후 되돌릴 수 없습니다.', confirmLabel: '삭제', tone: 'danger' })
+    if (!ok) return
     loading = true
     try {
       await deleteDeck(deck.id)
@@ -166,10 +170,7 @@
 
     {#if lastError}
       <div class="spacer"></div>
-      <div class="ti" style="border-color: rgba(255,93,116,.35); background: rgba(255,93,116,.06)">
-        <div class="logHead">API</div>
-        <div class="logBody">{lastError}</div>
-      </div>
+      <LogLineItem at="now" level="API" title="요청 실패" message={lastError} />
     {/if}
   </div>
 
@@ -204,9 +205,9 @@
         <div class="row wrap" style="justify-content:space-between">
           <div class="cardTitle">편집 (전체 저장)</div>
           <div class="row wrap" style="justify-content:flex-end">
-            <span class="badge">총 {draftTotal}{draftType === 'PLAYER' ? '/12' : ''}</span>
+            <StatusBadge label={`총 ${draftTotal}${draftType === 'PLAYER' ? '/12' : ''}`} />
             {#if draftType === 'PLAYER'}
-              <span class="badge {copyOk ? 'ok' : 'no'}">복제 {copyOk ? 'OK' : '초과'}</span>
+              <StatusBadge tone={copyOk ? 'ok' : 'danger'} label={`복제 ${copyOk ? 'OK' : '초과'}`} />
             {/if}
           </div>
         </div>
@@ -249,7 +250,7 @@
           <div class="spacer"></div>
           <div class="searchGrid">
             {#each $content.cards.slice(0, 60) as c (c.id)}
-              <CardTile card={c} onClick={() => addOne(c.id)} />
+              <CardSummaryTile def={c} on:inspect={() => addOne(c.id)} />
             {/each}
           </div>
           <div class="hint">편집 드래프트에만 반영되고, 저장 버튼을 눌러야 서버에 반영된다.</div>

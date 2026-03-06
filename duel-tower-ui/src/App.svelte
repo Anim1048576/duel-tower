@@ -16,6 +16,8 @@
   import { content, ensureCards } from './stores/content'
   import { combat } from './stores/combat'
   import { toasts, dismissToast } from './stores/log'
+  import ConfirmActionModal from './lib/components/ConfirmActionModal.svelte'
+  import RuleTooltip from './lib/components/RuleTooltip.svelte'
 
   type Phase = 'session' | 'lobby' | 'adventure' | 'combat' | 'results'
 
@@ -67,6 +69,7 @@
 <header class="topbar">
   <div class="brand" role="banner">
     <div class="logo">DT</div>
+
     <div>
       <div class="brandTitle">Duel Tower</div>
       <div class="brandSub">SPA UI · /ui · phase: <span class="mono">{phase}</span></div>
@@ -150,3 +153,7 @@
     </div>
   {/each}
 </div>
+
+
+<ConfirmActionModal />
+<RuleTooltip />
