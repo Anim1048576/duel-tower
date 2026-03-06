@@ -1,12 +1,13 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
+  import type { ActionDescriptor } from '../model'
   import type { TeamSummon } from './types'
+  import DisabledReason from '../components/DisabledReason.svelte'
 
-  const dispatch = createEventDispatcher<{ summonAction: { summonId: string; ownerId: string } }>()
+  const dispatch = createEventDispatcher<{ summonAction: { action: ActionDescriptor } }>()
 
   export let summons: TeamSummon[] = []
-  export let ownerId = ''
-  export let disabled = false
+  export let actionBySummonId: Record<string, ActionDescriptor | undefined> = {}
 </script>
 
 <section class="panel">
@@ -21,6 +22,7 @@
   {:else}
     <div class="stack">
       {#each summons as s (s.summonId)}
+        {@const action = actionBySummonId[s.summonId]}
         <div class="ti">
           <div class="row" style="justify-content:space-between">
             <b>{s.summonId}</b>
@@ -28,7 +30,8 @@
           </div>
           <div class="hint">ATK {s.atk} · HEAL {s.heal} · owner {s.owner}</div>
           <div class="spacer"></div>
-          <button class="btn" disabled={disabled || !s.actionAvailable} on:click={() => dispatch('summonAction', { summonId: s.summonId, ownerId: ownerId || s.owner })}>소환 행동</button>
+          <button class="btn" disabled={Boolean(action?.disabledReason)} title={action?.disabledReason ?? ''} on:click={() => action && dispatch('summonAction', { action })}>소환 행동</button>
+          <DisabledReason show={Boolean(action?.disabledReason)} reason={action?.disabledReason ?? ''} />
         </div>
       {/each}
     </div>

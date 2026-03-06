@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
-  import type { TeamPlayer, TeamSide, CombatTarget, TeamSummon } from './types'
+  import type { CombatTarget } from '../model'
+  import type { TeamPlayer, TeamSide, TeamSummon } from './types'
   import CharacterPanel from '../components/CharacterPanel.svelte'
   import StatusBadge from '../components/StatusBadge.svelte'
 
@@ -10,13 +11,18 @@
   export let title = ''
   export let players: TeamPlayer[] = []
   export let summons: TeamSummon[] = []
-  export let targetable = false
+  export let validTargets: CombatTarget[] = []
   export let selectedTarget: string | null = null
 
   $: heading = title || (side === 'ally' ? '아군' : '적 진영')
+  $: validTargetKeys = new Set(validTargets.map((t) => targetKey(t)))
 
   function targetKey(target: CombatTarget) {
     return target.type === 'player' ? `player:${target.playerId}` : `summon:${target.playerId}:${target.summonId}`
+  }
+
+  function canTarget(target: CombatTarget) {
+    return validTargetKeys.has(targetKey(target))
   }
 </script>
 
@@ -28,7 +34,8 @@
   {:else}
     <div class="stack">
       {#each players as p (p.playerId)}
-        <button class="unit" class:isTargetable={targetable} class:isSelected={selectedTarget === targetKey({ type: 'player', playerId: p.playerId })} disabled={!targetable} on:click={() => dispatch('selectTarget', { type: 'player', playerId: p.playerId })}>
+        {@const target = { type: 'player', playerId: p.playerId } as CombatTarget}
+        <button class="unit" class:isTargetable={canTarget(target)} class:isSelected={selectedTarget === targetKey(target)} disabled={!canTarget(target)} on:click={() => dispatch('selectTarget', target)}>
           <CharacterPanel player={p} />
         </button>
       {/each}
@@ -40,7 +47,8 @@
     <div class="hint">소환수</div>
     <div class="stack">
       {#each summons as s (`${s.owner}:${s.summonId}`)}
-        <button class="unit" class:isTargetable={targetable} class:isSelected={selectedTarget === targetKey({ type: 'summon', playerId: s.owner, summonId: s.summonId })} disabled={!targetable} on:click={() => dispatch('selectTarget', { type: 'summon', playerId: s.owner, summonId: s.summonId })}>
+        {@const target = { type: 'summon', playerId: s.owner, summonId: s.summonId } as CombatTarget}
+        <button class="unit" class:isTargetable={canTarget(target)} class:isSelected={selectedTarget === targetKey(target)} disabled={!canTarget(target)} on:click={() => dispatch('selectTarget', target)}>
           <div class="rowLine">
             <b>{s.summonId}</b>
             <StatusBadge label={s.owner} />

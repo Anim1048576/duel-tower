@@ -1,13 +1,14 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
-  import type { CardDef, CardInstance } from '../model'
+  import type { ActionDescriptor, CardDef, CardInstance } from '../model'
   import CardSummaryTile from '../components/CardSummaryTile.svelte'
+  import DisabledReason from '../components/DisabledReason.svelte'
 
-  const dispatch = createEventDispatcher<{ useEx: { cardId: string }; inspect: { cardId: string } }>()
+  const dispatch = createEventDispatcher<{ useEx: { action: ActionDescriptor }; inspect: { cardId: string } }>()
 
   export let card: CardInstance | null = null
   export let cardDef: CardDef | null = null
-  export let disabled = false
+  export let action: ActionDescriptor | null = null
 </script>
 
 <section class="panel">
@@ -18,7 +19,8 @@
   {:else}
     <CardSummaryTile def={cardDef} instance={card} on:inspect={(e) => dispatch('inspect', e.detail)}>
       <div class="spacer"></div>
-      <button class="btn" disabled={disabled} on:click={() => dispatch('useEx', { cardId: card.instanceId })}>EX 사용</button>
+      <button class="btn" disabled={Boolean(action?.disabledReason)} title={action?.disabledReason ?? ''} on:click={() => action && dispatch('useEx', { action })}>EX 사용</button>
+      <DisabledReason show={Boolean(action?.disabledReason)} reason={action?.disabledReason ?? ''} />
     </CardSummaryTile>
   {/if}
 </section>

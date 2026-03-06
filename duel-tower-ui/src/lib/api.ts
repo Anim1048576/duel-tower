@@ -4,10 +4,11 @@ import type {
   CreateSessionResponse,
   EngineResponse,
   JoinSessionResponse,
-  SessionState,
+  SessionSnapshot,
 } from './model'
 
 import { normalizeCardDef } from './model'
+import { adaptEngineResponse, adaptSessionSnapshot } from './adapters/combatAdapter'
 
 // Deck API models (DB-backed)
 export type DeckType = 'PLAYER' | 'ENEMY'
@@ -71,21 +72,24 @@ export async function listCardDefs(): Promise<CardDef[]> {
 }
 
 export async function createSession(gmId: string): Promise<CreateSessionResponse> {
-  return await request<CreateSessionResponse>('/api/sessions', {
+  const raw = await request<any>('/api/sessions', {
     method: 'POST',
     body: JSON.stringify({ gmId }),
   })
+  return { ...raw, state: adaptSessionSnapshot(raw?.state ?? {}) }
 }
 
-export async function getSessionState(code: string): Promise<SessionState> {
-  return await request<SessionState>(`/api/sessions/${encodeURIComponent(code)}`)
+export async function getSessionState(code: string): Promise<SessionSnapshot> {
+  const raw = await request<any>(`/api/sessions/${encodeURIComponent(code)}`)
+  return adaptSessionSnapshot(raw)
 }
 
 export async function joinSession(code: string, playerId: string, passiveIds?: string[]): Promise<JoinSessionResponse> {
-  return await request<JoinSessionResponse>(`/api/sessions/${encodeURIComponent(code)}/join`, {
+  const raw = await request<any>(`/api/sessions/${encodeURIComponent(code)}/join`, {
     method: 'POST',
     body: JSON.stringify({ playerId, passiveIds }),
   })
+  return { ...raw, state: adaptSessionSnapshot(raw?.state ?? {}) }
 }
 
 export async function sendCommand(code: string, req: CommandRequest, gmToken?: string): Promise<EngineResponse> {
@@ -94,11 +98,12 @@ export async function sendCommand(code: string, req: CommandRequest, gmToken?: s
     headers["X-GM-Token"] = gmToken
   }
 
-  return await request<EngineResponse>(`/api/sessions/${encodeURIComponent(code)}/command`, {
+  const raw = await request<any>(`/api/sessions/${encodeURIComponent(code)}/command`, {
     method: 'POST',
     headers,
     body: JSON.stringify(req),
   })
+  return adaptEngineResponse(raw)
 }
 
 // ------------------

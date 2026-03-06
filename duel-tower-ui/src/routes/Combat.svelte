@@ -5,7 +5,8 @@
   import { session } from '../stores/session'
   import { content, ensureCards } from '../stores/content'
   import { logs } from '../stores/log'
-  import type { CardInstance, PlayerState } from '../lib/model'
+  import { toTargetRef } from '../lib/adapters/combatAdapter'
+  import type { ActionDescriptor, CardInstance } from '../lib/model'
   import CombatHeader from '../lib/combat/CombatHeader.svelte'
   import TeamPanel from '../lib/combat/TeamPanel.svelte'
   import ActionCenter from '../lib/combat/ActionCenter.svelte'
@@ -14,8 +15,7 @@
   import FieldZone from '../lib/combat/FieldZone.svelte'
   import SummonZone from '../lib/combat/SummonZone.svelte'
   import CardDetailDrawer from '../lib/components/CardDetailDrawer.svelte'
-  import LogLineItem from '../lib/components/LogLineItem.svelte'
-  import type { ActionStage, CombatTarget, PendingAction } from '../lib/combat/types'
+  import type { ActionStage, PendingAction } from '../lib/combat/types'
 
   let busy = false
   let showLogs = false
@@ -33,7 +33,7 @@
   $: state = $combat.state
   $: players = state?.players ? Object.values(state.players) : []
   $: meId = $session.meId
-  $: me = state?.players?.[meId] ?? (players[0] as PlayerState | undefined)
+  $: me = state?.players?.[meId] ?? players[0]
   $: combatState = state?.combat
   $: inCombat = Boolean(combatState)
   $: version = state?.version
@@ -55,18 +55,38 @@
 
   $: initiative = combatState?.turnOrder?.length ? combatState.turnOrder.map((p, i) => `${i === combatState.currentTurnIndex ? '▶ ' : ''}${p}`).join(' → ') : '—'
   $: selectedTargetKey = pendingAction?.target ? targetKey(pendingAction.target) : null
+  $: validTargets = pendingAction?.validTargets ?? []
+
+  $: myActions = me?.availableActions ?? []
+  $: playActionByCardId = indexActionByCardId(myActions.filter((a) => a.kind === 'play'))
+  $: exAction = myActions.find((a) => a.kind === 'useEx') ?? null
+  $: summonActionById = indexActionBySummonId(myActions.filter((a) => a.kind === 'summon'))
 
   function mapCardInstances(ids: string[]): CardInstance[] {
     return ids.map((id) => cardById[id]).filter(Boolean)
   }
 
-  function beginAction(next: PendingAction) {
+  function indexActionByCardId(actions: ActionDescriptor[]) {
+    const map: Record<string, ActionDescriptor | undefined> = {}
+    for (const action of actions) if (action.cardId) map[action.cardId] = action
+    return map
+  }
+
+  function indexActionBySummonId(actions: ActionDescriptor[]) {
+    const map: Record<string, ActionDescriptor | undefined> = {}
+    for (const action of actions) if (action.summonId) map[action.summonId] = action
+    return map
+  }
+
+  function beginAction(next: ActionDescriptor) {
+    if (next.disabledReason) return
     pendingAction = { ...next }
     stage = next.requiresTarget ? 'targeting' : 'confirming'
   }
 
-  function onSelectTarget(target: CombatTarget) {
+  function onSelectTarget(target: NonNullable<PendingAction['target']>) {
     if (stage !== 'targeting' || !pendingAction) return
+    if (!pendingAction.validTargets.some((t) => targetKey(t) === targetKey(target))) return
     pendingAction = { ...pendingAction, target }
     stage = 'confirming'
   }
@@ -76,7 +96,7 @@
     pendingAction = null
   }
 
-  function targetKey(target: CombatTarget) {
+  function targetKey(target: NonNullable<PendingAction['target']>) {
     return target.type === 'player' ? `player:${target.playerId}` : `summon:${target.playerId}:${target.summonId}`
   }
 
@@ -84,69 +104,17 @@
     if (!pendingAction || !me || busy) return
     busy = true
     try {
-      if (pendingAction.kind === 'play' && pendingAction.cardId) {
-        await command({
-          type: 'PLAY_CARD',
-          cardId: pendingAction.cardId,
-          expectedVersion: version,
-          targets: pendingAction.target ? [toTargetRef(pendingAction.target)] : undefined,
-        })
-      }
-      if (pendingAction.kind === 'useEx' && pendingAction.cardId) {
-        await command({
-          type: 'USE_EX',
-          cardId: pendingAction.cardId,
-          expectedVersion: version,
-          targets: pendingAction.target ? [toTargetRef(pendingAction.target)] : undefined,
-        })
-      }
-      if (pendingAction.kind === 'summon' && pendingAction.summonId) {
-        await command({
-          type: 'USE_SUMMON_ACTION',
-          summonId: pendingAction.summonId,
-          expectedVersion: version,
-          targets: pendingAction.target ? [toTargetRef(pendingAction.target)] : undefined,
-        })
-      }
+      await command({
+        type: pendingAction.commandType,
+        cardId: pendingAction.cardId,
+        summonId: pendingAction.summonId,
+        expectedVersion: version,
+        targets: pendingAction.target ? [toTargetRef(pendingAction.target)] : undefined,
+      })
       cancelAction()
     } finally {
       busy = false
     }
-  }
-
-  function toTargetRef(target: CombatTarget) {
-    if (target.type === 'player') return { playerId: target.playerId }
-    return { summonOwnerPlayerId: target.playerId, summonInstanceId: target.summonId }
-  }
-
-  function onPlay(cardId: string) {
-    beginAction({
-      kind: 'play',
-      cardId,
-      sourcePlayerId: me?.playerId ?? '',
-      requiresTarget: true,
-      label: `카드 사용 · ${$content.cardsById[cardById[cardId]?.defId ?? '']?.name ?? cardId}`,
-    })
-  }
-
-  function onUseEx(cardId: string) {
-    beginAction({
-      kind: 'useEx',
-      cardId,
-      sourcePlayerId: me?.playerId ?? '',
-      requiresTarget: true,
-      label: `EX 사용 · ${$content.cardsById[cardById[cardId]?.defId ?? '']?.name ?? cardId}`,
-    })
-  }
-
-  function onSummonAction(summonId: string, ownerId: string) {
-    beginAction({
-      kind: 'summon',
-      summonId,
-      sourcePlayerId: ownerId,
-      requiresTarget: true,
-      label: `소환 행동 · ${summonId}`,
-    })
   }
 </script>
 
@@ -162,20 +130,20 @@
   <div class="spacer"></div>
 
   <div class="layoutTop">
-    <TeamPanel side="enemy" title="TeamPanel enemy" players={enemyPlayers} summons={enemySummons} targetable={stage === 'targeting'} selectedTarget={selectedTargetKey} on:selectTarget={(e) => onSelectTarget(e.detail)} />
+    <TeamPanel side="enemy" title="TeamPanel enemy" players={enemyPlayers} summons={enemySummons} {validTargets} selectedTarget={selectedTargetKey} on:selectTarget={(e) => onSelectTarget(e.detail)} />
 
     <ActionCenter {stage} action={pendingAction} {busy} on:cancel={cancelAction} on:confirm={confirmAction} />
 
-    <TeamPanel side="ally" title="TeamPanel ally" players={allyPlayers} summons={allySummons} targetable={stage === 'targeting'} selectedTarget={selectedTargetKey} on:selectTarget={(e) => onSelectTarget(e.detail)} />
+    <TeamPanel side="ally" title="TeamPanel ally" players={allyPlayers} summons={allySummons} {validTargets} selectedTarget={selectedTargetKey} on:selectTarget={(e) => onSelectTarget(e.detail)} />
   </div>
 
   <div class="spacer"></div>
 
   <div class="layoutBottom">
-    <HandZone cards={handCards} cardDefs={$content.cardsById} disabled={!inCombat || stage !== 'idle'} on:inspect={(e) => (selectedCardId = e.detail.cardId)} on:play={(e) => onPlay(e.detail.cardId)} />
-    <ExZone card={exCard} cardDef={exCard ? $content.cardsById[exCard.defId] ?? null : null} disabled={!inCombat || stage !== 'idle'} on:inspect={(e) => (selectedCardId = e.detail.cardId)} on:useEx={(e) => onUseEx(e.detail.cardId)} />
+    <HandZone cards={handCards} cardDefs={$content.cardsById} actionByCardId={playActionByCardId} on:inspect={(e) => (selectedCardId = e.detail.cardId)} on:play={(e) => beginAction(e.detail.action)} />
+    <ExZone card={exCard} cardDef={exCard ? $content.cardsById[exCard.defId] ?? null : null} action={exAction} on:inspect={(e) => (selectedCardId = e.detail.cardId)} on:useEx={(e) => beginAction(e.detail.action)} />
     <FieldZone cards={fieldCards} cardDefs={$content.cardsById} on:inspect={(e) => (selectedCardId = e.detail.cardId)} />
-    <SummonZone summons={allySummons} ownerId={me?.playerId ?? ''} disabled={!inCombat || stage !== 'idle'} on:summonAction={(e) => onSummonAction(e.detail.summonId, e.detail.ownerId)} />
+    <SummonZone summons={allySummons} actionBySummonId={summonActionById} on:summonAction={(e) => beginAction(e.detail.action)} />
   </div>
 
   {#if showLogs}
@@ -184,11 +152,26 @@
       <div class="panelTitle">최근 로그</div>
       <div class="spacer"></div>
       <div class="log">
-        {#if !$logs.length}
+        {#if !$combat.lastResolutionLogs.length && !$logs.length}
           <div class="hint">로그 없음</div>
         {:else}
+          {#each $combat.lastResolutionLogs as item (item.id)}
+            <details class="logItem" open>
+              <summary>result summary · {item.summary}</summary>
+              <details>
+                <summary>detailed breakdown</summary>
+                <pre>{item.breakdown}</pre>
+              </details>
+            </details>
+          {/each}
           {#each $logs.slice(0, 20) as item (item.id)}
-            <LogLineItem at={item.at} level={item.level} title={item.title} message={item.message ?? ''} />
+            <details class="logItem">
+              <summary>result summary · {item.title}</summary>
+              <details>
+                <summary>detailed breakdown</summary>
+                <pre>{item.message ?? ''}</pre>
+              </details>
+            </details>
           {/each}
         {/if}
       </div>
@@ -212,6 +195,8 @@
   .combatPage{display:flex; flex-direction:column}
   .layoutTop{display:grid; grid-template-columns: 320px 1fr 320px; gap:12px}
   .layoutBottom{display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px}
+  .logItem{padding:8px; border:1px solid var(--line-default); border-radius:12px; background:var(--surface-2); margin-bottom:8px}
+  .logItem pre{white-space:pre-wrap}
   @media (max-width: 1200px){
     .layoutTop,.layoutBottom{grid-template-columns:1fr}
   }
