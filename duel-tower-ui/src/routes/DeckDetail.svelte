@@ -12,6 +12,7 @@
   } from '../lib/api'
   import CardSummaryTile from '../lib/components/CardSummaryTile.svelte'
   import StatusBadge from '../lib/components/StatusBadge.svelte'
+  import DisabledReason from '../lib/components/DisabledReason.svelte'
   import LogLineItem from '../lib/components/LogLineItem.svelte'
   import { requestConfirm } from '../stores/ui'
   import { content, ensureCards } from '../stores/content'
@@ -31,15 +32,92 @@
   let draftName = ''
   let draftType: DeckType = 'PLAYER'
   let draft: Record<string, number> = {}
+  let originalDraft: Record<string, number> = {}
   let initDone = false
 
+  let maxEditableCards = 4
+  let protectedCardIds: string[] = []
+  let curseNodeLocked = false
+
   $: draftTotal = Object.values(draft).reduce((a, b) => a + (b || 0), 0)
-  $: copyOk = Object.values(draft).every((c) => (c || 0) <= 3)
-  $: canSave =
-    !loading &&
-    (draftType === 'ENEMY'
-      ? true
-      : draftTotal === 12 && copyOk && Object.values(draft).every((c) => (c || 0) > 0))
+  $: normalEntries = Object.entries(draft).filter(([cardId]) => !isExCard(cardId))
+  $: exEntries = Object.entries(draft).filter(([cardId]) => isExCard(cardId))
+  $: normalTotal = normalEntries.reduce((sum, [, count]) => sum + (count || 0), 0)
+  $: exTotal = exEntries.reduce((sum, [, count]) => sum + (count || 0), 0)
+
+  $: changedCopies = Object.keys({ ...originalDraft, ...draft }).reduce((sum, cardId) => {
+    const before = originalDraft[cardId] || 0
+    const after = draft[cardId] || 0
+    return sum + Math.abs(after - before)
+  }, 0)
+
+  $: removedProtectedCards = protectedCardIds.filter((cardId) => (originalDraft[cardId] || 0) > 0 && (draft[cardId] || 0) === 0)
+
+  $: duplicateViolations = normalEntries
+    .filter(([, count]) => (count || 0) > 3)
+    .map(([cardId, count]) => `${$content.cardsById[cardId]?.name ?? cardId} × ${count}`)
+
+  $: deckValidation = (() => {
+    const totalCardsMessage =
+      draftType === 'PLAYER' && normalTotal !== 12 ? `일반 스킬 덱은 12장 고정이다. 현재 ${normalTotal}장.` : ''
+
+    const duplicateMessage = duplicateViolations.length
+      ? `중복 제한(최대 3장) 위반: ${duplicateViolations.join(', ')}`
+      : ''
+
+    const mutableCountMessage =
+      changedCopies > maxEditableCards
+        ? `변경 가능 장수(${maxEditableCards})를 초과했다. 현재 ${changedCopies}장 변경.`
+        : ''
+
+    const protectedRemovalMessage = removedProtectedCards.length
+      ? `제거 금지 카드가 빠졌다: ${removedProtectedCards.join(', ')}`
+      : ''
+
+    const curseNodeLockMessage = curseNodeLocked && changedCopies > 0 ? '저주 노드 잠금 상태에서는 덱 수정을 할 수 없다.' : ''
+
+    const exSectionMessage = exTotal !== 1 ? `EX 카드는 별도 섹션에서 정확히 1장 선택해야 한다. 현재 ${exTotal}장.` : ''
+
+    const violations = [
+      totalCardsMessage,
+      duplicateMessage,
+      mutableCountMessage,
+      protectedRemovalMessage,
+      curseNodeLockMessage,
+      exSectionMessage,
+    ].filter(Boolean)
+
+    return {
+      totalCardsMessage,
+      duplicateMessage,
+      mutableCountMessage,
+      protectedRemovalMessage,
+      curseNodeLockMessage,
+      exSectionMessage,
+      violations,
+      canSave: !loading && violations.length === 0,
+      disabledReason: violations[0] ?? '',
+    }
+  })()
+
+  $: draftDiffSummary = (() => {
+    const keys = Object.keys({ ...originalDraft, ...draft })
+    const added: string[] = []
+    const removed: string[] = []
+    const changed: string[] = []
+
+    for (const cardId of keys) {
+      const before = originalDraft[cardId] || 0
+      const after = draft[cardId] || 0
+      if (before === after) continue
+      const name = $content.cardsById[cardId]?.name ?? cardId
+      if (before === 0 && after > 0) added.push(`${name} +${after}`)
+      else if (before > 0 && after === 0) removed.push(`${name} -${before}`)
+      else changed.push(`${name} ${before}→${after}`)
+    }
+
+    return { added, removed, changed }
+  })()
 
   function deckToDraft(d: DeckResponse) {
     draftName = d.name
@@ -50,7 +128,13 @@
       m[c.cardId] = (m[c.cardId] || 0) + (c.count || 0)
     }
     draft = m
+    originalDraft = { ...m }
     initDone = true
+  }
+
+  function isExCard(cardId: string) {
+    const def = $content.cardsById[cardId]
+    return def?.type === 'EX' || cardId.toUpperCase().includes('_EX')
   }
 
   function toSpecs() {
@@ -60,6 +144,15 @@
   }
 
   function addOne(defId: string) {
+    if (isExCard(defId)) {
+      const next = { ...draft }
+      for (const [cardId] of Object.entries(next)) {
+        if (isExCard(cardId)) delete next[cardId]
+      }
+      next[defId] = 1
+      draft = next
+      return
+    }
     draft = { ...draft, [defId]: (draft[defId] || 0) + 1 }
   }
 
@@ -143,6 +236,14 @@
   }
 
   onMount(async () => {
+    const params = new URLSearchParams(window.location.search)
+    maxEditableCards = Math.max(0, Number(params.get('maxChanges') || 4))
+    protectedCardIds = (params.get('protected') || '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean)
+    curseNodeLocked = params.get('curseLocked') === '1'
+
     await ensureCards()
     await load()
   })
@@ -205,10 +306,9 @@
         <div class="row wrap" style="justify-content:space-between">
           <div class="cardTitle">편집 (전체 저장)</div>
           <div class="row wrap" style="justify-content:flex-end">
-            <StatusBadge label={`총 ${draftTotal}${draftType === 'PLAYER' ? '/12' : ''}`} />
-            {#if draftType === 'PLAYER'}
-              <StatusBadge tone={copyOk ? 'ok' : 'danger'} label={`복제 ${copyOk ? 'OK' : '초과'}`} />
-            {/if}
+            <StatusBadge label={`일반 ${normalTotal}${draftType === 'PLAYER' ? '/12' : ''}`} />
+            <StatusBadge label={`EX ${exTotal}/1`} />
+            <StatusBadge tone={deckValidation.violations.length === 0 ? 'ok' : 'danger'} label={`검증 ${deckValidation.violations.length === 0 ? '통과' : '실패'}`} />
           </div>
         </div>
         <div class="hint">이 섹션은 <span class="mono">PUT /api/content/decks/{deck.id}</span>로 통째로 저장한다.</div>
@@ -229,11 +329,28 @@
         </div>
 
         <div class="spacer"></div>
-        <div class="row wrap">
-          <button class="btn primary" on:click={doSaveAll} disabled={!canSave}>저장</button>
-          {#if draftType === 'PLAYER' && draftTotal !== 12}
-            <span class="hint">PLAYER 덱은 총 12장이어야 저장 가능.</span>
-          {/if}
+        <div class="validationList">
+          <div class="ruleItem {deckValidation.totalCardsMessage ? 'bad' : 'ok'}">총 장수: {deckValidation.totalCardsMessage || 'OK'}</div>
+          <div class="ruleItem {deckValidation.duplicateMessage ? 'bad' : 'ok'}">중복: {deckValidation.duplicateMessage || 'OK'}</div>
+          <div class="ruleItem {deckValidation.mutableCountMessage ? 'bad' : 'ok'}">변경 가능 장수: {deckValidation.mutableCountMessage || 'OK'}</div>
+          <div class="ruleItem {deckValidation.protectedRemovalMessage ? 'bad' : 'ok'}">제거 금지 카드: {deckValidation.protectedRemovalMessage || 'OK'}</div>
+          <div class="ruleItem {deckValidation.curseNodeLockMessage ? 'bad' : 'ok'}">저주 노드 잠금: {deckValidation.curseNodeLockMessage || 'OK'}</div>
+        </div>
+
+        <div class="spacer"></div>
+        <div class="card" style="background: rgba(0,0,0,.12)">
+          <div class="cardTitle">저장 전 변경 요약</div>
+          <div class="hint">추가 {draftDiffSummary.added.length} · 제거 {draftDiffSummary.removed.length} · 수량 변경 {draftDiffSummary.changed.length}</div>
+          <div class="spacer"></div>
+          <div class="hint">추가: {draftDiffSummary.added.length ? draftDiffSummary.added.join(', ') : '없음'}</div>
+          <div class="hint">제거: {draftDiffSummary.removed.length ? draftDiffSummary.removed.join(', ') : '없음'}</div>
+          <div class="hint">변경: {draftDiffSummary.changed.length ? draftDiffSummary.changed.join(', ') : '없음'}</div>
+        </div>
+
+        <div class="spacer"></div>
+        <div>
+          <button class="btn primary" on:click={doSaveAll} disabled={!deckValidation.canSave}>저장</button>
+          <DisabledReason show={!deckValidation.canSave} reason={deckValidation.disabledReason} />
         </div>
       </div>
     </div>
@@ -244,13 +361,21 @@
       <div>
         <div class="card">
           <div class="row wrap" style="justify-content:space-between">
-            <div class="cardTitle">카드 풀 (클릭 +1)</div>
+            <div class="cardTitle">좌측 · 보유 카드 (클릭 +1)</div>
             <button class="btn" on:click={() => ensureCards()}>카드 재로딩</button>
           </div>
           <div class="spacer"></div>
+          <div class="hint">일반 스킬 카드</div>
           <div class="searchGrid">
-            {#each $content.cards.slice(0, 60) as c (c.id)}
+            {#each $content.cards.filter((c) => !isExCard(c.id)).slice(0, 60) as c (c.id)}
               <CardSummaryTile def={c} on:inspect={() => addOne(c.id)} />
+            {/each}
+          </div>
+          <div class="spacer"></div>
+          <div class="hint">EX 카드 (별도 섹션 고정)</div>
+          <div class="cardRow">
+            {#each $content.cards.filter((c) => isExCard(c.id)) as c (c.id)}
+              <button class="btn" on:click={() => addOne(c.id)}>{c.name}</button>
             {/each}
           </div>
           <div class="hint">편집 드래프트에만 반영되고, 저장 버튼을 눌러야 서버에 반영된다.</div>
@@ -259,13 +384,28 @@
 
       <aside>
         <div class="card">
-          <div class="cardTitle">현재 드래프트 (클릭 -1)</div>
+          <div class="cardTitle">우측 · 현재 덱 (클릭 -1)</div>
           <div class="spacer"></div>
+          <div class="hint">EX 카드</div>
           <div class="cardRow">
-            {#if Object.keys(draft).length === 0}
+            {#if exEntries.length === 0}
+              <span class="muted">선택된 EX 없음</span>
+            {:else}
+              {#each exEntries as [defId, cnt] (defId)}
+                <button class="btn" on:click={() => subOne(defId)}>
+                  <span class="mono">{defId}</span>
+                  · {($content.cardsById[defId]?.name ?? '—')} × {cnt}
+                </button>
+              {/each}
+            {/if}
+          </div>
+          <div class="spacer"></div>
+          <div class="hint">일반 스킬 덱</div>
+          <div class="cardRow">
+            {#if normalEntries.length === 0}
               <span class="muted">비어 있음</span>
             {:else}
-              {#each Object.entries(draft) as [defId, cnt] (defId)}
+              {#each normalEntries as [defId, cnt] (defId)}
                 <button class="btn" on:click={() => subOne(defId)}>
                   <span class="mono">{defId}</span>
                   · {($content.cardsById[defId]?.name ?? '—')} × {cnt}
@@ -278,3 +418,10 @@
     </section>
   {/if}
 </section>
+
+<style>
+  .validationList{display:grid; gap:8px}
+  .ruleItem{padding:8px 10px; border-radius:8px; border:1px solid var(--line-default)}
+  .ruleItem.ok{color:var(--state-ok); border-color:rgba(109,255,177,.35)}
+  .ruleItem.bad{color:var(--state-danger); border-color:rgba(255,93,116,.35)}
+</style>
