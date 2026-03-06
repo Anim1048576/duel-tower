@@ -53,7 +53,7 @@
   let dispositionAxis2: AxisMoral = '중용'
   let noAge = true
   let selectedTraits: string[] = []
-  let selectedOwnedCards: string[] = []
+  let selectedOwnedCardCounts: Record<string, number> = {}
   let selectedExCardId = ''
 
   $: cardOptions = cardDefs.map((card) => ({ id: card.id, label: `${card.id} · ${card.name}` }))
@@ -101,6 +101,24 @@
     }
   }
 
+  function toOwnedCardCountMap(cardIds: string[]): Record<string, number> {
+    return cardIds.reduce<Record<string, number>>((acc, id) => {
+      const key = id.trim()
+      if (!key) return acc
+      acc[key] = (acc[key] ?? 0) + 1
+      return acc
+    }, {})
+  }
+
+  function ownedCardCountMapToArray(cardCounts: Record<string, number>): string[] {
+    return Object.entries(cardCounts).flatMap(([id, count]) => {
+      if (!id.trim()) return []
+      const normalized = Number.isFinite(count) ? Math.floor(count) : 0
+      if (normalized <= 0) return []
+      return Array(normalized).fill(id)
+    })
+  }
+
   function parseExCardId(raw: string): string {
     try {
       const parsed = JSON.parse(raw)
@@ -118,7 +136,7 @@
     dispositionAxis2 = a2
     noAge = form.age == null
     selectedTraits = [form.trait1, form.trait2].filter((v): v is string => Boolean(v && v.trim()))
-    selectedOwnedCards = parseIdArray(form.ownedCards)
+    selectedOwnedCardCounts = toOwnedCardCountMap(parseIdArray(form.ownedCards))
     selectedExCardId = parseExCardId(form.exCard)
   }
 
@@ -129,7 +147,7 @@
       age: noAge ? null : form.age ?? 0,
       trait1: selectedTraits[0] ?? null,
       trait2: selectedTraits[1] ?? null,
-      ownedCards: JSON.stringify(selectedOwnedCards),
+      ownedCards: JSON.stringify(ownedCardCountMapToArray(selectedOwnedCardCounts)),
       exCard: selectedExCardId ? JSON.stringify({ id: selectedExCardId }) : '{}',
     }
   }
@@ -229,9 +247,20 @@
     syncFormFromUi()
   }
 
-  function toggleOwnedCardSelection(id: string) {
-    const exists = selectedOwnedCards.includes(id)
-    selectedOwnedCards = exists ? selectedOwnedCards.filter((v) => v !== id) : [...selectedOwnedCards, id]
+  function updateOwnedCardCount(id: string, rawValue: string) {
+    const parsed = Number(rawValue)
+    const nextCount = Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0
+    if (nextCount === 0) {
+      const { [id]: _, ...rest } = selectedOwnedCardCounts
+      selectedOwnedCardCounts = rest
+      syncFormFromUi()
+      return
+    }
+
+    selectedOwnedCardCounts = {
+      ...selectedOwnedCardCounts,
+      [id]: nextCount,
+    }
     syncFormFromUi()
   }
 
@@ -361,10 +390,17 @@
         <div class="blockTitle">보유 카드 선택</div>
         <div class="checkGrid">
           {#each cardOptions as card}
-            <label class="checkItem">
-              <input type="checkbox" checked={selectedOwnedCards.includes(card.id)} on:change={() => toggleOwnedCardSelection(card.id)} />
+            <div class="checkItem">
               <span>{card.label}</span>
-            </label>
+              <input
+                class="countInput"
+                type="number"
+                min="0"
+                step="1"
+                value={selectedOwnedCardCounts[card.id] ?? 0}
+                on:input={(e) => updateOwnedCardCount(card.id, (e.currentTarget as HTMLInputElement).value)}
+              />
+            </div>
           {/each}
         </div>
       </div>
@@ -403,7 +439,8 @@
   .chip.active{border-color:rgba(114,220,255,.6);background:rgba(114,220,255,.14)}
   .chip:disabled{opacity:.45}
   .checkGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:220px;overflow:auto;padding:8px;border:1px solid var(--line);border-radius:10px}
-  .checkItem{display:flex;align-items:center;gap:8px;color:var(--text);font-size:12px}
+  .checkItem{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--text);font-size:12px}
+  .countInput{width:72px}
 
   @media (max-width: 900px){
     .page{grid-template-columns:1fr}
