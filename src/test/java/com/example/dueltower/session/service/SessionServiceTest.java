@@ -57,7 +57,7 @@ class SessionServiceTest {
         String code = sessionService.createSession("gm").code();
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> sessionService.join(code, "p1", List.of("P001", "P002", "P003")));
+                () -> sessionService.join(code, "p1", List.of("P001", "P002", "P003"), null, null, null));
 
         assertEquals("400 BAD_REQUEST \"passiveIds allows 0 to 2 items.\"", ex.getMessage());
     }
@@ -67,7 +67,7 @@ class SessionServiceTest {
         String code = sessionService.createSession("gm").code();
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> sessionService.join(code, "p1", List.of("bad")));
+                () -> sessionService.join(code, "p1", List.of("bad"), null, null, null));
 
         assertEquals("400 BAD_REQUEST \"Invalid passiveId format: bad (expected P###, e.g. P001).\"", ex.getMessage());
     }
@@ -77,7 +77,7 @@ class SessionServiceTest {
         String code = sessionService.createSession("gm").code();
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> sessionService.join(code, "p1", List.of("P001", "P001")));
+                () -> sessionService.join(code, "p1", List.of("P001", "P001"), null, null, null));
 
         assertEquals("400 BAD_REQUEST \"Duplicate passiveId is not allowed: P001\"", ex.getMessage());
     }
@@ -87,7 +87,7 @@ class SessionServiceTest {
         String code = sessionService.createSession("gm").code();
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> sessionService.join(code, "p1", List.of("P099")));
+                () -> sessionService.join(code, "p1", List.of("P099"), null, null, null));
 
         assertEquals("400 BAD_REQUEST \"Unknown passiveId: P099. Select a passive from the available list.\"", ex.getMessage());
     }
@@ -95,10 +95,10 @@ class SessionServiceTest {
     @Test
     void joinDoesNotAllowPassiveChangeAfterInitialJoinEvenInLobbyOrCombat() {
         String code = sessionService.createSession("gm").code();
-        sessionService.join(code, "p1", List.of("P001"));
+        sessionService.join(code, "p1", List.of("P001"), null, null, null);
 
         ResponseStatusException lobbyEx = assertThrows(ResponseStatusException.class,
-                () -> sessionService.join(code, "p1", List.of("P002")));
+                () -> sessionService.join(code, "p1", List.of("P002"), null, null, null));
         assertEquals("400 BAD_REQUEST \"Passives are fixed at first join and cannot be changed later. Leave passiveIds empty or resend the same values.\"", lobbyEx.getMessage());
 
         sessionService.withSessionLock(code, rt -> {
@@ -107,7 +107,73 @@ class SessionServiceTest {
         });
 
         ResponseStatusException combatEx = assertThrows(ResponseStatusException.class,
-                () -> sessionService.join(code, "p1", List.of("P002")));
+                () -> sessionService.join(code, "p1", List.of("P002"), null, null, null));
         assertEquals("400 BAD_REQUEST \"Passives are fixed at first join and cannot be changed later. Leave passiveIds empty or resend the same values.\"", combatEx.getMessage());
     }
+
+    @Test
+    void updateDeckRejectsMoreThanThreeCopies() {
+        String code = sessionService.createSession("gm").code();
+        sessionService.join(code, "p1", List.of("P001"), null, null, null);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> sessionService.updateDeck(code, "p1", "p1", List.of(
+                        "C001", "C001", "C001", "C001",
+                        "C002", "C002", "C002",
+                        "C003", "C003", "C003",
+                        "C004", "C004"
+                )));
+
+        assertEquals("400 BAD_REQUEST \"card copy limit exceeded: C001 (max 3)\"", ex.getMessage());
+    }
+
+    @Test
+    void updateDeckRejectsWeakenedOwnedCards() {
+        String code = sessionService.createSession("gm").code();
+        sessionService.join(code, "p1", List.of("P001"), null, null, List.of(
+                new com.example.dueltower.session.dto.OwnedCardDto("C001", true),
+                new com.example.dueltower.session.dto.OwnedCardDto("C001", false),
+                new com.example.dueltower.session.dto.OwnedCardDto("C001", false),
+                new com.example.dueltower.session.dto.OwnedCardDto("C002", false),
+                new com.example.dueltower.session.dto.OwnedCardDto("C002", false),
+                new com.example.dueltower.session.dto.OwnedCardDto("C002", false),
+                new com.example.dueltower.session.dto.OwnedCardDto("C003", false),
+                new com.example.dueltower.session.dto.OwnedCardDto("C003", false),
+                new com.example.dueltower.session.dto.OwnedCardDto("C003", false),
+                new com.example.dueltower.session.dto.OwnedCardDto("C004", false),
+                new com.example.dueltower.session.dto.OwnedCardDto("C004", false),
+                new com.example.dueltower.session.dto.OwnedCardDto("C004", false)
+        ));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> sessionService.updateDeck(code, "p1", "p1", List.of(
+                        "C001", "C001", "C001",
+                        "C002", "C002", "C002",
+                        "C003", "C003", "C003",
+                        "C004", "C004", "C004"
+                )));
+
+        assertEquals("400 BAD_REQUEST \"owned card unavailable or weakened: C001\"", ex.getMessage());
+    }
+
+    @Test
+    void updateDeckForbiddenDuringCombatNode() {
+        String code = sessionService.createSession("gm").code();
+        sessionService.join(code, "p1", List.of("P001"), null, null, null);
+        sessionService.withSessionLock(code, rt -> {
+            rt.state().combat(new CombatState());
+            return null;
+        });
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> sessionService.updateDeck(code, "p1", "p1", List.of(
+                        "C001", "C001", "C001",
+                        "C002", "C002", "C002",
+                        "C003", "C003", "C003",
+                        "C004", "C004", "C004"
+                )));
+
+        assertEquals("403 FORBIDDEN \"deck can only be edited in non-combat nodes\"", ex.getMessage());
+    }
+
 }

@@ -1,15 +1,17 @@
 package com.example.dueltower.session.service;
 
+import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.service.CardService;
+import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
-import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SessionId;
+import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,17 +22,20 @@ import org.springframework.web.server.ResponseStatusException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.*;
-import java.util.regex.Pattern;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 import static org.springframework.http.HttpStatus.*;
 
 @Service
 @Slf4j
 public class SessionService {
+
+    private static final int DECK_SIZE = 12;
+    private static final int MAX_DECK_COPIES = 3;
+    private static final Pattern PASSIVE_ID_FORMAT = Pattern.compile("^P\\d{3}$");
 
     private final CardService cardService;
     private final StatusService statusService;
@@ -44,7 +49,7 @@ public class SessionService {
 
     private final SecureRandom rnd = new SecureRandom();
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
-    private static final Pattern PASSIVE_ID_FORMAT = Pattern.compile("^P\\d{3}$");
+
     public SessionService(CardService cardService,
                           StatusService statusService,
                           KeywordService keywordService,
@@ -105,11 +110,12 @@ public class SessionService {
         return rt.withLock(() -> reader.apply(rt));
     }
 
-    /**
-     * 참가: 지금은 프리셋/DB 없이 기본 덱(12) + 기본 EX(1)을 자동 생성.
-     * 같은 playerId로 다시 join하면 idempotent.
-     */
-    public GameState join(String code, String playerIdRaw, List<String> passiveIdsRaw) {
+    public GameState join(String code,
+                          String playerIdRaw,
+                          List<String> passiveIdsRaw,
+                          List<String> presetDeckCardIdsRaw,
+                          String presetExCardIdRaw,
+                          List<OwnedCardDto> ownedCardsRaw) {
         if (playerIdRaw == null || playerIdRaw.isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
@@ -117,8 +123,6 @@ public class SessionService {
         SessionRuntime rt = get(code);
         PlayerId pid = new PlayerId(playerIdRaw.trim());
         List<String> passiveIds = parsePassiveIds(passiveIdsRaw);
-
-        log.info("join request code={} playerId={} requestedPassiveIds={}", code, pid.value(), passiveIds);
 
         return rt.withLock(() -> {
             GameState state = rt.state();
@@ -131,49 +135,119 @@ public class SessionService {
                             "Passives are fixed at first join and cannot be changed later. Leave passiveIds empty or resend the same values."
                     );
                 }
-                log.debug("join is idempotent code={} playerId={}", code, pid.value());
                 return state;
             }
 
             PlayerState ps = new PlayerState(pid);
             ps.passiveIds(passiveIds);
+
+            List<OwnedCard> ownedCards = parseOwnedCards(ownedCardsRaw);
+            ps.ownedCards(ownedCards);
+
+            List<String> deckCardIds = parsePresetDeckCardIds(presetDeckCardIdsRaw);
+            validateDeckBuild(deckCardIds, ps.ownedCards());
+
             state.players().put(pid, ps);
+            loadDeck(state, ps, deckCardIds);
+            addCardToEx(state, ps, new CardDefId(normalizeExCardId(presetExCardIdRaw)));
 
-            // Default deck: 3x C001 + 3x C002 + 3x C003 + 3x C004
-            CardDefId attack = new CardDefId("C001");
-            CardDefId recovery = new CardDefId("C002");
-            CardDefId guard = new CardDefId("C003");
-            CardDefId curse = new CardDefId("C004");
-
-            for (int i = 0; i < 3; i++) addCardToDeck(state, ps, attack);
-            for (int i = 0; i < 3; i++) addCardToDeck(state, ps, recovery);
-            for (int i = 0; i < 3; i++) addCardToDeck(state, ps, guard);
-            for (int i = 0; i < 3; i++) addCardToDeck(state, ps, curse);
-
-            // Default EX: EX901
-            addCardToEx(state, ps, new CardDefId("EX901"));
-
-            // Join 시 1회 셔플
-            List<CardInstId> list = new ArrayList<>(ps.deck());
-            ps.deck().clear();
-            Collections.shuffle(list, new Random(state.seed() ^ pid.value().hashCode()));
-            for (CardInstId id : list) ps.deck().addLast(id);
-
-            log.debug("player joined code={} playerId={} deckSize={} exId={} passiveIds={}",
-                    code,
-                    pid.value(),
-                    ps.deck().size(),
-                    (ps.exCard() == null) ? null : ps.exCard().value(),
-                    ps.passiveIds()
-            );
-
+            shuffleDeck(state, ps);
             return state;
         });
     }
 
+    public GameState updateDeck(String code,
+                                String actorPlayerIdRaw,
+                                String targetPlayerIdRaw,
+                                List<String> deckCardIdsRaw) {
+        if (targetPlayerIdRaw == null || targetPlayerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
+        }
+
+        if (actorPlayerIdRaw == null || actorPlayerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "actorPlayerId is required");
+        }
+        PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
+        PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
+
+        SessionRuntime rt = get(code);
+        return rt.withLock(() -> {
+            GameState state = rt.state();
+            if (!state.nodeState().deckEditable()) {
+                throw new ResponseStatusException(FORBIDDEN, "deck can only be edited in non-combat nodes");
+            }
+            if (!actor.equals(target)) {
+                throw new ResponseStatusException(FORBIDDEN, "players may only edit their own deck");
+            }
+
+            PlayerState ps = state.player(target);
+            if (ps == null) {
+                throw new ResponseStatusException(NOT_FOUND, "player not found");
+            }
+
+            List<String> deckCardIds = normalizeDeckCardIds(deckCardIdsRaw);
+            validateDeckBuild(deckCardIds, ps.ownedCards());
+            loadDeck(state, ps, deckCardIds);
+            shuffleDeck(state, ps);
+            return state;
+        });
+    }
+
+    private void loadDeck(GameState state, PlayerState ps, List<String> deckCardIds) {
+        Set<CardInstId> toDelete = new HashSet<>();
+        toDelete.addAll(ps.deck());
+        toDelete.addAll(ps.hand());
+        toDelete.addAll(ps.grave());
+        toDelete.addAll(ps.field());
+        toDelete.addAll(ps.excluded());
+
+        ps.deck().clear();
+        ps.hand().clear();
+        ps.grave().clear();
+        ps.field().clear();
+        ps.excluded().clear();
+
+        for (CardInstId id : toDelete) {
+            state.cardInstances().remove(id);
+        }
+
+        for (String cardId : deckCardIds) {
+            addCardToDeck(state, ps, new CardDefId(cardId));
+        }
+    }
+
+    private void validateDeckBuild(List<String> deckCardIds, List<OwnedCard> ownedCards) {
+        if (deckCardIds.size() != DECK_SIZE) {
+            throw new ResponseStatusException(BAD_REQUEST, "deck must contain exactly 12 cards");
+        }
+
+        Map<String, Integer> deckCounts = new LinkedHashMap<>();
+        for (String cardId : deckCardIds) {
+            deckCounts.merge(cardId, 1, Integer::sum);
+        }
+        for (var e : deckCounts.entrySet()) {
+            if (e.getValue() > MAX_DECK_COPIES) {
+                throw new ResponseStatusException(BAD_REQUEST,
+                        "card copy limit exceeded: " + e.getKey() + " (max 3)");
+            }
+        }
+
+        Map<String, Integer> availableOwned = new LinkedHashMap<>();
+        for (OwnedCard owned : ownedCards) {
+            if (owned.weakened()) continue;
+            availableOwned.merge(owned.cardId(), 1, Integer::sum);
+        }
+
+        for (var e : deckCounts.entrySet()) {
+            int available = availableOwned.getOrDefault(e.getKey(), 0);
+            if (available < e.getValue()) {
+                throw new ResponseStatusException(BAD_REQUEST,
+                        "owned card unavailable or weakened: " + e.getKey());
+            }
+        }
+    }
 
     private List<String> parsePassiveIds(List<String> passiveIdsRaw) {
-        // 기본값 정책: 미지정(null)이면 패시브를 자동 부여하지 않고 빈 목록으로 처리한다.
         if (passiveIdsRaw == null) return List.of();
         if (passiveIdsRaw.size() > PlayerState.MAX_PASSIVES) {
             throw new ResponseStatusException(BAD_REQUEST, "passiveIds allows 0 to " + PlayerState.MAX_PASSIVES + " items.");
@@ -199,6 +273,65 @@ public class SessionService {
         return List.copyOf(normalized);
     }
 
+    private List<OwnedCard> parseOwnedCards(List<OwnedCardDto> ownedCardsRaw) {
+        if (ownedCardsRaw == null || ownedCardsRaw.isEmpty()) {
+            return defaultOwnedCards();
+        }
+
+        if (ownedCardsRaw.size() > PlayerState.MAX_OWNED_CARDS) {
+            throw new ResponseStatusException(BAD_REQUEST, "ownedCards supports up to 20 items");
+        }
+
+        List<OwnedCard> out = new ArrayList<>(ownedCardsRaw.size());
+        for (OwnedCardDto dto : ownedCardsRaw) {
+            if (dto == null || dto.cardId() == null || dto.cardId().isBlank()) {
+                throw new ResponseStatusException(BAD_REQUEST, "ownedCards.cardId is required");
+            }
+            out.add(new OwnedCard(dto.cardId().trim(), dto.weakened()));
+        }
+        return List.copyOf(out);
+    }
+
+    private List<String> parsePresetDeckCardIds(List<String> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return defaultPresetDeckCardIds();
+        }
+        return normalizeDeckCardIds(raw);
+    }
+
+    private List<String> normalizeDeckCardIds(List<String> raw) {
+        List<String> normalized = new ArrayList<>();
+        for (String cardId : raw) {
+            if (cardId == null || cardId.isBlank()) {
+                throw new ResponseStatusException(BAD_REQUEST, "deckCardIds must not contain blank values");
+            }
+            normalized.add(cardId.trim());
+        }
+        return List.copyOf(normalized);
+    }
+
+    private String normalizeExCardId(String raw) {
+        return (raw == null || raw.isBlank()) ? "EX901" : raw.trim();
+    }
+
+    private List<OwnedCard> defaultOwnedCards() {
+        List<OwnedCard> owned = new ArrayList<>(20);
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C001", false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C002", false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C003", false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C004", false));
+        return List.copyOf(owned);
+    }
+
+    private List<String> defaultPresetDeckCardIds() {
+        return List.of(
+                "C001", "C001", "C001",
+                "C002", "C002", "C002",
+                "C003", "C003", "C003",
+                "C004", "C004", "C004"
+        );
+    }
+
     private void addCardToDeck(GameState state, PlayerState ps, CardDefId defId) {
         CardInstId instId = Ids.newCardInstId();
         CardInstance ci = new CardInstance(instId, defId, ps.playerId(), Zone.DECK);
@@ -207,10 +340,22 @@ public class SessionService {
     }
 
     private void addCardToEx(GameState state, PlayerState ps, CardDefId defId) {
+        CardInstId previousEx = ps.exCard();
+        if (previousEx != null) {
+            state.cardInstances().remove(previousEx);
+        }
+
         CardInstId instId = Ids.newCardInstId();
         CardInstance ci = new CardInstance(instId, defId, ps.playerId(), Zone.EX);
         state.cardInstances().put(instId, ci);
         ps.exCard(instId);
+    }
+
+    private void shuffleDeck(GameState state, PlayerState ps) {
+        List<CardInstId> list = new ArrayList<>(ps.deck());
+        ps.deck().clear();
+        Collections.shuffle(list, new Random(state.seed() ^ ps.playerId().value().hashCode()));
+        for (CardInstId id : list) ps.deck().addLast(id);
     }
 
     private String generateCode(int len) {

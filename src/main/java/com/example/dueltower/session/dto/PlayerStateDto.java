@@ -5,6 +5,7 @@ import java.util.List;
 public record PlayerStateDto(
         String playerId,
         List<String> passiveIds,
+        List<OwnedCardDto> ownedCards,
         List<String> deck,
         List<String> hand,
         List<String> grave,
