@@ -1,17 +1,30 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import Home from './routes/Home.svelte'
+  import Session from './routes/Session.svelte'
   import Lobby from './routes/Lobby.svelte'
-  import Presets from './routes/Presets.svelte'
-  import Decks from './routes/Decks.svelte'
-  import DeckDetail from './routes/DeckDetail.svelte'
+  import Character from './routes/Character.svelte'
   import Node from './routes/Node.svelte'
   import Combat from './routes/Combat.svelte'
+  import DeckEdit from './routes/DeckEdit.svelte'
+  import Inventory from './routes/Inventory.svelte'
+  import Results from './routes/Results.svelte'
+  import Logs from './routes/Logs.svelte'
 
   import { route, startRouter, navigate } from './lib/router'
   import { session, resetSession } from './stores/session'
   import { content, ensureCards } from './stores/content'
+  import { combat } from './stores/combat'
   import { toasts, dismissToast } from './stores/log'
+
+  type Phase = 'session' | 'lobby' | 'adventure' | 'combat' | 'results'
+
+  type NavItem = {
+    path: string
+    label: string
+    phases: Phase[]
+    disabledReason?: string
+  }
 
   onMount(() => {
     startRouter()
@@ -20,6 +33,35 @@
 
   $: cur = $route
   $: code = $session.code
+  $: hasSession = Boolean(code)
+  $: inCombat = Boolean($combat.state?.combat)
+  $: phase = !hasSession ? 'session' : inCombat ? 'combat' : 'lobby'
+
+  function isPathActive(path: string) {
+    return cur === path || (path.includes(':id') && cur.startsWith('/character/'))
+  }
+
+  function itemStatus(item: NavItem) {
+    if (!item.phases.includes(phase)) {
+      return { disabled: true, reason: `현재 phase(${phase})에서는 이동 불가` }
+    }
+    if (!hasSession && item.path !== '/session') {
+      return { disabled: true, reason: '세션 생성/참가가 먼저 필요' }
+    }
+    return { disabled: false, reason: item.disabledReason ?? '' }
+  }
+
+  $: navItems = [
+    { path: '/session', label: 'Session', phases: ['session', 'lobby', 'adventure', 'combat', 'results'] },
+    { path: '/lobby', label: 'Lobby', phases: ['lobby', 'adventure', 'combat', 'results'] },
+    { path: '/character/1', label: 'Character', phases: ['lobby', 'adventure'] },
+    { path: '/node', label: 'Node', phases: ['adventure'] },
+    { path: '/combat', label: 'Combat', phases: ['combat', 'lobby'], disabledReason: !inCombat ? '전투 시작 전: 레이아웃 미리보기만 가능' : '' },
+    { path: '/deck-edit', label: 'Deck Edit', phases: ['lobby', 'adventure'] },
+    { path: '/inventory', label: 'Inventory', phases: ['lobby', 'adventure'] },
+    { path: '/results', label: 'Results', phases: ['results', 'combat'] },
+    { path: '/logs', label: 'Logs', phases: ['session', 'lobby', 'adventure', 'combat', 'results'] },
+  ] satisfies NavItem[]
 </script>
 
 <header class="topbar">
@@ -27,17 +69,22 @@
     <div class="logo">DT</div>
     <div>
       <div class="brandTitle">Duel Tower</div>
-      <div class="brandSub">SPA UI · /ui</div>
+      <div class="brandSub">SPA UI · /ui · phase: <span class="mono">{phase}</span></div>
     </div>
   </div>
 
   <nav class="nav" aria-label="primary">
-    <a class="navItem" class:isActive={cur === '/'} href="/ui/" on:click|preventDefault={() => navigate('/')}>홈</a>
-    <a class="navItem" class:isActive={cur === '/lobby'} href="/ui/lobby" on:click|preventDefault={() => navigate('/lobby')}>로비</a>
-    <a class="navItem" class:isActive={cur === '/presets'} href="/ui/presets" on:click|preventDefault={() => navigate('/presets')}>프리셋</a>
-    <a class="navItem" class:isActive={cur === '/decks' || cur.startsWith('/decks/')} href="/ui/decks" on:click|preventDefault={() => navigate('/decks')}>덱</a>
-    <a class="navItem" class:isActive={cur === '/node'} href="/ui/node" on:click|preventDefault={() => navigate('/node')}>노드</a>
-    <a class="navItem" class:isActive={cur === '/combat'} href="/ui/combat" on:click|preventDefault={() => navigate('/combat')}>전투</a>
+    {#each navItems as item (item.path)}
+      {@const status = itemStatus(item)}
+      <button
+        class="navItem"
+        class:isActive={isPathActive(item.path)}
+        disabled={status.disabled}
+        title={status.reason}
+        on:click={() => navigate(item.path)}>
+        {item.label}{#if status.disabled && status.reason} · {status.reason}{/if}
+      </button>
+    {/each}
   </nav>
 
   <div class="topRight">
@@ -61,23 +108,29 @@
   <div class="container">
     {#if $route === '/'}
       <Home />
+    {:else if $route === '/session'}
+      <Session />
     {:else if $route === '/lobby'}
       <Lobby />
-    {:else if $route === '/presets'}
-      <Presets />
-    {:else if $route === '/decks'}
-      <Decks />
-    {:else if $route.startsWith('/decks/')}
-      <DeckDetail id={$route.split('/')[2] || ''} />
+    {:else if $route.startsWith('/character/')}
+      <Character id={$route.split('/')[2] || ''} />
     {:else if $route === '/node'}
       <Node />
     {:else if $route === '/combat'}
       <Combat />
+    {:else if $route === '/deck-edit'}
+      <DeckEdit />
+    {:else if $route === '/inventory'}
+      <Inventory />
+    {:else if $route === '/results'}
+      <Results />
+    {:else if $route === '/logs'}
+      <Logs />
     {:else}
       <div class="card">
         <div class="row wrap">
           <div class="grow">404 · <span class="muted mono">{cur}</span></div>
-          <button class="btn" on:click={() => navigate('/')}>홈으로</button>
+          <button class="btn" on:click={() => navigate('/session')}>세션으로</button>
         </div>
       </div>
     {/if}

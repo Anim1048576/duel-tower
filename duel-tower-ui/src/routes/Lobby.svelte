@@ -135,9 +135,9 @@
       <div class="cardTitle">다음 단계</div>
       <div class="spacer"></div>
       <div class="choices">
-        <div class="choice" on:click={() => navigate('/presets')}>
-          <div class="choiceTitle">프리셋</div>
-          <div class="choiceDesc">카드 풀 확인 + 덱 구성(프론트 저장)</div>
+        <div class="choice" on:click={() => navigate('/deck-edit')}>
+          <div class="choiceTitle">덱 편집</div>
+          <div class="choiceDesc">덱 구성/저장 플로우 진입</div>
         </div>
         <div class="choice" on:click={() => navigate('/node')}>
           <div class="choiceTitle">노드</div>

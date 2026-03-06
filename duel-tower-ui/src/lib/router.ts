@@ -2,6 +2,19 @@ import { writable } from 'svelte/store'
 
 const base = import.meta.env.PROD ? '/ui' : ''
 
+export const APP_ROUTES = {
+  home: '/',
+  session: '/session',
+  lobby: '/lobby',
+  character: (id: string) => `/character/${id}`,
+  node: '/node',
+  combat: '/combat',
+  deckEdit: '/deck-edit',
+  inventory: '/inventory',
+  results: '/results',
+  logs: '/logs',
+} as const
+
 function stripBase(pathname: string) {
   if (base && pathname.startsWith(base)) {
     const rest = pathname.slice(base.length)
@@ -31,6 +44,11 @@ export function navigate(path: string) {
 
 export function isActive(path: string) {
   let cur: string
-  route.subscribe(v => (cur = v))()
+  route.subscribe((v) => (cur = v))()
   return cur === path
+}
+
+export function getCharacterId(path: string) {
+  if (!path.startsWith('/character/')) return ''
+  return path.split('/')[2] || ''
 }
