@@ -1,24 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { content, ensureCards } from '../stores/content'
+  import { ensurePassives, passives } from '../stores/passives'
   import { presets, createPreset, deletePreset, renamePreset, selectPreset, setDeck, setEx, setPassiveIds } from '../stores/presets'
   import { pushToast } from '../stores/log'
 
   let q = ''
   let nameDraft = ''
-
-  const passiveCandidates = [
-    { id: 'P001', name: '기본 패시브 I' },
-    { id: 'P002', name: '기본 패시브 II' },
-    { id: 'P003', name: '기본 패시브 III' },
-  ]
-
   onMount(async () => {
-    await ensureCards()
+    await Promise.all([ensureCards(), ensurePassives()])
   })
 
   $: selected = $presets.presets.find((p) => p.id === $presets.selectedId) ?? $presets.presets[0]
   $: if (selected && nameDraft === '') nameDraft = selected.name
+
+  $: orphanPassiveIds = selected
+    ? selected.passiveIds.filter((id) => !$passives.passivesById[id])
+    : []
 
   function iconForCard(c: { name?: string; text?: string }) {
     const t = `${c?.name ?? ''} ${c?.text ?? ''}`
@@ -53,6 +51,12 @@
   function clearEx() {
     if (!selected) return
     setEx(selected.id, null)
+  }
+
+  function cleanupOrphanPassives() {
+    if (!selected || orphanPassiveIds.length === 0) return
+    setPassiveIds(selected.id, selected.passiveIds.filter((id) => $passives.passivesById[id]))
+    pushToast('고아 패시브를 정리했어요')
   }
 
   function togglePassive(passiveId: string) {
@@ -102,6 +106,7 @@
         <div class="row wrap" style="justify-content:flex-end">
           <input class="input" style="width:240px" bind:value={q} placeholder="검색 (이름/ID/텍스트)" />
           <button class="btn" on:click={() => ensureCards()}>카드 재로딩</button>
+          <button class="btn" on:click={() => ensurePassives()}>패시브 재로딩</button>
         </div>
       </div>
 
@@ -110,6 +115,14 @@
         <div class="ti" style="border-color: rgba(255,93,116,.35); background: rgba(255,93,116,.06)">
           <div class="logHead">API</div>
           <div class="logBody">{$content.lastError}</div>
+        </div>
+      {/if}
+
+      {#if $passives.lastError}
+        <div class="spacer"></div>
+        <div class="ti" style="border-color: rgba(255,93,116,.35); background: rgba(255,93,116,.06)">
+          <div class="logHead">Passive API</div>
+          <div class="logBody">{$passives.lastError}</div>
         </div>
       {/if}
     </div>
@@ -196,16 +209,28 @@
             <div class="k">패시브</div>
             <div class="v mono">{selected.passiveIds.length ? selected.passiveIds.join(', ') : '—'}</div>
             <div class="hint" style="margin-top:10px">최대 2개 선택</div>
+            {#if orphanPassiveIds.length}
+              <div class="row wrap" style="margin-top:10px; gap:8px">
+                <span class="badge" style="border-color:#ff5d74;color:#ff5d74">고아 {orphanPassiveIds.length}</span>
+                <button class="btn danger" on:click={cleanupOrphanPassives}>고아 패시브 정리</button>
+              </div>
+              <div class="hint" style="margin-top:6px">서버에 없는 패시브 ID: {orphanPassiveIds.join(', ')}</div>
+            {/if}
             <div class="cardRow" style="margin-top:10px">
-              {#each passiveCandidates as passive (passive.id)}
-                <button
-                  class="btn"
-                  class:primary={selected.passiveIds.includes(passive.id)}
-                  on:click={() => togglePassive(passive.id)}
-                >
-                  {passive.id} · {passive.name}
-                </button>
-              {/each}
+              {#if $passives.passives.length === 0}
+                <div class="hint">패시브 목록이 비어 있어요. 재로딩을 시도해 주세요.</div>
+              {:else}
+                {#each $passives.passives as passive (passive.id)}
+                  <button
+                    class="btn"
+                    class:primary={selected.passiveIds.includes(passive.id)}
+                    on:click={() => togglePassive(passive.id)}
+                    title={passive.description ?? ''}
+                  >
+                    {passive.id} · {passive.name}
+                  </button>
+                {/each}
+              {/if}
             </div>
           </div>
           <div class="kv">

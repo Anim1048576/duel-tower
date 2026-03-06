@@ -5,10 +5,11 @@ import type {
   EngineResponse,
   JoinSessionResponse,
   OwnedCard,
+  PassiveDefinition,
   SessionSnapshot,
 } from './model'
 
-import { normalizeCardDef } from './model'
+import { normalizeCardDef, normalizePassiveDefinition } from './model'
 import { adaptEngineResponse, adaptSessionSnapshot } from './adapters/combatAdapter'
 
 // Deck API models (DB-backed)
@@ -112,6 +113,12 @@ function normalizeApiErrorMessage(status: number | undefined, message: unknown):
 export async function listCardDefs(): Promise<CardDef[]> {
   const raw = await request<any[]>('/api/content/cards')
   return raw.map(normalizeCardDef)
+}
+
+
+export async function listPassives(): Promise<PassiveDefinition[]> {
+  const raw = await request<any[]>('/api/content/passives')
+  return raw.map(normalizePassiveDefinition)
 }
 
 export async function createSession(gmId: string): Promise<CreateSessionResponse> {
