@@ -7,6 +7,7 @@
 
   let q = ''
   let nameDraft = ''
+  let missingSkillIcons: Record<string, true> = {}
   onMount(async () => {
     await Promise.all([ensureCards(), ensurePassives()])
   })
@@ -25,6 +26,10 @@
     if (t.includes('보호') || t.includes('방어') || t.includes('가드')) return `${base}assets/skills/guard.png`
     if (t.includes('회복') || t.includes('치유') || t.includes('힐')) return `${base}assets/skills/recovery.png`
     return null
+  }
+
+  function handleSkillIconError(src: string) {
+    missingSkillIcons = { ...missingSkillIcons, [src]: true }
   }
 
   function addToDeck(defId: string) {
@@ -142,6 +147,7 @@
       <div class="searchGrid">
         {#each filtered as c (c.id)}
           <div class="gcard" on:click={() => addToDeck(c.id)}>
+            {@const skillIcon = iconForCard(c)}
             <div class="row" style="justify-content:space-between; align-items:flex-start">
               <div class="gcardTitle">{c.name}</div>
               <span class="badge">{c.cost}</span>
@@ -153,10 +159,11 @@
                 <span class="tag p">{k}</span>
               {/each}
             </div>
-            {#if iconForCard(c)}
+            {#if skillIcon && !missingSkillIcons[skillIcon]}
               <img
-                src={iconForCard(c) || ''}
+                src={skillIcon}
                 alt=""
+                on:error={() => handleSkillIconError(skillIcon)}
                 style="position:absolute; right:10px; bottom:10px; width:26px; height:26px; opacity:.9"
               />
             {/if}
