@@ -1,8 +1,8 @@
 package com.example.dueltower.engine.core.effect;
 
 import com.example.dueltower.engine.core.combat.DamageFlags;
-import com.example.dueltower.engine.core.combat.CombatEntityOps;
 import com.example.dueltower.engine.core.combat.DamageOps;
+import com.example.dueltower.engine.core.combat.HealOps;
 import com.example.dueltower.content.keyword.kdb.K011_Critical;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
@@ -156,11 +156,15 @@ public final class EffectOps {
             finalAmount *= 2;
             ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! heal x2"));
         }
-        CombatEntityOps.adjustHp(ec.state(), ec.ctx(), ec.out(), ref, finalAmount);
-        ec.out().add(new GameEvent.LogAppended(
-                ec.actor().value() + " heals " + finalAmount + " to " + CombatEntityOps.targetLabel(ref)
-                        + " (hp=" + CombatEntityOps.hpText(ec.state(), ref) + ")"
-        ));
+        HealOps.apply(
+                ec.state(),
+                ec.ctx(),
+                ec.out(),
+                TargetRef.ofPlayer(ec.actor()),
+                ec.actor().value(),
+                ref,
+                finalAmount
+        );
     }
 
     private boolean isCritical(TargetRef target, String kind) {
