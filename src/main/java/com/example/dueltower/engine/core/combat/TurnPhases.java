@@ -6,6 +6,7 @@ import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusPhases;
 import com.example.dueltower.engine.core.effect.card.FieldEffectOps;
+import com.example.dueltower.engine.core.effect.keyword.EnemyExOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.PlayerState;
@@ -32,6 +33,11 @@ public final class TurnPhases {
         // 턴 시작 훅 순서: passive -> status
         PassiveOps.turnStart(state, ctx, actor, out, source);
         StatusPhases.turnStart(state, ctx, actor, out, source);
+
+        if (actor instanceof TargetRef.Enemy e) {
+            EnemyExOps.refreshActivatable(state.enemy(e.id()),
+                    state.combat() == null ? 0 : state.combat().round());
+        }
 
         if (actor instanceof TargetRef.Player p) {
             PlayerState ps = state.player(p.id());
@@ -70,6 +76,11 @@ public final class TurnPhases {
         // 턴 종료 훅 순서: passive -> status
         PassiveOps.turnEnd(state, ctx, actor, out, source);
         StatusPhases.turnEnd(state, ctx, actor, out, source);
+
+        if (actor instanceof TargetRef.Enemy e) {
+            EnemyExOps.refreshActivatable(state.enemy(e.id()),
+                    state.combat() == null ? 0 : state.combat().round());
+        }
 
         if (actor instanceof TargetRef.Player p) {
             PlayerState ps = state.player(p.id());

@@ -118,8 +118,7 @@ public final class StartCombatCommand implements GameCommand {
         }
 
         // 2.5) 첫 턴 시작 처리(드로우 규칙/턴 플래그 초기화 등)
-        // - 적이 선공이면(현재는 AI가 없으므로) 자동 스킵해서 플레이어 턴으로 맞춘다.
-        TurnFlow.normalizeToPlayerAtCombatStart(state, ctx, events);
+        TurnFlow.initializeFirstTurn(state, ctx, events);
 
         // 3) 로그 + 현재 턴 알림 이벤트
         for (TargetRef ref : order) {

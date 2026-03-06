@@ -46,6 +46,20 @@ public final class StateMapper {
                             !s.actionUsedThisTurn()
                     ))
                     .toList();
+            List<CombatStateDto.EnemyCombatDto> enemies = state.enemies().values().stream()
+                    .map(e -> new CombatStateDto.EnemyCombatDto(
+                            e.enemyId().value(),
+                            e.hp(),
+                            e.maxHp(),
+                            e.ap(),
+                            e.attackPower(),
+                            e.healPower(),
+                            e.exCard() == null ? null : e.exCard().value().toString(),
+                            e.exActivatable(),
+                            e.exOnCooldown(cs.round()),
+                            Map.copyOf(e.statusValues())
+                    ))
+                    .toList();
 
             combat = new CombatStateDto(
                     cs.round(),
@@ -55,7 +69,8 @@ public final class StateMapper {
                     cs.phase().name(),
                     Map.copyOf(cs.initiatives()),
                     List.copyOf(cs.initiativeTieGroups()),
-                    summons
+                    summons,
+                    enemies
             );
         }
 

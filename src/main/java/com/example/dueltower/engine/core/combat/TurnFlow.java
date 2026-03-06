@@ -2,21 +2,35 @@ package com.example.dueltower.engine.core.combat;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.event.GameEvent;
-import com.example.dueltower.engine.model.*;
+import com.example.dueltower.engine.model.CombatPhase;
+import com.example.dueltower.engine.model.CombatState;
+import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.PlayerState;
+import com.example.dueltower.engine.model.TargetRef;
 
 import java.util.List;
 
 /**
  * "현재 턴 종료" 후 "다음 턴 시작"까지의 흐름을 한 곳에 모아둔다.
- * 주의: 현재는 적(AI) 턴이 구현되지 않았으므로, 적 턴은 자동 스킵(상태 틱만 처리)한다.
  */
 public final class TurnFlow {
     private TurnFlow() {}
 
+    public static final TurnAdvancePolicy DEFAULT_POLICY = new DefaultTurnAdvancePolicy();
+
     /**
-     * 현재 actor의 턴을 종료하고, 다음 '플레이어'의 턴을 시작 상태로 만든다.
+     * 현재 actor의 턴을 종료하고, 다음 턴 시작 상태로 만든다.
      */
-    public static void endCurrentAndAdvanceToNextPlayer(GameState state, EngineContext ctx, List<GameEvent> out) {
+    public static void endCurrentAndAdvance(GameState state, EngineContext ctx, List<GameEvent> out) {
+        endCurrentAndAdvance(state, ctx, out, DEFAULT_POLICY);
+    }
+
+    public static void endCurrentAndAdvance(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TurnAdvancePolicy policy
+    ) {
         CombatState cs = state.combat();
         if (cs == null) throw new IllegalStateException("combat not started");
 
@@ -27,54 +41,57 @@ public final class TurnFlow {
         TurnPhases.turnEnd(state, ctx, current, out, "TURN_END");
 
         advanceOne(state, cs);
-
-        // 적 턴이 현재 엔진에서 직접 입력을 받을 수 없으므로, 연속된 적 턴은 자동으로 넘긴다.
-        int guard = Math.max(1, cs.turnOrder().size()) * 2;
-        while (guard-- > 0 && shouldAutoSkipTurn(state, cs.currentTurnActor())) {
-            TargetRef actor = cs.currentTurnActor();
-            out.add(new GameEvent.LogAppended(autoSkipMessage(state, actor)));
-
-            cs.phase(CombatPhase.TURN_START);
-            TurnPhases.turnStart(state, ctx, actor, out, "TURN_START");
-
-            cs.phase(CombatPhase.TURN_END);
-            TurnPhases.turnEnd(state, ctx, actor, out, "TURN_END");
-            advanceOne(state, cs);
-        }
-
-        // 이제 플레이어 턴 시작
-        TargetRef next = cs.currentTurnActor();
-
-        cs.phase(CombatPhase.TURN_START);
-        TurnPhases.turnStart(state, ctx, next, out, "TURN_START");
-
-        // 입력 가능한 시점
-        cs.phase(CombatPhase.MAIN);
+        normalizeToPlayableTurn(state, ctx, out, policy);
     }
 
     /**
-     * 전투 시작 직후, 현재 actor가 플레이어가 아니면(적이 선공이면) 적 턴을 자동 스킵해서 플레이어 턴으로 맞춘다.
+     * 전투 시작 직후 현재 턴 actor의 TURN_START 처리까지 수행한다.
      */
-    public static void normalizeToPlayerAtCombatStart(GameState state, EngineContext ctx, List<GameEvent> out) {
+    public static void initializeFirstTurn(GameState state, EngineContext ctx, List<GameEvent> out) {
+        initializeFirstTurn(state, ctx, out, DEFAULT_POLICY);
+    }
+
+    public static void initializeFirstTurn(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TurnAdvancePolicy policy
+    ) {
+        CombatState cs = state.combat();
+        if (cs == null) throw new IllegalStateException("combat not started");
+
+        normalizeToPlayableTurn(state, ctx, out, policy);
+    }
+
+    private static void normalizeToPlayableTurn(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TurnAdvancePolicy policy
+    ) {
         CombatState cs = state.combat();
         if (cs == null) throw new IllegalStateException("combat not started");
 
         int guard = Math.max(1, cs.turnOrder().size()) * 2;
-        while (guard-- > 0 && shouldAutoSkipTurn(state, cs.currentTurnActor())) {
+        while (guard-- > 0) {
             TargetRef actor = cs.currentTurnActor();
-            out.add(new GameEvent.LogAppended(autoSkipOpeningMessage(state, actor)));
 
             cs.phase(CombatPhase.TURN_START);
             TurnPhases.turnStart(state, ctx, actor, out, "TURN_START");
+
+            if (!policy.autoEndAfterTurnStart(state, actor)) {
+                cs.phase(CombatPhase.MAIN);
+                return;
+            }
+
+            out.add(new GameEvent.LogAppended(policy.autoEndMessage(state, actor)));
 
             cs.phase(CombatPhase.TURN_END);
             TurnPhases.turnEnd(state, ctx, actor, out, "TURN_END");
             advanceOne(state, cs);
         }
 
-        cs.phase(CombatPhase.TURN_START);
-        TurnPhases.turnStart(state, ctx, cs.currentTurnActor(), out, "TURN_START");
-
+        // fail-safe: guard가 소진되어도 턴은 MAIN으로 둔다.
         cs.phase(CombatPhase.MAIN);
     }
 
@@ -96,37 +113,42 @@ public final class TurnFlow {
                     ps.exCooldownUntilRound(0);
                 }
             }
+            state.enemies().values().forEach(es -> {
+                if (es.exCooldownUntilRound() > 0 && nextRound > es.exCooldownUntilRound()) {
+                    es.exCooldownUntilRound(0);
+                }
+            });
         }
 
         cs.currentTurnIndex(nextIndex);
     }
 
-    private static boolean shouldAutoSkipTurn(GameState state, TargetRef actor) {
-        if (actor instanceof TargetRef.Enemy) return true;
-        if (actor instanceof TargetRef.Player p) {
-            PlayerState ps = state.player(p.id());
-            return CombatStatuses.isBattleIncapacitated(ps);
-        }
-        return false;
+    public interface TurnAdvancePolicy {
+        boolean autoEndAfterTurnStart(GameState state, TargetRef actor);
+
+        String autoEndMessage(GameState state, TargetRef actor);
     }
 
-    private static String autoSkipMessage(GameState state, TargetRef actor) {
-        if (actor instanceof TargetRef.Player p) {
-            PlayerState ps = state.player(p.id());
-            if (CombatStatuses.isBattleIncapacitated(ps)) {
-                return CombatState.actorKey(actor) + " turn (auto-skip: battle incapacitated)";
+    private static final class DefaultTurnAdvancePolicy implements TurnAdvancePolicy {
+        @Override
+        public boolean autoEndAfterTurnStart(GameState state, TargetRef actor) {
+            if (actor instanceof TargetRef.Enemy) return true;
+            if (actor instanceof TargetRef.Player p) {
+                PlayerState ps = state.player(p.id());
+                return CombatStatuses.isBattleIncapacitated(ps);
             }
+            return false;
         }
-        return CombatState.actorKey(actor) + " turn (auto-skip: enemy AI not implemented)";
-    }
 
-    private static String autoSkipOpeningMessage(GameState state, TargetRef actor) {
-        if (actor instanceof TargetRef.Player p) {
-            PlayerState ps = state.player(p.id());
-            if (CombatStatuses.isBattleIncapacitated(ps)) {
-                return CombatState.actorKey(actor) + " opens combat (auto-skip: battle incapacitated)";
+        @Override
+        public String autoEndMessage(GameState state, TargetRef actor) {
+            if (actor instanceof TargetRef.Player p) {
+                PlayerState ps = state.player(p.id());
+                if (CombatStatuses.isBattleIncapacitated(ps)) {
+                    return CombatState.actorKey(actor) + " turn (auto-end: battle incapacitated)";
+                }
             }
+            return CombatState.actorKey(actor) + " turn (auto-end: policy)";
         }
-        return CombatState.actorKey(actor) + " opens combat (auto-skip: enemy AI not implemented)";
     }
 }

@@ -11,7 +11,8 @@ public record CombatStateDto(
         String phase,
         Map<String, Integer> initiatives,
         List<List<String>> initiativeTieGroups,
-        List<SummonDto> summons
+        List<SummonDto> summons,
+        List<EnemyCombatDto> enemies
 ) {
     public record SummonDto(
             String summonId,
@@ -20,5 +21,18 @@ public record CombatStateDto(
             int atk,
             int heal,
             boolean actionAvailable
+    ) {}
+
+    public record EnemyCombatDto(
+            String enemyId,
+            int hp,
+            int maxHp,
+            int ap,
+            int attackPower,
+            int healPower,
+            String exCardId,
+            boolean exActivatable,
+            boolean exOnCooldown,
+            Map<String, Integer> statuses
     ) {}
 }
