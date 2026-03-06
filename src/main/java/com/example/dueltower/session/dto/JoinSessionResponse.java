@@ -1,3 +1,3 @@
 package com.example.dueltower.session.dto;
 
-public record JoinSessionResponse(SessionStateDto state) {}
+public record JoinSessionResponse(SessionStateDto state, String playerToken) {}
