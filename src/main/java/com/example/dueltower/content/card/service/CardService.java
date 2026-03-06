@@ -64,6 +64,13 @@ public class CardService {
         return all;
     }
 
+    /** API 용: 타입별 목록 */
+    public List<CardDefinition> list(CardType type) {
+        return all.stream()
+                .filter(card -> card.type() == type)
+                .toList();
+    }
+
     /** 엔진 구성/검증/디버깅용 */
     public Map<CardDefId, CardDefinition> asMap() {
         return byId;
