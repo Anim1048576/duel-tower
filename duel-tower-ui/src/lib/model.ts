@@ -160,6 +160,13 @@ export type OwnedCard = {
   weakened: boolean
 }
 
+export type PassiveDefinition = {
+  id: string
+  name: string
+  priority: number
+  description?: string
+}
+
 export function normalizeCardDef(raw: any): CardDef {
   // Backend CardDefinition serializes id as { value: 'C001' }
   const id = String(raw?.id?.value ?? raw?.id ?? '')
@@ -172,5 +179,15 @@ export function normalizeCardDef(raw: any): CardDef {
     resolveTo: raw?.resolveTo ? String(raw.resolveTo) : undefined,
     token: Boolean(raw?.token ?? false),
     text: raw?.text ? String(raw.text) : undefined,
+  }
+}
+
+export function normalizePassiveDefinition(raw: any): PassiveDefinition {
+  const id = String(raw?.id ?? '')
+  return {
+    id,
+    name: String(raw?.name ?? id),
+    priority: Number(raw?.priority ?? 0),
+    description: raw?.description ? String(raw.description) : undefined,
   }
 }
