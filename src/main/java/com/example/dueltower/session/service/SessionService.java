@@ -6,6 +6,7 @@ import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -333,22 +334,17 @@ public class SessionService {
     }
 
     private void addCardToDeck(GameState state, PlayerState ps, CardDefId defId) {
-        CardInstId instId = Ids.newCardInstId();
-        CardInstance ci = new CardInstance(instId, defId, ps.playerId(), Zone.DECK);
-        state.cardInstances().put(instId, ci);
-        ps.deck().addLast(instId);
+        ZoneOps.createCardInZone(state, ps, defId, Zone.DECK);
     }
 
     private void addCardToEx(GameState state, PlayerState ps, CardDefId defId) {
         CardInstId previousEx = ps.exCard();
         if (previousEx != null) {
             state.cardInstances().remove(previousEx);
+            ps.exCard(null);
         }
 
-        CardInstId instId = Ids.newCardInstId();
-        CardInstance ci = new CardInstance(instId, defId, ps.playerId(), Zone.EX);
-        state.cardInstances().put(instId, ci);
-        ps.exCard(instId);
+        ZoneOps.createCardInZone(state, ps, defId, Zone.EX);
     }
 
     private void shuffleDeck(GameState state, PlayerState ps) {
