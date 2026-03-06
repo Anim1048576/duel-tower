@@ -160,7 +160,16 @@
     tieOrderDraft = next
   }
 
-  async function sendPendingDecisionCommand(payload: { type: string; discardIds?: string[]; tieGroupIndex?: number; orderedActorKeys?: string[] }) {
+  async function sendPendingDecisionCommand(
+    payload: {
+      type: string
+      discardIds?: string[]
+      /** Required when type === 'RESOLVE_INITIATIVE_TIE'. */
+      tieGroupIndex?: number
+      /** Required when type === 'RESOLVE_INITIATIVE_TIE'. */
+      orderedActorKeys?: string[]
+    },
+  ) {
     if (busy) return
     pendingError = ''
     busy = true
