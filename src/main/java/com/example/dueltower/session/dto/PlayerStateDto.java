@@ -18,5 +18,8 @@ public record PlayerStateDto(
         int cardsPlayedThisTurn,
         boolean usedExThisTurn,
         int handLimit,
-        int fieldLimit
+        int fieldLimit,
+        int ownedCardCount,
+        int maxOwnedCardCount,
+        boolean forgettingRequired
 ) {}
