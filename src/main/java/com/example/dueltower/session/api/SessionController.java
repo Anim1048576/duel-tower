@@ -116,6 +116,25 @@ public class SessionController {
 
 
 
+
+    @PostMapping("/{code}/players/{playerId}/forget")
+    public SessionStateDto forgetOwnedCard(@PathVariable String code,
+                                           @PathVariable String playerId,
+                                           @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                           @RequestBody ForgetOwnedCardRequest req) {
+        if (req == null || req.ownedCardIndex() == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "ownedCardIndex is required");
+        }
+
+        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
+        if (!playerId.equals(actorPlayerId)) {
+            throw new ResponseStatusException(FORBIDDEN, "players may only forget their own cards");
+        }
+
+        sessionService.forgetOwnedCard(code, actorPlayerId, playerId, req.ownedCardIndex());
+        return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+    }
+
     @PostMapping("/{code}/players/{playerId}/deck")
     public SessionStateDto updateDeck(@PathVariable String code,
                                       @PathVariable String playerId,
