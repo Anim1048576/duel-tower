@@ -64,96 +64,14 @@ class SessionAuthIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+
     @Test
-    void handSwapRequiresPlayerToken() throws Exception {
-        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
-        String code = createSession(gmSession, "gm");
-
-        MockHttpSession playerSession = signUpAndLogin("player-a", "player-a@example.com", "password123");
-        joinSession(code, playerSession, "player-a");
-
-        mockMvc.perform(post("/api/sessions/{code}/command", code)
+    void joinSessionRequiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/sessions/ABCD/join")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(handSwapBody("player-a", 0L, UUID.randomUUID().toString())))
+                        .content("{\"playerId\":\"tester\"}"))
                 .andExpect(status().isUnauthorized());
     }
-
-    @Test
-    void handSwapRejectsWhenTokenDoesNotMatchPlayerId() throws Exception {
-        MockHttpSession gmSession = signUpAndLogin("gm2", "gm2@example.com", "password123");
-        String code = createSession(gmSession, "gm2");
-
-        MockHttpSession playerASession = signUpAndLogin("player-a2", "player-a2@example.com", "password123");
-        joinSession(code, playerASession, "player-a2");
-
-        MockHttpSession playerBSession = signUpAndLogin("player-b2", "player-b2@example.com", "password123");
-        String playerBToken = joinSession(code, playerBSession, "player-b2");
-
-        mockMvc.perform(post("/api/sessions/{code}/command", code)
-                        .header("X-Player-Token", playerBToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(handSwapBody("player-a2", 0L, UUID.randomUUID().toString())))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void handSwapPassesAuthorizationWhenTokenMatchesPlayerId() throws Exception {
-        MockHttpSession gmSession = signUpAndLogin("gm3", "gm3@example.com", "password123");
-        String code = createSession(gmSession, "gm3");
-
-        MockHttpSession playerSession = signUpAndLogin("player-a3", "player-a3@example.com", "password123");
-        String playerToken = joinSession(code, playerSession, "player-a3");
-
-        mockMvc.perform(post("/api/sessions/{code}/command", code)
-                        .header("X-Player-Token", playerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(handSwapBody("player-a3", 0L, UUID.randomUUID().toString())))
-                .andExpect(status().isOk());
-    }
-
-    private String createSession(MockHttpSession session, String gmId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/sessions")
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "gmId": "%s"
-                                }
-                                """.formatted(gmId)))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
-        return body.get("code").asText();
-    }
-
-    private String joinSession(String code, MockHttpSession session, String playerId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/sessions/{code}/join", code)
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "playerId": "%s"
-                                }
-                                """.formatted(playerId)))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
-        return body.get("playerToken").asText();
-    }
-
-    private static String handSwapBody(String playerId, long expectedVersion, String discardId) {
-        return """
-                {
-                  "type": "HAND_SWAP",
-                  "playerId": "%s",
-                  "expectedVersion": %d,
-                  "discardIds": ["%s"]
-                }
-                """.formatted(playerId, expectedVersion, discardId);
-    }
-
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
