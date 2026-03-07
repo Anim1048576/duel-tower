@@ -115,7 +115,6 @@ public final class StartCombatCommand implements GameCommand {
             ps.usedExThisTurn(false);
             ps.usedTenacityThisTurn(false);
             ps.tenacityDebtThisTurn(0);
-            ps.ap(ps.maxAp());
 
             drawOpeningHand(state, ps, 4, events);
 
@@ -239,7 +238,6 @@ public final class StartCombatCommand implements GameCommand {
         ps.tenacityDebtThisTurn(0);
         ps.exCooldownUntilRound(0);
         ps.exActivatable(true);
-        ps.ap(ps.maxAp());
         ps.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 0);
 
         for (Ids.SummonInstId summonId : new ArrayList<>(ps.activeSummons())) {

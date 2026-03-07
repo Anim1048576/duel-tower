@@ -101,13 +101,31 @@ public final class ZoneOps {
     }
 
     public static void drawWithRefill(GameState state, EngineContext ctx, PlayerState ps, int count, List<GameEvent> events) {
+        drawWithRefill(state, ctx, ps, count, events, true);
+    }
+
+    /**
+     * Draw cards with deck refill/shuffle support.
+     *
+     * @param applyDeckOutIncapacitated when true, deck+grave empty applies [전투 불능]
+     */
+    public static void drawWithRefill(
+            GameState state,
+            EngineContext ctx,
+            PlayerState ps,
+            int count,
+            List<GameEvent> events,
+            boolean applyDeckOutIncapacitated
+    ) {
         for (int i = 0; i < count; i++) {
             if (ps.deck().isEmpty()) {
                 refillDeckFromGrave(state, ps, events);
                 shuffleDeck(state, ps, events, deriveShuffleRandom(state, ps));
             }
             if (ps.deck().isEmpty()) {
-                applyBattleIncapacitatedOnDeckOut(state, ps, events);
+                if (applyDeckOutIncapacitated) {
+                    applyBattleIncapacitatedOnDeckOut(state, ps, events);
+                }
                 return;
             }
             CardInstId top = ps.deck().removeFirst();
