@@ -1,8 +1,6 @@
 package com.example.dueltower.session.api;
 
 import com.example.dueltower.member.MemberRepository;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +12,9 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -29,9 +30,6 @@ class SessionDeckRuleIntegrationTest {
 
     @Autowired
     private MemberRepository memberRepository;
-
-    @Autowired
-    private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
@@ -117,9 +115,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String playerToken = objectMapper.readTree(joinResult.getResponse().getContentAsString())
-                .path("playerToken")
-                .asText();
+        String playerToken = extractJsonStringValue(joinResult.getResponse().getContentAsString(), "playerToken");
 
         MvcResult updateResult = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player2")
                         .header("X-Player-Token", playerToken)
@@ -182,9 +178,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String playerToken = objectMapper.readTree(joinResult.getResponse().getContentAsString())
-                .path("playerToken")
-                .asText();
+        String playerToken = extractJsonStringValue(joinResult.getResponse().getContentAsString(), "playerToken");
 
         mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player3")
                         .header("X-Player-Token", playerToken)
@@ -218,9 +212,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String playerToken = objectMapper.readTree(joinResult.getResponse().getContentAsString())
-                .path("playerToken")
-                .asText();
+        String playerToken = extractJsonStringValue(joinResult.getResponse().getContentAsString(), "playerToken");
 
         mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player4")
                         .header("X-Player-Token", playerToken)
@@ -245,8 +237,14 @@ class SessionDeckRuleIntegrationTest {
                         .content("{}"))
                 .andExpect(status().isOk())
                 .andReturn();
-        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
-        return json.path("code").asText();
+        return extractJsonStringValue(result.getResponse().getContentAsString(), "code");
+    }
+
+    private String extractJsonStringValue(String json, String key) {
+        Pattern pattern = Pattern.compile("\\\"" + Pattern.quote(key) + "\\\"\\s*:\\s*\\\"([^\\\"]*)\\\"");
+        Matcher matcher = pattern.matcher(json);
+        org.junit.jupiter.api.Assertions.assertTrue(matcher.find(), "JSON field not found: " + key);
+        return matcher.group(1);
     }
 
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {
