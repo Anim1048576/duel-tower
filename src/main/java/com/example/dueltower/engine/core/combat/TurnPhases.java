@@ -62,7 +62,8 @@ public final class TurnPhases {
             }
 
             int draw = (ps.hand().size() < 4) ? 2 : 1;
-            ZoneOps.drawWithRefill(state, ctx, ps, draw, out);
+            // 턴 시작 드로우는 deck+grave 고갈로 즉시 [전투 불능] 처리하지 않는다.
+            ZoneOps.drawWithRefill(state, ctx, ps, draw, out, false);
 
             HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, out, "hand limit exceeded");
             out.add(new GameEvent.LogAppended(ps.playerId().value() + " draws " + draw + " (turn start)"));
