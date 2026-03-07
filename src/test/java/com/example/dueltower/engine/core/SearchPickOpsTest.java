@@ -77,7 +77,7 @@ class SearchPickOpsTest {
                 2,
                 Zone.HAND,
                 false,
-                def -> def.type() == CardType.ACTION
+                def -> def.type() == CardType.EX
         );
         assertFalse(notEnough);
 
@@ -105,7 +105,7 @@ class SearchPickOpsTest {
         CardDefId actionDefId = new CardDefId("A001");
         CardDefId skillDefId = new CardDefId("S001");
         EngineContext ctx = new EngineContext(Map.of(
-                actionDefId, new CardDefinition(actionDefId, "action", CardType.ACTION, 1, Map.of(), Zone.GRAVE, false, ""),
+                actionDefId, new CardDefinition(actionDefId, "action", CardType.EX, 1, Map.of(), Zone.GRAVE, false, ""),
                 skillDefId, new CardDefinition(skillDefId, "skill", CardType.SKILL, 1, Map.of(), Zone.GRAVE, false, "")
         ), Map.of());
 
