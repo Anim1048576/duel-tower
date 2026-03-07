@@ -35,7 +35,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
 
-                        .requestMatchers("/api/sessions", "/api/sessions/*/join").authenticated()
+                        // Session endpoints perform their own authentication checks and return
+                        // consistent API error payloads (401/403) from the controller layer.
+                        .requestMatchers("/api/sessions", "/api/sessions/*/join").permitAll()
                         .requestMatchers("/api/sessions/*/command").permitAll()
                         .requestMatchers("/api/sessions/*/players/*/deck").permitAll()
                         .requestMatchers("/api/**").permitAll()
