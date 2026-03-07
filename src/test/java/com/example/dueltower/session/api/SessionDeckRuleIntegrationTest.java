@@ -133,8 +133,9 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
-        String response = updateResult.getResponse().getContentAsString();
-        org.junit.jupiter.api.Assertions.assertTrue(response.contains("locked-in-deck card must remain in deck"));
+        String errorMessage = updateResult.getResponse().getErrorMessage();
+        org.junit.jupiter.api.Assertions.assertNotNull(errorMessage);
+        org.junit.jupiter.api.Assertions.assertTrue(errorMessage.contains("locked-in-deck card must remain in deck"));
     }
 
     @Test
