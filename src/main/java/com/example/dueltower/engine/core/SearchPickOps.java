@@ -29,8 +29,8 @@ public final class SearchPickOps {
             CardInstance ci = state.card(id);
             if (ci == null || !ps.playerId().equals(ci.ownerId()) || ci.zone() != Zone.DECK) continue;
 
-            CardDefinition def = ctx.cardDef(ci.defId());
-            if (def == null || !filter.test(def)) continue;
+            CardDefinition def = ctx.def(ci.defId());
+            if (!filter.test(def)) continue;
             out.add(id);
         }
         return out;
