@@ -13,10 +13,8 @@ public interface MemberRepository extends JpaRepository<Member, Integer> {
     Page<Member> findAllByDeletedFalse(Pageable pageable);
 
     boolean existsByUsernameAndDeletedFalse(String username);
-    boolean existsByEmailAndDeletedFalse(String email);
 
     // 필요하면 "탈퇴 포함" 조회용
     Optional<Member> findByUsername(String username);
     boolean existsByUsername(String username);
-    boolean existsByEmail(String email);
 }
