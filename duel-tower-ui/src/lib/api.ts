@@ -76,6 +76,22 @@ export type CharacterProfileRequest = {
   exCard: string
 }
 
+export type AuthUserResponse = {
+  username: string
+  roles: string[]
+}
+
+export type SignupRequest = {
+  username: string
+  email: string
+  password: string
+}
+
+export type LoginRequest = {
+  username: string
+  password: string
+}
+
 type ApiError = Error & { status?: number; body?: any }
 
 type RequestAuthOptions = {
@@ -111,6 +127,7 @@ function createAuthHeaders(auth?: RequestAuthOptions): Record<string, string> {
 
 async function request<T>(path: string, init?: RequestInit, auth?: RequestAuthOptions): Promise<T> {
   const res = await fetch(path, {
+    credentials: 'same-origin',
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -157,6 +174,30 @@ function normalizeApiErrorMessage(status: number | undefined, message: unknown):
   }
 
   return msg
+}
+
+export async function signup(req: SignupRequest): Promise<AuthUserResponse> {
+  return await request<AuthUserResponse>('/api/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  })
+}
+
+export async function login(req: LoginRequest): Promise<AuthUserResponse> {
+  return await request<AuthUserResponse>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  })
+}
+
+export async function getCurrentUser(): Promise<AuthUserResponse> {
+  return await request<AuthUserResponse>('/api/auth/me')
+}
+
+export async function logout(): Promise<void> {
+  await request<null>('/api/auth/logout', {
+    method: 'POST',
+  })
 }
 
 export async function listCardDefs(): Promise<CardDef[]> {

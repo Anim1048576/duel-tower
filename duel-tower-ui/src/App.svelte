@@ -17,6 +17,7 @@
   import { content, ensureCards } from './stores/content'
   import { combat } from './stores/combat'
   import { toasts, dismissToast } from './stores/log'
+  import { auth, restoreAuth, doLogout } from './stores/auth'
   import ConfirmActionModal from './lib/components/ConfirmActionModal.svelte'
   import RuleTooltip from './lib/components/RuleTooltip.svelte'
 
@@ -32,6 +33,7 @@
   onMount(() => {
     startRouter()
     ensureCards()
+    restoreAuth()
   })
 
   $: cur = $route
@@ -99,6 +101,13 @@
       <span class="pill">API · …</span>
     {:else}
       <span class="pill">API · ERR</span>
+    {/if}
+
+    {#if $auth.status === 'authenticated'}
+      <span class="pill mono">@{$auth.username}</span>
+      <button class="iconBtn" title="로그아웃" on:click={doLogout}>⎋</button>
+    {:else}
+      <span class="pill">로그인 필요</span>
     {/if}
 
     {#if code}
