@@ -215,11 +215,21 @@ public final class StartCombatCommand implements GameCommand {
     }
 
     private static void resetPlayerForCombat(PlayerState ps, GameState state) {
-        List<Ids.CardInstId> toDeck = new ArrayList<>();
+        LinkedHashSet<Ids.CardInstId> toDeck = new LinkedHashSet<>();
         toDeck.addAll(ps.hand());
         toDeck.addAll(ps.grave());
         toDeck.addAll(ps.field());
         toDeck.addAll(ps.excluded());
+
+        // 전투 중 테스트/효과 처리에서 존 리스트와 CardInstance가 어긋난 경우를 대비해
+        // 소유자 기준으로 누락 카드도 회수한다.
+        for (Map.Entry<Ids.CardInstId, CardInstance> e : state.cardInstances().entrySet()) {
+            CardInstance ci = e.getValue();
+            if (ci == null) continue;
+            if (!Objects.equals(ci.ownerId(), ps.playerId())) continue;
+            if (ci.zone() == Zone.EX) continue;
+            toDeck.add(e.getKey());
+        }
 
         ps.hand().clear();
         ps.grave().clear();

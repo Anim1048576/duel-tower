@@ -42,6 +42,9 @@ public final class DrawCommand implements GameCommand {
         PlayerState ps = state.player(playerId);
         List<GameEvent> events = new ArrayList<>();
 
+        // 테스트/효과 처리에서 존 리스트만 직접 비운 경우 고아 카드 인스턴스를 임시 격리한다.
+        ZoneOps.stashDetachedOwnedCardInstancesToExcluded(state, ps);
+
         ZoneOps.drawWithRefill(state, ctx, ps, count, events);
 
         HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, events, "hand limit exceeded");
