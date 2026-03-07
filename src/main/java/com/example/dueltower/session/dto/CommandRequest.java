@@ -6,13 +6,13 @@ import java.util.List;
  * Public command payload for {@code POST /api/sessions/{code}/command}.
  * <p>
  * Allowed {@code type} values:
- * START_COMBAT, DRAW, END_TURN, HAND_SWAP, PLAY_CARD, USE_EX, USE_SUMMON_ACTION, DISCARD_TO_HAND_LIMIT, RESOLVE_INITIATIVE_TIE, ENEMY_PLAY_CARD, ENEMY_USE_EX, ENEMY_END_TURN.
+ * START_COMBAT, DRAW, END_TURN, HAND_SWAP, PLAY_CARD, USE_EX, USE_SUMMON_ACTION, DISCARD_TO_HAND_LIMIT, RESOLVE_INITIATIVE_TIE, SEARCH_PICK/RESOLVE_SEARCH_PICK, ENEMY_PLAY_CARD, ENEMY_USE_EX, ENEMY_END_TURN.
  * <p>
  * DRAW and HAND_SWAP are product rule commands (not admin/debug commands):
  * they are validated with normal main-turn constraints (phase/actor/pending-decision).
  *
  * Player-auth required types (must pass X-Player-Token -> playerId verification):
- * DRAW, PLAY_CARD, HAND_SWAP, END_TURN, USE_EX, USE_SUMMON_ACTION, DISCARD_TO_HAND_LIMIT, RESOLVE_INITIATIVE_TIE.
+ * DRAW, PLAY_CARD, HAND_SWAP, END_TURN, USE_EX, USE_SUMMON_ACTION, DISCARD_TO_HAND_LIMIT, RESOLVE_INITIATIVE_TIE, SEARCH_PICK/RESOLVE_SEARCH_PICK.
  *
  * expectedVersion is required and must be provided by clients for optimistic concurrency.
  *
@@ -39,5 +39,6 @@ public record CommandRequest(
         List<String> targetEnemyIds,  // legacy
         List<TargetRefDto> targets,
         Integer tieGroupIndex,
-        List<String> orderedActorKeys
+        List<String> orderedActorKeys,
+        List<String> selectedIds
 ) {}
