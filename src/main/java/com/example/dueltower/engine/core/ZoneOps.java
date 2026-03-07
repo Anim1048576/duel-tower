@@ -7,6 +7,7 @@ import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.keyword.MoveReason;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
+import com.example.dueltower.engine.model.Ids.EnemyId;
 
 import java.util.*;
 
@@ -60,6 +61,11 @@ public final class ZoneOps {
 
             PlayerState owner = state.player(ci.ownerId());
             if (owner == null) {
+                EnemyState enemyOwner = state.enemy(new EnemyId(ci.ownerId().value()));
+                if (enemyOwner != null) {
+                    // 적 카드는 현재 enemy 전용 존 컬렉션이 없어 플레이어 존 불변식 검사에서 제외한다.
+                    continue;
+                }
                 issues.add("card " + safeId(id) + " owner missing: " + ci.ownerId().value());
                 continue;
             }

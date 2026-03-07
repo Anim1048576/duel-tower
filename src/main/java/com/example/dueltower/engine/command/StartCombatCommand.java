@@ -93,7 +93,14 @@ public final class StartCombatCommand implements GameCommand {
 
         cs.turnOrder().clear();
         cs.turnOrder().addAll(order);
-        cs.currentTurnIndex(0);
+        int firstPlayerIndex = 0;
+        for (int i = 0; i < order.size(); i++) {
+            if (order.get(i) instanceof TargetRef.Player) {
+                firstPlayerIndex = i;
+                break;
+            }
+        }
+        cs.currentTurnIndex(firstPlayerIndex);
         cs.round(1);
 
         state.combat(cs);
@@ -110,7 +117,7 @@ public final class StartCombatCommand implements GameCommand {
             ps.tenacityDebtThisTurn(0);
             ps.ap(ps.maxAp());
 
-            ZoneOps.drawWithRefill(state, ctx, ps, 4, events);
+            drawOpeningHand(state, ps, 4, events);
 
             HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, events, "hand limit exceeded");
 
@@ -144,6 +151,31 @@ public final class StartCombatCommand implements GameCommand {
         }
 
         return events;
+    }
+
+    /**
+     * 전투 시작 오프닝 드로우:
+     * - 덱 top 순서를 그대로 유지해 드로우한다.
+     * - 덱이 비면 grave를 리필+셔플한다.
+     * - deck+grave가 모두 비어도 [전투 불능]은 부여하지 않는다.
+     */
+    private static void drawOpeningHand(GameState state, PlayerState ps, int count, List<GameEvent> events) {
+        if (count <= 0) return;
+
+        Random rnd = new Random(state.seed() ^ state.version() ^ ps.playerId().value().hashCode());
+        for (int i = 0; i < count; i++) {
+            if (ps.deck().isEmpty()) {
+                ZoneOps.refillDeckFromGrave(state, ps, events);
+                ZoneOps.shuffleDeck(state, ps, events, rnd);
+            }
+            if (ps.deck().isEmpty()) {
+                return;
+            }
+
+            Ids.CardInstId top = ps.deck().removeFirst();
+            ps.hand().add(top);
+            state.card(top).zone(Zone.HAND);
+        }
     }
 
     private static void markInitiativeTiePendingDecisions(GameState state, CombatState cs, List<GameEvent> events) {
