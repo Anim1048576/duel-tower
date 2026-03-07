@@ -26,9 +26,6 @@ public class Member {
     @Column(nullable = false, length = 100)
     private String password;
 
-    @Column(nullable = false, length = 100, unique = true)
-    private String email;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private RoleType role;
@@ -64,7 +61,6 @@ public class Member {
                 : TimeUtility.formatTimestamp(deletedDate, "yyyy-MM-dd");
         return "[Member]: {[id: " + id +
                 "][username: " + username +
-                "][email: " + email +
                 "][role: " + role +
                 "][createDate: " + TimeUtility.formatTimestamp(createDate, "yyyy-MM-dd") +
                 "][deleted: " + deleted +
