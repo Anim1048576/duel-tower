@@ -146,7 +146,7 @@ public class SessionService {
             ps.ownedCards(ownedCards);
 
             List<String> deckCardIds = parsePresetDeckCardIds(presetDeckCardIdsRaw);
-            validateDeckBuild(deckCardIds, ps.ownedCards());
+            validateDeckBuild(deckCardIds, ps.ownedCards(), null);
 
             state.players().put(pid, ps);
             loadDeck(state, ps, deckCardIds);
@@ -210,7 +210,7 @@ public class SessionService {
             }
 
             List<String> deckCardIds = normalizeDeckCardIds(deckCardIdsRaw);
-            validateDeckBuild(deckCardIds, ps.ownedCards());
+            validateDeckBuild(deckCardIds, ps.ownedCards(), currentDeckCardIds(ps, state));
             loadDeck(state, ps, deckCardIds);
             shuffleDeck(state, ps);
             return state;
@@ -240,7 +240,7 @@ public class SessionService {
         }
     }
 
-    private void validateDeckBuild(List<String> deckCardIds, List<OwnedCard> ownedCards) {
+    private void validateDeckBuild(List<String> deckCardIds, List<OwnedCard> ownedCards, List<String> currentDeckCardIds) {
         if (deckCardIds.size() != DECK_SIZE) {
             throw new ResponseStatusException(BAD_REQUEST, "deck must contain exactly 12 cards");
         }
@@ -258,7 +258,6 @@ public class SessionService {
 
         Map<String, Integer> availableOwned = new LinkedHashMap<>();
         for (OwnedCard owned : ownedCards) {
-            if (owned.weakened()) continue;
             availableOwned.merge(owned.cardId(), 1, Integer::sum);
         }
 
@@ -266,9 +265,64 @@ public class SessionService {
             int available = availableOwned.getOrDefault(e.getKey(), 0);
             if (available < e.getValue()) {
                 throw new ResponseStatusException(BAD_REQUEST,
-                        "owned card unavailable or weakened: " + e.getKey());
+                        "owned card unavailable: " + e.getKey());
             }
         }
+
+        if (currentDeckCardIds != null) {
+            Map<String, Integer> lockedCounts = lockedCardCountsInCurrentDeck(currentDeckCardIds, ownedCards);
+            for (var e : lockedCounts.entrySet()) {
+                int updatedCount = deckCounts.getOrDefault(e.getKey(), 0);
+                if (updatedCount < e.getValue()) {
+                    throw new ResponseStatusException(
+                            BAD_REQUEST,
+                            "deck edit invalid: locked-in-deck card must remain in deck: "
+                                    + e.getKey()
+                                    + " (required " + e.getValue() + ", provided " + updatedCount + ")"
+                    );
+                }
+            }
+        }
+    }
+
+
+
+    private List<String> currentDeckCardIds(PlayerState ps, GameState state) {
+        List<String> deckCardIds = new ArrayList<>(ps.deck().size());
+        for (CardInstId id : ps.deck()) {
+            CardInstance card = state.cardInstances().get(id);
+            if (card != null) {
+                deckCardIds.add(card.defId().value());
+            }
+        }
+        return List.copyOf(deckCardIds);
+    }
+
+    private Map<String, Integer> lockedCardCountsInCurrentDeck(List<String> currentDeckCardIds, List<OwnedCard> ownedCards) {
+        Map<String, Integer> deckCounts = new LinkedHashMap<>();
+        for (String cardId : currentDeckCardIds) {
+            deckCounts.merge(cardId, 1, Integer::sum);
+        }
+
+        Map<String, Integer> ownedLockedCounts = new LinkedHashMap<>();
+        for (OwnedCard owned : ownedCards) {
+            if (owned.lockedInDeck()) {
+                ownedLockedCounts.merge(owned.cardId(), 1, Integer::sum);
+            }
+        }
+
+        Map<String, Integer> out = new LinkedHashMap<>();
+        for (var e : deckCounts.entrySet()) {
+            int lockedCount = ownedLockedCounts.getOrDefault(e.getKey(), 0);
+            if (lockedCount > 0) {
+                out.put(e.getKey(), Math.min(e.getValue(), lockedCount));
+            }
+        }
+        return out;
+    }
+
+    private boolean isLockedInDeck(OwnedCardDto dto) {
+        return dto.lockedInDeck() != null && dto.lockedInDeck();
     }
 
     private List<String> parsePassiveIds(List<String> passiveIdsRaw) {
@@ -311,7 +365,7 @@ public class SessionService {
             if (dto == null || dto.cardId() == null || dto.cardId().isBlank()) {
                 throw new ResponseStatusException(BAD_REQUEST, "ownedCards.cardId is required");
             }
-            out.add(new OwnedCard(dto.cardId().trim(), dto.weakened()));
+            out.add(new OwnedCard(dto.cardId().trim(), dto.weakened(), isLockedInDeck(dto)));
         }
         return List.copyOf(out);
     }
@@ -340,10 +394,10 @@ public class SessionService {
 
     private List<OwnedCard> defaultOwnedCards() {
         List<OwnedCard> owned = new ArrayList<>(20);
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C001", false));
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C002", false));
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C003", false));
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C004", false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C001", false, false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C002", false, false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C003", false, false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C004", false, false));
         return List.copyOf(owned);
     }
 

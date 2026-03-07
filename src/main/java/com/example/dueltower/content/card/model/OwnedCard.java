@@ -2,9 +2,11 @@ package com.example.dueltower.content.card.model;
 
 /**
  * 플레이어 보유 카드 슬롯.
- * weakened=true 인 카드는 덱 편성 시 잠금(선택 불가) 상태다.
+ * weakened=true 는 카드가 약화된 상태를 의미한다.
+ * lockedInDeck=true 는 현재 덱에서 제거할 수 없는 카드 슬롯을 의미한다.
  */
 public record OwnedCard(
         String cardId,
-        boolean weakened
+        boolean weakened,
+        boolean lockedInDeck
 ) {}
