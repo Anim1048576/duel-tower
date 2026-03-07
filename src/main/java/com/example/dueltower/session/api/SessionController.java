@@ -42,6 +42,12 @@ public class SessionController {
             "RESOLVE_INITIATIVE_TIE"
     );
 
+    private static final Set<String> GM_AUTH_REQUIRED_TYPES = Set.of(
+            "ENEMY_PLAY_CARD",
+            "ENEMY_USE_EX",
+            "ENEMY_END_TURN"
+    );
+
     private final SessionService sessionService;
 
     public SessionController(SessionService sessionService) {
@@ -153,6 +159,10 @@ public class SessionController {
             }
         }
 
+        if (GM_AUTH_REQUIRED_TYPES.contains(t)) {
+            validateStartCombatAuthority(rt, gmTokenHeader);
+        }
+
         UUID commandId = parseOrNewUuid(req.commandId());
 
         log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} summonId={} count={} discardIds={} targetPlayers={} targetEnemies={} targets={}",
@@ -234,6 +244,13 @@ public class SessionController {
     private static PlayerId parsePlayerId(String playerId) {
         requirePlayer(playerId);
         return new PlayerId(playerId.trim());
+    }
+
+    private static Ids.EnemyId parseEnemyId(String enemyId) {
+        if (enemyId == null || enemyId.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "enemyId is required");
+        }
+        return new Ids.EnemyId(enemyId.trim());
     }
 
     private static CardInstId parseCardInstId(String raw, String fieldName) {
@@ -352,6 +369,26 @@ public class SessionController {
                 TargetSelection sel = parseTargetSelection(req);
 
                 return new UseExCommand(commandId, expectedVersion, playerId, sel);
+            }
+            case "ENEMY_PLAY_CARD" -> {
+                Ids.EnemyId enemyId = parseEnemyId(req.enemyId());
+                if (req.cardId() == null || req.cardId().isBlank()) {
+                    throw new ResponseStatusException(BAD_REQUEST, "cardId is required");
+                }
+
+                CardInstId id = parseCardInstId(req.cardId(), "cardId");
+                TargetSelection sel = parseTargetSelection(req);
+
+                return new EnemyPlayCardCommand(commandId, expectedVersion, enemyId, id, sel);
+            }
+            case "ENEMY_USE_EX" -> {
+                Ids.EnemyId enemyId = parseEnemyId(req.enemyId());
+                TargetSelection sel = parseTargetSelection(req);
+                return new EnemyUseExCommand(commandId, expectedVersion, enemyId, sel);
+            }
+            case "ENEMY_END_TURN" -> {
+                Ids.EnemyId enemyId = parseEnemyId(req.enemyId());
+                return new EnemyEndTurnCommand(commandId, expectedVersion, enemyId);
             }
             case "USE_SUMMON_ACTION" -> {
                 PlayerId playerId = parsePlayerId(req.playerId());

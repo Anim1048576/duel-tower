@@ -133,7 +133,7 @@ public final class TurnFlow {
     private static final class DefaultTurnAdvancePolicy implements TurnAdvancePolicy {
         @Override
         public boolean autoEndAfterTurnStart(GameState state, TargetRef actor) {
-            if (actor instanceof TargetRef.Enemy) return true;
+            if (actor instanceof TargetRef.Enemy) return false;
             if (actor instanceof TargetRef.Player p) {
                 PlayerState ps = state.player(p.id());
                 return CombatStatuses.isBattleIncapacitated(ps);

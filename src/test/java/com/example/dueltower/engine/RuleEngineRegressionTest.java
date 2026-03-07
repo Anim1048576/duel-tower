@@ -231,6 +231,77 @@ class RuleEngineRegressionTest {
         assertTrue(available.accepted());
     }
 
+
+    @Test
+    void enemyPlayCardFailsWhenNotEnemyTurn() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId enemyCard = fx.addEnemyHandCard("NORMAL_STRIKE");
+        fx.enemy.ap(3);
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        EngineResult res = fx.process(new EnemyPlayCardCommand(UUID.randomUUID(), fx.state.version(), fx.enemyId, enemyCard,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))));
+
+        assertFalse(res.accepted());
+        assertTrue(res.errors().contains("not enemy turn"));
+    }
+
+    @Test
+    void enemyUseExFailsOnPlayerTurn() {
+        TestFixture fx = TestFixture.basic();
+        fx.enemy.exCard(fx.addEnemyExCard("EX_BLAST"));
+        fx.enemy.statusSet(com.example.dueltower.engine.core.effect.keyword.EnemyExOps.BOSS_EX_READY, 1);
+        fx.enemy.ap(5);
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        EngineResult res = fx.process(new EnemyUseExCommand(UUID.randomUUID(), fx.state.version(), fx.enemyId,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))));
+
+        assertFalse(res.accepted());
+        assertTrue(res.errors().contains("not enemy turn"));
+    }
+
+    @Test
+    void enemyExCooldownValidationApplies() {
+        TestFixture fx = TestFixture.basic();
+        fx.enemy.exCard(fx.addEnemyExCard("EX_BLAST"));
+        fx.enemy.statusSet(com.example.dueltower.engine.core.effect.keyword.EnemyExOps.BOSS_EX_READY, 1);
+        fx.enemy.ap(5);
+        fx.startSimpleCombat();
+        fx.forceMainTurnForEnemy();
+
+        EngineResult use = fx.process(new EnemyUseExCommand(UUID.randomUUID(), fx.state.version(), fx.enemyId,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))));
+        assertTrue(use.accepted());
+
+        fx.enemy.statusSet(com.example.dueltower.engine.core.effect.keyword.EnemyExOps.BOSS_EX_READY, 1);
+        fx.enemy.ap(5);
+        EngineResult blocked = fx.process(new EnemyUseExCommand(UUID.randomUUID(), fx.state.version(), fx.enemyId,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))));
+
+        assertFalse(blocked.accepted());
+        assertTrue(blocked.errors().contains("ex on cooldown"));
+    }
+
+    @Test
+    void enemyPlayCardSuccessPathDealsDamageToPlayer() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId enemyCard = fx.addEnemyHandCard("NORMAL_STRIKE");
+        fx.enemy.ap(3);
+        fx.startSimpleCombat();
+        fx.forceMainTurnForEnemy();
+
+        int hpBefore = fx.player.hp();
+        EngineResult res = fx.process(new EnemyPlayCardCommand(UUID.randomUUID(), fx.state.version(), fx.enemyId, enemyCard,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))));
+
+        assertTrue(res.accepted());
+        assertEquals(hpBefore - 5, fx.player.hp());
+        assertEquals(Zone.GRAVE, fx.state.card(enemyCard).zone());
+    }
+
     @Test
     void drawFailsWithEmptyDeckAndGraveMarksBattleIncapacitated() {
         TestFixture fx = TestFixture.basic();
@@ -320,6 +391,15 @@ class RuleEngineRegressionTest {
             cs.phase(CombatPhase.MAIN);
         }
 
+        void forceMainTurnForEnemy() {
+            CombatState cs = state.combat();
+            assertNotNull(cs);
+            cs.turnOrder().clear();
+            cs.turnOrder().add(TargetRef.ofEnemy(enemyId));
+            cs.currentTurnIndex(0);
+            cs.phase(CombatPhase.MAIN);
+        }
+
         List<CardInstId> addDeckCards(PlayerState owner, String defId, int count) {
             List<CardInstId> out = new ArrayList<>();
             for (int i = 0; i < count; i++) {
@@ -342,6 +422,24 @@ class RuleEngineRegressionTest {
 
         CardInstId addExCard(PlayerState owner, String defId) {
             return addCard(owner, defId, Zone.EX);
+        }
+
+        CardInstId addEnemyHandCard(String defId) {
+            return addEnemyCard(defId, Zone.HAND);
+        }
+
+        CardInstId addEnemyExCard(String defId) {
+            return addEnemyCard(defId, Zone.EX);
+        }
+
+        private CardInstId addEnemyCard(String defId, Zone zone) {
+            CardInstId id = Ids.newCardInstId();
+            CardInstance ci = new CardInstance(id, new CardDefId(defId), new PlayerId(enemyId.value()), zone);
+            state.cardInstances().put(id, ci);
+            if (zone == Zone.EX) {
+                enemy.exCard(id);
+            }
+            return id;
         }
 
         private CardInstId addCard(PlayerState owner, String defId, Zone zone) {
@@ -402,7 +500,9 @@ class RuleEngineRegressionTest {
         public void resolve(EffectContext ec) {
             if (damage <= 0) return;
             TargetRef target = ec.selection().requireOne();
-            TargetRef src = TargetRef.ofPlayer(ec.actor());
+            TargetRef src = (ec.actor() != null && ec.state().enemy(new EnemyId(ec.actor().value())) != null)
+                    ? TargetRef.ofEnemy(new EnemyId(ec.actor().value()))
+                    : TargetRef.ofPlayer(ec.actor());
             DamageOps.apply(ec.state(), ec.ctx(), ec.out(), src, id, target, damage,
                     KeywordOps.damageFlags(ec.state(), ec.ctx(), src, ec.cardId(), target));
         }
