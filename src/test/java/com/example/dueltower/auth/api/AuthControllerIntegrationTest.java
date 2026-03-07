@@ -41,7 +41,6 @@ class AuthControllerIntegrationTest {
         String signupBody = """
                 {
                   "username": "tester",
-                  "email": "tester@example.com",
                   "password": "password123"
                 }
                 """;
@@ -89,7 +88,6 @@ class AuthControllerIntegrationTest {
         String signupBody = """
                 {
                   "username": "tester",
-                  "email": "tester@example.com",
                   "password": "password123"
                 }
                 """;
@@ -102,7 +100,6 @@ class AuthControllerIntegrationTest {
         String duplicateBody = """
                 {
                   "username": "tester",
-                  "email": "tester2@example.com",
                   "password": "password123"
                 }
                 """;

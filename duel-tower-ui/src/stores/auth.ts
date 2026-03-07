@@ -36,9 +36,9 @@ export async function restoreAuth() {
   }
 }
 
-export async function doSignup(username: string, email: string, password: string) {
+export async function doSignup(username: string, password: string) {
   try {
-    const user = await signupApi({ username: username.trim(), email: email.trim(), password })
+    const user = await signupApi({ username: username.trim(), password })
     setAuthenticated(user.username, user.roles ?? [])
     return { ok: true as const }
   } catch (e) {

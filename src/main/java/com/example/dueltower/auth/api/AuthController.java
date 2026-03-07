@@ -42,14 +42,10 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "request body is required");
         }
         String username = normalize(req.username());
-        String email = normalize(req.email());
         String password = req.password();
 
         if (username.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "username is required");
-        }
-        if (email.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email is required");
         }
         if (password == null || password.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "password is required");
@@ -57,13 +53,9 @@ public class AuthController {
         if (memberRepository.existsByUsernameAndDeletedFalse(username)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 username 입니다.");
         }
-        if (memberRepository.existsByEmailAndDeletedFalse(email)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 email 입니다.");
-        }
-
         Member member = Member.builder()
                 .username(username)
-                .email(email)
+                .email(buildSignupEmail(username, req.email()))
                 .password(passwordEncoder.encode(password))
                 .role(RoleType.USER)
                 .deleted(false)
@@ -125,6 +117,15 @@ public class AuthController {
             session.invalidate();
         }
         response.setStatus(HttpStatus.NO_CONTENT.value());
+    }
+
+
+    private String buildSignupEmail(String username, String requestedEmail) {
+        String normalizedEmail = normalize(requestedEmail);
+        if (!normalizedEmail.isBlank()) {
+            return normalizedEmail;
+        }
+        return username + "@signup.local";
     }
 
     private String normalize(String value) {
