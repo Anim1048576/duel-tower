@@ -75,6 +75,15 @@ class AuthControllerIntegrationTest {
                 .andExpect(jsonPath("$.username").value("tester"));
     }
 
+
+    @Test
+    void protectedAuthEndpointsShouldNotBePublic() throws Exception {
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/auth/logout"))
+                .andExpect(status().isUnauthorized());
+    }
     @Test
     void duplicateUsernameShouldFail() throws Exception {
         String signupBody = """

@@ -111,10 +111,6 @@ public class AuthController {
 
     @GetMapping("/me")
     public AuthUserResponse me(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
-        }
-
         return new AuthUserResponse(
                 authentication.getName(),
                 authentication.getAuthorities().stream().map(a -> a.getAuthority()).toList()

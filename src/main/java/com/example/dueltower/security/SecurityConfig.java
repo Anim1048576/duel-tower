@@ -2,6 +2,7 @@ package com.example.dueltower.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -35,12 +36,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
 
-                        // Session endpoints perform their own authentication checks and return
-                        // consistent API error payloads (401/403) from the controller layer.
-                        .requestMatchers("/api/sessions", "/api/sessions/*/join").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/sessions", "/api/sessions/*/join").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/sessions/*").permitAll()
                         .requestMatchers("/api/sessions/*/command").permitAll()
                         .requestMatchers("/api/sessions/*/players/*/deck").permitAll()
-                        .requestMatchers("/api/**").permitAll()
+                        .requestMatchers("/api/**").authenticated()
 
                         .anyRequest().permitAll()
                 );

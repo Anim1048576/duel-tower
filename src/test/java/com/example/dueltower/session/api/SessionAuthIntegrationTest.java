@@ -56,6 +56,14 @@ class SessionAuthIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+
+    @Test
+    void joinSessionRequiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/sessions/ABCD/join")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"playerId\":\"tester\"}"))
+                .andExpect(status().isUnauthorized());
+    }
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
