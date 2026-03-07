@@ -137,7 +137,7 @@ class ResolveSearchPickCommandTest {
         state.players().put(playerId, player);
 
         CardDefId defId = new CardDefId("C001");
-        CardDefinition def = new CardDefinition(defId, "test", CardType.ACTION, 1, Map.of(), Zone.GRAVE, false, "");
+        CardDefinition def = new CardDefinition(defId, "test", CardType.SKILL, 1, Map.of(), Zone.GRAVE, false, "");
         EngineContext ctx = new EngineContext(Map.of(defId, def), Map.of());
 
         CardInstId candidate1 = Ids.newCardInstId();
