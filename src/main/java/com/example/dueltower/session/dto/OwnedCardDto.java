@@ -2,9 +2,9 @@ package com.example.dueltower.session.dto;
 
 public record OwnedCardDto(
         String cardId,
-        boolean strengthened,
-        boolean weakened,
+        Boolean strengthened,
+        Boolean weakened,
         Boolean lockedInDeck,
-        boolean forgettable,
+        Boolean forgettable,
         String notForgettableReason
 ) {}
