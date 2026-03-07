@@ -105,6 +105,60 @@ public final class ZoneOps {
     }
 
     /**
+     * owner 존 리스트에서 완전히 분리된 카드 인스턴스를 정리한다.
+     *
+     * <p>정상 플로우에서는 필요 없지만, 테스트 셋업/복구 시 리스트만 직접 조작된 경우
+     * 고아 인스턴스가 남아 불변식 검증을 깨뜨릴 수 있어 방어적으로 제거한다.</p>
+     */
+    public static void purgeDetachedOwnedCardInstances(GameState state, PlayerState ps) {
+        if (state == null || ps == null) return;
+
+        Set<CardInstId> referenced = new HashSet<>();
+        referenced.addAll(ps.deck());
+        referenced.addAll(ps.hand());
+        referenced.addAll(ps.grave());
+        referenced.addAll(ps.field());
+        referenced.addAll(ps.excluded());
+        if (ps.exCard() != null) referenced.add(ps.exCard());
+
+        Iterator<Map.Entry<CardInstId, CardInstance>> it = state.cardInstances().entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<CardInstId, CardInstance> e = it.next();
+            CardInstance ci = e.getValue();
+            if (ci == null) continue;
+            if (!Objects.equals(ci.ownerId(), ps.playerId())) continue;
+            if (referenced.contains(e.getKey())) continue;
+            it.remove();
+        }
+    }
+
+    /**
+     * owner 존 리스트에서 분리된 카드 인스턴스를 EXCLUDED로 임시 보관해 불변식을 맞춘다.
+     * 전투 중 덱/패/묘지를 직접 비우는 테스트 셋업 호환용이다.
+     */
+    public static void stashDetachedOwnedCardInstancesToExcluded(GameState state, PlayerState ps) {
+        if (state == null || ps == null) return;
+
+        Set<CardInstId> referenced = new HashSet<>();
+        referenced.addAll(ps.deck());
+        referenced.addAll(ps.hand());
+        referenced.addAll(ps.grave());
+        referenced.addAll(ps.field());
+        referenced.addAll(ps.excluded());
+        if (ps.exCard() != null) referenced.add(ps.exCard());
+
+        for (Map.Entry<CardInstId, CardInstance> e : state.cardInstances().entrySet()) {
+            CardInstance ci = e.getValue();
+            if (ci == null) continue;
+            if (!Objects.equals(ci.ownerId(), ps.playerId())) continue;
+            if (referenced.contains(e.getKey())) continue;
+
+            ps.excluded().add(e.getKey());
+            ci.zone(Zone.EXCLUDED);
+        }
+    }
+
+    /**
      * Draw cards with deck refill/shuffle support.
      *
      * @param applyDeckOutIncapacitated when true, deck+grave empty applies [전투 불능]

@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.core.effect.status;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.combat.CombatStatuses;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.Ids;
@@ -53,6 +54,9 @@ public final class StatusPhases {
 
         var keys = new ArrayList<>(rt.statusMap(owner).keySet());
         for (String key : keys) {
+            if (CombatStatuses.BATTLE_INCAPACITATED_PERSISTENT.equals(key)) {
+                continue;
+            }
             if (!ctx.hasStatusDef(key)) {
                 rt.stacksSet(owner, key, 0);
                 continue;
