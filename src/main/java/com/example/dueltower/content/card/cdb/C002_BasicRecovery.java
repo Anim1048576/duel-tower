@@ -44,10 +44,6 @@ public class C002_BasicRecovery implements CardBlueprint {
     public void resolve(EffectContext ec) {
         EffectOps ops = new EffectOps(ec);
 
-        PlayerState me = ec.state().player(ec.actor());
-        if (me == null) throw new IllegalStateException("missing player: " + ec.actor().value());
-
-        int heal = me.healPower();
-        ops.heal(Target.ALLY_ONE, heal);
+        ops.healWithActorHeal(Target.ALLY_ONE);
     }
 }

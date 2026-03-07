@@ -50,8 +50,8 @@ public class Tig004_Card implements CardBlueprint {
             return;
         }
 
-        int amount = me.attackPower() + TigEffectSupport.overcome(me);
-        int hits = TigEffectSupport.overcome(me) >= 3 ? 2 : 1;
-        for (int i = 0; i < hits; i++) ops.damage(Target.ENEMY_ONE, amount);
+        int overcome = TigEffectSupport.overcome(me);
+        int hits = overcome >= 3 ? 2 : 1;
+        for (int i = 0; i < hits; i++) ops.damageWithActorAttackPlus(overcome, Target.ENEMY_ONE);
     }
 }
