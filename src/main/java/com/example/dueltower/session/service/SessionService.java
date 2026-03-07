@@ -434,7 +434,15 @@ public class SessionService {
     }
 
     private boolean isLockedInDeck(OwnedCardDto dto) {
-        return dto.lockedInDeck() != null && dto.lockedInDeck();
+        return Boolean.TRUE.equals(dto.lockedInDeck());
+    }
+
+    private boolean isStrengthened(OwnedCardDto dto) {
+        return Boolean.TRUE.equals(dto.strengthened());
+    }
+
+    private boolean isWeakened(OwnedCardDto dto) {
+        return Boolean.TRUE.equals(dto.weakened());
     }
 
     private List<String> parsePassiveIds(List<String> passiveIdsRaw) {
@@ -473,7 +481,7 @@ public class SessionService {
             if (dto == null || dto.cardId() == null || dto.cardId().isBlank()) {
                 throw new ResponseStatusException(BAD_REQUEST, "ownedCards.cardId is required");
             }
-            out.add(new OwnedCard(dto.cardId().trim(), dto.strengthened(), dto.weakened(), isLockedInDeck(dto)));
+            out.add(new OwnedCard(dto.cardId().trim(), isStrengthened(dto), isWeakened(dto), isLockedInDeck(dto)));
         }
         return List.copyOf(out);
     }

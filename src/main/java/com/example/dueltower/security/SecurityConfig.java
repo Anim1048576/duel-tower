@@ -45,6 +45,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/sessions/*").permitAll()
                         .requestMatchers("/api/sessions/*/command").permitAll()
                         .requestMatchers("/api/sessions/*/players/*/deck").permitAll()
+                        .requestMatchers("/api/sessions/*/players/*/forget").permitAll()
                         .requestMatchers("/api/**").authenticated()
 
                         .anyRequest().permitAll()
