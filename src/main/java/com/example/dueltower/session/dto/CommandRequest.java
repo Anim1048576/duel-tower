@@ -8,8 +8,11 @@ import java.util.List;
  * Allowed {@code type} values:
  * START_COMBAT, DRAW, END_TURN, HAND_SWAP, PLAY_CARD, USE_EX, USE_SUMMON_ACTION, DISCARD_TO_HAND_LIMIT, RESOLVE_INITIATIVE_TIE.
  * <p>
- * DRAW is a product rule command (not an admin/debug command):
- * it is validated with normal main-turn constraints (phase/actor/pending-decision).
+ * DRAW and HAND_SWAP are product rule commands (not admin/debug commands):
+ * they are validated with normal main-turn constraints (phase/actor/pending-decision).
+ *
+ * Player-auth required types (must pass X-Player-Token -> playerId verification):
+ * DRAW, PLAY_CARD, HAND_SWAP, END_TURN, USE_EX, USE_SUMMON_ACTION, DISCARD_TO_HAND_LIMIT, RESOLVE_INITIATIVE_TIE.
  *
  * expectedVersion is required and must be provided by clients for optimistic concurrency.
  *

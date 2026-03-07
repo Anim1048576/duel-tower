@@ -34,6 +34,7 @@ public class SessionController {
     private static final Set<String> PLAYER_AUTH_REQUIRED_TYPES = Set.of(
             "DRAW",
             "PLAY_CARD",
+            "HAND_SWAP",
             "END_TURN",
             "USE_EX",
             "USE_SUMMON_ACTION",
