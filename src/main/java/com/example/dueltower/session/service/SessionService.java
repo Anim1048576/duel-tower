@@ -275,8 +275,8 @@ public class SessionService {
                 );
             }
 
-            Map<String, Integer> lockedCounts = lockedCardCountsInCurrentDeck(currentDeckCardIds, ownedCards);
-            for (var e : lockedCounts.entrySet()) {
+            Map<String, Integer> lockedRequiredCounts = lockedCardRequiredDeckCounts(currentDeckCardIds, ownedCards);
+            for (var e : lockedRequiredCounts.entrySet()) {
                 int updatedCount = deckCounts.getOrDefault(e.getKey(), 0);
                 if (updatedCount < e.getValue()) {
                     throw new ResponseStatusException(
@@ -336,7 +336,7 @@ public class SessionService {
         return List.copyOf(deckCardIds);
     }
 
-    private Map<String, Integer> lockedCardCountsInCurrentDeck(List<String> currentDeckCardIds, List<OwnedCard> ownedCards) {
+    private Map<String, Integer> lockedCardRequiredDeckCounts(List<String> currentDeckCardIds, List<OwnedCard> ownedCards) {
         Map<String, Integer> deckCounts = new LinkedHashMap<>();
         for (String cardId : currentDeckCardIds) {
             deckCounts.merge(cardId, 1, Integer::sum);
@@ -353,7 +353,7 @@ public class SessionService {
         for (var e : deckCounts.entrySet()) {
             int lockedCount = ownedLockedCounts.getOrDefault(e.getKey(), 0);
             if (lockedCount > 0) {
-                out.put(e.getKey(), Math.min(e.getValue(), lockedCount));
+                out.put(e.getKey(), e.getValue());
             }
         }
         return out;
