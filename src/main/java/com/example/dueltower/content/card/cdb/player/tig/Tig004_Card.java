@@ -48,7 +48,7 @@ public class Tig004_Card implements CardBlueprint {
         if (!TigEffectSupport.requireDiscardOrAbort(ec, me, id())) return;
 
         int overcome = TigEffectSupport.overcome(me);
-        int hits = overcome >= 3 ? 2 : 1;
+        int hits = TigEffectSupport.isOvercome3Plus(me) ? 2 : 1;
         for (int i = 0; i < hits; i++) ops.damageWithActorAttackPlus(overcome, Target.ENEMY_ONE);
     }
 }

@@ -21,6 +21,14 @@ final class TigEffectSupport {
         return me.status(Tig201_Status.ID);
     }
 
+    static boolean isOvercomeAtLeast(PlayerState me, int threshold) {
+        return overcome(me) >= threshold;
+    }
+
+    static boolean isOvercome3Plus(PlayerState me) {
+        return isOvercomeAtLeast(me, 3);
+    }
+
     static boolean discardOneFromHandExcludingSource(EffectContext ec, PlayerState me) {
         List<Ids.CardInstId> hand = new ArrayList<>(me.hand());
         for (Ids.CardInstId id : hand) {

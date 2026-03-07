@@ -45,6 +45,6 @@ public class Tig005_Card implements CardBlueprint {
         ops.damageWithActorAttackPlus(overcome, Target.ENEMY_ALL);
 
         // 코스트 감소 문구는 현재 상태/패시브/키워드 훅만 코스트 변형이 가능하므로, resolve 시 AP 1 환급으로 반영.
-        if (overcome >= 3) me.ap(me.ap() + 1);
+        if (TigEffectSupport.isOvercome3Plus(me)) me.ap(me.ap() + 1);
     }
 }
