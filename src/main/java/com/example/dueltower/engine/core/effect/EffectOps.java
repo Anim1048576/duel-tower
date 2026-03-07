@@ -57,6 +57,27 @@ public final class EffectOps {
         }
     }
 
+    public void damageSelected(List<TargetRef> targets, int amount, int hits) {
+        if (amount <= 0 || hits <= 0 || targets == null || targets.isEmpty()) return;
+
+        TargetRef src = TargetRef.ofPlayer(ec.actor());
+        for (TargetRef chosen : targets) {
+            TargetRef resolved = StatusOps.resolveEnemyOneTarget(
+                    ec.state(),
+                    ec.ctx(),
+                    src,
+                    ec.cardId(),
+                    chosen,
+                    ec.out(),
+                    ec.actor().value()
+            );
+            DamageFlags flags = KeywordOps.damageFlags(ec.state(), ec.ctx(), src, ec.cardId(), resolved);
+            for (int i = 0; i < hits; i++) {
+                DamageOps.apply(ec.state(), ec.ctx(), ec.out(), src, ec.actor().value(), resolved, amount, flags);
+            }
+        }
+    }
+
     public void heal(Target t, int amount) {
         if (amount <= 0) return;
         for (TargetRef ref : resolveTargets(t)) {
