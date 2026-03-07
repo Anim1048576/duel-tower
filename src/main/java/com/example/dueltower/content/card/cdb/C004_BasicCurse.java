@@ -44,10 +44,6 @@ public class C004_BasicCurse implements CardBlueprint {
     public void resolve(EffectContext ec) {
         EffectOps ops = new EffectOps(ec);
 
-        PlayerState me = ec.state().player(ec.actor());
-        if (me == null) throw new IllegalStateException("missing player: " + ec.actor().value());
-
-        int pain = me.attackPower();
-        ops.addStatus(Target.ENEMY_ONE, S101_Pain.ID, pain);
+        ops.addStatusWithActorAttack(Target.ENEMY_ONE, S101_Pain.ID);
     }
 }

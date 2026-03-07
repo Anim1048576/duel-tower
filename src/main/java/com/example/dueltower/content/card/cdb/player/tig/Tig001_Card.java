@@ -47,7 +47,7 @@ public class Tig001_Card implements CardBlueprint {
         PlayerState me = ec.state().player(ec.actor());
         int overcome = TigEffectSupport.overcome(me);
 
-        ops.damage(Target.ENEMY_ONE, me.attackPower() + overcome);
+        ops.damageWithActorAttackPlus(overcome, Target.ENEMY_ONE);
         if (overcome >= 3) TigEffectSupport.destroyInstalledCards(ec, 1);
     }
 }

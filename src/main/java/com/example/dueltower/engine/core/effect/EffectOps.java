@@ -64,6 +64,22 @@ public final class EffectOps {
         }
     }
 
+    public void damageWithActorAttack(Target t) {
+        damage(t, actor().attackPower());
+    }
+
+    public void healWithActorHeal(Target t) {
+        heal(t, actor().healPower());
+    }
+
+    public void damageWithActorAttackPlus(int bonus, Target t) {
+        damage(t, actor().attackPower() + bonus);
+    }
+
+    public void addStatusWithActorAttack(Target t, String key) {
+        addStatus(t, key, actor().attackPower());
+    }
+
     public void addStatus(Target t, String key, int delta) {
         if (delta == 0) return;
 
@@ -198,5 +214,11 @@ public final class EffectOps {
             if (es == null) throw new IllegalStateException("missing enemy: " + e.id().value());
             es.statusAdd(key, delta);
         }
+    }
+
+    private PlayerState actor() {
+        PlayerState me = ec.state().player(ec.actor());
+        if (me == null) throw new IllegalStateException("missing player: " + ec.actor().value());
+        return me;
     }
 }

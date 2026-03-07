@@ -50,7 +50,7 @@ public class Tig008_Card implements CardBlueprint {
         }
 
         int overcome = TigEffectSupport.overcome(me);
-        if (overcome >= 3) ops.damage(Target.ENEMY_ONE, me.attackPower() + overcome);
+        if (overcome >= 3) ops.damageWithActorAttackPlus(overcome, Target.ENEMY_ONE);
     }
 
     @Override
