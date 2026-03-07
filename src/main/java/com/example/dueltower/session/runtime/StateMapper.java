@@ -3,6 +3,7 @@ package com.example.dueltower.session.runtime;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.session.dto.*;
+import com.example.dueltower.session.service.OwnedCardForgetPolicy;
 
 import java.util.*;
 
@@ -13,7 +14,7 @@ public final class StateMapper {
         int currentRound = (state.combat() == null) ? 0 : state.combat().round();
         Map<String, PlayerStateDto> players = new LinkedHashMap<>();
         for (Map.Entry<Ids.PlayerId, PlayerState> e : state.players().entrySet()) {
-            players.put(e.getKey().value(), toDto(e.getValue(), currentRound));
+            players.put(e.getKey().value(), toDto(e.getValue(), currentRound, state));
         }
 
         Map<String, CardInstanceDto> cards = new HashMap<>();
@@ -86,7 +87,7 @@ public final class StateMapper {
         );
     }
 
-    private static PlayerStateDto toDto(PlayerState ps, int currentRound) {
+    private static PlayerStateDto toDto(PlayerState ps, int currentRound, GameState state) {
         PendingDecisionDto pending = null;
         if (ps.pendingDecision() instanceof PendingDecision.DiscardToHandLimit dt) {
             pending = new PendingDecisionDto("DISCARD_TO_HAND_LIMIT", dt.reason(), dt.limit(), null, null, null, null, null, null);
@@ -109,7 +110,7 @@ public final class StateMapper {
         return new PlayerStateDto(
                 ps.playerId().value(),
                 ps.passiveIds(),
-                ps.ownedCards().stream().map(c -> new OwnedCardDto(c.cardId(), c.weakened(), c.lockedInDeck())).toList(),
+                mapOwnedCards(ps, state),
                 ps.deck().stream().map(id -> id.value().toString()).toList(),
                 ps.hand().stream().map(id -> id.value().toString()).toList(),
                 ps.grave().stream().map(id -> id.value().toString()).toList(),
@@ -127,6 +128,35 @@ public final class StateMapper {
                 ps.maxOwnedCardCount(),
                 ps.forgettingRequired()
         );
+    }
+
+    private static List<OwnedCardDto> mapOwnedCards(PlayerState ps, GameState state) {
+        Map<String, Integer> ownedCounts = new LinkedHashMap<>();
+        for (var owned : ps.ownedCards()) {
+            ownedCounts.merge(owned.cardId(), 1, Integer::sum);
+        }
+
+        Map<String, Integer> deckCounts = new LinkedHashMap<>();
+        for (var cardInstId : ps.deck()) {
+            CardInstance card = state.cardInstances().get(cardInstId);
+            if (card != null) {
+                deckCounts.merge(card.defId().value(), 1, Integer::sum);
+            }
+        }
+
+        return ps.ownedCards().stream()
+                .map(c -> {
+                    OwnedCardForgetPolicy.ForgetCheck forgetCheck = OwnedCardForgetPolicy.evaluate(c, ownedCounts, deckCounts);
+                    return new OwnedCardDto(
+                            c.cardId(),
+                            c.strengthened(),
+                            c.weakened(),
+                            c.lockedInDeck(),
+                            forgetCheck.forgettable(),
+                            forgetCheck.reason()
+                    );
+                })
+                .toList();
     }
 
     public static List<EventDto> toEventDtos(List<GameEvent> events) {

@@ -217,6 +217,63 @@ public class SessionService {
         });
     }
 
+
+    public GameState forgetOwnedCard(String code,
+                                     String actorPlayerIdRaw,
+                                     String targetPlayerIdRaw,
+                                     Integer ownedCardIndexRaw) {
+        if (targetPlayerIdRaw == null || targetPlayerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
+        }
+        if (actorPlayerIdRaw == null || actorPlayerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "actorPlayerId is required");
+        }
+        if (ownedCardIndexRaw == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "ownedCardIndex is required");
+        }
+
+        PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
+        PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
+
+        SessionRuntime rt = get(code);
+        return rt.withLock(() -> {
+            GameState state = rt.state();
+            if (!actor.equals(target)) {
+                throw new ResponseStatusException(FORBIDDEN, "players may only forget their own cards");
+            }
+
+            PlayerState ps = state.player(target);
+            if (ps == null) {
+                throw new ResponseStatusException(NOT_FOUND, "player not found");
+            }
+
+            List<OwnedCard> ownedCards = new ArrayList<>(ps.ownedCards());
+            if (ownedCardIndexRaw < 0 || ownedCardIndexRaw >= ownedCards.size()) {
+                throw new ResponseStatusException(BAD_REQUEST,
+                        "ownedCardIndex out of range: " + ownedCardIndexRaw + " (size " + ownedCards.size() + ")");
+            }
+
+            Map<String, Integer> ownedCounts = cardCountsFromOwned(ownedCards);
+            Map<String, Integer> deckCounts = cardCounts(currentDeckCardIds(ps, state));
+
+            if (ps.forgettingRequired() && !OwnedCardForgetPolicy.hasForgettableCard(ownedCards, ownedCounts, deckCounts)) {
+                throw new ResponseStatusException(BAD_REQUEST,
+                        "cannot resolve forgetting required: no forgettable cards (all are strengthened/weakened/locked or required by current deck)");
+            }
+
+            OwnedCard selectedCard = ownedCards.get(ownedCardIndexRaw);
+            OwnedCardForgetPolicy.ForgetCheck forgetCheck = OwnedCardForgetPolicy.evaluate(selectedCard, ownedCounts, deckCounts);
+            if (!forgetCheck.forgettable()) {
+                throw new ResponseStatusException(BAD_REQUEST,
+                        "cannot forget owned card at index " + ownedCardIndexRaw + ": " + forgetCheck.reason());
+            }
+
+            ownedCards.remove((int) ownedCardIndexRaw);
+            ps.ownedCards(ownedCards);
+            return state;
+        });
+    }
+
     private void loadDeck(GameState state, PlayerState ps, List<String> deckCardIds) {
         Set<CardInstId> toDelete = new HashSet<>();
         toDelete.addAll(ps.deck());
@@ -326,6 +383,14 @@ public class SessionService {
         return changed;
     }
 
+    private Map<String, Integer> cardCountsFromOwned(List<OwnedCard> ownedCards) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (OwnedCard ownedCard : ownedCards) {
+            counts.merge(ownedCard.cardId(), 1, Integer::sum);
+        }
+        return counts;
+    }
+
     private Map<String, Integer> cardCounts(List<String> cardIds) {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (String cardId : cardIds) {
@@ -408,7 +473,7 @@ public class SessionService {
             if (dto == null || dto.cardId() == null || dto.cardId().isBlank()) {
                 throw new ResponseStatusException(BAD_REQUEST, "ownedCards.cardId is required");
             }
-            out.add(new OwnedCard(dto.cardId().trim(), dto.weakened(), isLockedInDeck(dto)));
+            out.add(new OwnedCard(dto.cardId().trim(), dto.strengthened(), dto.weakened(), isLockedInDeck(dto)));
         }
         return List.copyOf(out);
     }
@@ -437,10 +502,10 @@ public class SessionService {
 
     private List<OwnedCard> defaultOwnedCards() {
         List<OwnedCard> owned = new ArrayList<>(20);
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C001", false, false));
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C002", false, false));
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C003", false, false));
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C004", false, false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C001", false, false, false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C002", false, false, false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C003", false, false, false));
+        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C004", false, false, false));
         return List.copyOf(owned);
     }
 
