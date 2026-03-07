@@ -198,7 +198,6 @@ public class SessionService {
         SessionRuntime rt = get(code);
         return rt.withLock(() -> {
             GameState state = rt.state();
-            validateDeckEditableState(state.nodeState());
             if (!actor.equals(target)) {
                 throw new ResponseStatusException(FORBIDDEN, "players may only edit their own deck");
             }
@@ -207,6 +206,8 @@ public class SessionService {
             if (ps == null) {
                 throw new ResponseStatusException(NOT_FOUND, "player not found");
             }
+
+            validateDeckEditableState(state.nodeState(), ps);
 
             List<String> deckCardIds = normalizeDeckCardIds(deckCardIdsRaw);
             validateDeckBuild(deckCardIds, ps.ownedCards(), currentDeckCardIds(ps, state));
@@ -290,7 +291,7 @@ public class SessionService {
         }
     }
 
-    private void validateDeckEditableState(NodeState nodeState) {
+    private void validateDeckEditableState(NodeState nodeState, PlayerState ps) {
         if (nodeState == NodeState.COMBAT) {
             throw new ResponseStatusException(FORBIDDEN, "deck edit unavailable during combat");
         }
@@ -299,6 +300,14 @@ public class SessionService {
         }
         if (!nodeState.deckEditable()) {
             throw new ResponseStatusException(FORBIDDEN, "deck cannot be edited in current node state: " + nodeState.name());
+        }
+        if (ps.forgettingRequired()) {
+            throw new ResponseStatusException(FORBIDDEN,
+                    "forgetting required: owned card limit exceeded ("
+                            + ps.ownedCardCount()
+                            + "/"
+                            + ps.maxOwnedCardCount()
+                            + ")");
         }
     }
 
@@ -392,10 +401,6 @@ public class SessionService {
     private List<OwnedCard> parseOwnedCards(List<OwnedCardDto> ownedCardsRaw) {
         if (ownedCardsRaw == null || ownedCardsRaw.isEmpty()) {
             return defaultOwnedCards();
-        }
-
-        if (ownedCardsRaw.size() > PlayerState.MAX_OWNED_CARDS) {
-            throw new ResponseStatusException(BAD_REQUEST, "ownedCards supports up to 20 items");
         }
 
         List<OwnedCard> out = new ArrayList<>(ownedCardsRaw.size());

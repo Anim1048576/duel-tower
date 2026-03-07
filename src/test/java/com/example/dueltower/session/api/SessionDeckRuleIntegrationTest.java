@@ -15,12 +15,16 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -267,6 +271,97 @@ class SessionDeckRuleIntegrationTest {
                 .andReturn();
 
         assertTrue(updateResult.getResponse().getErrorMessage().contains("locked-in-deck card must remain in deck"));
+    }
+
+    @Test
+    void joinAllowsOwnedCardsUpToTwentyAndExposesForgettingFlags() throws Exception {
+        MockHttpSession session = signUpAndLogin("player8", "player8@example.com", "password123");
+        String code = createSession(session);
+
+        mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(joinBodyWithOwnedCards("player8", twentyOwnedCardsJson())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state.players.player8.ownedCardCount").value(20))
+                .andExpect(jsonPath("$.state.players.player8.maxOwnedCardCount").value(20))
+                .andExpect(jsonPath("$.state.players.player8.forgettingRequired").value(false));
+    }
+
+    @Test
+    void overTwentyOwnedCardsSetsForgettingRequiredAndBlocksDeckEdit() throws Exception {
+        MockHttpSession session = signUpAndLogin("player9", "player9@example.com", "password123");
+        String code = createSession(session);
+
+        MvcResult joinResult = mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(joinBodyWithOwnedCards("player9", twentyOneOwnedCardsJson())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state.players.player9.ownedCardCount").value(21))
+                .andExpect(jsonPath("$.state.players.player9.maxOwnedCardCount").value(20))
+                .andExpect(jsonPath("$.state.players.player9.forgettingRequired").value(true))
+                .andReturn();
+
+        String playerToken = extractJsonStringValue(joinResult.getResponse().getContentAsString(), "playerToken");
+
+        MvcResult updateResult = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player9")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(deckUpdateBody("""
+                                "C001","C001","C001",
+                                "C002","C002","C002",
+                                "C003","C003","C003",
+                                "C004","C004","C004"
+                                """)))
+                .andExpect(status().isForbidden())
+                .andReturn();
+
+        assertTrue(updateResult.getResponse().getErrorMessage().contains("forgetting required"));
+
+        mockMvc.perform(get("/api/sessions/{code}", code)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.player9.ownedCardCount").value(21))
+                .andExpect(jsonPath("$.players.player9.maxOwnedCardCount").value(20))
+                .andExpect(jsonPath("$.players.player9.forgettingRequired").value(true));
+    }
+
+
+    private String joinBodyWithOwnedCards(String playerId, String ownedCardsJson) {
+        return """
+                {
+                  "playerId": "%s",
+                  "ownedCards": [
+                    %s
+                  ],
+                  "presetDeckCardIds": [
+                    "C001","C001","C001",
+                    "C002","C002","C002",
+                    "C003","C003","C003",
+                    "C004","C004","C004"
+                  ]
+                }
+                """.formatted(playerId, ownedCardsJson);
+    }
+
+    private String twentyOwnedCardsJson() {
+        return repeatCardJson("C001", 5)
+                + ",\n" + repeatCardJson("C002", 5)
+                + ",\n" + repeatCardJson("C003", 5)
+                + ",\n" + repeatCardJson("C004", 5);
+    }
+
+    private String twentyOneOwnedCardsJson() {
+        return twentyOwnedCardsJson() + ",\n{\"cardId\":\"C005\",\"weakened\":false}";
+    }
+
+    private String repeatCardJson(String cardId, int count) {
+        List<String> cards = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            cards.add("{\"cardId\":\"" + cardId + "\",\"weakened\":false}");
+        }
+        return String.join(",\n", cards);
     }
 
     private String createSession(MockHttpSession session) throws Exception {

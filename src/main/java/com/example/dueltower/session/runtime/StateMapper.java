@@ -122,7 +122,10 @@ public final class StateMapper {
                 ps.cardsPlayedThisTurn(),
                 ps.usedExThisTurn(),
                 ps.handLimit(),
-                ps.fieldLimit()
+                ps.fieldLimit(),
+                ps.ownedCardCount(),
+                ps.maxOwnedCardCount(),
+                ps.forgettingRequired()
         );
     }
 

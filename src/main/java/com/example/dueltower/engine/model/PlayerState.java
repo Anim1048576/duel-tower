@@ -210,9 +210,6 @@ public final class PlayerState {
 
     public void ownedCards(Collection<OwnedCard> value) {
         Objects.requireNonNull(value, "ownedCards is required");
-        if (value.size() > MAX_OWNED_CARDS) {
-            throw new IllegalArgumentException("ownedCards supports up to " + MAX_OWNED_CARDS);
-        }
 
         ownedCards.clear();
         for (OwnedCard card : value) {
@@ -221,6 +218,18 @@ public final class PlayerState {
             }
             ownedCards.add(new OwnedCard(card.cardId().trim(), card.weakened(), card.lockedInDeck()));
         }
+    }
+
+    public int ownedCardCount() {
+        return ownedCards.size();
+    }
+
+    public int maxOwnedCardCount() {
+        return MAX_OWNED_CARDS;
+    }
+
+    public boolean forgettingRequired() {
+        return ownedCardCount() > MAX_OWNED_CARDS;
     }
 
     public int status(String key) {
