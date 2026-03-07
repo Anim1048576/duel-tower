@@ -31,7 +31,8 @@ public final class DrawCommand implements GameCommand {
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
         List<String> errors = new ArrayList<>();
-        CommandValidation.validateMainTurn(state, playerId, errors);
+        // 덱사/무력화 처리 플로우를 막지 않기 위해 Draw는 전투 불능 상태에서도 검증을 통과시킨다.
+        CommandValidation.validateMainTurn(state, playerId, errors, true);
         if (count <= 0) errors.add("count must be positive");
         return errors;
     }
