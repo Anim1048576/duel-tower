@@ -10,6 +10,7 @@ import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
+import com.example.dueltower.engine.core.combat.CombatEntityOps;
 import com.example.dueltower.engine.core.combat.CombatStatuses;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.combat.TurnPhases;
@@ -301,6 +302,54 @@ class RuleEngineRegressionTest {
         assertTrue(res.accepted());
         assertEquals(hpBefore - 5, fx.player.hp());
         assertEquals(Zone.GRAVE, fx.state.card(enemyCard).zone());
+    }
+
+
+    @Test
+    void hpZeroBattleIncapacitationPersistsAcrossCombatRestart() {
+        TestFixture fx = TestFixture.basic();
+        fx.addDeckCards(fx.player, "FILLER", 6);
+        fx.startSimpleCombat();
+
+        List<GameEvent> events = new ArrayList<>();
+        CombatEntityOps.adjustHp(fx.state, fx.ctx, events, TargetRef.ofPlayer(fx.playerId), -fx.player.hp());
+
+        assertEquals(1, fx.player.status(CombatStatuses.BATTLE_INCAPACITATED_PERSISTENT));
+        assertTrue(CombatStatuses.isBattleIncapacitated(fx.player));
+
+        fx.state.combat().phase(CombatPhase.END);
+        EngineResult restart = fx.process(new StartCombatCommand(UUID.randomUUID(), fx.state.version(), fx.playerId));
+
+        assertTrue(restart.accepted());
+        assertEquals(1, fx.player.status(CombatStatuses.BATTLE_INCAPACITATED_PERSISTENT));
+        assertFalse(fx.state.combat().turnOrder().contains(TargetRef.ofPlayer(fx.playerId)));
+        assertEquals(0, fx.player.hand().size(), "persistently incapacitated players do not receive opening draw");
+    }
+
+    @Test
+    void deckOutBattleIncapacitationDoesNotPersistAcrossCombatRestart() {
+        TestFixture fx = TestFixture.basic();
+        fx.addDeckCards(fx.player, "FILLER", 6);
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.hand().clear();
+        fx.player.deck().clear();
+        fx.player.grave().clear();
+
+        EngineResult draw = fx.process(new DrawCommand(UUID.randomUUID(), fx.state.version(), fx.playerId, 1));
+
+        assertTrue(draw.accepted());
+        assertEquals(1, fx.player.status(CombatStatuses.BATTLE_INCAPACITATED));
+        assertEquals(0, fx.player.status(CombatStatuses.BATTLE_INCAPACITATED_PERSISTENT));
+
+        fx.state.combat().phase(CombatPhase.END);
+        EngineResult restart = fx.process(new StartCombatCommand(UUID.randomUUID(), fx.state.version(), fx.playerId));
+
+        assertTrue(restart.accepted());
+        assertEquals(0, fx.player.status(CombatStatuses.BATTLE_INCAPACITATED));
+        assertEquals(0, fx.player.status(CombatStatuses.BATTLE_INCAPACITATED_PERSISTENT));
+        assertTrue(fx.state.combat().turnOrder().contains(TargetRef.ofPlayer(fx.playerId)));
+        assertTrue(fx.player.hand().size() > 0, "combat-only incapacitation should not block opening draw");
     }
 
     @Test

@@ -46,7 +46,11 @@ public final class StartCombatCommand implements GameCommand {
 
         // 1) 참가자 목록(플레이어 + 적)
         List<TargetRef> order = new ArrayList<>();
-        for (Ids.PlayerId pid : state.players().keySet()) order.add(TargetRef.ofPlayer(pid));
+        for (Ids.PlayerId pid : state.players().keySet()) {
+            PlayerState ps = state.player(pid);
+            if (CombatStatuses.isPersistentlyBattleIncapacitated(ps)) continue;
+            order.add(TargetRef.ofPlayer(pid));
+        }
         for (Ids.EnemyId eid : state.enemies().keySet()) order.add(TargetRef.ofEnemy(eid));
 
         // 2) 이니셔티브 1D100 굴리기
@@ -93,14 +97,14 @@ public final class StartCombatCommand implements GameCommand {
 
         cs.turnOrder().clear();
         cs.turnOrder().addAll(order);
-        int firstPlayerIndex = 0;
+        int firstPlayerIndex = -1;
         for (int i = 0; i < order.size(); i++) {
             if (order.get(i) instanceof TargetRef.Player) {
                 firstPlayerIndex = i;
                 break;
             }
         }
-        cs.currentTurnIndex(firstPlayerIndex);
+        cs.currentTurnIndex(firstPlayerIndex >= 0 ? firstPlayerIndex : 0);
         cs.round(1);
 
         state.combat(cs);
@@ -108,7 +112,7 @@ public final class StartCombatCommand implements GameCommand {
         // 2) 전투 시작 손패 4장 드로우(플레이어만)
         for (Ids.PlayerId pid : state.players().keySet()) {
             PlayerState ps = state.player(pid);
-            if (ps == null) continue;
+            if (ps == null || CombatStatuses.isPersistentlyBattleIncapacitated(ps)) continue;
 
             ps.swappedThisTurn(false);
             ps.cardsPlayedThisTurn(0);
