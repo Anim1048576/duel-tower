@@ -39,7 +39,9 @@ public class SessionController {
             "USE_EX",
             "USE_SUMMON_ACTION",
             "DISCARD_TO_HAND_LIMIT",
-            "RESOLVE_INITIATIVE_TIE"
+            "RESOLVE_INITIATIVE_TIE",
+            "SEARCH_PICK",
+            "RESOLVE_SEARCH_PICK"
     );
 
     private static final Set<String> GM_AUTH_REQUIRED_TYPES = Set.of(
@@ -419,6 +421,11 @@ public class SessionController {
                         req.tieGroupIndex(),
                         req.orderedActorKeys()
                 );
+            }
+            case "SEARCH_PICK", "RESOLVE_SEARCH_PICK" -> {
+                PlayerId playerId = parsePlayerId(req.playerId());
+                List<CardInstId> ids = parseCardInstIds(req.selectedIds(), "selectedIds");
+                return new ResolveSearchPickCommand(commandId, expectedVersion, playerId, ids);
             }
             default -> throw new ResponseStatusException(BAD_REQUEST, "unknown command type: " + req.type());
         }
