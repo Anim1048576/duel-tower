@@ -2,10 +2,8 @@ package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
 import com.example.dueltower.engine.core.ZoneOps;
-import com.example.dueltower.engine.core.combat.DamageOps;
+import com.example.dueltower.engine.core.effect.EffectOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
-import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
-import com.example.dueltower.engine.core.effect.status.StatusOps;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
@@ -54,15 +52,7 @@ public class Tig901_EX implements CardBlueprint {
 
         List<TargetRef> selected = ec.selection().targets();
         int hits = (selected.size() == 1 ? 2 : 1) + (overcome >= 3 ? 1 : 0);
-
-        TargetRef src = TargetRef.ofPlayer(ec.actor());
-        for (TargetRef chosen : selected) {
-            TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), src, ec.cardId(), chosen, ec.out(), ec.actor().value());
-            for (int i = 0; i < hits; i++) {
-                DamageOps.apply(ec.state(), ec.ctx(), ec.out(), src, ec.actor().value(), resolved, damage,
-                        KeywordOps.damageFlags(ec.state(), ec.ctx(), src, ec.cardId(), resolved));
-            }
-        }
+        new EffectOps(ec).damageSelected(selected, damage, hits);
 
         ZoneOps.drawWithRefill(ec.state(), ec.ctx(), me, 1, ec.out());
     }
