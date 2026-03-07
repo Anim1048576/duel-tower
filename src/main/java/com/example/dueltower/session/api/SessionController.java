@@ -12,6 +12,7 @@ import com.example.dueltower.session.dto.*;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import com.example.dueltower.session.runtime.StateMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -47,8 +48,13 @@ public class SessionController {
     }
 
     @PostMapping
-    public CreateSessionResponse create(@RequestBody(required = false) CreateSessionRequest req) {
-        String gmId = (req == null || req.gmId() == null || req.gmId().isBlank()) ? "gm" : req.gmId().trim();
+    public CreateSessionResponse create(@RequestBody(required = false) CreateSessionRequest req,
+                                      Authentication authentication) {
+        String loginUsername = requireAuthenticatedUsername(authentication);
+        String gmId = (req == null || req.gmId() == null || req.gmId().isBlank()) ? loginUsername : req.gmId().trim();
+        if (!gmId.equals(loginUsername)) {
+            throw new ResponseStatusException(FORBIDDEN, "gmId must match the authenticated user");
+        }
         SessionRuntime rt = sessionService.createSession(gmId);
 
         log.info("session created code={} gmId={} sessionId={} seed={}",
@@ -71,24 +77,31 @@ public class SessionController {
     }
 
     @PostMapping("/{code}/join")
-    public JoinSessionResponse join(@PathVariable String code, @RequestBody JoinSessionRequest req) {
-        if (req == null || req.playerId() == null || req.playerId().isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
+    public JoinSessionResponse join(@PathVariable String code,
+                                    @RequestBody(required = false) JoinSessionRequest req,
+                                    Authentication authentication) {
+        String loginUsername = requireAuthenticatedUsername(authentication);
+        if (req == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "request body is required");
+        }
+        String requestedPlayerId = (req.playerId() == null || req.playerId().isBlank()) ? loginUsername : req.playerId().trim();
+        if (!requestedPlayerId.equals(loginUsername)) {
+            throw new ResponseStatusException(FORBIDDEN, "playerId must match the authenticated user");
         }
         List<String> requestedPassiveIds = (req.passiveIds() == null) ? List.of() : req.passiveIds();
-        sessionService.join(code, req.playerId(), requestedPassiveIds, req.presetDeckCardIds(), req.presetExCardId(), req.ownedCards());
+        sessionService.join(code, requestedPlayerId, requestedPassiveIds, req.presetDeckCardIds(), req.presetExCardId(), req.ownedCards());
 
         SessionStateDto state = sessionService.withSessionLock(code, rt -> {
             log.info("session join code={} playerId={} requestedPassiveIds={} playersNow={}",
                     code,
-                    req.playerId().trim(),
+                    requestedPlayerId,
                     requestedPassiveIds,
                     rt.state().players().size()
             );
             return StateMapper.toDto(rt.code(), rt.state());
         });
 
-        String playerToken = sessionService.issuePlayerToken(code, req.playerId());
+        String playerToken = sessionService.issuePlayerToken(code, requestedPlayerId);
         return new JoinSessionResponse(state, playerToken);
     }
 
@@ -180,6 +193,14 @@ public class SessionController {
         );
     }
 
+
+
+    private static String requireAuthenticatedUsername(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new ResponseStatusException(UNAUTHORIZED, "authentication required");
+        }
+        return authentication.getName();
+    }
 
     private String resolveActorPlayerId(String code, String playerTokenHeader) {
         String mappedPlayerId = sessionService.resolvePlayerIdByToken(code, playerTokenHeader);

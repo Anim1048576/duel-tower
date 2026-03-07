@@ -35,6 +35,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
 
+                        .requestMatchers("/api/sessions", "/api/sessions/*/join").authenticated()
                         .requestMatchers("/api/sessions/*/command").permitAll()
                         .requestMatchers("/api/sessions/*/players/*/deck").permitAll()
                         .requestMatchers("/api/**").permitAll()

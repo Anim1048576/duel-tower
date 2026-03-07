@@ -1,5 +1,6 @@
 export const KEY = {
   session: 'dt.session.v1',
+  auth: 'dt.auth.v1',
   presets: 'dt.presets.v1',
   selectedPreset: 'dt.preset.selected.v1',
   run: 'dt.run.v1',
