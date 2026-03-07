@@ -32,6 +32,12 @@ final class TigEffectSupport {
         return false;
     }
 
+    static boolean requireDiscardOrAbort(EffectContext ec, PlayerState me, String cardId) {
+        if (discardOneFromHandExcludingSource(ec, me)) return true;
+        log(ec, cardId + ": discard failed, no card to discard");
+        return false;
+    }
+
     static int destroyInstalledCards(EffectContext ec, int maxCount) {
         if (maxCount <= 0) return 0;
 

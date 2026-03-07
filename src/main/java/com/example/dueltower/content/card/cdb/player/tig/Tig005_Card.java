@@ -39,10 +39,7 @@ public class Tig005_Card implements CardBlueprint {
         EffectOps ops = new EffectOps(ec);
         PlayerState me = ec.state().player(ec.actor());
 
-        if (!TigEffectSupport.discardOneFromHandExcludingSource(ec, me)) {
-            TigEffectSupport.log(ec, id() + ": discard failed, no card to discard");
-            return;
-        }
+        if (!TigEffectSupport.requireDiscardOrAbort(ec, me, id())) return;
 
         int overcome = TigEffectSupport.overcome(me);
         ops.damageWithActorAttackPlus(overcome, Target.ENEMY_ALL);

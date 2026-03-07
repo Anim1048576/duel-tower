@@ -34,10 +34,7 @@ public class Tig006_Card implements CardBlueprint {
     @Override
     public void resolve(EffectContext ec) {
         PlayerState me = ec.state().player(ec.actor());
-        if (!TigEffectSupport.discardOneFromHandExcludingSource(ec, me)) {
-            TigEffectSupport.log(ec, id() + ": discard failed, no card to discard");
-            return;
-        }
+        if (!TigEffectSupport.requireDiscardOrAbort(ec, me, id())) return;
         TigEffectSupport.destroyInstalledCards(ec, 3);
     }
 }
