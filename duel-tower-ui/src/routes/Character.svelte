@@ -32,6 +32,11 @@
     }
   }
 
+  function statPercent(value: number, max = 100) {
+    if (!Number.isFinite(value)) return 0
+    return Math.max(0, Math.min(100, Math.round((value / max) * 100)))
+  }
+
   $: numericId = Number(id)
 
   async function loadProfile() {
@@ -63,22 +68,42 @@
   {:else if error}
     <div class="hint">오류: {error}</div>
   {:else if profile}
+    <section class="hero panel">
+      <div class="heroTop">
+        <div>
+          <div class="name">{profile.name}</div>
+          <div class="sub">{genderLabel(profile.gender)} · {profile.age == null ? '나이 불명' : `${profile.age}세`}</div>
+        </div>
+        <div class="chips">
+          <span class="chip">성향: {profile.disposition}</span>
+          <span class="chip">소원: {profile.wish}</span>
+        </div>
+      </div>
+      <div class="quote">“{profile.oneLiner}”</div>
+      <div class="story">{profile.story}</div>
+    </section>
+
     <div class="grid">
       <section class="panel">
-        <div class="panelTitle">기본 정보</div>
-        <div class="kv"><span>이름</span><b>{profile.name}</b></div>
-        <div class="kv"><span>성별</span><b>{genderLabel(profile.gender)}</b></div>
-        <div class="kv"><span>나이</span><b>{profile.age == null ? "불명" : `${profile.age}`}</b></div>
-        <div class="kv"><span>성향</span><b>{profile.disposition}</b></div>
-        <div class="kv"><span>소원</span><b>{profile.wish}</b></div>
-      </section>
-
-      <section class="panel">
         <div class="panelTitle">생활 능력치</div>
-        <div class="kv"><span>Physical</span><b>{profile.physical}</b></div>
-        <div class="kv"><span>Technique</span><b>{profile.technique}</b></div>
-        <div class="kv"><span>Sense</span><b>{profile.sense}</b></div>
-        <div class="kv"><span>Willpower</span><b>{profile.willpower}</b></div>
+        <div class="statList">
+          <div class="statRow">
+            <div class="statHead"><span>Physical</span><b>{profile.physical}</b></div>
+            <div class="meter"><div style={`width:${statPercent(profile.physical)}%`}></div></div>
+          </div>
+          <div class="statRow">
+            <div class="statHead"><span>Technique</span><b>{profile.technique}</b></div>
+            <div class="meter"><div style={`width:${statPercent(profile.technique)}%`}></div></div>
+          </div>
+          <div class="statRow">
+            <div class="statHead"><span>Sense</span><b>{profile.sense}</b></div>
+            <div class="meter"><div style={`width:${statPercent(profile.sense)}%`}></div></div>
+          </div>
+          <div class="statRow">
+            <div class="statHead"><span>Willpower</span><b>{profile.willpower}</b></div>
+            <div class="meter"><div style={`width:${statPercent(profile.willpower)}%`}></div></div>
+          </div>
+        </div>
       </section>
 
       <section class="panel">
@@ -89,19 +114,30 @@
         <div class="kv"><span>치유력</span><b>{profile.combatStats.healPower}</b></div>
       </section>
 
-      <section class="panel">
-        <div class="panelTitle">캐릭터 표현</div>
-        <div class="quote">“{profile.oneLiner}”</div>
-        <div class="story">{profile.story}</div>
-      </section>
-
-      <section class="panel">
+      <section class="panel span2">
         <div class="panelTitle">패시브 / 덱 데이터</div>
-        <div class="kv"><span>Passive 1</span><b>{profile.trait1 ?? "-"}</b></div>
-        <div class="kv"><span>Passive 2</span><b>{profile.trait2 ?? "-"}</b></div>
-        <div class="kv"><span>Owned Cards</span><b>{safeJsonSummary(profile.ownedCards)}</b></div>
-        <div class="kv"><span>Current Skill Deck</span><b>{safeJsonSummary(profile.currentSkillDeck)}</b></div>
-        <div class="kv"><span>EX Card</span><b>{safeJsonSummary(profile.exCard)}</b></div>
+        <div class="deckGrid">
+          <div class="tile">
+            <div class="th">Passive 1</div>
+            <div>{profile.trait1 ?? '-'}</div>
+          </div>
+          <div class="tile">
+            <div class="th">Passive 2</div>
+            <div>{profile.trait2 ?? '-'}</div>
+          </div>
+          <div class="tile">
+            <div class="th">Owned Cards</div>
+            <div>{safeJsonSummary(profile.ownedCards)}</div>
+          </div>
+          <div class="tile">
+            <div class="th">Current Skill Deck</div>
+            <div>{safeJsonSummary(profile.currentSkillDeck)}</div>
+          </div>
+          <div class="tile span2">
+            <div class="th">EX Card</div>
+            <div>{safeJsonSummary(profile.exCard)}</div>
+          </div>
+        </div>
       </section>
     </div>
   {:else}
@@ -110,14 +146,33 @@
 </PageSkeleton>
 
 <style>
+  .hero{margin-bottom:12px}
+  .heroTop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+  .name{font-size:28px;font-weight:900;line-height:1.1}
+  .sub{margin-top:4px;color:var(--text-muted)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+  .quote{margin-top:10px;margin-bottom:10px;font-weight:700;font-size:16px}
+  .story{color:var(--text-muted);line-height:1.6;white-space:pre-wrap}
+
   .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .span2{grid-column:1 / -1}
   .kv{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.07)}
   .kv:last-child{border-bottom:0}
   .kv > span{color:var(--text-muted)}
-  .quote{margin-top:8px;margin-bottom:10px;font-weight:700}
-  .story{color:var(--text-muted);line-height:1.5;white-space:pre-wrap}
+
+  .statList{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+  .statRow{display:flex;flex-direction:column;gap:6px}
+  .statHead{display:flex;justify-content:space-between;gap:8px}
+  .statHead span{color:var(--text-muted)}
+  .meter{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
+  .meter > div{height:100%;border-radius:999px;background:linear-gradient(90deg, rgba(114,220,255,.95), rgba(124,255,198,.95))}
+
+  .deckGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
+  .tile{padding:10px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(7,14,25,.32)}
 
   @media (max-width: 900px){
     .grid{grid-template-columns:1fr}
+    .deckGrid{grid-template-columns:1fr}
+    .span2{grid-column:auto}
   }
 </style>
