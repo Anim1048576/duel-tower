@@ -51,7 +51,7 @@ public class Tig901_EX implements CardBlueprint {
         int damage = me.attackPower() + overcome;
 
         List<TargetRef> selected = ec.selection().targets();
-        int hits = (selected.size() == 1 ? 2 : 1) + (overcome >= 3 ? 1 : 0);
+        int hits = (selected.size() == 1 ? 2 : 1) + (TigEffectSupport.isOvercome3Plus(me) ? 1 : 0);
         new EffectOps(ec).damageSelected(selected, damage, hits);
 
         ZoneOps.drawWithRefill(ec.state(), ec.ctx(), me, 1, ec.out());

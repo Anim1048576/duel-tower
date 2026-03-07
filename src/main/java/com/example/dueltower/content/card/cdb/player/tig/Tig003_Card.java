@@ -53,7 +53,7 @@ public class Tig003_Card implements CardBlueprint {
         TigEffectSupport.log(ec, id() + " rolled 1d6=" + roll);
         if (roll >= 4) ZoneOps.drawWithRefill(ec.state(), ec.ctx(), me, 3, ec.out());
 
-        if (TigEffectSupport.overcome(me) >= 3) {
+        if (TigEffectSupport.isOvercome3Plus(me)) {
             ops.addStatus(Target.ENEMY_ONE, S106_Vulnerable.ID, 3);
         }
     }

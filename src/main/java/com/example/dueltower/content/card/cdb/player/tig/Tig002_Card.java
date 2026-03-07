@@ -48,6 +48,6 @@ public class Tig002_Card implements CardBlueprint {
         int overcome = TigEffectSupport.overcome(me);
 
         ops.heal(Target.ALLY_ONE, me.healPower());
-        if (overcome >= 3) ZoneOps.drawWithRefill(ec.state(), ec.ctx(), me, 1, ec.out());
+        if (TigEffectSupport.isOvercome3Plus(me)) ZoneOps.drawWithRefill(ec.state(), ec.ctx(), me, 1, ec.out());
     }
 }
