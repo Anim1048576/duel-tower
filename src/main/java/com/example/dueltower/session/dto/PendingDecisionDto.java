@@ -7,6 +7,9 @@ public record PendingDecisionDto(
         String reason,
         Integer limit,
         Integer pickCount,
+        List<String> candidateIds,
+        String destination,
+        Boolean shuffleAfterPick,
         Integer groupIndex,
         List<String> actorKeys
 ) {}
