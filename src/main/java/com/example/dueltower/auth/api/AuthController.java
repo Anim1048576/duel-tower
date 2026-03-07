@@ -55,7 +55,6 @@ public class AuthController {
         }
         Member member = Member.builder()
                 .username(username)
-                .email(buildSignupEmail(username, req.email()))
                 .password(passwordEncoder.encode(password))
                 .role(RoleType.USER)
                 .deleted(false)
