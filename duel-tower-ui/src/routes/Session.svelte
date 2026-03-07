@@ -16,7 +16,6 @@
   let authBusy = false
   let authMode: 'login' | 'signup' = 'login'
   let username = ''
-  let email = ''
   let password = ''
 
   $: if ($auth.status === 'authenticated') meId = $auth.username
@@ -30,7 +29,7 @@
     authBusy = true
     try {
       const result = authMode === 'signup'
-        ? await doSignup(username, email, password)
+        ? await doSignup(username, password)
         : await doLogin(username, password)
 
       if (!result.ok) {
@@ -124,11 +123,8 @@
       <div class="spacer"></div>
       <form class="row wrap" style="gap:8px;" on:submit|preventDefault={submitAuth}>
         <input class="input mono" style="width:180px" bind:value={username} placeholder="username" />
-        {#if authMode === 'signup'}
-          <input class="input" style="width:220px" bind:value={email} placeholder="email" type="email" />
-        {/if}
         <input class="input" style="width:180px" bind:value={password} placeholder="password" type="password" />
-        <button class="btn primary" type="submit" disabled={authBusy || !username.trim() || !password.trim() || (authMode === 'signup' && !email.trim())}>
+        <button class="btn primary" type="submit" disabled={authBusy || !username.trim() || !password.trim()}>
           {authBusy ? '처리 중…' : authMode === 'signup' ? '회원가입' : '로그인'}
         </button>
       </form>
