@@ -2,6 +2,7 @@ package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.combat.CombatStatuses;
 import com.example.dueltower.engine.model.*;
+import com.example.dueltower.engine.model.Ids.EnemyId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 
 import java.util.List;
@@ -47,5 +48,41 @@ public final class CommandValidation {
 
         if (ps.pendingDecision() != null) errors.add("pending decision exists");
         return ps;
+    }
+
+    /**
+     * Validates: combat started, enemy exists, MAIN phase, current actor is enemyId, no pending decision.
+     *
+     * @return EnemyState if found, otherwise null.
+     */
+    public static EnemyState validateEnemyMainTurn(GameState state, EnemyId enemyId, List<String> errors) {
+        if (state.combat() == null) errors.add("combat not started");
+
+        EnemyState es = state.enemy(enemyId);
+        if (es == null) {
+            errors.add("enemy not found");
+            return null;
+        }
+
+        CombatState cs = state.combat();
+        if (cs != null) {
+            if (cs.phase() != CombatPhase.MAIN) {
+                errors.add("invalid phase: " + cs.phase());
+            }
+            TargetRef cur = cs.currentTurnActor();
+            if (!(cur instanceof TargetRef.Enemy e) || !e.id().equals(enemyId)) {
+                errors.add("not enemy turn");
+            }
+        }
+
+        if (hasAnyPendingDecision(state)) {
+            errors.add("pending decision exists");
+        }
+
+        return es;
+    }
+
+    public static boolean hasAnyPendingDecision(GameState state) {
+        return state.players().values().stream().anyMatch(ps -> ps.pendingDecision() != null);
     }
 }

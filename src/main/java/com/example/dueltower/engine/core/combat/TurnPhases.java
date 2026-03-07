@@ -35,8 +35,11 @@ public final class TurnPhases {
         StatusPhases.turnStart(state, ctx, actor, out, source);
 
         if (actor instanceof TargetRef.Enemy e) {
-            EnemyExOps.refreshActivatable(state.enemy(e.id()),
-                    state.combat() == null ? 0 : state.combat().round());
+            var enemy = state.enemy(e.id());
+            if (enemy != null) {
+                enemy.usedExThisTurn(false);
+                EnemyExOps.refreshActivatable(enemy, state.combat() == null ? 0 : state.combat().round());
+            }
         }
 
         if (actor instanceof TargetRef.Player p) {
@@ -78,8 +81,11 @@ public final class TurnPhases {
         StatusPhases.turnEnd(state, ctx, actor, out, source);
 
         if (actor instanceof TargetRef.Enemy e) {
-            EnemyExOps.refreshActivatable(state.enemy(e.id()),
-                    state.combat() == null ? 0 : state.combat().round());
+            var enemy = state.enemy(e.id());
+            if (enemy != null) {
+                enemy.usedExThisTurn(false);
+                EnemyExOps.refreshActivatable(enemy, state.combat() == null ? 0 : state.combat().round());
+            }
         }
 
         if (actor instanceof TargetRef.Player p) {
