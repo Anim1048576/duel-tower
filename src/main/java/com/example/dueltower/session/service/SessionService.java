@@ -36,6 +36,7 @@ public class SessionService {
 
     private static final int DECK_SIZE = 12;
     private static final int MAX_DECK_COPIES = 3;
+    private static final int MAX_DECK_EDIT_CHANGES = 2;
     private static final Pattern PASSIVE_ID_FORMAT = Pattern.compile("^P\\d{3}$");
 
     private final CardService cardService;
@@ -197,9 +198,7 @@ public class SessionService {
         SessionRuntime rt = get(code);
         return rt.withLock(() -> {
             GameState state = rt.state();
-            if (!state.nodeState().deckEditable()) {
-                throw new ResponseStatusException(FORBIDDEN, "deck can only be edited in non-combat nodes");
-            }
+            validateDeckEditableState(state.nodeState());
             if (!actor.equals(target)) {
                 throw new ResponseStatusException(FORBIDDEN, "players may only edit their own deck");
             }
@@ -245,10 +244,7 @@ public class SessionService {
             throw new ResponseStatusException(BAD_REQUEST, "deck must contain exactly 12 cards");
         }
 
-        Map<String, Integer> deckCounts = new LinkedHashMap<>();
-        for (String cardId : deckCardIds) {
-            deckCounts.merge(cardId, 1, Integer::sum);
-        }
+        Map<String, Integer> deckCounts = cardCounts(deckCardIds);
         for (var e : deckCounts.entrySet()) {
             if (e.getValue() > MAX_DECK_COPIES) {
                 throw new ResponseStatusException(BAD_REQUEST,
@@ -270,6 +266,15 @@ public class SessionService {
         }
 
         if (currentDeckCardIds != null) {
+            Map<String, Integer> currentDeckCounts = cardCounts(currentDeckCardIds);
+            int changedCards = calculateDeckChangedCards(currentDeckCounts, deckCounts);
+            if (changedCards > MAX_DECK_EDIT_CHANGES) {
+                throw new ResponseStatusException(
+                        BAD_REQUEST,
+                        "deck edit invalid: at most 2 cards can be changed (requested " + changedCards + ")"
+                );
+            }
+
             Map<String, Integer> lockedCounts = lockedCardCountsInCurrentDeck(currentDeckCardIds, ownedCards);
             for (var e : lockedCounts.entrySet()) {
                 int updatedCount = deckCounts.getOrDefault(e.getKey(), 0);
@@ -285,7 +290,40 @@ public class SessionService {
         }
     }
 
+    private void validateDeckEditableState(NodeState nodeState) {
+        if (nodeState == NodeState.COMBAT) {
+            throw new ResponseStatusException(FORBIDDEN, "deck edit unavailable during combat");
+        }
+        if (nodeState.curseBlocked()) {
+            throw new ResponseStatusException(FORBIDDEN, "deck edit unavailable during curse");
+        }
+        if (!nodeState.deckEditable()) {
+            throw new ResponseStatusException(FORBIDDEN, "deck cannot be edited in current node state: " + nodeState.name());
+        }
+    }
 
+    private int calculateDeckChangedCards(Map<String, Integer> currentDeckCounts, Map<String, Integer> newDeckCounts) {
+        int changed = 0;
+        Set<String> union = new LinkedHashSet<>();
+        union.addAll(currentDeckCounts.keySet());
+        union.addAll(newDeckCounts.keySet());
+        for (String cardId : union) {
+            int currentCount = currentDeckCounts.getOrDefault(cardId, 0);
+            int newCount = newDeckCounts.getOrDefault(cardId, 0);
+            if (currentCount > newCount) {
+                changed += currentCount - newCount;
+            }
+        }
+        return changed;
+    }
+
+    private Map<String, Integer> cardCounts(List<String> cardIds) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (String cardId : cardIds) {
+            counts.merge(cardId, 1, Integer::sum);
+        }
+        return counts;
+    }
 
     private List<String> currentDeckCardIds(PlayerState ps, GameState state) {
         List<String> deckCardIds = new ArrayList<>(ps.deck().size());
