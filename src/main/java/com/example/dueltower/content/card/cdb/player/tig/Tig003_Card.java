@@ -47,10 +47,7 @@ public class Tig003_Card implements CardBlueprint {
         EffectOps ops = new EffectOps(ec);
         PlayerState me = ec.state().player(ec.actor());
 
-        if (!TigEffectSupport.discardOneFromHandExcludingSource(ec, me)) {
-            TigEffectSupport.log(ec, id() + ": discard failed, no card to discard");
-            return;
-        }
+        if (!TigEffectSupport.requireDiscardOrAbort(ec, me, id())) return;
 
         int roll = TigEffectSupport.rollD6(ec);
         TigEffectSupport.log(ec, id() + " rolled 1d6=" + roll);
