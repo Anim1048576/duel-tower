@@ -162,7 +162,8 @@ public class SessionService {
             ps.ownedCards(ownedCards);
 
             List<String> sourceDeckCardIds = characterTemplate != null ? characterTemplate.deckCardIds() : presetDeckCardIdsRaw;
-            boolean allowEmptyCharacterDeck = characterTemplate != null && sourceDeckCardIds != null && sourceDeckCardIds.isEmpty();
+            boolean allowEmptyCharacterDeck = characterTemplate != null
+                    && (sourceDeckCardIds == null || sourceDeckCardIds.isEmpty());
             List<String> deckCardIds = allowEmptyCharacterDeck ? List.of() : parsePresetDeckCardIds(sourceDeckCardIds);
             if (!allowEmptyCharacterDeck) {
                 validateDeckBuild(deckCardIds, ps.ownedCards(), null);
