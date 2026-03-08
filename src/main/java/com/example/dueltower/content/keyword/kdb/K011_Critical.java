@@ -41,8 +41,8 @@ public class K011_Critical implements KeywordBlueprint {
     }
 
     @Override
-    public int criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) {
-        if (rt.value() <= 0) return 1;
-        return 2;
+    public double criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) {
+        if (rt.value() <= 0) return 1d;
+        return 1d + (rt.value() * 0.5d);
     }
 }

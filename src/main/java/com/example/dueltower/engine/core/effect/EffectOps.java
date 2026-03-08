@@ -164,10 +164,10 @@ public final class EffectOps {
 
     private void applyDamage(TargetRef ref, int amount) {
         int finalAmount = amount;
-        int multiplier = criticalAmountMultiplier(ref, "damage");
-        if (multiplier > 1 && isCritical(ref, "damage")) {
-            finalAmount *= multiplier;
-            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! damage x" + multiplier));
+        double multiplier = criticalAmountMultiplier(ref, "damage");
+        if (multiplier > 1d && isCritical(ref, "damage")) {
+            finalAmount = (int) Math.round(finalAmount * multiplier);
+            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! damage x" + formatMultiplier(multiplier)));
         }
 
         DamageFlags flags = KeywordOps.damageFlags(
@@ -191,10 +191,10 @@ public final class EffectOps {
 
     private void applyHeal(TargetRef ref, int amount) {
         int finalAmount = amount;
-        int multiplier = criticalAmountMultiplier(ref, "heal");
-        if (multiplier > 1 && isCritical(ref, "heal")) {
-            finalAmount *= multiplier;
-            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! heal x" + multiplier));
+        double multiplier = criticalAmountMultiplier(ref, "heal");
+        if (multiplier > 1d && isCritical(ref, "heal")) {
+            finalAmount = (int) Math.round(finalAmount * multiplier);
+            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! heal x" + formatMultiplier(multiplier)));
         }
         HealOps.apply(
                 ec.state(),
@@ -207,9 +207,9 @@ public final class EffectOps {
         );
     }
 
-    private int criticalAmountMultiplier(TargetRef target, String kind) {
+    private double criticalAmountMultiplier(TargetRef target, String kind) {
         TargetRef source = actorRef();
-        int multiplier = KeywordOps.criticalAmountMultiplier(
+        double multiplier = KeywordOps.criticalAmountMultiplier(
                 ec.state(),
                 ec.ctx(),
                 source,
@@ -310,16 +310,16 @@ public final class EffectOps {
         return Math.max(0, Math.min(100, cur));
     }
 
-    private int applyStatusCriticalAmountMultiplier(TargetRef source, TargetRef target, String kind, int baseMultiplier) {
+    private double applyStatusCriticalAmountMultiplier(TargetRef source, TargetRef target, String kind, double baseMultiplier) {
         StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
-        int cur = Math.max(1, baseMultiplier);
+        double cur = Math.max(1d, baseMultiplier);
         for (HookEntry it : collectStatusEntries(rt, source)) {
             if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
             int stacks = rt.stacks(it.owner(), it.statusId());
             if (stacks <= 0) continue;
             cur = ec.ctx().statusEffect(it.statusId()).onCriticalAmountMultiplier(rt, it.owner(), source, target, kind, cur);
         }
-        return Math.max(1, cur);
+        return Math.max(1d, cur);
     }
 
 
@@ -335,16 +335,16 @@ public final class EffectOps {
         return Math.max(0, Math.min(100, cur));
     }
 
-    private int applyStatusIncomingCriticalAmountMultiplier(TargetRef source, TargetRef target, String kind, int baseMultiplier) {
+    private double applyStatusIncomingCriticalAmountMultiplier(TargetRef source, TargetRef target, String kind, double baseMultiplier) {
         StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
-        int cur = Math.max(1, baseMultiplier);
+        double cur = Math.max(1d, baseMultiplier);
         for (HookEntry it : collectStatusEntries(rt, target)) {
             if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
             int stacks = rt.stacks(it.owner(), it.statusId());
             if (stacks <= 0) continue;
             cur = ec.ctx().statusEffect(it.statusId()).onIncomingCriticalAmountMultiplier(rt, it.owner(), source, target, kind, cur);
         }
-        return Math.max(1, cur);
+        return Math.max(1d, cur);
     }
 
     private record HookEntry(StatusOwnerRef owner, String statusId, int priority) {}
@@ -382,6 +382,14 @@ public final class EffectOps {
             es.statusAdd(key, delta);
         }
     }
+
+    private static String formatMultiplier(double multiplier) {
+        if (Math.abs(multiplier - Math.rint(multiplier)) < 1e-9) {
+            return Long.toString(Math.round(multiplier));
+        }
+        return Double.toString(multiplier);
+    }
+
 
     private PlayerState actor() {
         PlayerState me = ec.state().player(ec.actor());

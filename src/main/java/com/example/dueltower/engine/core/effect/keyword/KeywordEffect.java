@@ -88,5 +88,5 @@ public interface KeywordEffect {
      *
      * @return multiplier for critical amount (damage/heal). 1 means no change.
      */
-    default int criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) { return 1; }
+    default double criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) { return 1d; }
 }
