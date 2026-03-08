@@ -77,7 +77,7 @@ public class SessionController {
         return new CreateSessionResponse(rt.code(), rt.gmId(), rt.gmToken(), state);
     }
 
-    @GetMapping("/{code}")
+    @GetMapping({"/{code}", "/{code}/state"})
     public SessionStateDto state(@PathVariable String code) {
         return sessionService.withSessionLock(code, rt -> {
             log.debug("session state requested code={} version={}", code, rt.state().version());
