@@ -399,4 +399,78 @@ public final class KeywordOps {
             ctx.keywordEffect(rt.id()).onAfterPlayCard(rt, pc);
         }
     }
+
+    /**
+     * Compute critical chance percent from keywords on the card.
+     */
+    public static int criticalChancePercent(
+            GameState state,
+            EngineContext ctx,
+            TargetRef source,
+            Ids.CardInstId cardId,
+            TargetRef target,
+            String kind
+    ) {
+        if (cardId == null) return 0;
+        CardInstance ci = state.card(cardId);
+        if (ci == null) return 0;
+
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return 0;
+
+        DamageKeywordCtx dc = new DamageKeywordCtx(source, cardId, target);
+        int chance = 0;
+
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+            if (!ctx.hasKeywordEffect(rt.id())) continue;
+
+            chance += ctx.keywordEffect(rt.id()).criticalChancePercent(rt, dc, kind);
+        }
+
+        return Math.max(0, Math.min(100, chance));
+    }
+
+    /**
+     * Compute critical amount multiplier from keywords on the card.
+     */
+    public static int criticalAmountMultiplier(
+            GameState state,
+            EngineContext ctx,
+            TargetRef source,
+            Ids.CardInstId cardId,
+            TargetRef target,
+            String kind
+    ) {
+        if (cardId == null) return 1;
+        CardInstance ci = state.card(cardId);
+        if (ci == null) return 1;
+
+        CardDefinition def = ctx.def(ci.defId());
+        Map<String, Integer> kws = def.keywords();
+        if (kws == null || kws.isEmpty()) return 1;
+
+        DamageKeywordCtx dc = new DamageKeywordCtx(source, cardId, target);
+        int multiplier = 1;
+
+        for (var e : kws.entrySet()) {
+            String kid = (e.getKey() == null) ? "" : e.getKey().trim();
+            int val = (e.getValue() == null) ? 1 : e.getValue();
+
+            KeywordRuntime rt = new KeywordRuntime(kid, val);
+            if (!rt.present()) continue;
+            if (!ctx.hasKeywordEffect(rt.id())) continue;
+
+            int next = ctx.keywordEffect(rt.id()).criticalAmountMultiplier(rt, dc, kind);
+            if (next > multiplier) multiplier = next;
+        }
+
+        return Math.max(1, multiplier);
+    }
+
 }
