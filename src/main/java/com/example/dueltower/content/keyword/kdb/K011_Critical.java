@@ -1,6 +1,8 @@
 package com.example.dueltower.content.keyword.kdb;
 
 import com.example.dueltower.content.keyword.model.KeywordBlueprint;
+import com.example.dueltower.engine.core.effect.keyword.DamageKeywordCtx;
+import com.example.dueltower.engine.core.effect.keyword.KeywordRuntime;
 import com.example.dueltower.engine.model.KeywordDefinition;
 import org.springframework.stereotype.Component;
 
@@ -30,5 +32,17 @@ public class K011_Critical implements KeywordBlueprint {
                         [치명타] 발생시, 해당 대미지 체크로 발생하는 대미지 / 회복량이 2배가 됩니다.
                         """
         );
+    }
+
+    @Override
+    public int criticalChancePercent(KeywordRuntime rt, DamageKeywordCtx c, String kind) {
+        if (rt.value() <= 0) return 0;
+        return Math.max(0, rt.value() * 10);
+    }
+
+    @Override
+    public int criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) {
+        if (rt.value() <= 0) return 1;
+        return 2;
     }
 }

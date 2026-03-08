@@ -75,4 +75,18 @@ public interface KeywordEffect {
      * Damage rule hook: if true, BARRIER (방벽) should be ignored for this damage instance.
      */
     default boolean ignoresBarrier(KeywordRuntime rt, DamageKeywordCtx c) { return false; }
+
+    /**
+     * Critical chance hook.
+     *
+     * @return critical chance percent [0..100] contributed by this keyword.
+     */
+    default int criticalChancePercent(KeywordRuntime rt, DamageKeywordCtx c, String kind) { return 0; }
+
+    /**
+     * Critical amount hook.
+     *
+     * @return multiplier for critical amount (damage/heal). 1 means no change.
+     */
+    default int criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) { return 1; }
 }

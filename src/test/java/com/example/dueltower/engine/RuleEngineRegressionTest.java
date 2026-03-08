@@ -3,6 +3,7 @@ package com.example.dueltower.engine;
 import com.example.dueltower.content.keyword.kdb.K008_Accurate;
 import com.example.dueltower.content.keyword.kdb.K009_Penetration;
 import com.example.dueltower.content.keyword.kdb.K010_Tenacity;
+import com.example.dueltower.content.keyword.kdb.K011_Critical;
 import com.example.dueltower.content.status.model.StatusBlueprint;
 import com.example.dueltower.content.status.sdb.*;
 import com.example.dueltower.engine.command.*;
@@ -142,6 +143,34 @@ class RuleEngineRegressionTest {
         assertEquals(fx.enemy.maxHp() - 5, fx.enemy.hp());
         assertEquals(3, fx.enemy.status(S001_Shield.ID));
         assertEquals(4, fx.state.combat().factionStatusValues(CombatState.FactionId.ENEMIES).get(S301_Barrier.ID));
+    }
+
+
+    @Test
+    void criticalChanceComesFromKeywordHook() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId critical = fx.addHandCard(fx.player, "CRITICAL_STRIKE");
+
+        int chance = KeywordOps.criticalChancePercent(
+                fx.state,
+                fx.ctx,
+                TargetRef.ofPlayer(fx.playerId),
+                critical,
+                TargetRef.ofEnemy(fx.enemyId),
+                "damage"
+        );
+
+        assertEquals(20, chance);
+
+        int multiplier = KeywordOps.criticalAmountMultiplier(
+                fx.state,
+                fx.ctx,
+                TargetRef.ofPlayer(fx.playerId),
+                critical,
+                TargetRef.ofEnemy(fx.enemyId),
+                "damage"
+        );
+        assertEquals(2, multiplier);
     }
 
     @Test
@@ -396,6 +425,7 @@ class RuleEngineRegressionTest {
             registerCard(defs, effects, new TestCardEffect("TENACITY_STRIKE", CardType.SKILL, 3, Map.of(K010_Tenacity.ID, 1), 5));
             registerCard(defs, effects, new TestCardEffect("ACCURATE_STRIKE", CardType.SKILL, 1, Map.of(K008_Accurate.ID, 1), 5));
             registerCard(defs, effects, new TestCardEffect("PIERCE_STRIKE", CardType.SKILL, 1, Map.of(K009_Penetration.ID, 1), 5));
+            registerCard(defs, effects, new TestCardEffect("CRITICAL_STRIKE", CardType.SKILL, 1, Map.of(K011_Critical.ID, 2), 5));
             registerCard(defs, effects, new TestCardEffect("EX_BLAST", CardType.EX, 1, Map.of(), 4));
 
             Map<String, StatusDefinition> statusDefs = new HashMap<>();
@@ -411,7 +441,7 @@ class RuleEngineRegressionTest {
 
             Map<String, KeywordDefinition> keywordDefs = new HashMap<>();
             Map<String, com.example.dueltower.engine.core.effect.keyword.KeywordEffect> keywordEffects = new HashMap<>();
-            for (var bp : List.of(new K008_Accurate(), new K009_Penetration(), new K010_Tenacity())) {
+            for (var bp : List.of(new K008_Accurate(), new K009_Penetration(), new K010_Tenacity(), new K011_Critical())) {
                 keywordDefs.put(bp.id(), bp.definition());
                 keywordEffects.put(bp.id(), bp);
             }

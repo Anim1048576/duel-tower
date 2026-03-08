@@ -3,7 +3,6 @@ package com.example.dueltower.engine.core.effect;
 import com.example.dueltower.engine.core.combat.DamageFlags;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.combat.HealOps;
-import com.example.dueltower.content.keyword.kdb.K011_Critical;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
@@ -163,9 +162,10 @@ public final class EffectOps {
 
     private void applyDamage(TargetRef ref, int amount) {
         int finalAmount = amount;
-        if (isCritical(ref, "damage")) {
-            finalAmount *= 2;
-            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! damage x2"));
+        int multiplier = criticalAmountMultiplier(ref, "damage");
+        if (multiplier > 1 && isCritical(ref, "damage")) {
+            finalAmount *= multiplier;
+            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! damage x" + multiplier));
         }
 
         DamageFlags flags = KeywordOps.damageFlags(
@@ -189,9 +189,10 @@ public final class EffectOps {
 
     private void applyHeal(TargetRef ref, int amount) {
         int finalAmount = amount;
-        if (isCritical(ref, "heal")) {
-            finalAmount *= 2;
-            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! heal x2"));
+        int multiplier = criticalAmountMultiplier(ref, "heal");
+        if (multiplier > 1 && isCritical(ref, "heal")) {
+            finalAmount *= multiplier;
+            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! heal x" + multiplier));
         }
         HealOps.apply(
                 ec.state(),
@@ -204,11 +205,26 @@ public final class EffectOps {
         );
     }
 
-    private boolean isCritical(TargetRef target, String kind) {
-        int crit = KeywordOps.keywordValue(ec.state(), ec.ctx(), ec.cardId(), K011_Critical.ID);
-        if (crit <= 0) return false;
+    private int criticalAmountMultiplier(TargetRef target, String kind) {
+        return KeywordOps.criticalAmountMultiplier(
+                ec.state(),
+                ec.ctx(),
+                TargetRef.ofPlayer(ec.actor()),
+                ec.cardId(),
+                target,
+                kind
+        );
+    }
 
-        int chance = Math.max(0, Math.min(100, crit * 10));
+    private boolean isCritical(TargetRef target, String kind) {
+        int chance = KeywordOps.criticalChancePercent(
+                ec.state(),
+                ec.ctx(),
+                TargetRef.ofPlayer(ec.actor()),
+                ec.cardId(),
+                target,
+                kind
+        );
         if (chance == 0) return false;
 
         long mix = ec.state().seed();
