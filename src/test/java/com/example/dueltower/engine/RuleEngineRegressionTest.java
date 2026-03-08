@@ -162,7 +162,7 @@ class RuleEngineRegressionTest {
                 "damage"
         );
 
-        assertEquals(20, chance);
+        assertEquals(10, chance);
 
         double multiplier = KeywordOps.criticalAmountMultiplier(
                 fx.state,
@@ -172,7 +172,7 @@ class RuleEngineRegressionTest {
                 TargetRef.ofEnemy(fx.enemyId),
                 "damage"
         );
-        assertEquals(2d, multiplier);
+        assertEquals(1.5d, multiplier);
     }
 
     @Test
@@ -191,8 +191,8 @@ class RuleEngineRegressionTest {
                 new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))));
 
         assertTrue(play.accepted());
-        assertEquals(hpBefore - 15, fx.enemy.hp(), "critical multiplier should become x3");
-        assertTrue(play.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("critical! damage x3")));
+        assertEquals(hpBefore - 20, fx.enemy.hp(), "critical multiplier should become x4");
+        assertTrue(play.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("critical! damage x4")));
     }
 
     @Test
@@ -213,8 +213,8 @@ class RuleEngineRegressionTest {
                 new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))));
 
         assertTrue(play.accepted());
-        assertEquals(hpBefore - 20, fx.player.hp(), "keyword x2 -> incoming passive +1 -> incoming status +1 => x4");
-        assertTrue(play.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("critical! damage x4")));
+        assertEquals(hpBefore - 18, fx.player.hp(), "keyword x1.5 -> incoming passive +1 -> incoming status +1 => x3.5");
+        assertTrue(play.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("critical! damage x3.5")));
     }
 
     @Test

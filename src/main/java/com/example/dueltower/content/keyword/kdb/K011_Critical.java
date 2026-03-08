@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * [키워드 : 치명 n]
- * 해당 스킬이 n×10%p의 [치명타] 확률을 갖습니다.
- * [치명타] 발생시, 해당 대미지 체크로 발생하는 대미지 / 회복량이 2배가 됩니다.
+ * 해당 스킬이 n×5%p의 [치명타] 확률을 갖습니다.
+ * [치명타] 발생시, 해당 대미지 체크로 발생하는 대미지 / 회복량이 1.5배가 됩니다.
  */
 @Component
 public class K011_Critical implements KeywordBlueprint {
@@ -28,8 +28,8 @@ public class K011_Critical implements KeywordBlueprint {
                 "치명",
                 true,
                 """
-                        해당 스킬이 n×10%p의 [치명타] 확률을 갖습니다.
-                        [치명타] 발생시, 해당 대미지 체크로 발생하는 대미지 / 회복량이 2배가 됩니다.
+                        해당 스킬이 n×5%p의 [치명타] 확률을 갖습니다.
+                        [치명타] 발생시, 해당 대미지 체크로 발생하는 대미지 / 회복량이 1.5배가 됩니다.
                         """
         );
     }
@@ -37,12 +37,12 @@ public class K011_Critical implements KeywordBlueprint {
     @Override
     public int criticalChancePercent(KeywordRuntime rt, DamageKeywordCtx c, String kind) {
         if (rt.value() <= 0) return 0;
-        return Math.max(0, rt.value() * 10);
+        return Math.max(0, rt.value() * 5);
     }
 
     @Override
     public double criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) {
         if (rt.value() <= 0) return 1d;
-        return 1d + (rt.value() * 0.5d);
+        return 1.5d;
     }
 }
