@@ -11,6 +11,7 @@ import java.util.List;
  */
 public record JoinSessionRequest(
         String playerId,
+        Long characterId,
         List<String> passiveIds,
         List<String> presetDeckCardIds,
         String presetExCardId,

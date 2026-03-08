@@ -98,7 +98,7 @@ public class SessionController {
             throw new ResponseStatusException(FORBIDDEN, "playerId must match the authenticated user");
         }
         List<String> requestedPassiveIds = (req.passiveIds() == null) ? List.of() : req.passiveIds();
-        sessionService.join(code, requestedPlayerId, requestedPassiveIds, req.presetDeckCardIds(), req.presetExCardId(), req.ownedCards());
+        sessionService.join(code, requestedPlayerId, req.characterId(), requestedPassiveIds, req.presetDeckCardIds(), req.presetExCardId(), req.ownedCards());
 
         SessionStateDto state = sessionService.withSessionLock(code, rt -> {
             log.info("session join code={} playerId={} requestedPassiveIds={} playersNow={}",
