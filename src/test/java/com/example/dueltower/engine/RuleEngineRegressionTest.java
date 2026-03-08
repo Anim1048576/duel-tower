@@ -776,8 +776,8 @@ class RuleEngineRegressionTest {
             multiplier = PassiveOps.incomingCriticalAmountMultiplier(ec.state(), ec.ctx(), ec.out(), source, target, kind, multiplier, ec.actor().value());
             multiplier = applyStatusIncomingCriticalAmountMultiplier(ec, source, target, kind, multiplier);
 
-            multiplier = PassiveOps.criticalAmountMultiplier(ec.state(), ec.ctx(), ec.out(), source, target, kind, multiplier, ec.actor().value());
-            return applyStatusCriticalAmountMultiplier(ec, source, target, kind, multiplier);
+            multiplier = applyStatusCriticalAmountMultiplier(ec, source, target, kind, multiplier);
+            return PassiveOps.criticalAmountMultiplier(ec.state(), ec.ctx(), ec.out(), source, target, kind, multiplier, ec.actor().value());
         }
 
         private boolean isCritical(EffectContext ec, TargetRef source, TargetRef target, String kind) {
