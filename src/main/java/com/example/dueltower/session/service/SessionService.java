@@ -157,6 +157,9 @@ public class SessionService {
 
             PlayerState ps = new PlayerState(pid);
             ps.passiveIds(passiveIds);
+            if (characterIdRaw != null) {
+                rt.bindCharacterId(pid.value(), characterIdRaw);
+            }
 
             List<OwnedCard> ownedCards = parseOwnedCards(characterTemplate != null ? characterTemplate.ownedCards() : ownedCardsRaw);
             ps.ownedCards(ownedCards);
@@ -234,6 +237,7 @@ public class SessionService {
             validateDeckBuild(deckCardIds, ps.ownedCards(), currentDeckCardIds(ps, state));
             loadDeck(state, ps, deckCardIds);
             shuffleDeck(state, ps);
+            persistCharacterDeck(rt, target, deckCardIds);
             return state;
         });
     }
@@ -456,6 +460,18 @@ public class SessionService {
 
     private boolean isLockedInDeck(OwnedCardDto dto) {
         return Boolean.TRUE.equals(dto.lockedInDeck());
+    }
+
+    private void persistCharacterDeck(SessionRuntime rt, PlayerId playerId, List<String> deckCardIds) {
+        Long characterId = rt.findCharacterIdByPlayerId(playerId.value());
+        if (characterId == null) {
+            return;
+        }
+
+        CharacterProfile profile = characterProfileRepository.findById(characterId)
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId));
+        profile.setCurrentSkillDeck(List.copyOf(deckCardIds));
+        characterProfileRepository.save(profile);
     }
 
     private boolean isStrengthened(OwnedCardDto dto) {

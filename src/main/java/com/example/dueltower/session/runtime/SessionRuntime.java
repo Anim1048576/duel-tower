@@ -24,6 +24,7 @@ public final class SessionRuntime {
     private final String gmToken;
     private final Map<String, String> playerTokensByPlayerId = new ConcurrentHashMap<>();
     private final Map<String, String> playerIdByToken = new ConcurrentHashMap<>();
+    private final Map<String, Long> characterIdByPlayerId = new ConcurrentHashMap<>();
 
     private final GameState state;
     private final EngineContext ctx;
@@ -58,6 +59,20 @@ public final class SessionRuntime {
 
     public String findPlayerIdByToken(String token) {
         return playerIdByToken.get(token);
+    }
+
+    public void bindCharacterId(String playerId, Long characterId) {
+        if (playerId == null || characterId == null) {
+            return;
+        }
+        characterIdByPlayerId.put(playerId, characterId);
+    }
+
+    public Long findCharacterIdByPlayerId(String playerId) {
+        if (playerId == null) {
+            return null;
+        }
+        return characterIdByPlayerId.get(playerId);
     }
 
     public GameState state() { return state; }
