@@ -4,6 +4,7 @@ import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.service.CardService;
+import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
@@ -47,6 +48,7 @@ public class SessionService {
 
     private final CharacterProfileRepository characterProfileRepository;
     private final CardService cardService;
+    private final DeckService deckService;
     private final StatusService statusService;
     private final KeywordService keywordService;
     private final PassiveService passiveService;
@@ -61,6 +63,7 @@ public class SessionService {
 
     public SessionService(CharacterProfileRepository characterProfileRepository,
                           CardService cardService,
+                          DeckService deckService,
                           StatusService statusService,
                           KeywordService keywordService,
                           PassiveService passiveService,
@@ -68,6 +71,7 @@ public class SessionService {
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.characterProfileRepository = characterProfileRepository;
         this.cardService = cardService;
+        this.deckService = deckService;
         this.statusService = statusService;
         this.keywordService = keywordService;
         this.passiveService = passiveService;
@@ -472,6 +476,7 @@ public class SessionService {
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId));
         profile.setCurrentSkillDeck(List.copyOf(deckCardIds));
         characterProfileRepository.save(profile);
+        deckService.upsertCharacterCurrentSkillDeck(characterId, deckCardIds);
     }
 
     private boolean isStrengthened(OwnedCardDto dto) {

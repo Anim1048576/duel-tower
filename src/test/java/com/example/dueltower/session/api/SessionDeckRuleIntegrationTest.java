@@ -130,6 +130,17 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(jsonPath("$.currentSkillDeck[9]").value("C004"))
                 .andExpect(jsonPath("$.currentSkillDeck[10]").value("C005"))
                 .andExpect(jsonPath("$.currentSkillDeck[11]").value("C005"));
+
+        String decksJson = mockMvc.perform(get("/api/content/decks")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertTrue(decksJson.contains("\"name\":\"character:" + characterIdValue + ":currentSkillDeck\""));
+        assertTrue(decksJson.contains("\"totalCards\":12"));
+        assertTrue(decksJson.contains("\"cardId\":\"C005\",\"count\":2"));
     }
 
     @Test
