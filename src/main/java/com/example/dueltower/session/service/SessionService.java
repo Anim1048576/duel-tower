@@ -548,7 +548,7 @@ public class SessionService {
                 throw new ResponseStatusException(BAD_REQUEST, "Each passiveId must be a non-empty string.");
             }
             String id = raw.trim();
-            if (!PASSIVE_ID_FORMAT.matcher(id).matches()) {
+            if (!passiveService.defsMap().containsKey(id) && !PASSIVE_ID_FORMAT.matcher(id).matches()) {
                 throw new ResponseStatusException(BAD_REQUEST, "Invalid passiveId format: " + id + " (expected P###, e.g. P001).");
             }
             if (!passiveService.defsMap().containsKey(id)) {
