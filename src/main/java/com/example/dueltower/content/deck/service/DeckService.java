@@ -3,9 +3,9 @@ package com.example.dueltower.content.deck.service;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.deck.domain.Deck;
 import com.example.dueltower.content.deck.domain.DeckCard;
-import com.example.dueltower.content.deck.repository.DeckRepository;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.dto.*;
+import com.example.dueltower.content.deck.repository.DeckRepository;
 import com.example.dueltower.engine.model.Ids;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,13 +34,10 @@ public class DeckService {
         DeckType type = (req == null || req.type() == null) ? DeckType.PLAYER : req.type();
         String name = normalizeName(req == null ? null : req.name(), type);
 
-        List<DeckCard> cards = normalizeAndValidateCards(type, req == null ? null : req.cards());
+        Map<String, Integer> cards = normalizeAndValidateCards(type, req == null ? null : req.cards());
 
-        Deck deck = Deck.builder()
-                .name(name)
-                .type(type)
-                .build();
-        deck.replaceCards(cards);
+        Deck deck = Deck.create(name, type);
+        deck.syncCards(cards);
 
         Deck saved = deckRepository.save(deck);
         return toResponse(saved);
@@ -64,11 +61,11 @@ public class DeckService {
         DeckType newType = (req == null || req.type() == null) ? deck.getType() : req.type();
         String newName = normalizeName(req == null ? null : req.name(), newType);
 
-        List<DeckCard> cards = normalizeAndValidateCards(newType, req == null ? null : req.cards());
+        Map<String, Integer> cards = normalizeAndValidateCards(newType, req == null ? null : req.cards());
 
-        deck.setType(newType);
-        deck.setName(newName);
-        deck.replaceCards(cards);
+        deck.changeType(newType);
+        deck.rename(newName);
+        deck.syncCards(cards);
 
         return toResponse(deck);
     }
@@ -82,39 +79,20 @@ public class DeckService {
     public DeckResponse addCards(long id, AddDeckCardsRequest req) {
         Deck deck = getDeckOrThrow(id);
 
-        // 현재 덱 상태 -> Map(cardId -> count)
-        Map<String, Integer> current = new LinkedHashMap<>();
-        if (deck.getCards() != null) {
-            for (DeckCard c : deck.getCards()) {
-                if (c == null) continue;
-                if (c.getCardId() == null || c.getCardId().isBlank()) continue;
-                current.merge(c.getCardId().trim(), c.getCount(), Integer::sum);
-            }
-        }
-
         // 요청 normalize + validate
         List<DeckCardSpec> specs = (req == null) ? null : req.cards();
         Map<String, Integer> toAdd = normalizeAndValidateAddSpecs(specs);
 
-        // apply
+        // add on current aggregate state
         for (var e : toAdd.entrySet()) {
-            current.merge(e.getKey(), e.getValue(), Integer::sum);
+            deck.addCardCopies(e.getKey(), e.getValue());
         }
 
         // constraints (PLAYER only, partial)
         if (deck.getType() == DeckType.PLAYER) {
-            deckLimitPolicy.validatePlayerDeckUpTo(current);
+            deckLimitPolicy.validatePlayerDeckUpTo(toCountMap(deck));
         }
 
-        // to entities & persist
-        List<DeckCard> newCards = new ArrayList<>();
-        for (var e : current.entrySet()) {
-            newCards.add(DeckCard.builder()
-                    .cardId(e.getKey())
-                    .count(e.getValue())
-                    .build());
-        }
-        deck.replaceCards(newCards);
         return toResponse(deck);
     }
 
@@ -130,14 +108,11 @@ public class DeckService {
         deckLimitPolicy.validatePlayerDeckExact(merged);
 
         Deck deck = deckRepository.findFirstByTypeAndName(DeckType.PLAYER, deckName)
-                .orElseGet(() -> Deck.builder()
-                        .type(DeckType.PLAYER)
-                        .name(deckName)
-                        .build());
+                .orElseGet(() -> Deck.create(deckName, DeckType.PLAYER));
 
-        deck.setType(DeckType.PLAYER);
-        deck.setName(deckName);
-        deck.replaceCards(toEntities(merged));
+        deck.changeType(DeckType.PLAYER);
+        deck.rename(deckName);
+        deck.syncCards(merged);
         deckRepository.save(deck);
     }
 
@@ -212,21 +187,10 @@ public class DeckService {
         }
     }
 
-    private static List<DeckCard> toEntities(Map<String, Integer> merged) {
-        List<DeckCard> cards = new ArrayList<>();
-        for (var e : merged.entrySet()) {
-            cards.add(DeckCard.builder()
-                    .cardId(e.getKey())
-                    .count(e.getValue())
-                    .build());
-        }
-        return cards;
-    }
-
     /**
      * cards 요청을 Map(cardId -> count)로 정규화 + 카드ID 존재 검증 + (플레이어 덱만) 제약 검증
      */
-    private List<DeckCard> normalizeAndValidateCards(DeckType type, List<DeckCardSpec> specs) {
+    private Map<String, Integer> normalizeAndValidateCards(DeckType type, List<DeckCardSpec> specs) {
         Map<String, Integer> merged = normalizeAndMergeSpecs(specs);
 
         // validate cardId exists in content
@@ -237,7 +201,7 @@ public class DeckService {
             deckLimitPolicy.validatePlayerDeckExact(merged);
         }
 
-        return toEntities(merged);
+        return merged;
     }
 
     /**
@@ -249,14 +213,20 @@ public class DeckService {
         return merged;
     }
 
+    private Map<String, Integer> toCountMap(Deck deck) {
+        Map<String, Integer> current = new LinkedHashMap<>();
+        for (DeckCard c : deck.getCards()) {
+            current.merge(c.getCardId(), c.getCount(), Integer::sum);
+        }
+        return current;
+    }
+
     private DeckResponse toResponse(Deck deck) {
         int total = 0;
         List<DeckCardDto> cards = new ArrayList<>();
-        if (deck.getCards() != null) {
-            for (DeckCard c : deck.getCards()) {
-                total += c.getCount();
-                cards.add(new DeckCardDto(c.getCardId(), c.getCount()));
-            }
+        for (DeckCard c : deck.getCards()) {
+            total += c.getCount();
+            cards.add(new DeckCardDto(c.getCardId(), c.getCount()));
         }
         return new DeckResponse(deck.getId(), deck.getName(), deck.getType(), total, List.copyOf(cards));
     }
