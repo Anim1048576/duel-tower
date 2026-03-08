@@ -1,14 +1,15 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import { navigate } from '../lib/router'
-  import { createSession, explainApiError, joinSession } from '../lib/api'
+  import { createSession, explainApiError, joinSession, listCharacterProfiles, type CharacterProfileResponse } from '../lib/api'
   import { copyToClipboard } from '../lib/clipboard'
   import PageSkeleton from '../lib/PageSkeleton.svelte'
   import { session, setGmId, setGmToken, setLastError, setMeId, setPlayerToken, setSessionCode } from '../stores/session'
   import { ensureCards } from '../stores/content'
   import { refreshState } from '../stores/combat'
   import { pushToast } from '../stores/log'
-  import { presets } from '../stores/presets'
   import { auth, doLogin, doSignup } from '../stores/auth'
+  import type { OwnedCard } from '../lib/model'
 
   let meId = ''
   let joinCode = ''
@@ -17,13 +18,97 @@
   let authMode: 'login' | 'signup' = 'login'
   let username = ''
   let password = ''
+  let characterBusy = false
+  let characterError = ''
+  let characterProfiles: CharacterProfileResponse[] = []
+  let selectedCharacterId = ""
 
   $: if ($auth.status === 'authenticated') meId = $auth.username
   $: if ($auth.status !== 'authenticated' && $session.meId && meId === '') meId = $session.meId
   $: if ($session.code && joinCode === '') joinCode = $session.code
-
-  $: selectedPreset = $presets.presets.find((p) => p.id === $presets.selectedId) ?? $presets.presets[0]
   $: if ($auth.status === 'authenticated') setMeId($auth.username)
+
+  $: selectedCharacter = characterProfiles.find((profile) => String(profile.id) === selectedCharacterId) ?? null
+
+  function parseExCardId(raw: string): string {
+    try {
+      const parsed = JSON.parse(raw)
+      if (typeof parsed === 'string') return parsed.trim()
+      if (parsed && typeof parsed === 'object' && typeof parsed.id === 'string') return parsed.id.trim()
+      return ''
+    } catch {
+      return ''
+    }
+  }
+
+  function parseOwnedCards(raw: string): OwnedCard[] {
+    try {
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return []
+
+      return parsed.flatMap((item) => {
+        if (typeof item === 'string') {
+          const cardId = item.trim()
+          return cardId ? [{ cardId, weakened: false }] : []
+        }
+
+        if (item && typeof item === 'object' && typeof item.cardId === 'string') {
+          const cardId = item.cardId.trim()
+          if (!cardId) return []
+          const weakened = Boolean((item as { weakened?: unknown }).weakened)
+          return [{ cardId, weakened }]
+        }
+
+        return []
+      })
+    } catch {
+      return []
+    }
+  }
+
+  function toPassiveIds(profile: CharacterProfileResponse): string[] {
+    return [profile.trait1, profile.trait2]
+      .map((value) => (value ?? '').trim())
+      .filter((value) => /^P\d{3}$/.test(value))
+  }
+
+  function getJoinPayload(profile: CharacterProfileResponse | null) {
+    if (!profile) {
+      return {
+        passiveIds: [],
+        presetDeckCardIds: undefined,
+        presetExCardId: undefined,
+        ownedCards: undefined,
+      }
+    }
+
+    const ownedCards = parseOwnedCards(profile.ownedCards)
+    const exCardId = parseExCardId(profile.exCard)
+
+    return {
+      passiveIds: toPassiveIds(profile),
+      presetDeckCardIds: profile.currentSkillDeck?.length ? profile.currentSkillDeck : undefined,
+      presetExCardId: exCardId || undefined,
+      ownedCards: ownedCards.length ? ownedCards : undefined,
+    }
+  }
+
+  async function loadCharacterProfiles() {
+    if ($auth.status !== 'authenticated') return
+
+    characterBusy = true
+    characterError = ''
+    try {
+      characterProfiles = await listCharacterProfiles()
+      if (!characterProfiles.some((profile) => String(profile.id) === selectedCharacterId)) {
+        selectedCharacterId = characterProfiles[0] ? String(characterProfiles[0].id) : ""
+      }
+    } catch (e) {
+      characterError = explainApiError(e)
+    } finally {
+      characterBusy = false
+    }
+  }
 
   async function submitAuth() {
     authBusy = true
@@ -38,6 +123,7 @@
       }
 
       setMeId(username.trim())
+      await loadCharacterProfiles()
       pushToast(authMode === 'signup' ? '회원가입 완료' : '로그인 완료', username.trim())
     } finally {
       authBusy = false
@@ -45,6 +131,11 @@
   }
 
   async function doCreate() {
+    if (!selectedCharacter) {
+      pushToast('캐릭터 선택 필요', '로비 입장 전에 캐릭터를 먼저 선택해 주세요.')
+      return
+    }
+
     busy = true
     setLastError(undefined)
     try {
@@ -54,16 +145,18 @@
       setSessionCode(res.code)
       setGmId(res.gmId)
       setGmToken(res.gmToken)
+      const payload = getJoinPayload(selectedCharacter)
       const joinRes = await joinSession(
         res.code,
         $auth.username.trim(),
-        selectedPreset?.passiveIds ?? [],
-        selectedPreset?.deck?.length ? selectedPreset.deck : undefined,
-        selectedPreset?.ex ?? undefined,
+        payload.passiveIds,
+        payload.presetDeckCardIds,
+        payload.presetExCardId,
+        payload.ownedCards,
       )
       setPlayerToken(joinRes.playerToken)
       await refreshState()
-      pushToast('세션 생성', res.code)
+      pushToast('세션 생성', `${res.code} · ${selectedCharacter.name}`)
       navigate('/lobby')
     } catch (e) {
       setLastError(explainApiError(e))
@@ -74,6 +167,11 @@
   }
 
   async function doJoin() {
+    if (!selectedCharacter) {
+      pushToast('캐릭터 선택 필요', '로비 입장 전에 캐릭터를 먼저 선택해 주세요.')
+      return
+    }
+
     busy = true
     setLastError(undefined)
     try {
@@ -82,16 +180,18 @@
       const code = joinCode.trim().toUpperCase()
       setSessionCode(code)
       setGmToken('')
+      const payload = getJoinPayload(selectedCharacter)
       const joinRes = await joinSession(
         code,
         $auth.username.trim(),
-        selectedPreset?.passiveIds ?? [],
-        selectedPreset?.deck?.length ? selectedPreset.deck : undefined,
-        selectedPreset?.ex ?? undefined,
+        payload.passiveIds,
+        payload.presetDeckCardIds,
+        payload.presetExCardId,
+        payload.ownedCards,
       )
       setPlayerToken(joinRes.playerToken)
       await refreshState()
-      pushToast('세션 참가', code)
+      pushToast('세션 참가', `${code} · ${selectedCharacter.name}`)
       navigate('/lobby')
     } catch (e) {
       setLastError(explainApiError(e))
@@ -106,6 +206,12 @@
     if (ok) pushToast('복사됨', text)
     else pushToast('복사 실패')
   }
+
+  onMount(async () => {
+    if ($auth.status === 'authenticated') {
+      await loadCharacterProfiles()
+    }
+  })
 </script>
 
 <PageSkeleton title="Session" summary="세션 생성/참가 전용 페이지">
@@ -134,6 +240,35 @@
     {/if}
   </div>
 
+  <div class="card" style="margin-bottom:12px;">
+    <div class="cardTitle">입장 캐릭터 선택</div>
+    <div class="hint">로비 입장 전에 이 세션에서 사용할 캐릭터를 선택하세요.</div>
+    <div class="spacer"></div>
+    <div class="row wrap" style="gap:8px; align-items:center;">
+      <select class="input" style="min-width:260px" bind:value={selectedCharacterId} disabled={$auth.status !== 'authenticated' || characterBusy || characterProfiles.length === 0}>
+        {#if characterProfiles.length === 0}
+          <option value="">캐릭터 없음</option>
+        {/if}
+        {#each characterProfiles as profile}
+          <option value={profile.id}>#{profile.id} · {profile.name}</option>
+        {/each}
+      </select>
+      <button class="btn" type="button" on:click={loadCharacterProfiles} disabled={$auth.status !== 'authenticated' || characterBusy}>
+        {characterBusy ? '불러오는 중…' : '목록 새로고침'}
+      </button>
+    </div>
+    {#if selectedCharacter}
+      <div class="hint" style="margin-top:8px;">
+        선택됨: <span class="mono">{selectedCharacter.name}</span>
+        · 패시브 {toPassiveIds(selectedCharacter).length || 0}개
+        · 덱 {selectedCharacter.currentSkillDeck?.length ?? 0}장
+      </div>
+    {/if}
+    {#if characterError}
+      <div class="hint" style="margin-top:8px; color:var(--state-danger);">캐릭터 로드 실패: {characterError}</div>
+    {/if}
+  </div>
+
   <div class="row wrap" style="justify-content:flex-start; gap:12px;">
     <span class="pill">내 ID</span>
     <input class="input mono" style="width:220px" bind:value={meId} placeholder="playerId" readonly />
@@ -154,7 +289,7 @@
       <div class="cardTitle">세션 생성</div>
       <div class="hint">GM ID로 <span class="mono">{meId || 'me'}</span> 사용</div>
       <div class="spacer"></div>
-      <button class="btn primary" disabled={busy || $auth.status !== 'authenticated' || !meId.trim()} on:click={doCreate}>{busy ? '처리 중…' : '생성'}</button>
+      <button class="btn primary" disabled={busy || $auth.status !== 'authenticated' || !meId.trim() || !selectedCharacter} on:click={doCreate}>{busy ? '처리 중…' : '생성'}</button>
     </div>
 
     <div class="card">
@@ -163,7 +298,7 @@
       <div class="spacer"></div>
       <form class="row wrap" on:submit|preventDefault={doJoin}>
         <input class="input mono" style="width:220px" bind:value={joinCode} placeholder="세션 코드" />
-        <button class="btn" type="submit" disabled={busy || $auth.status !== 'authenticated' || !meId.trim() || !joinCode.trim()}>{busy ? '처리 중…' : '참가'}</button>
+        <button class="btn" type="submit" disabled={busy || $auth.status !== 'authenticated' || !meId.trim() || !joinCode.trim() || !selectedCharacter}>{busy ? '처리 중…' : '참가'}</button>
         {#if joinCode.trim()}
           <button class="btn" type="button" on:click={() => copy(joinCode.trim().toUpperCase())}>코드 복사</button>
         {/if}
