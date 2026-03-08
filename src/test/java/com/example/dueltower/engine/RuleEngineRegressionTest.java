@@ -174,6 +174,48 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    void criticalCanBeModifiedByStatusAndPassiveHooks() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId critical = fx.addHandCard(fx.player, "CRITICAL_STRIKE");
+
+        fx.player.statusSet(TestCriticalStatus.ID, 1);
+        fx.player.passiveIds().add(TestCriticalPassive.ID);
+
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        int hpBefore = fx.enemy.hp();
+        EngineResult play = fx.process(new PlayCardCommand(UUID.randomUUID(), fx.state.version(), fx.playerId, critical,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))));
+
+        assertTrue(play.accepted());
+        assertEquals(hpBefore - 15, fx.enemy.hp(), "critical multiplier should become x3");
+        assertTrue(play.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("critical! damage x3")));
+    }
+
+    @Test
+    void incomingCriticalHooksCanModifyReceivedCriticalDamage() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId enemyCritical = fx.addEnemyHandCard("CRITICAL_STRIKE");
+
+        fx.enemy.statusSet(TestCriticalStatus.ID, 1); // 치명 확률 100% 보장
+        fx.player.statusSet(TestIncomingCriticalStatus.ID, 1);
+        fx.player.passiveIds().add(TestIncomingCriticalPassive.ID);
+
+        fx.enemy.ap(3);
+        fx.startSimpleCombat();
+        fx.forceMainTurnForEnemy();
+
+        int hpBefore = fx.player.hp();
+        EngineResult play = fx.process(new EnemyPlayCardCommand(UUID.randomUUID(), fx.state.version(), fx.enemyId, enemyCritical,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))));
+
+        assertTrue(play.accepted());
+        assertEquals(hpBefore - 20, fx.player.hp(), "keyword x2 -> incoming passive +1 -> incoming status +1 => x4");
+        assertTrue(play.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("critical! damage x4")));
+    }
+
+    @Test
     void turnEndProcessesRegenAndPainWithStackDecay() {
         TestFixture fx = TestFixture.basic();
         fx.state.combat(new CombatState());
@@ -433,7 +475,8 @@ class RuleEngineRegressionTest {
             for (StatusBlueprint bp : List.of(
                     new S001_Shield(), new S002_Regeneration(), new S004_Evasion(),
                     new S101_Pain(), new S102_Stun(), new S103_Pressure(), new S104_Destruction(),
-                    new S105_Weak(), new S106_Vulnerable(), new S108_Seal(), new S301_Barrier()
+                    new S105_Weak(), new S106_Vulnerable(), new S108_Seal(), new S301_Barrier(),
+                    new TestCriticalStatus(), new TestIncomingCriticalStatus()
             )) {
                 statusDefs.put(bp.id(), bp.definition());
                 statusEffects.put(bp.id(), bp);
@@ -446,7 +489,17 @@ class RuleEngineRegressionTest {
                 keywordEffects.put(bp.id(), bp);
             }
 
-            this.ctx = new EngineContext(defs, effects, statusDefs, statusEffects, keywordDefs, keywordEffects);
+            Map<String, PassiveDefinition> passiveDefs = new HashMap<>();
+            Map<String, com.example.dueltower.engine.core.effect.passive.PassiveEffect> passiveEffects = new HashMap<>();
+            TestCriticalPassive criticalPassive = new TestCriticalPassive();
+            passiveDefs.put(TestCriticalPassive.ID, TestCriticalPassive.definition());
+            passiveEffects.put(TestCriticalPassive.ID, criticalPassive);
+
+            TestIncomingCriticalPassive incomingCriticalPassive = new TestIncomingCriticalPassive();
+            passiveDefs.put(TestIncomingCriticalPassive.ID, TestIncomingCriticalPassive.definition());
+            passiveEffects.put(TestIncomingCriticalPassive.ID, incomingCriticalPassive);
+
+            this.ctx = new EngineContext(defs, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, passiveDefs, passiveEffects);
         }
 
         static TestFixture basic() {
@@ -541,6 +594,117 @@ class RuleEngineRegressionTest {
             CardDefinition def = effect.definition();
             defs.put(def.id(), def);
             effects.put(def.id(), effect);
+        }
+    }
+
+    private static final class TestCriticalStatus implements com.example.dueltower.content.status.model.StatusBlueprint {
+        static final String ID = "TEST_CRITICAL_STATUS";
+
+        @Override
+        public String id() {
+            return ID;
+        }
+
+        @Override
+        public StatusDefinition definition() {
+            return new StatusDefinition(ID, "치명 증폭 상태", StatusKind.BUFF, StatusScope.CHARACTER, Set.of(), 10, false, "치명 확률/배율을 증가시킨다.");
+        }
+
+        @Override
+        public int onCriticalChancePercent(com.example.dueltower.engine.core.effect.status.StatusRuntime rt,
+                                           StatusOwnerRef owner,
+                                           TargetRef source,
+                                           TargetRef target,
+                                           String kind,
+                                           int currentChance) {
+            return currentChance + 90;
+        }
+
+        @Override
+        public int onCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.status.StatusRuntime rt,
+                                              StatusOwnerRef owner,
+                                              TargetRef source,
+                                              TargetRef target,
+                                              String kind,
+                                              int currentMultiplier) {
+            return Math.max(currentMultiplier, 3);
+        }
+    }
+
+    private static final class TestCriticalPassive implements com.example.dueltower.engine.core.effect.passive.PassiveEffect {
+        static final String ID = "TEST_CRITICAL_PASSIVE";
+
+        @Override
+        public String id() {
+            return ID;
+        }
+
+        static PassiveDefinition definition() {
+            return new PassiveDefinition(ID, "치명 증폭 패시브", 10, "치명 확률과 배율을 올린다.");
+        }
+
+        @Override
+        public int onCriticalChancePercent(com.example.dueltower.engine.core.effect.passive.PassiveRuntime rt,
+                                           TargetRef source,
+                                           TargetRef target,
+                                           String kind,
+                                           int currentChance) {
+            return currentChance + 60;
+        }
+
+        @Override
+        public int onCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.passive.PassiveRuntime rt,
+                                              TargetRef source,
+                                              TargetRef target,
+                                              String kind,
+                                              int currentMultiplier) {
+            return currentMultiplier + 1;
+        }
+    }
+
+    private static final class TestIncomingCriticalStatus implements com.example.dueltower.content.status.model.StatusBlueprint {
+        static final String ID = "TEST_INCOMING_CRITICAL_STATUS";
+
+        @Override
+        public String id() {
+            return ID;
+        }
+
+        @Override
+        public StatusDefinition definition() {
+            return new StatusDefinition(ID, "피격 치명 증폭 상태", StatusKind.BUFF, StatusScope.CHARACTER, Set.of(), 10, false, "받는 치명 배율을 증가시킨다.");
+        }
+
+        @Override
+        public int onIncomingCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.status.StatusRuntime rt,
+                                                      StatusOwnerRef owner,
+                                                      TargetRef source,
+                                                      TargetRef target,
+                                                      String kind,
+                                                      int currentMultiplier) {
+            return currentMultiplier + 1;
+        }
+    }
+
+    private static final class TestIncomingCriticalPassive implements com.example.dueltower.engine.core.effect.passive.PassiveEffect {
+        static final String ID = "TEST_INCOMING_CRITICAL_PASSIVE";
+
+        @Override
+        public String id() {
+            return ID;
+        }
+
+        static PassiveDefinition definition() {
+            return new PassiveDefinition(ID, "피격 치명 증폭 패시브", 10, "받는 치명 배율을 증가시킨다.");
+        }
+
+        @Override
+        public int onIncomingCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.passive.PassiveRuntime rt,
+                                                      TargetRef source,
+                                                      TargetRef target,
+                                                      String kind,
+                                                      int currentMultiplier) {
+            return currentMultiplier + 1;
         }
     }
 
