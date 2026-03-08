@@ -638,7 +638,334 @@
 
 ---
 
-## 19. 이번 시점의 오픈 이슈
+## 19. P0 백로그 (실행 단위)
+
+아래 백로그는 현재 업로드된 코드/룰 기준으로, **지금 바로 이슈로 쪼개서 진행할 수 있는 수준**으로 정리한 것이다.
+
+### EPIC P0-1. 전투 재시작과 전투 불능 규칙 고정
+
+#### P0-1-1. 체력 0 기반 전투 불능과 덱 소진 기반 전투 불능을 분리 정착
+
+* 문제
+
+    * 전투 불능에는 전투 간 유지되어야 하는 경우와 전투 종료 시 초기화되어야 하는 경우가 섞여 있다.
+    * 현재 회귀 테스트에서도 이 구분이 핵심 보호 대상이다.
+* 목표
+
+    * `BATTLE_INCAPACITATED_PERSISTENT`와 `BATTLE_INCAPACITATED`의 생명주기를 명확히 분리한다.
+* 완료 기준
+
+    * 체력 0 기반 전투 불능은 전투 재시작 후에도 유지된다.
+    * 덱 소진 기반 전투 불능은 전투 재시작 후 초기화된다.
+    * 새 전투 시작 시 지속 전투 불능 플레이어는 턴 오더와 오프닝 드로우에서 제외된다.
+* 주요 파일
+
+    * `engine/core/combat/CombatEntityOps.java`
+    * `engine/core/combat/VictoryOps.java`
+    * `engine/command/StartCombatCommand.java`
+    * `engine/command/DrawCommand.java`
+    * `engine/RuleEngineRegressionTest.java`
+
+#### P0-1-2. 전투 시작 초기화 규칙 표준화
+
+* 문제
+
+    * 새 전투 시작 시 무엇을 초기화하고 무엇을 유지하는지 코드상 진입점이 흩어질 가능성이 있다.
+* 목표
+
+    * 전투 시작 초기화 규칙을 한 곳에서 설명 가능한 수준으로 정리한다.
+* 완료 기준
+
+    * StartCombat 시 초기화 목록이 문서와 테스트로 고정된다.
+    * EX 쿨다운, 턴 관련 일시 상태, pending decision, 드로우 가능 상태의 초기화 범위가 명확하다.
+* 산출물
+
+    * 전투 시작 초기화 체크리스트
+    * 회귀 테스트 3개 이상 추가
+
+### EPIC P0-2. pending decision 흐름 완성
+
+#### P0-2-1. 손패 제한 강제 버리기 UX/서버 규칙 일치
+
+* 문제
+
+    * 손패 제한은 서버에서 pending decision을 생성하지만, 실제 플레이에서 "왜 막혔는지"와 "무엇을 버릴 수 있는지"의 안내가 더 선명해야 한다.
+* 목표
+
+    * 서버와 프론트 모두에서 손패 제한 처리 경험을 완성한다.
+* 완료 기준
+
+    * pending decision 존재 시 일반 행동이 차단된다.
+    * 부동 카드만 있는 경우, 실제 룰대로 예외 처리된다.
+    * 프론트에서 선택 개수 제한과 제출 가능 상태가 명확히 보인다.
+* 주요 파일
+
+    * `engine/core/HandLimitOps.java`
+    * `engine/command/DiscardToHandLimitCommand.java`
+    * `engine/command/CommandValidation.java`
+    * `duel-tower-ui/src/routes/Combat.svelte`
+
+#### P0-2-2. 이니셔티브 동률 해결 플로우 마감
+
+* 문제
+
+    * 현재 엔진에는 동률 그룹과 해결 커맨드가 있지만, 실전 UX 관점에서 전체 흐름을 더 닫아야 한다.
+* 목표
+
+    * 동률 발생 → 순서 지정 → 모든 동률 해소 → 턴 시작 흐름을 일관되게 만든다.
+* 완료 기준
+
+    * 동률 플레이어 모두에게 적절한 pending decision이 생성된다.
+    * 잘못된 그룹 인덱스/멤버 조합/중복 응답이 모두 방어된다.
+    * 프론트에서 순서 조정과 확정이 가능하다.
+* 주요 파일
+
+    * `engine/command/StartCombatCommand.java`
+    * `engine/command/ResolveInitiativeTieCommand.java`
+    * `duel-tower-ui/src/routes/Combat.svelte`
+
+#### P0-2-3. 서치 선택 pending decision 공통화 점검
+
+* 문제
+
+    * 검색/선택형 효과가 늘어나면 SearchPick 계열 흐름이 다른 pending decision과 충돌하기 쉽다.
+* 목표
+
+    * SearchPick을 hand limit / initiative tie와 같은 공통 규칙으로 묶는다.
+* 완료 기준
+
+    * 동시에 둘 이상의 pending decision이 생성되지 않는다.
+    * SearchPick 해결 후 상태/로그/버전이 정상 갱신된다.
+* 주요 파일
+
+    * `engine/core/SearchPickOps.java`
+    * `engine/command/ResolveSearchPickCommand.java`
+    * 관련 테스트 전부
+
+### EPIC P0-3. 덱 편집 / 보유 카드 / 잊기 루프 제품화
+
+#### P0-3-1. 덱 편집 규칙을 세션 기능으로 고정
+
+* 문제
+
+    * 현재 덱 편집은 이미 강한 제약을 가지지만, 제품 입장에서는 "왜 저장이 안 되는지"가 더 직접적으로 보여야 한다.
+* 목표
+
+    * 덱 편집을 단순 CRUD가 아니라 규칙 기반 세션 액션으로 고정한다.
+* 완료 기준
+
+    * 다음 규칙이 모두 테스트와 UI 메시지로 보장된다.
+
+        * 정확히 12장
+        * 동일 카드 최대 3장
+        * 보유 카드 수량 초과 불가
+        * 전투 중 불가
+        * 저주 상태 불가
+        * 변경 2장 초과 불가
+        * locked-in-deck 카드 제거 불가
+* 주요 파일
+
+    * `session/service/SessionService.java`
+    * `content/deck/service/DeckService.java`
+    * `duel-tower-ui/src/routes/DeckEdit.svelte`
+    * `session/api/SessionDeckRuleIntegrationTest.java`
+
+#### P0-3-2. 보유 카드 20장 초과 시 잊기 강제 루프 닫기
+
+* 문제
+
+    * 현재 forgettingRequired와 forget API는 존재하지만, 노드/보상과 이어지는 실제 플레이 루프가 아직 약하다.
+* 목표
+
+    * 카드 획득 직후 20장 초과 여부를 검사하고, 잊기 완료 전 다른 진행을 제한한다.
+* 완료 기준
+
+    * 20장 초과 즉시 `forgettingRequired=true`가 된다.
+    * 덱 편집 및 다음 진행 진입이 적절히 차단된다.
+    * 잊기 가능 카드가 없을 때 명시적인 오류를 준다.
+* 주요 파일
+
+    * `engine/model/PlayerState.java`
+    * `session/service/OwnedCardForgetPolicy.java`
+    * `session/service/SessionService.java`
+    * `session/api/SessionDeckRuleIntegrationTest.java`
+
+#### P0-3-3. 덱 편집/잊기 화면을 실제 세션 상태에 연결
+
+* 문제
+
+    * 프론트는 레이아웃이 이미 있으나, 제품적으로는 아직 "규칙 기반 편집기"보다 "보기 좋은 목업"에 가까운 부분이 남아 있다.
+* 목표
+
+    * 서버 응답을 그대로 쓰는 실전용 덱 운영 화면으로 바꾼다.
+* 완료 기준
+
+    * 현재 덱, 보유 카드, 잠금/강화/약화 상태, 편집 불가 사유, 잊기 필요 여부가 모두 표시된다.
+    * 실패 응답이 토스트가 아니라 화면 레벨 피드백으로도 드러난다.
+* 주요 파일
+
+    * `duel-tower-ui/src/routes/DeckEdit.svelte`
+    * `duel-tower-ui/src/stores/session.ts`
+    * `duel-tower-ui/src/lib/model.ts`
+
+### EPIC P0-4. Node / Results / Inventory의 더미 상태 제거
+
+#### P0-4-1. Node를 하드코딩 목록에서 세션 상태 기반으로 전환
+
+* 문제
+
+    * 현재 Node 화면은 정적 배열(`N-1`, `N-2` 등) 기반이다.
+    * 이 상태로는 실제 런 진행과 연결되지 않는다.
+* 목표
+
+    * 현재 노드, 선택지, 진입 가능 여부, 선택 후 결과가 세션 상태에 존재하도록 만든다.
+* 완료 기준
+
+    * 프론트의 정적 노드 배열이 제거된다.
+    * 세션 상태 DTO에 현재 노드/선택지 정보가 포함된다.
+    * 선택 확정은 서버 API를 통해 처리된다.
+* 주요 파일
+
+    * `engine/model/GameState.java`
+    * `engine/model/NodeState.java`
+    * `session/dto/SessionStateDto.java`
+    * `session/service/SessionService.java`
+    * `session/api/SessionController.java`
+    * `duel-tower-ui/src/routes/Node.svelte`
+
+#### P0-4-2. Results를 exploration store 임시 상태에서 서버 결과 기반으로 전환
+
+* 문제
+
+    * 현재 Results는 `explorationResult` 스토어의 임시 데이터에 강하게 의존한다.
+* 목표
+
+    * 전투 종료/판정 성공·실패/보상 획득 결과를 서버 상태 또는 서버 응답 이벤트로 일관되게 표현한다.
+* 완료 기준
+
+    * 결과 카드는 서버에서 온 데이터만으로 렌더링 가능하다.
+    * 새로고침 후에도 최근 결과를 재구성할 수 있다.
+* 주요 파일
+
+    * `duel-tower-ui/src/stores/exploration.ts`
+    * `duel-tower-ui/src/routes/Results.svelte`
+    * `session/dto/EngineResponseDto.java`
+    * `session/runtime/StateMapper.java`
+
+#### P0-4-3. Inventory를 실제 세션 자원과 연결
+
+* 문제
+
+    * 현재 Inventory는 고정 슬롯 데이터 기반이다.
+* 목표
+
+    * 최소 범위라도 열쇠/상자/재료/전투 사용 가능 아이템을 세션 상태로 노출한다.
+* 완료 기준
+
+    * 프론트의 하드코딩 슬롯 배열이 제거된다.
+    * SessionState 또는 별도 인벤토리 DTO에서 데이터를 받아 렌더링한다.
+    * Node/Results와 인벤토리 증감이 연결된다.
+* 주요 파일
+
+    * `session/dto/*`
+    * `engine/model/*` 또는 런 상태 모델 신설
+    * `duel-tower-ui/src/routes/Inventory.svelte`
+
+### EPIC P0-5. 상태 동기화와 사용자 피드백 정리
+
+#### P0-5-1. SessionStateDto 확장
+
+* 문제
+
+    * 현재 DTO는 `nodeState`, `players`, `combat`, `cards` 중심이다.
+    * 노드 선택지, 최근 결과, 인벤토리, 런 메타데이터가 없다.
+* 목표
+
+    * 프론트가 임시 스토어 없이도 주요 화면을 렌더링할 수 있게 한다.
+* 완료 기준
+
+    * 최소한 다음 중 필요한 항목이 DTO에 포함된다.
+
+        * currentNode
+        * availableChoices
+        * recentResults
+        * inventory/resources
+        * progression flags
+* 주요 파일
+
+    * `session/dto/SessionStateDto.java`
+    * `session/runtime/StateMapper.java`
+
+#### P0-5-2. 오류 메시지 표준화
+
+* 문제
+
+    * 현재는 문자열 오류가 많고, 프론트에서 이를 제품 메시지로 다듬는 층이 아직 약하다.
+* 목표
+
+    * 사용자 메시지와 개발 로그 메시지를 분리 가능한 구조로 정리한다.
+* 완료 기준
+
+    * 주요 거부 사유에 코드/카테고리/메시지 체계가 생긴다.
+    * 전투, 덱 편집, 잊기, 노드 선택에서 같은 스타일의 메시지를 보여준다.
+* 주요 파일
+
+    * `session/api/SessionController.java`
+    * `engine/core/EngineResult.java`
+    * 프론트 에러 표시 컴포넌트
+
+### EPIC P0-6. 테스트 보호막 보강
+
+#### P0-6-1. 전투 회귀 테스트 보강
+
+* 추가 대상
+
+    * 전투 재시작 시 persistent/non-persistent incapacitation
+    * EX 쿨다운 라운드 경계
+    * pending decision 존재 시 일반 행동 차단
+    * summon/install/token 이동 규칙
+
+#### P0-6-2. 세션 통합 테스트 보강
+
+* 추가 대상
+
+    * 노드 선택 → 전투 진입
+    * 전투 종료 → 결과 반영 → 보유 카드 증가 → 잊기 강제
+    * 잊기 완료 후 덱 편집 재허용
+    * 로그인 사용자와 플레이어 토큰 권한 경계
+
+## 20. 추천 작업 순서
+
+### Sprint A
+
+1. P0-1-1 전투 불능 분리 고정
+2. P0-2-1 손패 제한 pending decision 마감
+3. P0-2-2 이니셔티브 동률 해결 마감
+
+### Sprint B
+
+1. P0-3-1 덱 편집 규칙 UI/서버 일치
+2. P0-3-2 잊기 강제 루프 마감
+3. P0-5-2 오류 메시지 표준화
+
+### Sprint C
+
+1. P0-4-1 Node 세션 상태화
+2. P0-4-2 Results 서버 결과화
+3. P0-4-3 Inventory 세션 자원화
+4. P0-5-1 SessionStateDto 확장
+
+## 21. 이 백로그의 핵심 판단
+
+현재 코드 기준으로 가장 먼저 없애야 할 것은 "룰이 없는 기능"보다 **서버 룰은 있는데 프론트와 세션 루프가 아직 완전히 닫히지 않은 부분**이다.
+
+즉, 새 기능을 더 넣기 전에 아래 세 가지를 먼저 닫는 것이 맞다.
+
+1. 전투 재시작/전투 불능/결정 대기 같은 엔진 핵심 규칙
+2. 보유 카드/덱 편집/잊기 같은 세션 지속 규칙
+3. Node/Results/Inventory의 하드코딩 UI를 실제 상태 기반 화면으로 전환
+
+## 22. 이번 시점의 오픈 이슈
 
 1. 노드 상태와 런 상태를 어디까지 서버 영속 상태로 둘 것인가
 2. 결과/보상 데이터를 세션 상태, 프로필 상태, 별도 런 상태 중 어디에 저장할 것인가
