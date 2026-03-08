@@ -202,6 +202,20 @@ public final class PlayerState {
         passiveIds.addAll(normalized);
     }
 
+    public void addPassiveId(String passiveId) {
+        if (passiveId == null || passiveId.isBlank()) {
+            throw new IllegalArgumentException("passiveId is blank");
+        }
+        String normalized = passiveId.trim();
+        if (passiveIds.contains(normalized)) {
+            throw new IllegalArgumentException("duplicate passiveIds are not allowed");
+        }
+        if (passiveIds.size() >= MAX_PASSIVES) {
+            throw new IllegalArgumentException("passiveIds supports up to " + MAX_PASSIVES);
+        }
+        passiveIds.add(normalized);
+    }
+
 
     /**
      * 보유 카드 슬롯 목록(최대 20).
