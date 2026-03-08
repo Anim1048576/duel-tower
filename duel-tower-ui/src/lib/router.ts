@@ -28,15 +28,19 @@ function withBase(path: string) {
   return base ? base + path : path
 }
 
-export const route = writable(stripBase(window.location.pathname))
+const initialPath = typeof window !== 'undefined' ? stripBase(window.location.pathname) : '/'
+
+export const route = writable(initialPath)
 
 export function startRouter() {
+  if (typeof window === 'undefined') return () => {}
   const onPop = () => route.set(stripBase(window.location.pathname))
   window.addEventListener('popstate', onPop)
   return () => window.removeEventListener('popstate', onPop)
 }
 
 export function navigate(path: string) {
+  if (typeof window === 'undefined') return
   const to = withBase(path)
   history.pushState({}, '', to)
   route.set(stripBase(window.location.pathname))

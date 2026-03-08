@@ -45,6 +45,16 @@ export function clearLogs() {
   logs.set([])
 }
 
+function formatPayload(payload: unknown) {
+  if (typeof payload === 'string') return payload
+  try {
+    return JSON.stringify(payload)
+  } catch {
+    return String(payload)
+  }
+}
+
+
 export function pushToast(title: string, message?: string) {
   const item: ToastItem = { id: uid('t'), at: new Date().toISOString(), title, message }
   toasts.update((v) => [item, ...v].slice(0, 6))
@@ -84,7 +94,7 @@ export function pushEngineEvents(events: EngineEvent[]) {
       const round = String(ev.payload?.round ?? '')
       info(`턴 진행`, `R${round} · 다음: ${next}`)
     } else {
-      info(ev.type, JSON.stringify(ev.payload))
+      info(ev.type, formatPayload(ev.payload))
     }
   }
 }
