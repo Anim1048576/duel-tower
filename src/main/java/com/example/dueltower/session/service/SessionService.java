@@ -4,6 +4,7 @@ import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.service.CardService;
+import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
@@ -47,6 +48,7 @@ public class SessionService {
 
     private final CharacterProfileRepository characterProfileRepository;
     private final CardService cardService;
+    private final DeckService deckService;
     private final StatusService statusService;
     private final KeywordService keywordService;
     private final PassiveService passiveService;
@@ -61,6 +63,7 @@ public class SessionService {
 
     public SessionService(CharacterProfileRepository characterProfileRepository,
                           CardService cardService,
+                          DeckService deckService,
                           StatusService statusService,
                           KeywordService keywordService,
                           PassiveService passiveService,
@@ -68,6 +71,7 @@ public class SessionService {
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.characterProfileRepository = characterProfileRepository;
         this.cardService = cardService;
+        this.deckService = deckService;
         this.statusService = statusService;
         this.keywordService = keywordService;
         this.passiveService = passiveService;
@@ -157,6 +161,9 @@ public class SessionService {
 
             PlayerState ps = new PlayerState(pid);
             ps.passiveIds(passiveIds);
+            if (characterIdRaw != null) {
+                rt.bindCharacterId(pid.value(), characterIdRaw);
+            }
 
             List<OwnedCard> ownedCards = parseOwnedCards(characterTemplate != null ? characterTemplate.ownedCards() : ownedCardsRaw);
             ps.ownedCards(ownedCards);
@@ -234,6 +241,7 @@ public class SessionService {
             validateDeckBuild(deckCardIds, ps.ownedCards(), currentDeckCardIds(ps, state));
             loadDeck(state, ps, deckCardIds);
             shuffleDeck(state, ps);
+            persistCharacterDeck(rt, target, deckCardIds);
             return state;
         });
     }
@@ -456,6 +464,19 @@ public class SessionService {
 
     private boolean isLockedInDeck(OwnedCardDto dto) {
         return Boolean.TRUE.equals(dto.lockedInDeck());
+    }
+
+    private void persistCharacterDeck(SessionRuntime rt, PlayerId playerId, List<String> deckCardIds) {
+        Long characterId = rt.findCharacterIdByPlayerId(playerId.value());
+        if (characterId == null) {
+            return;
+        }
+
+        CharacterProfile profile = characterProfileRepository.findById(characterId)
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId));
+        profile.setCurrentSkillDeck(List.copyOf(deckCardIds));
+        characterProfileRepository.save(profile);
+        deckService.upsertCharacterCurrentSkillDeck(characterId, deckCardIds);
     }
 
     private boolean isStrengthened(OwnedCardDto dto) {

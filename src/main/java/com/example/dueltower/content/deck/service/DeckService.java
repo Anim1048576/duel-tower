@@ -119,6 +119,29 @@ public class DeckService {
     }
 
     @Transactional
+    public void upsertCharacterCurrentSkillDeck(long characterId, List<String> deckCardIds) {
+        if (characterId <= 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "characterId must be positive");
+        }
+
+        String deckName = characterCurrentDeckName(characterId);
+        Map<String, Integer> merged = normalizeAndMergeCardIds(deckCardIds);
+        validateCardIdsExist(merged.keySet());
+        deckLimitPolicy.validatePlayerDeckExact(merged);
+
+        Deck deck = deckRepository.findFirstByTypeAndName(DeckType.PLAYER, deckName)
+                .orElseGet(() -> Deck.builder()
+                        .type(DeckType.PLAYER)
+                        .name(deckName)
+                        .build());
+
+        deck.setType(DeckType.PLAYER);
+        deck.setName(deckName);
+        deck.replaceCards(toEntities(merged));
+        deckRepository.save(deck);
+    }
+
+    @Transactional
     public void delete(long id) {
         if (!deckRepository.existsById(id)) {
             throw new ResponseStatusException(NOT_FOUND, "deck not found: " + id);
@@ -157,6 +180,26 @@ public class DeckService {
             merged.merge(cardId, count, Integer::sum);
         }
         return merged;
+    }
+
+    private Map<String, Integer> normalizeAndMergeCardIds(List<String> cardIds) {
+        if (cardIds == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "deckCardIds is required");
+        }
+
+        Map<String, Integer> merged = new LinkedHashMap<>();
+        for (String rawCardId : cardIds) {
+            if (rawCardId == null || rawCardId.isBlank()) {
+                throw new ResponseStatusException(BAD_REQUEST, "deckCardIds must not contain blank values");
+            }
+            String cardId = rawCardId.trim();
+            merged.merge(cardId, 1, Integer::sum);
+        }
+        return merged;
+    }
+
+    private String characterCurrentDeckName(long characterId) {
+        return "character:" + characterId + ":currentSkillDeck";
     }
 
     private void validateCardIdsExist(Set<String> cardIds) {

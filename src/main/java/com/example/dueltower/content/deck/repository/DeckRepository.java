@@ -1,6 +1,7 @@
 package com.example.dueltower.content.deck.repository;
 
 import com.example.dueltower.content.deck.domain.Deck;
+import com.example.dueltower.content.deck.domain.DeckType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -17,4 +18,7 @@ public interface DeckRepository extends JpaRepository<Deck, Long> {
 
     @EntityGraph(attributePaths = {"cards"})
     Optional<Deck> findWithCardsById(Long id);
+
+    @EntityGraph(attributePaths = {"cards"})
+    Optional<Deck> findFirstByTypeAndName(DeckType type, String name);
 }

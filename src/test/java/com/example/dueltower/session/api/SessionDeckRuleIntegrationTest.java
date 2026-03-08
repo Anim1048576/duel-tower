@@ -64,6 +64,85 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+
+    @Test
+    void deckEditPersistsToCharacterCurrentSkillDeck() throws Exception {
+        MockHttpSession session = signUpAndLogin("playerPersist", "playerPersist@example.com", "password123");
+
+        String characterId = mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "테스트 캐릭터",
+                                  "gender": "OTHER",
+                                  "age": 20,
+                                  "wish": "소원",
+                                  "disposition": "중립",
+                                  "oneLiner": "한마디",
+                                  "story": "설명",
+                                  "physical": 5,
+                                  "technique": 5,
+                                  "sense": 5,
+                                  "willpower": 5,
+                                  "trait1": null,
+                                  "trait2": null,
+                                  "ownedCards": "[{\"cardId\":\"C001\"},{\"cardId\":\"C001\"},{\"cardId\":\"C001\"},{\"cardId\":\"C002\"},{\"cardId\":\"C002\"},{\"cardId\":\"C002\"},{\"cardId\":\"C003\"},{\"cardId\":\"C003\"},{\"cardId\":\"C003\"},{\"cardId\":\"C004\"},{\"cardId\":\"C004\"},{\"cardId\":\"C004\"},{\"cardId\":\"C005\"},{\"cardId\":\"C005\"}]",
+                                  "currentSkillDeck": ["C001","C001","C001","C002","C002","C002","C003","C003","C003","C004","C004","C004"],
+                                  "exCard": "{\"id\":\"EX901\"}"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String characterIdValue = extractJsonStringOrNumberValue(characterId, "id");
+
+        String code = createSession(session);
+        MvcResult joinResult = mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "playerPersist",
+                                  "characterId": %s
+                                }
+                                """.formatted(characterIdValue)))
+                .andExpect(status().isOk())
+                .andReturn();
+        String playerToken = extractJsonStringValue(joinResult.getResponse().getContentAsString(), "playerToken");
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "playerPersist")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(deckUpdateBody("""
+                                "C001","C001","C001",
+                                "C002","C002","C002",
+                                "C003","C003","C003",
+                                "C004","C005","C005"
+                                """)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/content/characters/{id}", characterIdValue)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentSkillDeck[0]").value("C001"))
+                .andExpect(jsonPath("$.currentSkillDeck[9]").value("C004"))
+                .andExpect(jsonPath("$.currentSkillDeck[10]").value("C005"))
+                .andExpect(jsonPath("$.currentSkillDeck[11]").value("C005"));
+
+        String decksJson = mockMvc.perform(get("/api/content/decks")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertTrue(decksJson.contains("\"name\":\"character:" + characterIdValue + ":currentSkillDeck\""));
+        assertTrue(decksJson.contains("\"totalCards\":12"));
+        assertTrue(decksJson.contains("\"cardId\":\"C005\",\"count\":2"));
+    }
+
     @Test
     void combatStateBlocksDeckEditWithExplicitError() throws Exception {
         MockHttpSession session = signUpAndLogin("player2", "player2@example.com", "password123");
@@ -614,6 +693,14 @@ class SessionDeckRuleIntegrationTest {
                   ]
                 }
                 """.formatted(cardsJson);
+    }
+
+    private String extractJsonStringOrNumberValue(String json, String key) {
+        Pattern pattern = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*(?:\"([^\"]*)\"|(\\d+))");
+        Matcher matcher = pattern.matcher(json);
+        assertTrue(matcher.find(), "JSON field not found: " + key);
+        String stringValue = matcher.group(1);
+        return stringValue != null ? stringValue : matcher.group(2);
     }
 
     private String extractJsonStringValue(String json, String key) {
