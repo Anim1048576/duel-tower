@@ -196,7 +196,7 @@
             <div class="gcardSub mono">{c.id}</div>
             <div class="gcardTags">
               {#if c.token}<span class="tag d">TOKEN</span>{/if}
-              {#each c.keywords as k (k)}
+              {#each c.keywords ?? [] as k (k)}
                 <span class="tag p">{k}</span>
               {/each}
             </div>

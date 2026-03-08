@@ -11,9 +11,25 @@
   export let onClick: (() => void) | undefined
 
   $: keywords = card?.keywords ?? []
+  $: clickable = Boolean(onClick)
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (!clickable) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onClick?.()
+    }
+  }
 </script>
 
-<div class="gcard" on:click={() => onClick?.()}>
+<div
+  class="gcard"
+  class:clickable
+  role={clickable ? 'button' : undefined}
+  tabindex={clickable ? 0 : undefined}
+  on:click={() => onClick?.()}
+  on:keydown={handleKeydown}
+>
   <div class="row" style="justify-content:space-between; align-items:flex-start">
     <div class="gcardTitle">{card.name}</div>
     <span class="badge">{card.cost}</span>
@@ -26,3 +42,8 @@
     {/each}
   </div>
 </div>
+
+
+<style>
+  .clickable { cursor: pointer; }
+</style>
