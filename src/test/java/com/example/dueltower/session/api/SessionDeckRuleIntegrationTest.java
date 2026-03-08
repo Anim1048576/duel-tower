@@ -50,7 +50,7 @@ class SessionDeckRuleIntegrationTest {
     void nonCombatStateAllowsDeckEdit() throws Exception {
         MockHttpSession session = signUpAndLogin("player1", "player1@example.com", "password123");
         String code = createSession(session);
-        String playerToken = joinWithOwnedCards(code, session, "player1", ownedCardsWithC005());
+        String playerToken = joinWithOwnedCards(code, session, "player1", ownedCardsWithTig001_Card());
 
         mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player1")
                         .header("X-Player-Token", playerToken)
@@ -59,7 +59,7 @@ class SessionDeckRuleIntegrationTest {
                                 "C001","C001","C001",
                                 "C002","C002","C002",
                                 "C003","C003","C003",
-                                "C004","C005","C005"
+                                "C004","Tig001_Card","Tig001_Card"
                                 """)))
                 .andExpect(status().isOk());
     }
@@ -78,7 +78,7 @@ class SessionDeckRuleIntegrationTest {
                                   "gender": "OTHER",
                                   "age": 20,
                                   "wish": "소원",
-                                  "disposition": "중립",
+                                  "disposition": "질서/선",
                                   "oneLiner": "한마디",
                                   "story": "설명",
                                   "physical": 5,
@@ -87,9 +87,9 @@ class SessionDeckRuleIntegrationTest {
                                   "willpower": 5,
                                   "trait1": null,
                                   "trait2": null,
-                                  "ownedCards": "[{\"cardId\":\"C001\"},{\"cardId\":\"C001\"},{\"cardId\":\"C001\"},{\"cardId\":\"C002\"},{\"cardId\":\"C002\"},{\"cardId\":\"C002\"},{\"cardId\":\"C003\"},{\"cardId\":\"C003\"},{\"cardId\":\"C003\"},{\"cardId\":\"C004\"},{\"cardId\":\"C004\"},{\"cardId\":\"C004\"},{\"cardId\":\"C005\"},{\"cardId\":\"C005\"}]",
-                                  "currentSkillDeck": ["C001","C001","C001","C002","C002","C002","C003","C003","C003","C004","C004","C004"],
-                                  "exCard": "{\"id\":\"EX901\"}"
+                                  "ownedCards": "[{\\\"cardId\\\":\\\"C001\\\"},{\\\"cardId\\\":\\\"C001\\\"},{\\\"cardId\\\":\\\"C001\\\"},{\\\"cardId\\\":\\\"C002\\\"},{\\\"cardId\\\":\\\"C002\\\"},{\\\"cardId\\\":\\\"C002\\\"},{\\\"cardId\\\":\\\"C003\\\"},{\\\"cardId\\\":\\\"C003\\\"},{\\\"cardId\\\":\\\"C003\\\"},{\\\"cardId\\\":\\\"C004\\\"},{\\\"cardId\\\":\\\"C004\\\"},{\\\"cardId\\\":\\\"C004\\\"},{\\\"cardId\\\":\\\"Tig001_Card\\\"},{\\\"cardId\\\":\\\"Tig001_Card\\\"}]",
+                                  "currentSkillDeck": ["C001","C001","C001","C002","C002","C002","C003","C003","C003","C004","C004","Tig001_Card"],
+                                  "exCard": "{\\\"id\\\":\\\"EX901\\\"}"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -119,7 +119,7 @@ class SessionDeckRuleIntegrationTest {
                                 "C001","C001","C001",
                                 "C002","C002","C002",
                                 "C003","C003","C003",
-                                "C004","C005","C005"
+                                "C004","Tig001_Card","Tig001_Card"
                                 """)))
                 .andExpect(status().isOk());
 
@@ -128,8 +128,8 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.currentSkillDeck[0]").value("C001"))
                 .andExpect(jsonPath("$.currentSkillDeck[9]").value("C004"))
-                .andExpect(jsonPath("$.currentSkillDeck[10]").value("C005"))
-                .andExpect(jsonPath("$.currentSkillDeck[11]").value("C005"));
+                .andExpect(jsonPath("$.currentSkillDeck[10]").value("Tig001_Card"))
+                .andExpect(jsonPath("$.currentSkillDeck[11]").value("Tig001_Card"));
 
         String decksJson = mockMvc.perform(get("/api/content/decks")
                         .session(session))
@@ -140,14 +140,14 @@ class SessionDeckRuleIntegrationTest {
 
         assertTrue(decksJson.contains("\"name\":\"character:" + characterIdValue + ":currentSkillDeck\""));
         assertTrue(decksJson.contains("\"totalCards\":12"));
-        assertTrue(decksJson.contains("\"cardId\":\"C005\",\"count\":2"));
+        assertTrue(decksJson.contains("\"cardId\":\"Tig001_Card\",\"count\":2"));
     }
 
     @Test
     void combatStateBlocksDeckEditWithExplicitError() throws Exception {
         MockHttpSession session = signUpAndLogin("player2", "player2@example.com", "password123");
         String code = createSession(session);
-        String playerToken = joinWithOwnedCards(code, session, "player2", ownedCardsWithC005());
+        String playerToken = joinWithOwnedCards(code, session, "player2", ownedCardsWithTig001_Card());
 
         sessionService.withSessionLock(code, rt -> {
             rt.state().nodeState(NodeState.COMBAT);
@@ -161,7 +161,7 @@ class SessionDeckRuleIntegrationTest {
                                 "C001","C001","C001",
                                 "C002","C002","C002",
                                 "C003","C003","C003",
-                                "C004","C005","C005"
+                                "C004","Tig001_Card","Tig001_Card"
                                 """)))
                 .andExpect(status().isForbidden())
                 .andReturn();
@@ -173,7 +173,7 @@ class SessionDeckRuleIntegrationTest {
     void curseStateBlocksDeckEditWithExplicitError() throws Exception {
         MockHttpSession session = signUpAndLogin("player3", "player3@example.com", "password123");
         String code = createSession(session);
-        String playerToken = joinWithOwnedCards(code, session, "player3", ownedCardsWithC005());
+        String playerToken = joinWithOwnedCards(code, session, "player3", ownedCardsWithTig001_Card());
 
         sessionService.withSessionLock(code, rt -> {
             rt.state().nodeState(NodeState.CURSE);
@@ -187,7 +187,7 @@ class SessionDeckRuleIntegrationTest {
                                 "C001","C001","C001",
                                 "C002","C002","C002",
                                 "C003","C003","C003",
-                                "C004","C005","C005"
+                                "C004","Tig001_Card","Tig001_Card"
                                 """)))
                 .andExpect(status().isForbidden())
                 .andReturn();
@@ -199,7 +199,7 @@ class SessionDeckRuleIntegrationTest {
     void deckEditAllowsAtMostTwoCardChanges() throws Exception {
         MockHttpSession session = signUpAndLogin("player4", "player4@example.com", "password123");
         String code = createSession(session);
-        String playerToken = joinWithOwnedCards(code, session, "player4", ownedCardsWithC005());
+        String playerToken = joinWithOwnedCards(code, session, "player4", ownedCardsWithTig001_Card());
 
         mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player4")
                         .header("X-Player-Token", playerToken)
@@ -208,7 +208,7 @@ class SessionDeckRuleIntegrationTest {
                                 "C001","C001","C001",
                                 "C002","C002","C002",
                                 "C003","C003","C003",
-                                "C004","C005","C005"
+                                "C004","Tig001_Card","Tig001_Card"
                                 """)))
                 .andExpect(status().isOk());
     }
@@ -217,7 +217,7 @@ class SessionDeckRuleIntegrationTest {
     void deckEditFailsWhenMoreThanTwoCardsChanged() throws Exception {
         MockHttpSession session = signUpAndLogin("player5", "player5@example.com", "password123");
         String code = createSession(session);
-        String playerToken = joinWithOwnedCards(code, session, "player5", ownedCardsWithC005());
+        String playerToken = joinWithOwnedCards(code, session, "player5", ownedCardsWithTig001_Card());
 
         MvcResult result = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player5")
                         .header("X-Player-Token", playerToken)
@@ -226,7 +226,7 @@ class SessionDeckRuleIntegrationTest {
                                 "C001","C001","C001",
                                 "C002","C002","C002",
                                 "C003","C003","C003",
-                                "C005","C005","C005"
+                                "Tig001_Card","Tig001_Card","Tig001_Card"
                                 """)))
                 .andExpect(status().isBadRequest())
                 .andReturn();
@@ -255,9 +255,9 @@ class SessionDeckRuleIntegrationTest {
                     {"cardId":"C004","weakened":false},
                     {"cardId":"C004","weakened":false},
                     {"cardId":"C004","weakened":false},
-                    {"cardId":"C005","weakened":false},
-                    {"cardId":"C005","weakened":false},
-                    {"cardId":"C005","weakened":false},
+                    {"cardId":"Tig001_Card","weakened":false},
+                    {"cardId":"Tig001_Card","weakened":false},
+                    {"cardId":"Tig001_Card","weakened":false},
                     {"cardId":"C006","weakened":false},
                     {"cardId":"C006","weakened":false},
                     {"cardId":"C006","weakened":false}
@@ -267,7 +267,7 @@ class SessionDeckRuleIntegrationTest {
                     "C002","C002",
                     "C003","C003",
                     "C004","C004",
-                    "C005","C005",
+                    "Tig001_Card","Tig001_Card",
                     "C006","C006"
                   ]
                 }
@@ -289,7 +289,7 @@ class SessionDeckRuleIntegrationTest {
                                 "C002",
                                 "C003","C003",
                                 "C004","C004",
-                                "C005","C005",
+                                "Tig001_Card","Tig001_Card",
                                 "C006","C006"
                                 """)))
                 .andExpect(status().isOk());
@@ -316,7 +316,7 @@ class SessionDeckRuleIntegrationTest {
                     {"cardId":"C004","weakened":false},
                     {"cardId":"C004","weakened":false},
                     {"cardId":"C004","weakened":false},
-                    {"cardId":"C005","weakened":false}
+                    {"cardId":"Tig001_Card","weakened":false}
                   ],
                   "presetDeckCardIds": [
                     "C001","C001","C001",
@@ -344,7 +344,7 @@ class SessionDeckRuleIntegrationTest {
                                 "C002","C002","C002",
                                 "C003","C003","C003",
                                 "C004","C004","C004",
-                                "C005"
+                                "Tig001_Card"
                                 """)))
                 .andExpect(status().isBadRequest())
                 .andReturn();
@@ -442,7 +442,7 @@ class SessionDeckRuleIntegrationTest {
                 {"cardId":"C004","weakened":false},
                 {"cardId":"C004","weakened":false},
                 {"cardId":"C004","weakened":false},
-                {"cardId":"C005","weakened":false}
+                {"cardId":"Tig001_Card","weakened":false}
                 """);
 
         MvcResult result = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/forget", code, "player11")
@@ -476,7 +476,7 @@ class SessionDeckRuleIntegrationTest {
                 {"cardId":"C004","weakened":false},
                 {"cardId":"C004","weakened":false},
                 {"cardId":"C004","weakened":false},
-                {"cardId":"C005","weakened":false}
+                {"cardId":"Tig001_Card","weakened":false}
                 """);
 
         MvcResult result = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/forget", code, "player12")
@@ -510,7 +510,7 @@ class SessionDeckRuleIntegrationTest {
                 {"cardId":"C004","weakened":false},
                 {"cardId":"C004","weakened":false},
                 {"cardId":"C004","weakened":false},
-                {"cardId":"C005","weakened":false}
+                {"cardId":"Tig001_Card","weakened":false}
                 """);
 
         MvcResult result = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/forget", code, "player13")
@@ -613,12 +613,12 @@ class SessionDeckRuleIntegrationTest {
         for (int i = 0; i < 3; i++) cards.add("{\"cardId\":\"C002\",\"weakened\":false,\"lockedInDeck\":true}");
         for (int i = 0; i < 3; i++) cards.add("{\"cardId\":\"C003\",\"weakened\":false,\"lockedInDeck\":true}");
         for (int i = 0; i < 3; i++) cards.add("{\"cardId\":\"C004\",\"weakened\":false,\"lockedInDeck\":true}");
-        for (int i = 0; i < 9; i++) cards.add("{\"cardId\":\"C005\",\"weakened\":false,\"lockedInDeck\":true}");
+        for (int i = 0; i < 9; i++) cards.add("{\"cardId\":\"Tig001_Card\",\"weakened\":false,\"lockedInDeck\":true}");
         return String.join(",\n", cards);
     }
 
     private String twentyOneOwnedCardsJson() {
-        return twentyOwnedCardsJson() + ",\n{\"cardId\":\"C005\",\"weakened\":false}";
+        return twentyOwnedCardsJson() + ",\n{\"cardId\":\"Tig001_Card\",\"weakened\":false}";
     }
 
     private String repeatCardJson(String cardId, int count) {
@@ -665,7 +665,7 @@ class SessionDeckRuleIntegrationTest {
         return extractJsonStringValue(joinResult.getResponse().getContentAsString(), "playerToken");
     }
 
-    private String ownedCardsWithC005() {
+    private String ownedCardsWithTig001_Card() {
         return """
                 {"cardId":"C001","weakened":false},
                 {"cardId":"C001","weakened":false},
@@ -679,9 +679,9 @@ class SessionDeckRuleIntegrationTest {
                 {"cardId":"C004","weakened":false},
                 {"cardId":"C004","weakened":false},
                 {"cardId":"C004","weakened":false},
-                {"cardId":"C005","weakened":false},
-                {"cardId":"C005","weakened":false},
-                {"cardId":"C005","weakened":false}
+                {"cardId":"Tig001_Card","weakened":false},
+                {"cardId":"Tig001_Card","weakened":false},
+                {"cardId":"Tig001_Card","weakened":false}
                 """;
     }
 
