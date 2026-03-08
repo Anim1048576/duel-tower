@@ -135,6 +135,83 @@ public final class PassiveOps {
         return Math.max(cur, 0);
     }
 
+
+    public static int criticalChancePercent(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef source,
+            TargetRef target,
+            String kind,
+            int baseChance,
+            String hookSource
+    ) {
+        PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
+        int cur = baseChance;
+        for (HookEntry it : collectEntries(state, ctx, source)) {
+            if (!ctx.hasPassiveEffect(it.passiveId())) continue;
+            cur = ctx.passiveEffect(it.passiveId()).onCriticalChancePercent(rt, source, target, kind, cur);
+        }
+        return Math.max(0, Math.min(100, cur));
+    }
+
+    public static int criticalAmountMultiplier(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef source,
+            TargetRef target,
+            String kind,
+            int baseMultiplier,
+            String hookSource
+    ) {
+        PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
+        int cur = Math.max(1, baseMultiplier);
+        for (HookEntry it : collectEntries(state, ctx, source)) {
+            if (!ctx.hasPassiveEffect(it.passiveId())) continue;
+            cur = ctx.passiveEffect(it.passiveId()).onCriticalAmountMultiplier(rt, source, target, kind, cur);
+        }
+        return Math.max(1, cur);
+    }
+
+    public static int incomingCriticalChancePercent(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef source,
+            TargetRef target,
+            String kind,
+            int baseChance,
+            String hookSource
+    ) {
+        PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
+        int cur = baseChance;
+        for (HookEntry it : collectEntries(state, ctx, target)) {
+            if (!ctx.hasPassiveEffect(it.passiveId())) continue;
+            cur = ctx.passiveEffect(it.passiveId()).onIncomingCriticalChancePercent(rt, source, target, kind, cur);
+        }
+        return Math.max(0, Math.min(100, cur));
+    }
+
+    public static int incomingCriticalAmountMultiplier(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef source,
+            TargetRef target,
+            String kind,
+            int baseMultiplier,
+            String hookSource
+    ) {
+        PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
+        int cur = Math.max(1, baseMultiplier);
+        for (HookEntry it : collectEntries(state, ctx, target)) {
+            if (!ctx.hasPassiveEffect(it.passiveId())) continue;
+            cur = ctx.passiveEffect(it.passiveId()).onIncomingCriticalAmountMultiplier(rt, source, target, kind, cur);
+        }
+        return Math.max(1, cur);
+    }
+
     public static int onIncomingHeal(
             GameState state,
             EngineContext ctx,

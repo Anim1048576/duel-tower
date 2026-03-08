@@ -23,6 +23,38 @@ public interface PassiveEffect {
         return amount;
     }
 
+    /**
+     * 치명타 확률(%)을 조정하는 훅.
+     * - kind: "damage" | "heal"
+     */
+    default int onCriticalChancePercent(PassiveRuntime rt, TargetRef source, TargetRef target, String kind, int currentChance) {
+        return currentChance;
+    }
+
+    /**
+     * 치명타 배율을 조정하는 훅.
+     * - kind: "damage" | "heal"
+     */
+    default int onCriticalAmountMultiplier(PassiveRuntime rt, TargetRef source, TargetRef target, String kind, int currentMultiplier) {
+        return currentMultiplier;
+    }
+
+    /**
+     * 피격/피회복 대상 관점에서 치명타 확률(%)을 조정하는 훅.
+     * - kind: "damage" | "heal"
+     */
+    default int onIncomingCriticalChancePercent(PassiveRuntime rt, TargetRef source, TargetRef target, String kind, int currentChance) {
+        return currentChance;
+    }
+
+    /**
+     * 피격/피회복 대상 관점에서 치명타 배율을 조정하는 훅.
+     * - kind: "damage" | "heal"
+     */
+    default int onIncomingCriticalAmountMultiplier(PassiveRuntime rt, TargetRef source, TargetRef target, String kind, int currentMultiplier) {
+        return currentMultiplier;
+    }
+
     default int onCost(PassiveRuntime rt, TargetRef actor, CardInstance ci, CardDefinition def, int currentCost) {
         return currentCost;
     }

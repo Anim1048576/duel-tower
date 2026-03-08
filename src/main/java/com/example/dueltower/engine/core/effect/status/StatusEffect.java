@@ -28,6 +28,39 @@ public interface StatusEffect {
     }
 
 
+    /**
+     * 치명타 확률(%)을 조정하는 훅.
+     * - kind: "damage" | "heal"
+     */
+    default int onCriticalChancePercent(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, int currentChance) {
+        return currentChance;
+    }
+
+    /**
+     * 치명타 배율을 조정하는 훅.
+     * - kind: "damage" | "heal"
+     */
+    default int onCriticalAmountMultiplier(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, int currentMultiplier) {
+        return currentMultiplier;
+    }
+
+    /**
+     * 피격/피회복 대상 관점에서 치명타 확률(%)을 조정하는 훅.
+     * - kind: "damage" | "heal"
+     */
+    default int onIncomingCriticalChancePercent(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, int currentChance) {
+        return currentChance;
+    }
+
+    /**
+     * 피격/피회복 대상 관점에서 치명타 배율을 조정하는 훅.
+     * - kind: "damage" | "heal"
+     */
+    default int onIncomingCriticalAmountMultiplier(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, int currentMultiplier) {
+        return currentMultiplier;
+    }
+
+
 /**
  * 상태가 '카드 코스트'를 변형할 수 있는 훅.
  * - PlayCardCommand / UseExCommand에서 사용한다.
