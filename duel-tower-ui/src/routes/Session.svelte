@@ -9,6 +9,7 @@
   import { refreshState } from '../stores/combat'
   import { pushToast } from '../stores/log'
   import { auth, doLogin, doSignup } from '../stores/auth'
+  import type { OwnedCard } from '../lib/model'
 
   let meId = ''
   let joinCode = ''
@@ -29,13 +30,11 @@
 
   $: selectedCharacter = characterProfiles.find((profile) => String(profile.id) === selectedCharacterId) ?? null
 
-
   function toPassiveIds(profile: CharacterProfileResponse): string[] {
     return [profile.trait1, profile.trait2]
       .map((value) => (value ?? '').trim())
       .filter((value) => /^P\d{3}$/.test(value))
   }
-
 
   async function loadCharacterProfiles() {
     if ($auth.status !== 'authenticated') return
@@ -89,6 +88,7 @@
       setSessionCode(res.code)
       setGmId(res.gmId)
       setGmToken(res.gmToken)
+      const payload = getJoinPayload(selectedCharacter)
       const joinRes = await joinSession(
         res.code,
         $auth.username.trim(),
@@ -124,6 +124,7 @@
       const code = joinCode.trim().toUpperCase()
       setSessionCode(code)
       setGmToken('')
+      const payload = getJoinPayload(selectedCharacter)
       const joinRes = await joinSession(
         code,
         $auth.username.trim(),
