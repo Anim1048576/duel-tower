@@ -123,6 +123,51 @@ class SessionAuthIntegrationTest {
                 .andExpect(jsonPath("$.state.players.tester.passiveIds[0]").value("P001"));
     }
 
+
+    @Test
+    void joinSessionAcceptsNonPFormatPassiveIdsWhenDefinedInContent() throws Exception {
+        MockHttpSession session = signUpAndLogin("tester", "tester@example.com", "password123");
+
+        MvcResult createResult = mockMvc.perform(post("/api/sessions")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"gmId\":\"tester\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String code = extractJsonStringValue(createResult.getResponse().getContentAsString(), "code");
+
+        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
+                .name("TIG 캐릭터")
+                .gender(CharacterGender.OTHER)
+                .age(20)
+                .wish("테스트")
+                .disposition("질서/선")
+                .oneLiner("안녕하세요")
+                .story("join tig passive 테스트")
+                .physical(10)
+                .technique(10)
+                .sense(10)
+                .willpower(10)
+                .trait1("Tig001_Passive")
+                .trait2(null)
+                .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
+                .currentSkillDeck(List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"))
+                .exCard("{\"id\":\"EX901\"}")
+                .build());
+
+        mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "tester",
+                                  "characterId": %d
+                                }
+                                """.formatted(profile.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state.players.tester.passiveIds[0]").value("Tig001_Passive"));
+    }
+
     @Test
     void joinSessionAllowsCharacterWithEmptySkillDeck() throws Exception {
         MockHttpSession session = signUpAndLogin("tester", "tester@example.com", "password123");
