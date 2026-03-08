@@ -18,6 +18,8 @@ import com.example.dueltower.engine.core.combat.TurnPhases;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
+import com.example.dueltower.engine.core.effect.passive.PassiveOps;
+import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.*;
 import org.junit.jupiter.api.Test;
@@ -747,8 +749,116 @@ class RuleEngineRegressionTest {
             TargetRef src = (ec.actor() != null && ec.state().enemy(new EnemyId(ec.actor().value())) != null)
                     ? TargetRef.ofEnemy(new EnemyId(ec.actor().value()))
                     : TargetRef.ofPlayer(ec.actor());
-            DamageOps.apply(ec.state(), ec.ctx(), ec.out(), src, id, target, damage,
+
+            int finalAmount = damage;
+            int multiplier = criticalAmountMultiplier(ec, src, target, "damage");
+            if (multiplier > 1 && isCritical(ec, src, target, "damage")) {
+                finalAmount *= multiplier;
+                ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! damage x" + multiplier));
+            }
+
+            DamageOps.apply(ec.state(), ec.ctx(), ec.out(), src, id, target, finalAmount,
                     KeywordOps.damageFlags(ec.state(), ec.ctx(), src, ec.cardId(), target));
+        }
+
+        private int criticalAmountMultiplier(EffectContext ec, TargetRef source, TargetRef target, String kind) {
+            int multiplier = KeywordOps.criticalAmountMultiplier(ec.state(), ec.ctx(), source, ec.cardId(), target, kind);
+            multiplier = PassiveOps.criticalAmountMultiplier(ec.state(), ec.ctx(), ec.out(), source, target, kind, multiplier, ec.actor().value());
+            multiplier = applyStatusCriticalAmountMultiplier(ec, source, target, kind, multiplier);
+
+            multiplier = PassiveOps.incomingCriticalAmountMultiplier(ec.state(), ec.ctx(), ec.out(), source, target, kind, multiplier, ec.actor().value());
+            return applyStatusIncomingCriticalAmountMultiplier(ec, source, target, kind, multiplier);
+        }
+
+        private boolean isCritical(EffectContext ec, TargetRef source, TargetRef target, String kind) {
+            int chance = KeywordOps.criticalChancePercent(ec.state(), ec.ctx(), source, ec.cardId(), target, kind);
+            chance = PassiveOps.criticalChancePercent(ec.state(), ec.ctx(), ec.out(), source, target, kind, chance, ec.actor().value());
+            chance = applyStatusCriticalChancePercent(ec, source, target, kind, chance);
+
+            chance = PassiveOps.incomingCriticalChancePercent(ec.state(), ec.ctx(), ec.out(), source, target, kind, chance, ec.actor().value());
+            chance = applyStatusIncomingCriticalChancePercent(ec, source, target, kind, chance);
+            if (chance == 0) return false;
+
+            long mix = ec.state().seed();
+            mix ^= (ec.state().version() * 0x9E3779B97F4A7C15L);
+            mix ^= ((long) ec.out().size() << 32);
+            if (ec.cardId() != null) mix ^= ec.cardId().value().hashCode();
+            mix ^= target.toString().hashCode();
+            mix ^= kind.hashCode();
+
+            Random rnd = new Random(mix);
+            int roll = rnd.nextInt(100) + 1;
+            return roll <= chance;
+        }
+
+        private int applyStatusCriticalChancePercent(EffectContext ec, TargetRef source, TargetRef target, String kind, int baseChance) {
+            StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
+            int cur = baseChance;
+            for (HookEntry it : collectStatusEntries(ec, rt, source)) {
+                if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
+                int stacks = rt.stacks(it.owner(), it.statusId());
+                if (stacks <= 0) continue;
+                cur = ec.ctx().statusEffect(it.statusId()).onCriticalChancePercent(rt, it.owner(), source, target, kind, cur);
+            }
+            return Math.max(0, Math.min(100, cur));
+        }
+
+        private int applyStatusCriticalAmountMultiplier(EffectContext ec, TargetRef source, TargetRef target, String kind, int baseMultiplier) {
+            StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
+            int cur = Math.max(1, baseMultiplier);
+            for (HookEntry it : collectStatusEntries(ec, rt, source)) {
+                if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
+                int stacks = rt.stacks(it.owner(), it.statusId());
+                if (stacks <= 0) continue;
+                cur = ec.ctx().statusEffect(it.statusId()).onCriticalAmountMultiplier(rt, it.owner(), source, target, kind, cur);
+            }
+            return Math.max(1, cur);
+        }
+
+        private int applyStatusIncomingCriticalChancePercent(EffectContext ec, TargetRef source, TargetRef target, String kind, int baseChance) {
+            StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
+            int cur = baseChance;
+            for (HookEntry it : collectStatusEntries(ec, rt, target)) {
+                if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
+                int stacks = rt.stacks(it.owner(), it.statusId());
+                if (stacks <= 0) continue;
+                cur = ec.ctx().statusEffect(it.statusId()).onIncomingCriticalChancePercent(rt, it.owner(), source, target, kind, cur);
+            }
+            return Math.max(0, Math.min(100, cur));
+        }
+
+        private int applyStatusIncomingCriticalAmountMultiplier(EffectContext ec, TargetRef source, TargetRef target, String kind, int baseMultiplier) {
+            StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
+            int cur = Math.max(1, baseMultiplier);
+            for (HookEntry it : collectStatusEntries(ec, rt, target)) {
+                if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
+                int stacks = rt.stacks(it.owner(), it.statusId());
+                if (stacks <= 0) continue;
+                cur = ec.ctx().statusEffect(it.statusId()).onIncomingCriticalAmountMultiplier(rt, it.owner(), source, target, kind, cur);
+            }
+            return Math.max(1, cur);
+        }
+
+        private record HookEntry(StatusOwnerRef owner, String statusId, int priority) {}
+
+        private List<HookEntry> collectStatusEntries(EffectContext ec, StatusRuntime rt, TargetRef owner) {
+            List<HookEntry> entries = new ArrayList<>();
+
+            var ownerChar = StatusOwnerRef.of(owner);
+            for (String k : rt.statusMap(ownerChar).keySet()) {
+                entries.add(new HookEntry(ownerChar, k, ec.ctx().hasStatusDef(k) ? ec.ctx().statusDef(k).priority() : Integer.MAX_VALUE));
+            }
+
+            CombatState cs = ec.state().combat();
+            if (cs != null) {
+                var ownerFaction = StatusOwnerRef.of(CombatState.factionOf(owner));
+                for (String k : rt.statusMap(ownerFaction).keySet()) {
+                    entries.add(new HookEntry(ownerFaction, k, ec.ctx().hasStatusDef(k) ? ec.ctx().statusDef(k).priority() : Integer.MAX_VALUE));
+                }
+            }
+
+            entries.sort(Comparator.comparingInt(HookEntry::priority));
+            return entries;
         }
     }
 }
