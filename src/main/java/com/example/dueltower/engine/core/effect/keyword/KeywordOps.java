@@ -439,7 +439,7 @@ public final class KeywordOps {
     /**
      * Compute critical amount multiplier from keywords on the card.
      */
-    public static int criticalAmountMultiplier(
+    public static double criticalAmountMultiplier(
             GameState state,
             EngineContext ctx,
             TargetRef source,
@@ -447,16 +447,16 @@ public final class KeywordOps {
             TargetRef target,
             String kind
     ) {
-        if (cardId == null) return 1;
+        if (cardId == null) return 1d;
         CardInstance ci = state.card(cardId);
-        if (ci == null) return 1;
+        if (ci == null) return 1d;
 
         CardDefinition def = ctx.def(ci.defId());
         Map<String, Integer> kws = def.keywords();
-        if (kws == null || kws.isEmpty()) return 1;
+        if (kws == null || kws.isEmpty()) return 1d;
 
         DamageKeywordCtx dc = new DamageKeywordCtx(source, cardId, target);
-        int multiplier = 1;
+        double multiplier = 1d;
 
         for (var e : kws.entrySet()) {
             String kid = (e.getKey() == null) ? "" : e.getKey().trim();
@@ -466,11 +466,11 @@ public final class KeywordOps {
             if (!rt.present()) continue;
             if (!ctx.hasKeywordEffect(rt.id())) continue;
 
-            int next = ctx.keywordEffect(rt.id()).criticalAmountMultiplier(rt, dc, kind);
+            double next = ctx.keywordEffect(rt.id()).criticalAmountMultiplier(rt, dc, kind);
             if (next > multiplier) multiplier = next;
         }
 
-        return Math.max(1, multiplier);
+        return Math.max(1d, multiplier);
     }
 
 }

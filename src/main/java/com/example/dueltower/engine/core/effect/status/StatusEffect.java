@@ -40,7 +40,7 @@ public interface StatusEffect {
      * 치명타 배율을 조정하는 훅.
      * - kind: "damage" | "heal"
      */
-    default int onCriticalAmountMultiplier(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, int currentMultiplier) {
+    default double onCriticalAmountMultiplier(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, double currentMultiplier) {
         return currentMultiplier;
     }
 
@@ -56,7 +56,7 @@ public interface StatusEffect {
      * 피격/피회복 대상 관점에서 치명타 배율을 조정하는 훅.
      * - kind: "damage" | "heal"
      */
-    default int onIncomingCriticalAmountMultiplier(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, int currentMultiplier) {
+    default double onIncomingCriticalAmountMultiplier(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, double currentMultiplier) {
         return currentMultiplier;
     }
 

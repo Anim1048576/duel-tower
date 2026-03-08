@@ -35,7 +35,7 @@ public interface PassiveEffect {
      * 치명타 배율을 조정하는 훅.
      * - kind: "damage" | "heal"
      */
-    default int onCriticalAmountMultiplier(PassiveRuntime rt, TargetRef source, TargetRef target, String kind, int currentMultiplier) {
+    default double onCriticalAmountMultiplier(PassiveRuntime rt, TargetRef source, TargetRef target, String kind, double currentMultiplier) {
         return currentMultiplier;
     }
 
@@ -51,7 +51,7 @@ public interface PassiveEffect {
      * 피격/피회복 대상 관점에서 치명타 배율을 조정하는 훅.
      * - kind: "damage" | "heal"
      */
-    default int onIncomingCriticalAmountMultiplier(PassiveRuntime rt, TargetRef source, TargetRef target, String kind, int currentMultiplier) {
+    default double onIncomingCriticalAmountMultiplier(PassiveRuntime rt, TargetRef source, TargetRef target, String kind, double currentMultiplier) {
         return currentMultiplier;
     }
 

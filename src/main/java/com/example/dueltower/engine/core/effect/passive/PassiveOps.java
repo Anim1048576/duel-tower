@@ -155,23 +155,23 @@ public final class PassiveOps {
         return Math.max(0, Math.min(100, cur));
     }
 
-    public static int criticalAmountMultiplier(
+    public static double criticalAmountMultiplier(
             GameState state,
             EngineContext ctx,
             List<GameEvent> out,
             TargetRef source,
             TargetRef target,
             String kind,
-            int baseMultiplier,
+            double baseMultiplier,
             String hookSource
     ) {
         PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
-        int cur = Math.max(1, baseMultiplier);
+        double cur = Math.max(1d, baseMultiplier);
         for (HookEntry it : collectEntries(state, ctx, source)) {
             if (!ctx.hasPassiveEffect(it.passiveId())) continue;
             cur = ctx.passiveEffect(it.passiveId()).onCriticalAmountMultiplier(rt, source, target, kind, cur);
         }
-        return Math.max(1, cur);
+        return Math.max(1d, cur);
     }
 
     public static int incomingCriticalChancePercent(
@@ -193,23 +193,23 @@ public final class PassiveOps {
         return Math.max(0, Math.min(100, cur));
     }
 
-    public static int incomingCriticalAmountMultiplier(
+    public static double incomingCriticalAmountMultiplier(
             GameState state,
             EngineContext ctx,
             List<GameEvent> out,
             TargetRef source,
             TargetRef target,
             String kind,
-            int baseMultiplier,
+            double baseMultiplier,
             String hookSource
     ) {
         PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
-        int cur = Math.max(1, baseMultiplier);
+        double cur = Math.max(1d, baseMultiplier);
         for (HookEntry it : collectEntries(state, ctx, target)) {
             if (!ctx.hasPassiveEffect(it.passiveId())) continue;
             cur = ctx.passiveEffect(it.passiveId()).onIncomingCriticalAmountMultiplier(rt, source, target, kind, cur);
         }
-        return Math.max(1, cur);
+        return Math.max(1d, cur);
     }
 
     public static int onIncomingHeal(
