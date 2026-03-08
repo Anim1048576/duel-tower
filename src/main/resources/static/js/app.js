@@ -275,9 +275,72 @@
     const btnCreate = $('#btnCreateSession');
     const joinForm = $('#joinForm');
     const joinCode = $('#joinCode');
+    const btnJoin = $('#btnJoinSession');
     const out = $('#createdCode');
+    const createDisabledReason = $('#createDisabledReason');
+    const joinDisabledReason = $('#joinDisabledReason');
+
+    const canUseStorage = () => {
+      try {
+        const key = '__dt_home_probe__';
+        localStorage.setItem(key, '1');
+        localStorage.removeItem(key);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const updateActionState = () => {
+      const createReasons = [];
+      const joinReasons = [];
+      const storageOk = canUseStorage();
+
+      if (!storageOk) {
+        createReasons.push('localStorage 접근이 차단되어 세션 데이터를 저장할 수 없다.');
+        joinReasons.push('localStorage 접근이 차단되어 참가 상태를 저장할 수 없다.');
+      }
+
+      const rawCode = (joinCode?.value || '').trim();
+      const normalizedCode = rawCode.toUpperCase();
+      if (rawCode && !/^[A-Z0-9]{4,12}$/.test(normalizedCode)) {
+        joinReasons.push('참가 코드는 4~12자의 영문/숫자만 허용된다.');
+      }
+
+      const createDisabledByRule = createReasons.length > 0;
+      const joinDisabledByRule = joinReasons.length > 0;
+
+      if (btnCreate) btnCreate.disabled = createDisabledByRule;
+      if (btnJoin) btnJoin.disabled = joinDisabledByRule;
+
+      const createReasonsForUi = [...createReasons];
+      const joinReasonsForUi = [...joinReasons];
+
+      if (btnCreate?.disabled && !createDisabledByRule) {
+        createReasonsForUi.push('버튼이 외부 상태(속성/스크립트)로 비활성화되어 있다.');
+      }
+      if (btnJoin?.disabled && !joinDisabledByRule) {
+        joinReasonsForUi.push('버튼이 외부 상태(속성/스크립트)로 비활성화되어 있다.');
+      }
+
+      if (createDisabledReason) {
+        createDisabledReason.textContent = createReasonsForUi.length
+          ? `비활성화 이유: ${createReasonsForUi.join(' / ')}`
+          : '';
+      }
+
+      if (joinDisabledReason) {
+        joinDisabledReason.textContent = joinReasonsForUi.length
+          ? `비활성화 이유: ${joinReasonsForUi.join(' / ')}`
+          : '';
+      }
+    };
 
     btnCreate?.addEventListener('click', () => {
+      if (btnCreate.disabled) {
+        updateActionState();
+        return;
+      }
       const s = load(KEY.session, null) || {};
       const newCode = code();
       const session = {
@@ -294,8 +357,13 @@
       setTimeout(() => (location.href = '/ui/lobby'), 120);
     });
 
+    joinCode?.addEventListener('input', updateActionState);
+
     joinForm?.addEventListener('submit', (e) => {
       e.preventDefault();
+      updateActionState();
+      if (btnJoin?.disabled) return;
+
       const c = (joinCode?.value || '').trim().toUpperCase() || code();
       const session = load(KEY.session, null) || { gm: 'GM', players: [] };
       session.code = c;
@@ -306,6 +374,8 @@
       bind();
       location.href = '/ui/lobby';
     });
+
+    updateActionState();
   };
 
   const initLobby = () => {
