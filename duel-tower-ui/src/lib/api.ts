@@ -230,6 +230,7 @@ export async function joinSession(
   presetDeckCardIds?: string[] | null,
   presetExCardId?: string | null,
   ownedCards?: OwnedCard[] | null,
+  characterId?: number | null,
 ): Promise<JoinSessionResponse> {
   const hasPresetDeck = Array.isArray(presetDeckCardIds) && presetDeckCardIds.length > 0
   const hasPresetEx = typeof presetExCardId === 'string' && presetExCardId.trim().length > 0
@@ -238,6 +239,7 @@ export async function joinSession(
     method: 'POST',
     body: JSON.stringify({
       playerId,
+      characterId: typeof characterId === 'number' && Number.isFinite(characterId) ? characterId : undefined,
       passiveIds,
       presetDeckCardIds: hasPresetDeck ? presetDeckCardIds : undefined,
       presetExCardId: hasPresetEx ? presetExCardId : undefined,

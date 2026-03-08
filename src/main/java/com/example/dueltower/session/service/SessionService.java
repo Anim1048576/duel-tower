@@ -1,5 +1,7 @@
 package com.example.dueltower.session.service;
 
+import com.example.dueltower.character.domain.CharacterProfile;
+import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.keyword.service.KeywordService;
@@ -19,6 +21,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -38,7 +43,9 @@ public class SessionService {
     private static final int MAX_DECK_COPIES = 3;
     private static final int MAX_DECK_EDIT_CHANGES = 2;
     private static final Pattern PASSIVE_ID_FORMAT = Pattern.compile("^P\\d{3}$");
+    private static final ObjectMapper JSON = new ObjectMapper();
 
+    private final CharacterProfileRepository characterProfileRepository;
     private final CardService cardService;
     private final StatusService statusService;
     private final KeywordService keywordService;
@@ -52,12 +59,14 @@ public class SessionService {
     private final SecureRandom rnd = new SecureRandom();
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
 
-    public SessionService(CardService cardService,
+    public SessionService(CharacterProfileRepository characterProfileRepository,
+                          CardService cardService,
                           StatusService statusService,
                           KeywordService keywordService,
                           PassiveService passiveService,
                           @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
+        this.characterProfileRepository = characterProfileRepository;
         this.cardService = cardService;
         this.statusService = statusService;
         this.keywordService = keywordService;
@@ -114,6 +123,7 @@ public class SessionService {
 
     public GameState join(String code,
                           String playerIdRaw,
+                          Long characterIdRaw,
                           List<String> passiveIdsRaw,
                           List<String> presetDeckCardIdsRaw,
                           String presetExCardIdRaw,
@@ -124,7 +134,12 @@ public class SessionService {
 
         SessionRuntime rt = get(code);
         PlayerId pid = new PlayerId(playerIdRaw.trim());
-        List<String> passiveIds = parsePassiveIds(passiveIdsRaw);
+
+        CharacterJoinTemplate characterTemplate = (characterIdRaw == null)
+                ? null
+                : toCharacterJoinTemplate(loadCharacterProfile(characterIdRaw));
+
+        List<String> passiveIds = parsePassiveIds(characterTemplate != null ? characterTemplate.passiveIds() : passiveIdsRaw);
 
         return rt.withLock(() -> {
             GameState state = rt.state();
@@ -143,15 +158,16 @@ public class SessionService {
             PlayerState ps = new PlayerState(pid);
             ps.passiveIds(passiveIds);
 
-            List<OwnedCard> ownedCards = parseOwnedCards(ownedCardsRaw);
+            List<OwnedCard> ownedCards = parseOwnedCards(characterTemplate != null ? characterTemplate.ownedCards() : ownedCardsRaw);
             ps.ownedCards(ownedCards);
 
-            List<String> deckCardIds = parsePresetDeckCardIds(presetDeckCardIdsRaw);
+            List<String> deckCardIds = parsePresetDeckCardIds(characterTemplate != null ? characterTemplate.deckCardIds() : presetDeckCardIdsRaw);
             validateDeckBuild(deckCardIds, ps.ownedCards(), null);
 
             state.players().put(pid, ps);
             loadDeck(state, ps, deckCardIds);
-            addCardToEx(state, ps, new CardDefId(normalizeExCardId(presetExCardIdRaw)));
+            String exCardId = (characterTemplate != null) ? characterTemplate.exCardId() : presetExCardIdRaw;
+            addCardToEx(state, ps, new CardDefId(normalizeExCardId(exCardId)));
 
             shuffleDeck(state, ps);
             return state;
@@ -444,6 +460,77 @@ public class SessionService {
     private boolean isWeakened(OwnedCardDto dto) {
         return Boolean.TRUE.equals(dto.weakened());
     }
+
+    private CharacterProfile loadCharacterProfile(Long characterIdRaw) {
+        if (characterIdRaw == null || characterIdRaw <= 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "characterId must be a positive number");
+        }
+        return characterProfileRepository.findById(characterIdRaw)
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterIdRaw));
+    }
+
+    private CharacterJoinTemplate toCharacterJoinTemplate(CharacterProfile profile) {
+        List<String> passiveIds = new ArrayList<>(2);
+        if (profile.getTrait1() != null && !profile.getTrait1().isBlank()) passiveIds.add(profile.getTrait1().trim());
+        if (profile.getTrait2() != null && !profile.getTrait2().isBlank()) passiveIds.add(profile.getTrait2().trim());
+
+        List<OwnedCardDto> ownedCards = parseOwnedCardsJson(profile.getOwnedCards());
+        List<String> deckCardIds = profile.getCurrentSkillDeck();
+        String exCardId = parseExCardId(profile.getExCard());
+
+        return new CharacterJoinTemplate(
+                List.copyOf(passiveIds),
+                (deckCardIds == null || deckCardIds.isEmpty()) ? null : List.copyOf(deckCardIds),
+                exCardId,
+                ownedCards
+        );
+    }
+
+    private List<OwnedCardDto> parseOwnedCardsJson(String raw) {
+        if (raw == null || raw.isBlank()) return List.of();
+        try {
+            List<JsonNode> nodes = JSON.readValue(raw, new TypeReference<>() {});
+            List<OwnedCardDto> out = new ArrayList<>();
+            for (JsonNode node : nodes) {
+                if (node == null || node.isNull()) continue;
+                if (node.isTextual()) {
+                    String cardId = node.asText("").trim();
+                    if (!cardId.isEmpty()) out.add(new OwnedCardDto(cardId, false, false, false, true, null));
+                    continue;
+                }
+                String cardId = node.path("cardId").asText("").trim();
+                if (cardId.isEmpty()) continue;
+                boolean weakened = node.path("weakened").asBoolean(false);
+                out.add(new OwnedCardDto(cardId, false, weakened, false, true, null));
+            }
+            return List.copyOf(out);
+        } catch (Exception e) {
+            throw new ResponseStatusException(BAD_REQUEST, "character ownedCards JSON is invalid");
+        }
+    }
+
+    private String parseExCardId(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            JsonNode node = JSON.readTree(raw);
+            if (node == null || node.isNull()) return null;
+            if (node.isTextual()) {
+                String exId = node.asText("").trim();
+                return exId.isEmpty() ? null : exId;
+            }
+            String exId = node.path("id").asText("").trim();
+            return exId.isEmpty() ? null : exId;
+        } catch (Exception e) {
+            throw new ResponseStatusException(BAD_REQUEST, "character exCard JSON is invalid");
+        }
+    }
+
+    private record CharacterJoinTemplate(
+            List<String> passiveIds,
+            List<String> deckCardIds,
+            String exCardId,
+            List<OwnedCardDto> ownedCards
+    ) {}
 
     private List<String> parsePassiveIds(List<String> passiveIdsRaw) {
         if (passiveIdsRaw == null) return List.of();

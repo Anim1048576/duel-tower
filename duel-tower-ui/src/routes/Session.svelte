@@ -30,67 +30,10 @@
 
   $: selectedCharacter = characterProfiles.find((profile) => String(profile.id) === selectedCharacterId) ?? null
 
-  function parseExCardId(raw: string): string {
-    try {
-      const parsed = JSON.parse(raw)
-      if (typeof parsed === 'string') return parsed.trim()
-      if (parsed && typeof parsed === 'object' && typeof parsed.id === 'string') return parsed.id.trim()
-      return ''
-    } catch {
-      return ''
-    }
-  }
-
-  function parseOwnedCards(raw: string): OwnedCard[] {
-    try {
-      const parsed = JSON.parse(raw)
-      if (!Array.isArray(parsed)) return []
-
-      return parsed.flatMap((item) => {
-        if (typeof item === 'string') {
-          const cardId = item.trim()
-          return cardId ? [{ cardId, weakened: false }] : []
-        }
-
-        if (item && typeof item === 'object' && typeof item.cardId === 'string') {
-          const cardId = item.cardId.trim()
-          if (!cardId) return []
-          const weakened = Boolean((item as { weakened?: unknown }).weakened)
-          return [{ cardId, weakened }]
-        }
-
-        return []
-      })
-    } catch {
-      return []
-    }
-  }
-
   function toPassiveIds(profile: CharacterProfileResponse): string[] {
     return [profile.trait1, profile.trait2]
       .map((value) => (value ?? '').trim())
       .filter((value) => /^P\d{3}$/.test(value))
-  }
-
-  function getJoinPayload(profile: CharacterProfileResponse | null) {
-    if (!profile) {
-      return {
-        passiveIds: [],
-        presetDeckCardIds: undefined,
-        presetExCardId: undefined,
-        ownedCards: undefined,
-      }
-    }
-
-    const ownedCards = parseOwnedCards(profile.ownedCards)
-    const exCardId = parseExCardId(profile.exCard)
-
-    return {
-      passiveIds: toPassiveIds(profile),
-      presetDeckCardIds: profile.currentSkillDeck?.length ? profile.currentSkillDeck : undefined,
-      presetExCardId: exCardId || undefined,
-      ownedCards: ownedCards.length ? ownedCards : undefined,
-    }
   }
 
   async function loadCharacterProfiles() {
@@ -149,10 +92,11 @@
       const joinRes = await joinSession(
         res.code,
         $auth.username.trim(),
-        payload.passiveIds,
-        payload.presetDeckCardIds,
-        payload.presetExCardId,
-        payload.ownedCards,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        selectedCharacter.id,
       )
       setPlayerToken(joinRes.playerToken)
       await refreshState()
@@ -184,10 +128,11 @@
       const joinRes = await joinSession(
         code,
         $auth.username.trim(),
-        payload.passiveIds,
-        payload.presetDeckCardIds,
-        payload.presetExCardId,
-        payload.ownedCards,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        selectedCharacter.id,
       )
       setPlayerToken(joinRes.playerToken)
       await refreshState()
