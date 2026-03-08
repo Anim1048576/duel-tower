@@ -161,8 +161,12 @@ public class SessionService {
             List<OwnedCard> ownedCards = parseOwnedCards(characterTemplate != null ? characterTemplate.ownedCards() : ownedCardsRaw);
             ps.ownedCards(ownedCards);
 
-            List<String> deckCardIds = parsePresetDeckCardIds(characterTemplate != null ? characterTemplate.deckCardIds() : presetDeckCardIdsRaw);
-            validateDeckBuild(deckCardIds, ps.ownedCards(), null);
+            List<String> sourceDeckCardIds = characterTemplate != null ? characterTemplate.deckCardIds() : presetDeckCardIdsRaw;
+            boolean allowEmptyCharacterDeck = characterTemplate != null && sourceDeckCardIds != null && sourceDeckCardIds.isEmpty();
+            List<String> deckCardIds = allowEmptyCharacterDeck ? List.of() : parsePresetDeckCardIds(sourceDeckCardIds);
+            if (!allowEmptyCharacterDeck) {
+                validateDeckBuild(deckCardIds, ps.ownedCards(), null);
+            }
 
             state.players().put(pid, ps);
             loadDeck(state, ps, deckCardIds);
@@ -480,7 +484,7 @@ public class SessionService {
 
         return new CharacterJoinTemplate(
                 List.copyOf(passiveIds),
-                (deckCardIds == null || deckCardIds.isEmpty()) ? null : List.copyOf(deckCardIds),
+                deckCardIds == null ? null : List.copyOf(deckCardIds),
                 exCardId,
                 ownedCards
         );
