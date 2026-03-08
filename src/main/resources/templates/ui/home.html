@@ -16,6 +16,7 @@
         <div class="muted">GM 기준. 참가 코드가 자동으로 만들어진다.</div>
         <div class="spacer"></div>
         <button class="btn primary" id="btnCreateSession">세션 만들기</button>
+        <div class="hint" id="createDisabledReason" aria-live="polite"></div>
         <div class="hint mono" id="createdCode"></div>
       </div>
 
@@ -25,8 +26,9 @@
         <div class="spacer"></div>
         <form class="row" id="joinForm">
           <input class="input mono" id="joinCode" placeholder="예: A7K2FQ" maxlength="12" />
-          <button class="btn" type="submit">참가</button>
+          <button class="btn" id="btnJoinSession" type="submit">참가</button>
         </form>
+        <div class="hint" id="joinDisabledReason" aria-live="polite"></div>
         <div class="hint">데모에서는 아무 코드나 입력해도 참가된다.</div>
       </div>
     </div>
