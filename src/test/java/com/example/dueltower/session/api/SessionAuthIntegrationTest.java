@@ -21,6 +21,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -120,6 +121,55 @@ class SessionAuthIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.playerToken").isString())
                 .andExpect(jsonPath("$.state.players.tester.passiveIds[0]").value("P001"));
+    }
+
+    @Test
+    void joinSessionAllowsCharacterWithEmptySkillDeck() throws Exception {
+        MockHttpSession session = signUpAndLogin("tester", "tester@example.com", "password123");
+
+        MvcResult createResult = mockMvc.perform(post("/api/sessions")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"gmId\":\"tester\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String code = extractJsonStringValue(createResult.getResponse().getContentAsString(), "code");
+
+        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
+                .name("빈 덱 캐릭터")
+                .gender(CharacterGender.OTHER)
+                .age(20)
+                .wish("테스트")
+                .disposition("질서/선")
+                .oneLiner("안녕하세요")
+                .story("join empty deck 테스트")
+                .physical(10)
+                .technique(10)
+                .sense(10)
+                .willpower(10)
+                .trait1("P001")
+                .trait2(null)
+                .ownedCards("[\"C001\",\"C001\"]")
+                .currentSkillDeck(List.of())
+                .exCard("{\"id\":\"EX901\"}")
+                .build());
+
+        mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "tester",
+                                  "characterId": %d
+                                }
+                                """.formatted(profile.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state.players.tester.deck.length()").value(0));
+
+        mockMvc.perform(get("/api/sessions/{code}/state", code)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.tester.deck.length()").value(0));
     }
 
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {
