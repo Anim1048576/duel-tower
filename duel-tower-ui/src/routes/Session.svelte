@@ -192,7 +192,7 @@
           <option value="">캐릭터 없음</option>
         {/if}
         {#each characterProfiles as profile}
-          <option value={profile.id}>#{profile.id} · {profile.name}</option>
+          <option value={String(profile.id)}>#{profile.id} · {profile.name}</option>
         {/each}
       </select>
       <button class="btn" type="button" on:click={loadCharacterProfiles} disabled={$auth.status !== 'authenticated' || characterBusy}>
