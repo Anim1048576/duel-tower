@@ -179,7 +179,7 @@ class RuleEngineRegressionTest {
         CardInstId critical = fx.addHandCard(fx.player, "CRITICAL_STRIKE");
 
         fx.player.statusSet(TestCriticalStatus.ID, 1);
-        fx.player.passiveIds().add(TestCriticalPassive.ID);
+        fx.player.addPassiveId(TestCriticalPassive.ID);
 
         fx.startSimpleCombat();
         fx.forceMainTurnForPlayer();
@@ -200,7 +200,7 @@ class RuleEngineRegressionTest {
 
         fx.enemy.statusSet(TestCriticalStatus.ID, 1); // 치명 확률 100% 보장
         fx.player.statusSet(TestIncomingCriticalStatus.ID, 1);
-        fx.player.passiveIds().add(TestIncomingCriticalPassive.ID);
+        fx.player.addPassiveId(TestIncomingCriticalPassive.ID);
 
         fx.enemy.ap(3);
         fx.startSimpleCombat();
