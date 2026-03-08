@@ -45,7 +45,7 @@ public final class EffectOps {
 
             // 도발(등) 타겟 강제 규칙 검증
             if (one instanceof TargetRef.Enemy || one instanceof TargetRef.Summon) {
-                StatusOps.validateEnemyOneTarget(ec.state(), ec.ctx(), TargetRef.ofPlayer(ec.actor()), ec.cardId(), one, errors);
+                StatusOps.validateEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), one, errors);
             }
         }
         return errors;
@@ -61,7 +61,7 @@ public final class EffectOps {
     public void damageSelected(List<TargetRef> targets, int amount, int hits) {
         if (amount <= 0 || hits <= 0 || targets == null || targets.isEmpty()) return;
 
-        TargetRef src = TargetRef.ofPlayer(ec.actor());
+        TargetRef src = actorRef();
         for (TargetRef chosen : targets) {
             TargetRef resolved = StatusOps.resolveEnemyOneTarget(
                     ec.state(),
@@ -137,7 +137,7 @@ public final class EffectOps {
         return switch (t) {
             case NONE -> List.of();
 
-            case SELF -> List.of(TargetRef.ofPlayer(ec.actor()));
+            case SELF -> List.of(actorRef());
 
             case ALLY_ALL, ALLY_SIDE ->
                     ec.state().players().keySet().stream().map(TargetRef::ofPlayer).toList();
@@ -148,13 +148,13 @@ public final class EffectOps {
             case ALLY_ONE -> List.of(TargetRef.ofPlayer(ec.selection().requireOnePlayer()));
             case ENEMY_ONE -> {
                 TargetRef chosen = ec.selection().requireOneEnemyOrSummon();
-                TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), TargetRef.ofPlayer(ec.actor()), ec.cardId(), chosen, ec.out(), ec.actor().value());
+                TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), chosen, ec.out(), ec.actor().value());
                 yield List.of(resolved);
             }
             case ANY_ONE -> {
                 TargetRef chosen = ec.selection().requireOne();
                 if (chosen instanceof TargetRef.Enemy || chosen instanceof TargetRef.Summon) {
-                    TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), TargetRef.ofPlayer(ec.actor()), ec.cardId(), chosen, ec.out(), ec.actor().value());
+                    TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), chosen, ec.out(), ec.actor().value());
                     yield List.of(resolved);
                 }
                 yield List.of(chosen);
@@ -173,7 +173,7 @@ public final class EffectOps {
         DamageFlags flags = KeywordOps.damageFlags(
                 ec.state(),
                 ec.ctx(),
-                TargetRef.ofPlayer(ec.actor()),
+                actorRef(),
                 ec.cardId(),
                 ref
         );
@@ -181,7 +181,7 @@ public final class EffectOps {
                 ec.state(),
                 ec.ctx(),
                 ec.out(),
-                TargetRef.ofPlayer(ec.actor()),
+                actorRef(),
                 ec.actor().value(),
                 ref,
                 finalAmount,
@@ -200,7 +200,7 @@ public final class EffectOps {
                 ec.state(),
                 ec.ctx(),
                 ec.out(),
-                TargetRef.ofPlayer(ec.actor()),
+                actorRef(),
                 ec.actor().value(),
                 ref,
                 finalAmount
@@ -208,7 +208,7 @@ public final class EffectOps {
     }
 
     private int criticalAmountMultiplier(TargetRef target, String kind) {
-        TargetRef source = TargetRef.ofPlayer(ec.actor());
+        TargetRef source = actorRef();
         int multiplier = KeywordOps.criticalAmountMultiplier(
                 ec.state(),
                 ec.ctx(),
@@ -243,7 +243,7 @@ public final class EffectOps {
     }
 
     private boolean isCritical(TargetRef target, String kind) {
-        TargetRef source = TargetRef.ofPlayer(ec.actor());
+        TargetRef source = actorRef();
         int chance = KeywordOps.criticalChancePercent(
                 ec.state(),
                 ec.ctx(),
@@ -287,6 +287,13 @@ public final class EffectOps {
         Random rnd = new Random(mix);
         int roll = rnd.nextInt(100) + 1;
         return roll <= chance;
+    }
+
+    private TargetRef actorRef() {
+        if (ec.actor() != null && ec.state().enemy(new Ids.EnemyId(ec.actor().value())) != null) {
+            return TargetRef.ofEnemy(new Ids.EnemyId(ec.actor().value()));
+        }
+        return TargetRef.ofPlayer(ec.actor());
     }
 
 
