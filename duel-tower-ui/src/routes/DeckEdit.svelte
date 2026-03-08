@@ -38,7 +38,13 @@
     return acc
   }, {})
 
-  $: ownedCardIds = new Set((currentPlayer?.ownedCards ?? []).map((owned) => owned.cardId))
+  $: ownedCounts = (currentPlayer?.ownedCards ?? []).reduce<Record<string, number>>((acc, owned) => {
+    const cardId = owned.cardId
+    if (!cardId) return acc
+    acc[cardId] = (acc[cardId] || 0) + 1
+    return acc
+  }, {})
+  $: ownedCardIds = new Set(Object.keys(ownedCounts))
 
   $: filtered = $content.cards
     .filter((c) => ownedCardIds.has(c.id))
@@ -70,6 +76,11 @@
       return
     }
     const copyCount = counts[defId] || 0
+    const ownedCount = ownedCounts[defId] || 0
+    if (copyCount >= ownedCount) {
+      errorMsg = `보유한 매수를 초과해 편성할 수 없어요. (${defId} 보유 ${ownedCount}장)`
+      return
+    }
     if (copyCount >= 3) {
       errorMsg = `같은 카드는 최대 3장까지 넣을 수 있어요. (${defId})`
       return
@@ -173,15 +184,19 @@
 
       <div class="searchGrid">
         {#each filtered as c (c.id)}
+          {@const ownedCount = ownedCounts[c.id] || 0}
+          {@const selectedCount = counts[c.id] || 0}
+          {@const addableCount = Math.max(0, Math.min(3, ownedCount) - selectedCount)}
           <div class="gcard" on:click={() => addToDeck(c.id)}>
             <div class="row" style="justify-content:space-between; align-items:flex-start">
               <div class="gcardTitle">{c.name}</div>
               <span class="badge">{c.cost}</span>
             </div>
             <div class="gcardSub mono">{c.id}</div>
+            <div class="hint">보유 {ownedCount}장 · 편성 가능 {addableCount}장</div>
             <div class="gcardTags">
               {#if c.token}<span class="tag d">TOKEN</span>{/if}
-              {#if counts[c.id]}<span class="tag p">선택 {counts[c.id]}장</span>{/if}
+              {#if selectedCount}<span class="tag p">선택 {selectedCount}장</span>{/if}
               {#each c.keywords as k (k)}
                 <span class="tag p">{k}</span>
               {/each}
