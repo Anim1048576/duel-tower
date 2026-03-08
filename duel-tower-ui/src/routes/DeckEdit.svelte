@@ -38,7 +38,10 @@
     return acc
   }, {})
 
+  $: ownedCardIds = new Set((currentPlayer?.ownedCards ?? []).map((owned) => owned.cardId))
+
   $: filtered = $content.cards
+    .filter((c) => ownedCardIds.has(c.id))
     .filter((c) => {
       const s = q.trim().toLowerCase()
       if (!s) return true
@@ -58,6 +61,10 @@
   }
 
   function addToDeck(defId: string) {
+    if (!ownedCardIds.has(defId)) {
+      errorMsg = `현재 캐릭터가 보유하지 않은 카드입니다. (${defId})`
+      return
+    }
     if (deckCardIds.length >= 12) {
       errorMsg = '덱은 정확히 12장이어야 해요.'
       return
@@ -126,7 +133,7 @@
       </div>
 
       <div class="spacer"></div>
-      <div class="hint">제약: <b>deckEditable 노드</b>에서만 수정 가능 · <b>본인 덱</b>만 수정 가능 · <b>12장 정확히</b> · <b>동일 카드 최대 3장</b></div>
+      <div class="hint">제약: <b>선택한 캐릭터 보유 카드</b>만 추가 가능 · <b>deckEditable 노드</b>에서만 수정 가능 · <b>본인 덱</b>만 수정 가능 · <b>12장 정확히</b> · <b>동일 카드 최대 3장</b></div>
 
       {#if $content.lastError}
         <div class="spacer"></div>
@@ -157,7 +164,7 @@
 
     <div class="card">
       <div class="row wrap" style="justify-content:space-between">
-        <div class="cardTitle">카드 풀 ({$content.cards.length})</div>
+        <div class="cardTitle">카드 풀 ({filtered.length})</div>
         <div class="row wrap" style="justify-content:flex-end">
           <span class="badge">덱 {deckCardIds.length}/12</span>
         </div>
@@ -203,6 +210,8 @@
           <div class="hint">덱 카드가 비어 있습니다. 카드 풀에서 추가해 주세요.</div>
         {/if}
       </div>
+      <div class="spacer"></div>
+      <div class="hint">보유 카드 종류 수: {ownedCardIds.size}종</div>
     </div>
   </aside>
 </section>

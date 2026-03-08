@@ -32,6 +32,7 @@ export type PendingDecision = {
 
 export type PlayerState = {
   playerId: string
+  ownedCards?: { cardId: string; strengthened?: boolean; weakened?: boolean; lockedInDeck?: boolean }[]
   deck: string[]
   hand: string[]
   grave: string[]
