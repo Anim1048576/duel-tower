@@ -217,17 +217,6 @@ public final class EffectOps {
                 target,
                 kind
         );
-        multiplier = PassiveOps.criticalAmountMultiplier(
-                ec.state(),
-                ec.ctx(),
-                ec.out(),
-                source,
-                target,
-                kind,
-                multiplier,
-                ec.actor().value()
-        );
-        multiplier = applyStatusCriticalAmountMultiplier(source, target, kind, multiplier);
 
         multiplier = PassiveOps.incomingCriticalAmountMultiplier(
                 ec.state(),
@@ -239,7 +228,19 @@ public final class EffectOps {
                 multiplier,
                 ec.actor().value()
         );
-        return applyStatusIncomingCriticalAmountMultiplier(source, target, kind, multiplier);
+        multiplier = applyStatusIncomingCriticalAmountMultiplier(source, target, kind, multiplier);
+
+        multiplier = PassiveOps.criticalAmountMultiplier(
+                ec.state(),
+                ec.ctx(),
+                ec.out(),
+                source,
+                target,
+                kind,
+                multiplier,
+                ec.actor().value()
+        );
+        return applyStatusCriticalAmountMultiplier(source, target, kind, multiplier);
     }
 
     private boolean isCritical(TargetRef target, String kind) {
