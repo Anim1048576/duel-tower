@@ -17,6 +17,12 @@ public interface CardModifierEffect {
 
     default void afterResolvePlayCard(CardModifierRuntime rt, PlayCardModifierCtx c) {}
 
+    default void validateUseEx(CardModifierRuntime rt, PlayCardModifierCtx c, List<String> errors) {}
+
+    default void beforeResolveUseEx(CardModifierRuntime rt, PlayCardModifierCtx c) {}
+
+    default void afterResolveUseEx(CardModifierRuntime rt, PlayCardModifierCtx c) {}
+
     default TargetRef resolveEnemyOneTarget(
             CardModifierRuntime rt,
             EnemyOneModifierTargetCtx c,
