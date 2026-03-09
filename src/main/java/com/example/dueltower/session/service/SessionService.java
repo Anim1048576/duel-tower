@@ -139,8 +139,7 @@ public class SessionService {
                           String playerIdRaw,
                           Long characterIdRaw,
                           List<String> passiveIdsRaw,
-                          List<String> presetDeckOwnedCardIdsRaw,
-                          List<String> presetDeckCardIdsRaw,
+                          List<String> requestedPresetDeckOwnedCardIdsRaw,
                           String presetExCardIdRaw,
                           List<OwnedCardDto> ownedCardsRaw) {
         if (playerIdRaw == null || playerIdRaw.isBlank()) {
@@ -181,8 +180,7 @@ public class SessionService {
 
             List<String> deckOwnedCardIds = resolveJoinDeckOwnedCardIds(
                     characterTemplate,
-                    presetDeckOwnedCardIdsRaw,
-                    presetDeckCardIdsRaw,
+                    requestedPresetDeckOwnedCardIdsRaw,
                     ps.ownedCards()
             );
             boolean allowEmptyCharacterDeck = characterTemplate != null && deckOwnedCardIds.isEmpty();
@@ -227,8 +225,7 @@ public class SessionService {
     public GameState updateDeck(String code,
                                 String actorPlayerIdRaw,
                                 String targetPlayerIdRaw,
-                                List<String> deckOwnedCardIdsRaw,
-                                List<String> legacyDeckCardIdsRaw) {
+                                List<String> requestedDeckOwnedCardIdsRaw) {
         if (targetPlayerIdRaw == null || targetPlayerIdRaw.isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
@@ -253,7 +250,7 @@ public class SessionService {
 
             validateDeckEditableState(state.nodeState(), ps);
 
-            List<String> deckOwnedCardIds = normalizeDeckOwnedCardIds(deckOwnedCardIdsRaw, legacyDeckCardIdsRaw, ps.ownedCards());
+            List<String> deckOwnedCardIds = normalizeDeckOwnedCardIds(requestedDeckOwnedCardIdsRaw);
             validateDeckBuild(deckOwnedCardIds, ps.ownedCards(), currentDeckOwnedCardIds(ps));
             ps.deckOwnedCardIds(deckOwnedCardIds);
             loadDeck(state, ps, deckOwnedCardIds);
@@ -636,6 +633,7 @@ public class SessionService {
                 out.add(new OwnedCardModifier(modifierDto.modifierId().trim(), modifierDto.value() == null ? 0 : modifierDto.value()));
             }
         }
+        // Legacy boolean flags are compatibility-only input shims; modifiers are canonical.
         if (Boolean.TRUE.equals(dto.strengthened()) && out.stream().noneMatch(m -> CardModifierIds.STRENGTHENED.equals(m.modifierId()))) {
             out.add(new OwnedCardModifier(CardModifierIds.STRENGTHENED, 1));
         }
@@ -670,29 +668,23 @@ public class SessionService {
     }
 
     private List<String> resolveJoinDeckOwnedCardIds(CharacterJoinTemplate characterTemplate,
-                                                    List<String> presetDeckOwnedCardIdsRaw,
-                                                    List<String> legacyPresetDeckCardIdsRaw,
+                                                    List<String> requestedPresetDeckOwnedCardIdsRaw,
                                                     List<OwnedCard> ownedCards) {
         if (characterTemplate != null) {
             List<String> fromProfile = resolveStoredDeckToOwnedCardIds(characterTemplate.currentSkillDeck(), ownedCards);
             if (fromProfile != null) {
                 return fromProfile;
             }
-            return resolveLegacyDeckCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards);
+            return resolveCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards, "deckCardIds must not contain blank values");
         }
 
-        if (presetDeckOwnedCardIdsRaw != null) {
-            return normalizeDeckOwnedCardIds(presetDeckOwnedCardIdsRaw, null, ownedCards);
+        if (requestedPresetDeckOwnedCardIdsRaw != null) {
+            return normalizeDeckOwnedCardIds(requestedPresetDeckOwnedCardIdsRaw);
         }
-        if (legacyPresetDeckCardIdsRaw != null) {
-            return resolveLegacyDeckCardIdsToOwnedCardIds(legacyPresetDeckCardIdsRaw, ownedCards);
-        }
-        return resolveLegacyDeckCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards);
+        return resolveCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards, "deckCardIds must not contain blank values");
     }
 
-    private List<String> normalizeDeckOwnedCardIds(List<String> deckOwnedCardIdsRaw,
-                                                   List<String> legacyDeckCardIdsRaw,
-                                                   List<OwnedCard> ownedCards) {
+    private List<String> normalizeDeckOwnedCardIds(List<String> deckOwnedCardIdsRaw) {
         if (deckOwnedCardIdsRaw != null) {
             List<String> normalized = new ArrayList<>();
             for (String ownedCardId : deckOwnedCardIdsRaw) {
@@ -702,9 +694,6 @@ public class SessionService {
                 normalized.add(ownedCardId.trim());
             }
             return List.copyOf(normalized);
-        }
-        if (legacyDeckCardIdsRaw != null) {
-            return resolveLegacyDeckCardIdsToOwnedCardIds(legacyDeckCardIdsRaw, ownedCards);
         }
         throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds is required");
     }
@@ -722,16 +711,18 @@ public class SessionService {
             }
         }
         if (allOwnedCardIds) {
-            return normalizeDeckOwnedCardIds(storedDeckEntries, null, ownedCards);
+            return normalizeDeckOwnedCardIds(storedDeckEntries);
         }
-        return resolveLegacyDeckCardIdsToOwnedCardIds(storedDeckEntries, ownedCards);
+        return resolveCardIdsToOwnedCardIds(storedDeckEntries, ownedCards, "deckCardIds must not contain blank values");
     }
 
-    private List<String> resolveLegacyDeckCardIdsToOwnedCardIds(List<String> deckCardIdsRaw, List<OwnedCard> ownedCards) {
+    private List<String> resolveCardIdsToOwnedCardIds(List<String> cardIdsRaw,
+                                                  List<OwnedCard> ownedCards,
+                                                  String blankValueMessage) {
         List<String> normalizedCardIds = new ArrayList<>();
-        for (String cardId : deckCardIdsRaw) {
+        for (String cardId : cardIdsRaw) {
             if (cardId == null || cardId.isBlank()) {
-                throw new ResponseStatusException(BAD_REQUEST, "deckCardIds must not contain blank values");
+                throw new ResponseStatusException(BAD_REQUEST, blankValueMessage);
             }
             normalizedCardIds.add(cardId.trim());
         }

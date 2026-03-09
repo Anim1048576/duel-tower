@@ -14,8 +14,17 @@ public record JoinSessionRequest(
         String playerId,
         Long characterId,
         List<String> passiveIds,
+        /** Canonical request field. */
         List<String> presetDeckOwnedCardIds,
+        /** Legacy compatibility field; prefer presetDeckOwnedCardIds when both are provided. */
         List<String> presetDeckCardIds,
         String presetExCardId,
         List<OwnedCardDto> ownedCards
-) {}
+) {
+    public List<String> requestedPresetDeckOwnedCardIds() {
+        if (presetDeckOwnedCardIds != null) {
+            return presetDeckOwnedCardIds;
+        }
+        return presetDeckCardIds;
+    }
+}
