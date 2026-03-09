@@ -16,6 +16,8 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +43,8 @@ class SessionDeckRuleIntegrationTest {
 
     @Autowired
     private SessionService sessionService;
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
@@ -370,31 +374,31 @@ class SessionDeckRuleIntegrationTest {
         String code = createSession(session);
 
         String joinBody = """
-                {
-                  "playerId": "player7",
-                  "ownedCards": [
-                    {"cardId":"C001","weakened":true,"lockedInDeck":true},
-                    {"cardId":"C001","weakened":false},
-                    {"cardId":"C001","weakened":false},
-                    {"cardId":"C002","weakened":false},
-                    {"cardId":"C002","weakened":false},
-                    {"cardId":"C002","weakened":false},
-                    {"cardId":"C003","weakened":false},
-                    {"cardId":"C003","weakened":false},
-                    {"cardId":"C003","weakened":false},
-                    {"cardId":"C004","weakened":false},
-                    {"cardId":"C004","weakened":false},
-                    {"cardId":"C004","weakened":false},
-                    {"cardId":"Tig001_Card","weakened":false}
-                  ],
-                  "presetDeckCardIds": [
-                    "C001","C001","C001",
-                    "C002","C002","C002",
-                    "C003","C003","C003",
-                    "C004","C004","C004"
-                  ]
-                }
-                """;
+            {
+              "playerId": "player7",
+              "ownedCards": [
+                {"cardId":"C001","weakened":true,"lockedInDeck":true},
+                {"cardId":"C001","weakened":false},
+                {"cardId":"C001","weakened":false},
+                {"cardId":"C002","weakened":false},
+                {"cardId":"C002","weakened":false},
+                {"cardId":"C002","weakened":false},
+                {"cardId":"C003","weakened":false},
+                {"cardId":"C003","weakened":false},
+                {"cardId":"C003","weakened":false},
+                {"cardId":"C004","weakened":false},
+                {"cardId":"C004","weakened":false},
+                {"cardId":"C004","weakened":false},
+                {"cardId":"Tig001_Card","weakened":false}
+              ],
+              "presetDeckCardIds": [
+                "C001","C001","C001",
+                "C002","C002","C002",
+                "C003","C003","C003",
+                "C004","C004","C004"
+              ]
+            }
+            """;
 
         MvcResult joinResult = mockMvc.perform(post("/api/sessions/{code}/join", code)
                         .session(session)
@@ -405,17 +409,26 @@ class SessionDeckRuleIntegrationTest {
 
         String joinResponse = joinResult.getResponse().getContentAsString();
         String playerToken = extractJsonStringValue(joinResponse, "playerToken");
-        String lockedOwnedCardId = extractLockedOwnedCardId(joinResponse);
+        String lockedOwnedCardId = extractLockedOwnedCardId(joinResponse, "player7");
         List<String> currentDeckOwnedCardIds = extractJsonArrayValues(joinResponse, "deckOwnedCardIds");
         List<String> allOwnedCardIds = extractJsonArrayValues(joinResponse, "ownedCardId");
 
         List<String> updateDeckOwnedCardIds = new ArrayList<>(currentDeckOwnedCardIds);
-        updateDeckOwnedCardIds.remove(lockedOwnedCardId);
+
+        boolean removed = updateDeckOwnedCardIds.remove(lockedOwnedCardId);
+        assertTrue(removed, "locked owned card was not present in current deck");
+
         String replacementOwnedCardId = allOwnedCardIds.stream()
+                .filter(ownedCardId -> !ownedCardId.equals(lockedOwnedCardId))
                 .filter(ownedCardId -> !updateDeckOwnedCardIds.contains(ownedCardId))
                 .findFirst()
                 .orElseThrow();
+
+        assertNotEquals(lockedOwnedCardId, replacementOwnedCardId);
+
         updateDeckOwnedCardIds.add(replacementOwnedCardId);
+
+        assertFalse(updateDeckOwnedCardIds.contains(lockedOwnedCardId));
 
         MvcResult updateResult = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player7")
                         .header("X-Player-Token", playerToken)
@@ -955,11 +968,22 @@ class SessionDeckRuleIntegrationTest {
         return out;
     }
 
-    private String extractLockedOwnedCardId(String json) {
-        Pattern pattern = Pattern.compile("\"ownedCardId\":\"([^\"]+)\"[^}]*\"lockedInDeck\":true");
-        Matcher matcher = pattern.matcher(json);
-        assertTrue(matcher.find(), "locked owned card id not found in response");
-        return matcher.group(1);
+    private String extractLockedOwnedCardId(String json, String playerId) throws Exception {
+        JsonNode root = JSON.readTree(json);
+        JsonNode ownedCards = root.path("state").path("players").path(playerId).path("ownedCards");
+
+        assertTrue(ownedCards.isArray(), "ownedCards array not found in response for playerId=" + playerId);
+
+        for (JsonNode card : ownedCards) {
+            if (card.path("lockedInDeck").asBoolean(false)) {
+                String ownedCardId = card.path("ownedCardId").asText("").trim();
+                assertFalse(ownedCardId.isEmpty(), "locked owned card id is blank");
+                return ownedCardId;
+            }
+        }
+
+        fail("locked owned card id not found in response for playerId=" + playerId);
+        return null;
     }
 
     private String extractJsonStringOrNumberValue(String json, String key) {
