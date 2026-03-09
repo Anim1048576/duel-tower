@@ -4,6 +4,8 @@ import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.model.OwnedCardModifier;
+import com.example.dueltower.content.card.model.OwnedCardModifierSemantics;
+import com.example.dueltower.content.cardmodifier.cmdb.CardModifierIds;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.content.cardmodifier.service.CardModifierService;
@@ -482,10 +484,6 @@ public class SessionService {
         return out;
     }
 
-    private boolean isLockedInDeck(OwnedCardDto dto) {
-        return Boolean.TRUE.equals(dto.lockedInDeck());
-    }
-
     private void persistCharacterDeck(SessionRuntime rt, PlayerId playerId, List<String> deckOwnedCardIds, List<OwnedCard> ownedCards) {
         Long characterId = rt.findCharacterIdByPlayerId(playerId.value());
         if (characterId == null) {
@@ -497,29 +495,6 @@ public class SessionService {
         profile.setCurrentSkillDeck(List.copyOf(deckOwnedCardIds));
         characterProfileRepository.save(profile);
         deckService.upsertCharacterCurrentSkillDeck(characterId, currentDeckCardIdsFromOwnedCardIds(deckOwnedCardIds, ownedCards));
-    }
-
-    private boolean isStrengthened(OwnedCardDto dto) {
-        return Boolean.TRUE.equals(dto.strengthened()) || hasModifier(dto, OwnedCard.MODIFIER_STRENGTHENED);
-    }
-
-    private boolean isWeakened(OwnedCardDto dto) {
-        return Boolean.TRUE.equals(dto.weakened()) || hasModifier(dto, OwnedCard.MODIFIER_WEAKENED);
-    }
-
-    private boolean hasModifier(OwnedCardDto dto, String modifierId) {
-        if (dto.modifiers() == null || dto.modifiers().isEmpty()) {
-            return false;
-        }
-        for (OwnedCardModifierDto modifier : dto.modifiers()) {
-            if (modifier == null || modifier.modifierId() == null) {
-                continue;
-            }
-            if (modifierId.equals(modifier.modifierId().trim())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private CharacterProfile loadCharacterProfile(Long characterIdRaw) {
@@ -644,7 +619,7 @@ public class SessionService {
             }
             String ownedCardId = (dto.ownedCardId() == null || dto.ownedCardId().isBlank()) ? UUID.randomUUID().toString() : dto.ownedCardId().trim();
             List<OwnedCardModifier> modifiers = toOwnedCardModifiers(dto);
-            out.add(new OwnedCard(ownedCardId, dto.cardId().trim(), modifiers, isLockedInDeck(dto)));
+            out.add(new OwnedCard(ownedCardId, dto.cardId().trim(), modifiers));
         }
         return List.copyOf(out);
     }
@@ -659,11 +634,16 @@ public class SessionService {
                 out.add(new OwnedCardModifier(modifierDto.modifierId().trim(), modifierDto.value() == null ? 0 : modifierDto.value()));
             }
         }
-        if (Boolean.TRUE.equals(dto.strengthened()) && out.stream().noneMatch(m -> OwnedCard.MODIFIER_STRENGTHENED.equals(m.modifierId()))) {
-            out.add(new OwnedCardModifier(OwnedCard.MODIFIER_STRENGTHENED, 1));
+        if (Boolean.TRUE.equals(dto.strengthened()) && out.stream().noneMatch(m -> CardModifierIds.STRENGTHENED.equals(m.modifierId()))) {
+            out.add(new OwnedCardModifier(CardModifierIds.STRENGTHENED, 1));
         }
-        if (Boolean.TRUE.equals(dto.weakened()) && out.stream().noneMatch(m -> OwnedCard.MODIFIER_WEAKENED.equals(m.modifierId()))) {
-            out.add(new OwnedCardModifier(OwnedCard.MODIFIER_WEAKENED, 1));
+        if (Boolean.TRUE.equals(dto.weakened())
+                && out.stream().noneMatch(m -> CardModifierIds.WEAKENED.equals(m.modifierId()))
+                && !OwnedCardModifierSemantics.hasConcreteWeakenedModifier(out)) {
+            out.add(new OwnedCardModifier(CardModifierIds.WEAKENED, 1));
+        }
+        if (Boolean.TRUE.equals(dto.lockedInDeck()) && out.stream().noneMatch(m -> CardModifierIds.LOCKED_IN_DECK.equals(m.modifierId()))) {
+            out.add(new OwnedCardModifier(CardModifierIds.LOCKED_IN_DECK, 1));
         }
         return List.copyOf(out);
     }
