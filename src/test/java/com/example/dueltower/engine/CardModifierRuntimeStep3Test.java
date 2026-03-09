@@ -4,6 +4,7 @@ import com.example.dueltower.content.card.model.OwnedCardModifier;
 import com.example.dueltower.content.cardmodifier.cmdb.*;
 import com.example.dueltower.engine.command.PlayCardCommand;
 import com.example.dueltower.engine.command.StartCombatCommand;
+import com.example.dueltower.engine.command.UseExCommand;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
@@ -132,6 +133,44 @@ class CardModifierRuntimeStep3Test {
         assertTrue(fx.player.grave().contains(other));
     }
 
+
+    @Test
+    void noModifierCardBehavesSameAsBefore() {
+        Fx fx = new Fx();
+        CardInstId id = fx.addHandCard("NORMAL_STRIKE");
+        fx.startMainTurn();
+        int apBefore = fx.player.ap();
+        int enemyBefore = fx.enemy.hp();
+
+        EngineResult res = fx.process(new PlayCardCommand(UUID.randomUUID(), fx.state.version(), fx.playerId, id,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))));
+
+        assertTrue(res.accepted());
+        assertEquals(apBefore - 1, fx.player.ap());
+        assertEquals(enemyBefore - 5, fx.enemy.hp());
+    }
+
+    @Test
+    void useExWithoutRuntimeModifiersRemainsUnchanged() {
+        Fx fx = new Fx();
+        CardInstId exId = fx.setExCard("EX_BURST");
+        fx.startMainTurn();
+        int apBefore = fx.player.ap();
+        int enemyBefore = fx.enemy.hp();
+
+        EngineResult res = fx.process(new UseExCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+
+        assertTrue(res.accepted());
+        assertEquals(apBefore - 2, fx.player.ap());
+        assertEquals(enemyBefore - 8, fx.enemy.hp());
+        assertEquals(exId, fx.player.exCard());
+    }
+
     @Test
     void strengthenedMarkerIsNoOp() {
         Fx fx = new Fx();
@@ -176,6 +215,7 @@ class CardModifierRuntimeStep3Test {
             register(defs, effects, new TestCard("FILLER", CardType.SKILL, 1, 0, 0));
             register(defs, effects, new TestCard("NORMAL_STRIKE", CardType.SKILL, 1, 5, 0));
             register(defs, effects, new TestCard("SELF_HEAL", CardType.SKILL, 1, 0, 4));
+            register(defs, effects, new TestCard("EX_BURST", CardType.EX, 2, 8, 0));
 
             var cm = List.of(
                     new CM001_StrengthenedMarker(), new CM002_WeakenedMarker(),
@@ -211,6 +251,14 @@ class CardModifierRuntimeStep3Test {
             state.enemies().put(new EnemyId(id), new EnemyState(new EnemyId(id), 40));
         }
 
+        CardInstId setExCard(String defId) {
+            CardInstId id = Ids.newCardInstId();
+            CardInstance ci = new CardInstance(id, new CardDefId(defId), playerId, Zone.EX, "owned", List.of());
+            state.cardInstances().put(id, ci);
+            player.exCard(id);
+            return id;
+        }
+
         void startMainTurn() {
             EngineResult r = process(new StartCombatCommand(UUID.randomUUID(), state.version(), playerId));
             assertTrue(r.accepted());
@@ -223,6 +271,7 @@ class CardModifierRuntimeStep3Test {
 
         EngineResult process(PlayCardCommand c) { return engine.process(state, ctx, c); }
         EngineResult process(StartCombatCommand c) { return engine.process(state, ctx, c); }
+        EngineResult process(UseExCommand c) { return engine.process(state, ctx, c); }
     }
 
     private static final class TestCard implements CardEffect {

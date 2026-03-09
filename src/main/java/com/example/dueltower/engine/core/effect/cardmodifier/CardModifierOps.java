@@ -114,6 +114,64 @@ public final class CardModifierOps {
         }
     }
 
+
+    public static void validateUseEx(
+            GameState state,
+            EngineContext ctx,
+            TargetRef actor,
+            PlayerState actorState,
+            CardInstId cardId,
+            CardInstance ci,
+            CardDefinition def,
+            List<String> errors
+    ) {
+        List<GameEvent> dummyOut = new ArrayList<>();
+        for (HookEntry it : collectEntries(ctx, ci)) {
+            if (!ctx.hasCardModifierEffect(it.modifierId())) continue;
+            CardModifierRuntime rt = new CardModifierRuntime(state, ctx, dummyOut, "VALIDATE", it.value());
+            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, dummyOut, actor, actorState, cardId, ci, def);
+            ctx.cardModifierEffect(it.modifierId()).validateUseEx(rt, hookCtx, errors);
+        }
+    }
+
+    public static void beforeResolveUseEx(
+            GameState state,
+            EngineContext ctx,
+            TargetRef actor,
+            PlayerState actorState,
+            CardInstId cardId,
+            CardInstance ci,
+            CardDefinition def,
+            List<GameEvent> out,
+            String source
+    ) {
+        for (HookEntry it : collectEntries(ctx, ci)) {
+            if (!ctx.hasCardModifierEffect(it.modifierId())) continue;
+            CardModifierRuntime rt = new CardModifierRuntime(state, ctx, out, source, it.value());
+            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, out, actor, actorState, cardId, ci, def);
+            ctx.cardModifierEffect(it.modifierId()).beforeResolveUseEx(rt, hookCtx);
+        }
+    }
+
+    public static void afterResolveUseEx(
+            GameState state,
+            EngineContext ctx,
+            TargetRef actor,
+            PlayerState actorState,
+            CardInstId cardId,
+            CardInstance ci,
+            CardDefinition def,
+            List<GameEvent> out,
+            String source
+    ) {
+        for (HookEntry it : collectEntries(ctx, ci)) {
+            if (!ctx.hasCardModifierEffect(it.modifierId())) continue;
+            CardModifierRuntime rt = new CardModifierRuntime(state, ctx, out, source, it.value());
+            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, out, actor, actorState, cardId, ci, def);
+            ctx.cardModifierEffect(it.modifierId()).afterResolveUseEx(rt, hookCtx);
+        }
+    }
+
     public static TargetRef resolveEnemyOneTarget(
             GameState state,
             EngineContext ctx,
