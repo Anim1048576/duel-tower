@@ -7,6 +7,7 @@ public record PlayerStateDto(
         List<String> passiveIds,
         List<OwnedCardDto> ownedCards,
         List<String> deck,
+        List<String> deckOwnedCardIds,
         List<String> hand,
         List<String> grave,
         List<String> field,

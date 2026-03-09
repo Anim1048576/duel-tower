@@ -32,11 +32,44 @@ public final class OwnedCardForgetPolicy {
         return ForgetCheck.allowed();
     }
 
+
+    public static ForgetCheck evaluateWithDeckMembership(OwnedCard card,
+                                                          Map<String, Integer> ownedCounts,
+                                                          Map<String, Integer> deckCounts,
+                                                          boolean inCurrentDeck) {
+        ForgetCheck baseCheck = evaluate(card, ownedCounts, deckCounts);
+        if (!baseCheck.forgettable()) {
+            if (inCurrentDeck && baseCheck.reason() != null && baseCheck.reason().startsWith("cannot forget card required by current deck:")) {
+                return ForgetCheck.blocked("cannot forget card required by current deck: " + card.cardId());
+            }
+            return baseCheck;
+        }
+
+        if (inCurrentDeck) {
+            return ForgetCheck.blocked("cannot forget card required by current deck: " + card.cardId());
+        }
+        return ForgetCheck.allowed();
+    }
+
     public static boolean hasForgettableCard(List<OwnedCard> ownedCards,
                                              Map<String, Integer> ownedCounts,
                                              Map<String, Integer> deckCounts) {
         for (OwnedCard card : ownedCards) {
             if (evaluate(card, ownedCounts, deckCounts).forgettable()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    public static boolean hasForgettableCardWithDeckMembership(List<OwnedCard> ownedCards,
+                                                               Map<String, Integer> ownedCounts,
+                                                               Map<String, Integer> deckCounts,
+                                                               java.util.Set<String> currentDeckOwnedCardIds) {
+        for (OwnedCard card : ownedCards) {
+            boolean inCurrentDeck = currentDeckOwnedCardIds.contains(card.ownedCardId());
+            if (evaluateWithDeckMembership(card, ownedCounts, deckCounts, inCurrentDeck).forgettable()) {
                 return true;
             }
         }

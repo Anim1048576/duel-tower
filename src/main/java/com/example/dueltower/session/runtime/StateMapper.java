@@ -115,6 +115,7 @@ public final class StateMapper {
                 ps.passiveIds(),
                 mapOwnedCards(ps, state),
                 ps.deck().stream().map(id -> id.value().toString()).toList(),
+                currentDeckOwnedCardIds(ps, state),
                 ps.hand().stream().map(id -> id.value().toString()).toList(),
                 ps.grave().stream().map(id -> id.value().toString()).toList(),
                 ps.field().stream().map(id -> id.value().toString()).toList(),
@@ -133,6 +134,19 @@ public final class StateMapper {
         );
     }
 
+
+    private static List<String> currentDeckOwnedCardIds(PlayerState ps, GameState state) {
+        List<String> out = new ArrayList<>(ps.deck().size());
+        for (var cardInstId : ps.deck()) {
+            CardInstance card = state.cardInstances().get(cardInstId);
+            if (card == null || card.sourceOwnedCardId() == null || card.sourceOwnedCardId().isBlank()) {
+                continue;
+            }
+            out.add(card.sourceOwnedCardId());
+        }
+        return List.copyOf(out);
+    }
+
     private static List<OwnedCardDto> mapOwnedCards(PlayerState ps, GameState state) {
         Map<String, Integer> ownedCounts = new LinkedHashMap<>();
         for (var owned : ps.ownedCards()) {
@@ -140,16 +154,26 @@ public final class StateMapper {
         }
 
         Map<String, Integer> deckCounts = new LinkedHashMap<>();
+        Set<String> deckOwnedCardIds = new LinkedHashSet<>();
         for (var cardInstId : ps.deck()) {
             CardInstance card = state.cardInstances().get(cardInstId);
-            if (card != null) {
-                deckCounts.merge(card.defId().value(), 1, Integer::sum);
+            if (card == null) {
+                continue;
+            }
+            deckCounts.merge(card.defId().value(), 1, Integer::sum);
+            if (card.sourceOwnedCardId() != null && !card.sourceOwnedCardId().isBlank()) {
+                deckOwnedCardIds.add(card.sourceOwnedCardId());
             }
         }
 
         return ps.ownedCards().stream()
                 .map(c -> {
-                    OwnedCardForgetPolicy.ForgetCheck forgetCheck = OwnedCardForgetPolicy.evaluate(c, ownedCounts, deckCounts);
+                    OwnedCardForgetPolicy.ForgetCheck forgetCheck = OwnedCardForgetPolicy.evaluateWithDeckMembership(
+                            c,
+                            ownedCounts,
+                            deckCounts,
+                            deckOwnedCardIds.contains(c.ownedCardId())
+                    );
                     return new OwnedCardDto(
                             c.ownedCardId(),
                             c.cardId(),

@@ -176,16 +176,18 @@ public class SessionService {
             List<OwnedCard> ownedCards = parseOwnedCards(characterTemplate != null ? characterTemplate.ownedCards() : ownedCardsRaw);
             ps.ownedCards(ownedCards);
 
-            List<String> sourceDeckCardIds = characterTemplate != null ? characterTemplate.deckCardIds() : presetDeckCardIdsRaw;
+            List<String> sourceDeckEntries = characterTemplate != null
+                    ? resolveStoredDeckToOwnedCardIds(characterTemplate.currentSkillDeck(), ps.ownedCards())
+                    : presetDeckCardIdsRaw;
             boolean allowEmptyCharacterDeck = characterTemplate != null
-                    && (sourceDeckCardIds == null || sourceDeckCardIds.isEmpty());
-            List<String> deckCardIds = allowEmptyCharacterDeck ? List.of() : parsePresetDeckCardIds(sourceDeckCardIds);
+                    && (sourceDeckEntries == null || sourceDeckEntries.isEmpty());
+            List<String> deckOwnedCardIds = allowEmptyCharacterDeck ? List.of() : parseDeckOwnedCardIds(sourceDeckEntries, ps.ownedCards());
             if (!allowEmptyCharacterDeck) {
-                validateDeckBuild(deckCardIds, ps.ownedCards(), null);
+                validateDeckBuild(deckOwnedCardIds, ps.ownedCards(), null);
             }
 
             state.players().put(pid, ps);
-            loadDeck(state, ps, deckCardIds);
+            loadDeck(state, ps, deckOwnedCardIds);
             String exCardId = (characterTemplate != null) ? characterTemplate.exCardId() : presetExCardIdRaw;
             addCardToEx(state, ps, new CardDefId(normalizeExCardId(exCardId)));
 
@@ -220,7 +222,8 @@ public class SessionService {
     public GameState updateDeck(String code,
                                 String actorPlayerIdRaw,
                                 String targetPlayerIdRaw,
-                                List<String> deckCardIdsRaw) {
+                                List<String> deckOwnedCardIdsRaw,
+                                List<String> legacyDeckCardIdsRaw) {
         if (targetPlayerIdRaw == null || targetPlayerIdRaw.isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
@@ -245,11 +248,11 @@ public class SessionService {
 
             validateDeckEditableState(state.nodeState(), ps);
 
-            List<String> deckCardIds = normalizeDeckCardIds(deckCardIdsRaw);
-            validateDeckBuild(deckCardIds, ps.ownedCards(), currentDeckCardIds(ps, state));
-            loadDeck(state, ps, deckCardIds);
+            List<String> deckOwnedCardIds = normalizeDeckOwnedCardIds(deckOwnedCardIdsRaw, legacyDeckCardIdsRaw, ps.ownedCards());
+            validateDeckBuild(deckOwnedCardIds, ps.ownedCards(), currentDeckOwnedCardIds(ps, state));
+            loadDeck(state, ps, deckOwnedCardIds);
             shuffleDeck(state, ps);
-            persistCharacterDeck(rt, target, deckCardIds);
+            persistCharacterDeck(rt, target, deckOwnedCardIds, ps.ownedCards());
             return state;
         });
     }
@@ -291,15 +294,27 @@ public class SessionService {
             }
 
             Map<String, Integer> ownedCounts = cardCountsFromOwned(ownedCards);
-            Map<String, Integer> deckCounts = cardCounts(currentDeckCardIds(ps, state));
+            List<String> currentDeckOwnedCardIds = currentDeckOwnedCardIds(ps, state);
+            Map<String, Integer> deckCounts = cardCounts(currentDeckCardIdsFromOwnedCardIds(currentDeckOwnedCardIds, ownedCards));
 
-            if (ps.forgettingRequired() && !OwnedCardForgetPolicy.hasForgettableCard(ownedCards, ownedCounts, deckCounts)) {
+            if (ps.forgettingRequired() && !OwnedCardForgetPolicy.hasForgettableCardWithDeckMembership(
+                    ownedCards,
+                    ownedCounts,
+                    deckCounts,
+                    new LinkedHashSet<>(currentDeckOwnedCardIds)
+            )) {
                 throw new ResponseStatusException(BAD_REQUEST,
                         "cannot resolve forgetting required: no forgettable cards (all are strengthened/weakened/locked or required by current deck)");
             }
 
             OwnedCard selectedCard = ownedCards.get(ownedCardIndexRaw);
-            OwnedCardForgetPolicy.ForgetCheck forgetCheck = OwnedCardForgetPolicy.evaluate(selectedCard, ownedCounts, deckCounts);
+            boolean inCurrentDeck = currentDeckOwnedCardIds.contains(selectedCard.ownedCardId());
+            OwnedCardForgetPolicy.ForgetCheck forgetCheck = OwnedCardForgetPolicy.evaluateWithDeckMembership(
+                    selectedCard,
+                    ownedCounts,
+                    deckCounts,
+                    inCurrentDeck
+            );
             if (!forgetCheck.forgettable()) {
                 throw new ResponseStatusException(BAD_REQUEST,
                         "cannot forget owned card at index " + ownedCardIndexRaw + ": " + forgetCheck.reason());
@@ -311,7 +326,7 @@ public class SessionService {
         });
     }
 
-    private void loadDeck(GameState state, PlayerState ps, List<String> deckCardIds) {
+    private void loadDeck(GameState state, PlayerState ps, List<String> deckOwnedCardIds) {
         Set<CardInstId> toDelete = new HashSet<>();
         toDelete.addAll(ps.deck());
         toDelete.addAll(ps.hand());
@@ -329,36 +344,37 @@ public class SessionService {
             state.cardInstances().remove(id);
         }
 
-        List<OwnedCard> availableOwnedSlots = new ArrayList<>(ps.ownedCards());
-        boolean[] consumedOwnedSlots = new boolean[availableOwnedSlots.size()];
-
-        for (String cardId : deckCardIds) {
-            OwnedCard matchedOwnedCard = null;
-            int matchedIndex = -1;
-            for (int i = 0; i < availableOwnedSlots.size(); i++) {
-                if (consumedOwnedSlots[i]) {
-                    continue;
-                }
-                OwnedCard candidate = availableOwnedSlots.get(i);
-                if (cardId.equals(candidate.cardId())) {
-                    matchedOwnedCard = candidate;
-                    matchedIndex = i;
-                    break;
-                }
+        Map<String, OwnedCard> ownedById = ownedCardMap(ps.ownedCards());
+        for (String ownedCardId : deckOwnedCardIds) {
+            OwnedCard ownedCard = ownedById.get(ownedCardId);
+            if (ownedCard == null) {
+                throw new IllegalStateException("owned card slot unavailable while loading deck: " + ownedCardId);
             }
-
-            if (matchedOwnedCard == null) {
-                throw new IllegalStateException("owned card slot unavailable while loading deck: " + cardId);
-            }
-
-            consumedOwnedSlots[matchedIndex] = true;
-            addCardToDeck(state, ps, new CardDefId(cardId), matchedOwnedCard.ownedCardId(), matchedOwnedCard.modifiers());
+            addCardToDeck(state, ps, new CardDefId(ownedCard.cardId()), ownedCard.ownedCardId(), ownedCard.modifiers());
         }
     }
 
-    private void validateDeckBuild(List<String> deckCardIds, List<OwnedCard> ownedCards, List<String> currentDeckCardIds) {
-        if (deckCardIds.size() != DECK_SIZE) {
+    private void validateDeckBuild(List<String> deckOwnedCardIds, List<OwnedCard> ownedCards, List<String> currentDeckOwnedCardIds) {
+        if (deckOwnedCardIds.size() != DECK_SIZE) {
             throw new ResponseStatusException(BAD_REQUEST, "deck must contain exactly 12 cards");
+        }
+
+        Map<String, OwnedCard> ownedById = ownedCardMap(ownedCards);
+        Set<String> seenOwnedCardIds = new LinkedHashSet<>();
+        List<String> deckCardIds = new ArrayList<>(deckOwnedCardIds.size());
+        for (String ownedCardId : deckOwnedCardIds) {
+            if (ownedCardId == null || ownedCardId.isBlank()) {
+                throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds must not contain blank values");
+            }
+            String normalizedOwnedCardId = ownedCardId.trim();
+            if (!seenOwnedCardIds.add(normalizedOwnedCardId)) {
+                throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds must not contain duplicate values: " + normalizedOwnedCardId);
+            }
+            OwnedCard owned = ownedById.get(normalizedOwnedCardId);
+            if (owned == null) {
+                throw new ResponseStatusException(BAD_REQUEST, "owned card unavailable: " + normalizedOwnedCardId);
+            }
+            deckCardIds.add(owned.cardId());
         }
 
         Map<String, Integer> deckCounts = cardCounts(deckCardIds);
@@ -369,22 +385,8 @@ public class SessionService {
             }
         }
 
-        Map<String, Integer> availableOwned = new LinkedHashMap<>();
-        for (OwnedCard owned : ownedCards) {
-            availableOwned.merge(owned.cardId(), 1, Integer::sum);
-        }
-
-        for (var e : deckCounts.entrySet()) {
-            int available = availableOwned.getOrDefault(e.getKey(), 0);
-            if (available < e.getValue()) {
-                throw new ResponseStatusException(BAD_REQUEST,
-                        "owned card unavailable: " + e.getKey());
-            }
-        }
-
-        if (currentDeckCardIds != null) {
-            Map<String, Integer> currentDeckCounts = cardCounts(currentDeckCardIds);
-            int changedCards = calculateDeckChangedCards(currentDeckCounts, deckCounts);
+        if (currentDeckOwnedCardIds != null) {
+            int changedCards = calculateDeckChangedCards(currentDeckOwnedCardIds, deckOwnedCardIds);
             if (changedCards > MAX_DECK_EDIT_CHANGES) {
                 throw new ResponseStatusException(
                         BAD_REQUEST,
@@ -392,15 +394,12 @@ public class SessionService {
                 );
             }
 
-            Map<String, Integer> lockedRequiredCounts = lockedCardRequiredDeckCounts(currentDeckCardIds, ownedCards);
-            for (var e : lockedRequiredCounts.entrySet()) {
-                int updatedCount = deckCounts.getOrDefault(e.getKey(), 0);
-                if (updatedCount < e.getValue()) {
+            Set<String> requiredLockedOwnedCardIds = lockedOwnedCardIdsRequiredInDeck(currentDeckOwnedCardIds, ownedCards);
+            for (String requiredLockedOwnedCardId : requiredLockedOwnedCardIds) {
+                if (!seenOwnedCardIds.contains(requiredLockedOwnedCardId)) {
                     throw new ResponseStatusException(
                             BAD_REQUEST,
-                            "deck edit invalid: locked-in-deck card must remain in deck: "
-                                    + e.getKey()
-                                    + " (required " + e.getValue() + ", provided " + updatedCount + ")"
+                            "deck edit invalid: locked-in-deck card must remain in deck: " + requiredLockedOwnedCardId
                     );
                 }
             }
@@ -427,16 +426,12 @@ public class SessionService {
         }
     }
 
-    private int calculateDeckChangedCards(Map<String, Integer> currentDeckCounts, Map<String, Integer> newDeckCounts) {
+    private int calculateDeckChangedCards(List<String> currentDeckOwnedCardIds, List<String> newDeckOwnedCardIds) {
+        Set<String> next = new LinkedHashSet<>(newDeckOwnedCardIds);
         int changed = 0;
-        Set<String> union = new LinkedHashSet<>();
-        union.addAll(currentDeckCounts.keySet());
-        union.addAll(newDeckCounts.keySet());
-        for (String cardId : union) {
-            int currentCount = currentDeckCounts.getOrDefault(cardId, 0);
-            int newCount = newDeckCounts.getOrDefault(cardId, 0);
-            if (currentCount > newCount) {
-                changed += currentCount - newCount;
+        for (String ownedCardId : currentDeckOwnedCardIds) {
+            if (!next.contains(ownedCardId)) {
+                changed++;
             }
         }
         return changed;
@@ -458,35 +453,36 @@ public class SessionService {
         return counts;
     }
 
-    private List<String> currentDeckCardIds(PlayerState ps, GameState state) {
-        List<String> deckCardIds = new ArrayList<>(ps.deck().size());
+    private List<String> currentDeckOwnedCardIds(PlayerState ps, GameState state) {
+        List<String> deckOwnedCardIds = new ArrayList<>(ps.deck().size());
         for (CardInstId id : ps.deck()) {
             CardInstance card = state.cardInstances().get(id);
-            if (card != null) {
-                deckCardIds.add(card.defId().value());
+            if (card == null || card.sourceOwnedCardId() == null || card.sourceOwnedCardId().isBlank()) {
+                continue;
             }
+            deckOwnedCardIds.add(card.sourceOwnedCardId());
         }
-        return List.copyOf(deckCardIds);
+        return List.copyOf(deckOwnedCardIds);
     }
 
-    private Map<String, Integer> lockedCardRequiredDeckCounts(List<String> currentDeckCardIds, List<OwnedCard> ownedCards) {
-        Map<String, Integer> deckCounts = new LinkedHashMap<>();
-        for (String cardId : currentDeckCardIds) {
-            deckCounts.merge(cardId, 1, Integer::sum);
-        }
-
-        Map<String, Integer> ownedLockedCounts = new LinkedHashMap<>();
-        for (OwnedCard owned : ownedCards) {
-            if (owned.lockedInDeck()) {
-                ownedLockedCounts.merge(owned.cardId(), 1, Integer::sum);
+    private List<String> currentDeckCardIdsFromOwnedCardIds(List<String> deckOwnedCardIds, List<OwnedCard> ownedCards) {
+        Map<String, OwnedCard> ownedById = ownedCardMap(ownedCards);
+        List<String> cardIds = new ArrayList<>(deckOwnedCardIds.size());
+        for (String ownedCardId : deckOwnedCardIds) {
+            OwnedCard ownedCard = ownedById.get(ownedCardId);
+            if (ownedCard != null) {
+                cardIds.add(ownedCard.cardId());
             }
         }
+        return List.copyOf(cardIds);
+    }
 
-        Map<String, Integer> out = new LinkedHashMap<>();
-        for (var e : deckCounts.entrySet()) {
-            int lockedCount = ownedLockedCounts.getOrDefault(e.getKey(), 0);
-            if (lockedCount > 0) {
-                out.put(e.getKey(), e.getValue());
+    private Set<String> lockedOwnedCardIdsRequiredInDeck(List<String> currentDeckOwnedCardIds, List<OwnedCard> ownedCards) {
+        Set<String> currentDeckSet = new LinkedHashSet<>(currentDeckOwnedCardIds);
+        Set<String> out = new LinkedHashSet<>();
+        for (OwnedCard owned : ownedCards) {
+            if (owned.lockedInDeck() && currentDeckSet.contains(owned.ownedCardId())) {
+                out.add(owned.ownedCardId());
             }
         }
         return out;
@@ -496,7 +492,7 @@ public class SessionService {
         return Boolean.TRUE.equals(dto.lockedInDeck());
     }
 
-    private void persistCharacterDeck(SessionRuntime rt, PlayerId playerId, List<String> deckCardIds) {
+    private void persistCharacterDeck(SessionRuntime rt, PlayerId playerId, List<String> deckOwnedCardIds, List<OwnedCard> ownedCards) {
         Long characterId = rt.findCharacterIdByPlayerId(playerId.value());
         if (characterId == null) {
             return;
@@ -504,9 +500,9 @@ public class SessionService {
 
         CharacterProfile profile = characterProfileRepository.findById(characterId)
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId));
-        profile.setCurrentSkillDeck(List.copyOf(deckCardIds));
+        profile.setCurrentSkillDeck(List.copyOf(deckOwnedCardIds));
         characterProfileRepository.save(profile);
-        deckService.upsertCharacterCurrentSkillDeck(characterId, deckCardIds);
+        deckService.upsertCharacterCurrentSkillDeck(characterId, currentDeckCardIdsFromOwnedCardIds(deckOwnedCardIds, ownedCards));
     }
 
     private boolean isStrengthened(OwnedCardDto dto) {
@@ -546,12 +542,12 @@ public class SessionService {
         if (profile.getTrait2() != null && !profile.getTrait2().isBlank()) passiveIds.add(profile.getTrait2().trim());
 
         List<OwnedCardDto> ownedCards = parseOwnedCardsJson(profile.getOwnedCards());
-        List<String> deckCardIds = profile.getCurrentSkillDeck();
+        List<String> currentSkillDeck = profile.getCurrentSkillDeck();
         String exCardId = parseExCardId(profile.getExCard());
 
         return new CharacterJoinTemplate(
                 List.copyOf(passiveIds),
-                deckCardIds == null ? null : List.copyOf(deckCardIds),
+                currentSkillDeck == null ? null : List.copyOf(currentSkillDeck),
                 exCardId,
                 ownedCards
         );
@@ -611,7 +607,7 @@ public class SessionService {
 
     private record CharacterJoinTemplate(
             List<String> passiveIds,
-            List<String> deckCardIds,
+            List<String> currentSkillDeck,
             String exCardId,
             List<OwnedCardDto> ownedCards
     ) {}
@@ -697,22 +693,88 @@ public class SessionService {
         return List.copyOf(out);
     }
 
-    private List<String> parsePresetDeckCardIds(List<String> raw) {
+    private List<String> parseDeckOwnedCardIds(List<String> raw, List<OwnedCard> ownedCards) {
         if (raw == null || raw.isEmpty()) {
-            return defaultPresetDeckCardIds();
+            return resolveLegacyDeckCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards);
         }
-        return normalizeDeckCardIds(raw);
+        List<String> resolved = resolveStoredDeckToOwnedCardIds(raw, ownedCards);
+        return resolved == null ? List.of() : resolved;
     }
 
-    private List<String> normalizeDeckCardIds(List<String> raw) {
-        List<String> normalized = new ArrayList<>();
-        for (String cardId : raw) {
+    private List<String> normalizeDeckOwnedCardIds(List<String> deckOwnedCardIdsRaw,
+                                                   List<String> legacyDeckCardIdsRaw,
+                                                   List<OwnedCard> ownedCards) {
+        if (deckOwnedCardIdsRaw != null) {
+            List<String> normalized = new ArrayList<>();
+            for (String ownedCardId : deckOwnedCardIdsRaw) {
+                if (ownedCardId == null || ownedCardId.isBlank()) {
+                    throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds must not contain blank values");
+                }
+                normalized.add(ownedCardId.trim());
+            }
+            return List.copyOf(normalized);
+        }
+        if (legacyDeckCardIdsRaw != null) {
+            return resolveLegacyDeckCardIdsToOwnedCardIds(legacyDeckCardIdsRaw, ownedCards);
+        }
+        throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds is required");
+    }
+
+    private List<String> resolveStoredDeckToOwnedCardIds(List<String> storedDeckEntries, List<OwnedCard> ownedCards) {
+        if (storedDeckEntries == null) {
+            return null;
+        }
+        Map<String, OwnedCard> ownedById = ownedCardMap(ownedCards);
+        boolean allOwnedCardIds = true;
+        for (String entry : storedDeckEntries) {
+            if (entry == null || entry.isBlank() || !ownedById.containsKey(entry.trim())) {
+                allOwnedCardIds = false;
+                break;
+            }
+        }
+        if (allOwnedCardIds) {
+            return normalizeDeckOwnedCardIds(storedDeckEntries, null, ownedCards);
+        }
+        return resolveLegacyDeckCardIdsToOwnedCardIds(storedDeckEntries, ownedCards);
+    }
+
+    private List<String> resolveLegacyDeckCardIdsToOwnedCardIds(List<String> deckCardIdsRaw, List<OwnedCard> ownedCards) {
+        List<String> normalizedCardIds = new ArrayList<>();
+        for (String cardId : deckCardIdsRaw) {
             if (cardId == null || cardId.isBlank()) {
                 throw new ResponseStatusException(BAD_REQUEST, "deckCardIds must not contain blank values");
             }
-            normalized.add(cardId.trim());
+            normalizedCardIds.add(cardId.trim());
         }
-        return List.copyOf(normalized);
+
+        boolean[] consumed = new boolean[ownedCards.size()];
+        List<String> resolvedOwnedCardIds = new ArrayList<>(normalizedCardIds.size());
+        for (String cardId : normalizedCardIds) {
+            int matchedIndex = -1;
+            for (int i = 0; i < ownedCards.size(); i++) {
+                if (consumed[i]) {
+                    continue;
+                }
+                if (cardId.equals(ownedCards.get(i).cardId())) {
+                    matchedIndex = i;
+                    break;
+                }
+            }
+            if (matchedIndex < 0) {
+                throw new ResponseStatusException(BAD_REQUEST, "owned card unavailable: " + cardId);
+            }
+            consumed[matchedIndex] = true;
+            resolvedOwnedCardIds.add(ownedCards.get(matchedIndex).ownedCardId());
+        }
+        return List.copyOf(resolvedOwnedCardIds);
+    }
+
+    private Map<String, OwnedCard> ownedCardMap(List<OwnedCard> ownedCards) {
+        Map<String, OwnedCard> out = new LinkedHashMap<>();
+        for (OwnedCard ownedCard : ownedCards) {
+            out.put(ownedCard.ownedCardId(), ownedCard);
+        }
+        return out;
     }
 
     private String normalizeExCardId(String raw) {

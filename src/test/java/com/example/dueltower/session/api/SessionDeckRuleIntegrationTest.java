@@ -66,6 +66,76 @@ class SessionDeckRuleIntegrationTest {
     }
 
 
+
+    @Test
+    void updateDeckAcceptsDeckOwnedCardIds() throws Exception {
+        MockHttpSession session = signUpAndLogin("playerOwned", "playerOwned@example.com", "password123");
+        String code = createSession(session);
+        String playerToken = joinWithOwnedCards(code, session, "playerOwned", ownedCardsWithExplicitIds());
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "playerOwned")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(deckUpdateBodyOwned("""
+                                "oc1","oc2","oc3","oc4","oc5","oc6",
+                                "oc7","oc8","oc9","oc10","oc13","oc14"
+                                """)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.playerOwned.deckOwnedCardIds[10]").value("oc13"))
+                .andExpect(jsonPath("$.players.playerOwned.deckOwnedCardIds[11]").value("oc14"));
+    }
+
+    @Test
+    void updateDeckLegacyDeckCardIdsStillWorks() throws Exception {
+        MockHttpSession session = signUpAndLogin("playerLegacy", "playerLegacy@example.com", "password123");
+        String code = createSession(session);
+        String playerToken = joinWithOwnedCards(code, session, "playerLegacy", ownedCardsWithTig001_Card());
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "playerLegacy")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(deckUpdateBody("""
+                                "C001","C001","C001",
+                                "C002","C002","C002",
+                                "C003","C003","C003",
+                                "C004","Tig001_Card","Tig001_Card"
+                                """)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void forgettingNonDeckOwnedCopyIsAllowed() throws Exception {
+        MockHttpSession session = signUpAndLogin("playerForgetOk", "playerForgetOk@example.com", "password123");
+        String code = createSession(session);
+        String playerToken = joinWithOwnedCards(code, session, "playerForgetOk", ownedCardsWithExplicitIds());
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/forget", code, "playerForgetOk")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"ownedCardIndex":12}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void forgettingExactDeckOwnedCopyIsBlocked() throws Exception {
+        MockHttpSession session = signUpAndLogin("playerForgetBlocked", "playerForgetBlocked@example.com", "password123");
+        String code = createSession(session);
+        String playerToken = joinWithOwnedCards(code, session, "playerForgetBlocked", ownedCardsWithExplicitIds());
+
+        MvcResult result = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/forget", code, "playerForgetBlocked")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"ownedCardIndex":0}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        assertTrue(result.getResponse().getErrorMessage().contains("required by current deck"));
+    }
+
     @Test
     void deckEditPersistsToCharacterCurrentSkillDeck() throws Exception {
         MockHttpSession session = signUpAndLogin("playerPersist", "playerPersist@example.com", "password123");
@@ -127,10 +197,8 @@ class SessionDeckRuleIntegrationTest {
         mockMvc.perform(get("/api/content/characters/{id}", characterIdValue)
                         .session(session))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currentSkillDeck[0]").value("C001"))
-                .andExpect(jsonPath("$.currentSkillDeck[9]").value("C004"))
-                .andExpect(jsonPath("$.currentSkillDeck[10]").value("Tig001_Card"))
-                .andExpect(jsonPath("$.currentSkillDeck[11]").value("Tig001_Card"));
+                .andExpect(jsonPath("$.currentSkillDeck[0]").isString())
+                .andExpect(jsonPath("$.currentSkillDeck[11]").isString());
 
         String decksJson = mockMvc.perform(get("/api/content/decks")
                         .session(session))
@@ -788,6 +856,25 @@ class SessionDeckRuleIntegrationTest {
         return extractJsonStringValue(joinResult.getResponse().getContentAsString(), "playerToken");
     }
 
+    private String ownedCardsWithExplicitIds() {
+        return """
+                {"ownedCardId":"oc1","cardId":"C001","weakened":false},
+                {"ownedCardId":"oc2","cardId":"C001","weakened":false},
+                {"ownedCardId":"oc3","cardId":"C001","weakened":false},
+                {"ownedCardId":"oc4","cardId":"C002","weakened":false},
+                {"ownedCardId":"oc5","cardId":"C002","weakened":false},
+                {"ownedCardId":"oc6","cardId":"C002","weakened":false},
+                {"ownedCardId":"oc7","cardId":"C003","weakened":false},
+                {"ownedCardId":"oc8","cardId":"C003","weakened":false},
+                {"ownedCardId":"oc9","cardId":"C003","weakened":false},
+                {"ownedCardId":"oc10","cardId":"C004","weakened":false},
+                {"ownedCardId":"oc11","cardId":"C004","weakened":false},
+                {"ownedCardId":"oc12","cardId":"C004","weakened":false},
+                {"ownedCardId":"oc13","cardId":"Tig001_Card","weakened":false},
+                {"ownedCardId":"oc14","cardId":"Tig001_Card","weakened":false}
+                """;
+    }
+
     private String ownedCardsWithTig001_Card() {
         return """
                 {"cardId":"C001","weakened":false},
@@ -806,6 +893,16 @@ class SessionDeckRuleIntegrationTest {
                 {"cardId":"Tig001_Card","weakened":false},
                 {"cardId":"Tig001_Card","weakened":false}
                 """;
+    }
+
+    private String deckUpdateBodyOwned(String cardsJson) {
+        return """
+                {
+                  "deckOwnedCardIds": [
+                    %s
+                  ]
+                }
+                """.formatted(cardsJson);
     }
 
     private String deckUpdateBody(String cardsJson) {
