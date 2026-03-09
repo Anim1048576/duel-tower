@@ -3,6 +3,7 @@ package com.example.dueltower.engine.core.effect;
 import com.example.dueltower.engine.core.combat.DamageFlags;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.combat.HealOps;
+import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierOps;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
@@ -72,9 +73,14 @@ public final class EffectOps {
                     ec.out(),
                     ec.actor().value()
             );
+            CardInstance ci = ec.state().card(ec.cardId());
+            if (ci != null) {
+                resolved = CardModifierOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), src, ec.cardId(), ci, ec.ctx().def(ci.defId()), resolved,
+                        enemyCandidatesFor(src), ec.out(), ec.actor().value());
+            }
             DamageFlags flags = KeywordOps.damageFlags(ec.state(), ec.ctx(), src, ec.cardId(), resolved);
             for (int i = 0; i < hits; i++) {
-                DamageOps.apply(ec.state(), ec.ctx(), ec.out(), src, ec.actor().value(), resolved, amount, flags);
+                DamageOps.apply(ec.state(), ec.ctx(), ec.out(), src, ec.cardId(), ec.actor().value(), resolved, amount, flags);
             }
         }
     }
@@ -149,12 +155,20 @@ public final class EffectOps {
             case ENEMY_ONE -> {
                 TargetRef chosen = ec.selection().requireOneEnemyOrSummon();
                 TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), chosen, ec.out(), ec.actor().value());
+                CardInstance ci = ec.state().card(ec.cardId());
+                if (ci != null) {
+                    resolved = CardModifierOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), ci, ec.ctx().def(ci.defId()), resolved, enemyCandidatesFor(actorRef()), ec.out(), ec.actor().value());
+                }
                 yield List.of(resolved);
             }
             case ANY_ONE -> {
                 TargetRef chosen = ec.selection().requireOne();
                 if (chosen instanceof TargetRef.Enemy || chosen instanceof TargetRef.Summon) {
                     TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), chosen, ec.out(), ec.actor().value());
+                    CardInstance ci = ec.state().card(ec.cardId());
+                    if (ci != null) {
+                        resolved = CardModifierOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), ci, ec.ctx().def(ci.defId()), resolved, enemyCandidatesFor(actorRef()), ec.out(), ec.actor().value());
+                    }
                     yield List.of(resolved);
                 }
                 yield List.of(chosen);
@@ -182,6 +196,7 @@ public final class EffectOps {
                 ec.ctx(),
                 ec.out(),
                 actorRef(),
+                ec.cardId(),
                 ec.actor().value(),
                 ref,
                 finalAmount,
@@ -201,6 +216,7 @@ public final class EffectOps {
                 ec.ctx(),
                 ec.out(),
                 actorRef(),
+                ec.cardId(),
                 ec.actor().value(),
                 ref,
                 finalAmount
@@ -288,6 +304,18 @@ public final class EffectOps {
         Random rnd = new Random(mix);
         int roll = rnd.nextInt(100) + 1;
         return roll <= chance;
+    }
+
+
+    private List<TargetRef> enemyCandidatesFor(TargetRef actor) {
+        List<TargetRef> enemyCandidates = new ArrayList<>();
+        if (actor instanceof TargetRef.Player) {
+            ec.state().enemies().keySet().forEach(id -> enemyCandidates.add(TargetRef.ofEnemy(id)));
+            ec.state().summons().values().forEach(s -> enemyCandidates.add(TargetRef.ofSummon(s.owner(), s.id())));
+            return enemyCandidates;
+        }
+        ec.state().players().keySet().forEach(id -> enemyCandidates.add(TargetRef.ofPlayer(id)));
+        return enemyCandidates;
     }
 
     private TargetRef actorRef() {
