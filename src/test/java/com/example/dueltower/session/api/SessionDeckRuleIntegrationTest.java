@@ -117,7 +117,7 @@ class SessionDeckRuleIntegrationTest {
             assertNotNull(ps);
 
             List<String> c001SourceOwnedIds = ps.deck().stream()
-                    .map(id -> rt.state().cardInstances().get(id))
+                    .map(rt.state()::card)
                     .filter(ci -> ci != null && "C001".equals(ci.defId().value()))
                     .map(CardInstance::sourceOwnedCardId)
                     .sorted()
