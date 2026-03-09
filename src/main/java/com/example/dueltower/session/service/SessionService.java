@@ -679,7 +679,7 @@ public class SessionService {
         }
 
         if (requestedPresetDeckOwnedCardIdsRaw != null) {
-            return normalizeDeckOwnedCardIds(requestedPresetDeckOwnedCardIdsRaw);
+            return resolveStoredDeckToOwnedCardIds(requestedPresetDeckOwnedCardIdsRaw, ownedCards);
         }
         return resolveCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards, "deckCardIds must not contain blank values");
     }
