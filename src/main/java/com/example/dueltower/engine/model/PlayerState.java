@@ -248,7 +248,7 @@ public final class PlayerState {
             if (card.ownedCardId() == null || card.ownedCardId().isBlank()) {
                 throw new IllegalArgumentException("ownedCards contains invalid ownedCardId");
             }
-            ownedCards.add(new OwnedCard(card.ownedCardId(), card.cardId(), card.modifiers(), card.lockedInDeck()));
+            ownedCards.add(new OwnedCard(card.ownedCardId(), card.cardId(), card.modifiers()));
         }
     }
 

@@ -1,25 +1,23 @@
 package com.example.dueltower.content.card.model;
 
+import com.example.dueltower.content.cardmodifier.cmdb.CardModifierIds;
+
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
  * 플레이어 보유 카드 슬롯.
- * strengthened=true 는 카드가 강화된 상태를 의미한다.
- * weakened=true 는 카드가 약화된 상태를 의미한다.
- * lockedInDeck=true 는 현재 덱에서 제거할 수 없는 카드 슬롯을 의미한다.
+ * 강화/약화/덱 고정 의미는 modifiers 기반으로 해석한다.
  */
 public record OwnedCard(
         String ownedCardId,
         String cardId,
-        List<OwnedCardModifier> modifiers,
-        boolean lockedInDeck
+        List<OwnedCardModifier> modifiers
 ) {
-    public static final String MODIFIER_STRENGTHENED = "STRENGTHENED";
-    public static final String MODIFIER_WEAKENED = "WEAKENED";
-
     public OwnedCard {
         cardId = normalizeRequired(cardId, "cardId");
         ownedCardId = normalizeOwnedCardId(ownedCardId);
@@ -29,28 +27,62 @@ public record OwnedCard(
     public static OwnedCard fromLegacy(String cardId, boolean strengthened, boolean weakened, boolean lockedInDeck) {
         List<OwnedCardModifier> modifiers = new ArrayList<>();
         if (strengthened) {
-            modifiers.add(new OwnedCardModifier(MODIFIER_STRENGTHENED, 1));
+            modifiers.add(new OwnedCardModifier(CardModifierIds.STRENGTHENED, 1));
         }
         if (weakened) {
-            modifiers.add(new OwnedCardModifier(MODIFIER_WEAKENED, 1));
+            modifiers.add(new OwnedCardModifier(CardModifierIds.WEAKENED, 1));
         }
-        return new OwnedCard(UUID.randomUUID().toString(), cardId, modifiers, lockedInDeck);
+        if (lockedInDeck) {
+            modifiers.add(new OwnedCardModifier(CardModifierIds.LOCKED_IN_DECK, 1));
+        }
+        return new OwnedCard(UUID.randomUUID().toString(), cardId, modifiers);
     }
 
     public boolean strengthened() {
-        return hasModifier(MODIFIER_STRENGTHENED);
+        return OwnedCardModifierSemantics.isStrengthened(modifiers);
     }
 
     public boolean weakened() {
-        return hasModifier(MODIFIER_WEAKENED);
+        return OwnedCardModifierSemantics.isWeakened(modifiers);
+    }
+
+    public boolean lockedInDeck() {
+        return OwnedCardModifierSemantics.isLockedInDeck(modifiers);
     }
 
     public boolean hasModifier(String modifierId) {
+        return OwnedCardModifierSemantics.hasModifier(modifiers, modifierId);
+    }
+
+    public OwnedCard withLockInDeck(boolean locked) {
+        if (locked) {
+            return withAddedModifier(CardModifierIds.LOCKED_IN_DECK);
+        }
+        return withRemovedModifier(CardModifierIds.LOCKED_IN_DECK);
+    }
+
+    public OwnedCard withAddedModifier(String modifierId) {
+        String normalized = normalizeRequired(modifierId, "modifierId");
+        if (hasModifier(normalized)) {
+            return this;
+        }
+        List<OwnedCardModifier> next = new ArrayList<>(modifiers);
+        next.add(new OwnedCardModifier(normalized, 1));
+        return new OwnedCard(ownedCardId, cardId, next);
+    }
+
+    public OwnedCard withRemovedModifier(String modifierId) {
         if (modifierId == null || modifierId.isBlank()) {
-            return false;
+            return this;
         }
         String normalized = modifierId.trim();
-        return modifiers.stream().anyMatch(modifier -> modifier.modifierId().equals(normalized));
+        List<OwnedCardModifier> next = modifiers.stream()
+                .filter(modifier -> !normalized.equals(modifier.modifierId()))
+                .toList();
+        if (next.size() == modifiers.size()) {
+            return this;
+        }
+        return new OwnedCard(ownedCardId, cardId, next);
     }
 
     private static String normalizeOwnedCardId(String value) {
@@ -64,14 +96,15 @@ public record OwnedCard(
         if (source == null || source.isEmpty()) {
             return List.of();
         }
-        List<OwnedCardModifier> out = new ArrayList<>(source.size());
+        Map<String, OwnedCardModifier> deduped = new LinkedHashMap<>();
         for (OwnedCardModifier modifier : source) {
             if (modifier == null) {
                 throw new IllegalArgumentException("modifiers contains null");
             }
-            out.add(new OwnedCardModifier(modifier.modifierId(), modifier.value()));
+            String modifierId = modifier.modifierId();
+            deduped.putIfAbsent(modifierId, new OwnedCardModifier(modifierId, modifier.value()));
         }
-        return List.copyOf(out);
+        return List.copyOf(deduped.values());
     }
 
     private static String normalizeRequired(String raw, String fieldName) {

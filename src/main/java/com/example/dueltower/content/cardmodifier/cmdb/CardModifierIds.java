@@ -5,6 +5,7 @@ public final class CardModifierIds {
 
     public static final String STRENGTHENED = "STRENGTHENED";
     public static final String WEAKENED = "WEAKENED";
+    public static final String LOCKED_IN_DECK = "LOCKED_IN_DECK";
 
     public static final String WEAKENED_COST_PLUS_ONE = "WEAKENED_COST_PLUS_ONE";
     public static final String WEAKENED_SELF_DAMAGE_10 = "WEAKENED_SELF_DAMAGE_10";

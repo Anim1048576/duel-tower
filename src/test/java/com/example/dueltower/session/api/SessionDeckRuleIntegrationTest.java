@@ -597,6 +597,46 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    void concreteWeakenedModifierCardCannotBeForgotten() throws Exception {
+        MockHttpSession session = signUpAndLogin("player12b", "player12b@example.com", "password123");
+        String code = createSession(session);
+        String playerToken = joinWithOwnedCards(code, session, "player12b", """
+                {"ownedCardId":"oc-w1","cardId":"C001","modifiers":[{"modifierId":"WEAKENED_COST_PLUS_ONE","value":1}]},
+                {"cardId":"C001","weakened":false},
+                {"cardId":"C001","weakened":false},
+                {"cardId":"C002","weakened":false},
+                {"cardId":"C002","weakened":false},
+                {"cardId":"C002","weakened":false},
+                {"cardId":"C003","weakened":false},
+                {"cardId":"C003","weakened":false},
+                {"cardId":"C003","weakened":false},
+                {"cardId":"C004","weakened":false},
+                {"cardId":"C004","weakened":false},
+                {"cardId":"C004","weakened":false},
+                {"cardId":"Tig001_Card","weakened":false}
+                """);
+
+        MvcResult result = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/forget", code, "player12b")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ownedCardIndex": 0
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        assertTrue(result.getResponse().getErrorMessage().contains("cannot forget weakened card"));
+
+        mockMvc.perform(get("/api/sessions/{code}", code)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.player12b.ownedCards[0].weakened").value(true))
+                .andExpect(jsonPath("$.players.player12b.ownedCards[0].modifiers[0].modifierId").value("WEAKENED_COST_PLUS_ONE"));
+    }
+
+    @Test
     void lockedCardCannotBeForgotten() throws Exception {
         MockHttpSession session = signUpAndLogin("player13", "player13@example.com", "password123");
         String code = createSession(session);
@@ -628,6 +668,12 @@ class SessionDeckRuleIntegrationTest {
                 .andReturn();
 
         assertTrue(result.getResponse().getErrorMessage().contains("cannot forget locked-in-deck card"));
+
+        mockMvc.perform(get("/api/sessions/{code}", code)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.player13.ownedCards[0].lockedInDeck").value(true))
+                .andExpect(jsonPath("$.players.player13.ownedCards[0].modifiers[0].modifierId").value("LOCKED_IN_DECK"));
     }
 
     @Test
