@@ -10,12 +10,14 @@ import com.example.dueltower.engine.core.GameEngine;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
-import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.*;
 import org.junit.jupiter.api.Test;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,12 +26,20 @@ class CardModifierRuntimeStep3Test {
     @Test
     void weakenedCostPlusOneIncreasesPlayCost() {
         Fx fx = new Fx();
-        CardInstId id = fx.addHandCardWithModifiers("NORMAL_STRIKE", List.of(new OwnedCardModifier(CardModifierIds.WEAKENED_COST_PLUS_ONE, 1)));
-        fx.player.ap(2);
+        CardInstId id = fx.addHandCardWithModifiers(
+                "NORMAL_STRIKE",
+                List.of(new OwnedCardModifier(CardModifierIds.WEAKENED_COST_PLUS_ONE, 1))
+        );
         fx.startMainTurn();
+        fx.player.ap(2);
 
-        EngineResult res = fx.process(new PlayCardCommand(UUID.randomUUID(), fx.state.version(), fx.playerId, id,
-                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))));
+        EngineResult res = fx.process(new PlayCardCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                id,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
 
         assertTrue(res.accepted());
         assertEquals(0, fx.player.ap());
