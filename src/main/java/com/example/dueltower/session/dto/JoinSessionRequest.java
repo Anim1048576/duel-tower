@@ -6,13 +6,15 @@ import java.util.List;
  * Join payload contract.
  * - playerId: required
  * - passiveIds: optional, 0..2 items
- * - presetDeckCardIds: optional, omitted 시 서버 기본 프리셋 덱 로드
+ * - presetDeckOwnedCardIds: optional, omitted 시 서버 기본 프리셋 덱 로드
+ * - presetDeckCardIds: optional legacy compatibility field
  * - ownedCards: optional, omitted 시 서버 기본 보유 카드(20) 로드
  */
 public record JoinSessionRequest(
         String playerId,
         Long characterId,
         List<String> passiveIds,
+        List<String> presetDeckOwnedCardIds,
         List<String> presetDeckCardIds,
         String presetExCardId,
         List<OwnedCardDto> ownedCards

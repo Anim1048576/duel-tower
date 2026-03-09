@@ -139,6 +139,7 @@ public class SessionService {
                           String playerIdRaw,
                           Long characterIdRaw,
                           List<String> passiveIdsRaw,
+                          List<String> presetDeckOwnedCardIdsRaw,
                           List<String> presetDeckCardIdsRaw,
                           String presetExCardIdRaw,
                           List<OwnedCardDto> ownedCardsRaw) {
@@ -178,12 +179,13 @@ public class SessionService {
             List<OwnedCard> ownedCards = parseOwnedCards(characterTemplate != null ? characterTemplate.ownedCards() : ownedCardsRaw);
             ps.ownedCards(ownedCards);
 
-            List<String> sourceDeckEntries = characterTemplate != null
-                    ? resolveStoredDeckToOwnedCardIds(characterTemplate.currentSkillDeck(), ps.ownedCards())
-                    : presetDeckCardIdsRaw;
-            boolean allowEmptyCharacterDeck = characterTemplate != null
-                    && (sourceDeckEntries == null || sourceDeckEntries.isEmpty());
-            List<String> deckOwnedCardIds = allowEmptyCharacterDeck ? List.of() : parseDeckOwnedCardIds(sourceDeckEntries, ps.ownedCards());
+            List<String> deckOwnedCardIds = resolveJoinDeckOwnedCardIds(
+                    characterTemplate,
+                    presetDeckOwnedCardIdsRaw,
+                    presetDeckCardIdsRaw,
+                    ps.ownedCards()
+            );
+            boolean allowEmptyCharacterDeck = characterTemplate != null && deckOwnedCardIds.isEmpty();
             if (!allowEmptyCharacterDeck) {
                 validateDeckBuild(deckOwnedCardIds, ps.ownedCards(), null);
             }
@@ -667,12 +669,25 @@ public class SessionService {
         return List.copyOf(out);
     }
 
-    private List<String> parseDeckOwnedCardIds(List<String> raw, List<OwnedCard> ownedCards) {
-        if (raw == null || raw.isEmpty()) {
+    private List<String> resolveJoinDeckOwnedCardIds(CharacterJoinTemplate characterTemplate,
+                                                    List<String> presetDeckOwnedCardIdsRaw,
+                                                    List<String> legacyPresetDeckCardIdsRaw,
+                                                    List<OwnedCard> ownedCards) {
+        if (characterTemplate != null) {
+            List<String> fromProfile = resolveStoredDeckToOwnedCardIds(characterTemplate.currentSkillDeck(), ownedCards);
+            if (fromProfile != null) {
+                return fromProfile;
+            }
             return resolveLegacyDeckCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards);
         }
-        List<String> resolved = resolveStoredDeckToOwnedCardIds(raw, ownedCards);
-        return resolved == null ? List.of() : resolved;
+
+        if (presetDeckOwnedCardIdsRaw != null) {
+            return normalizeDeckOwnedCardIds(presetDeckOwnedCardIdsRaw, null, ownedCards);
+        }
+        if (legacyPresetDeckCardIdsRaw != null) {
+            return resolveLegacyDeckCardIdsToOwnedCardIds(legacyPresetDeckCardIdsRaw, ownedCards);
+        }
+        return resolveLegacyDeckCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards);
     }
 
     private List<String> normalizeDeckOwnedCardIds(List<String> deckOwnedCardIdsRaw,

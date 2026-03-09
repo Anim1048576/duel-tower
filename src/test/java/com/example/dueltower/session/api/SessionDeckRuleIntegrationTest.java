@@ -71,6 +71,62 @@ class SessionDeckRuleIntegrationTest {
 
 
 
+
+    @Test
+    void joinAcceptsPresetDeckOwnedCardIdsCanonical() throws Exception {
+        MockHttpSession session = signUpAndLogin("playerJoinOwned", "playerJoinOwned@example.com", "password123");
+        String code = createSession(session);
+
+        String joinBody = """
+                {
+                  "playerId": "playerJoinOwned",
+                  "ownedCards": [
+                    {"ownedCardId":"oc1","cardId":"C001"},
+                    {"ownedCardId":"oc2","cardId":"C001","modifiers":[{"modifierId":"WEAKENED","value":1}]},
+                    {"ownedCardId":"oc3","cardId":"C001"},
+                    {"ownedCardId":"oc4","cardId":"C002"},
+                    {"ownedCardId":"oc5","cardId":"C002"},
+                    {"ownedCardId":"oc6","cardId":"C002"},
+                    {"ownedCardId":"oc7","cardId":"C003"},
+                    {"ownedCardId":"oc8","cardId":"C003"},
+                    {"ownedCardId":"oc9","cardId":"C003"},
+                    {"ownedCardId":"oc10","cardId":"C004"},
+                    {"ownedCardId":"oc11","cardId":"C004"},
+                    {"ownedCardId":"oc12","cardId":"C004"}
+                  ],
+                  "presetDeckOwnedCardIds": [
+                    "oc2","oc1","oc3",
+                    "oc4","oc5","oc6",
+                    "oc7","oc8","oc9",
+                    "oc10","oc11","oc12"
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(joinBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state.players.playerJoinOwned.deckOwnedCardIds[0]").value("oc2"))
+                .andExpect(jsonPath("$.state.players.playerJoinOwned.deckOwnedCardIds[1]").value("oc1"))
+                .andExpect(jsonPath("$.state.players.playerJoinOwned.deckOwnedCardIds[2]").value("oc3"));
+
+        sessionService.withSessionLock(code, rt -> {
+            PlayerState ps = rt.state().player(new com.example.dueltower.engine.model.Ids.PlayerId("playerJoinOwned"));
+            assertNotNull(ps);
+
+            List<String> c001SourceOwnedIds = ps.deck().stream()
+                    .map(id -> rt.state().cardInstances().get(id))
+                    .filter(ci -> ci != null && "C001".equals(ci.defId().value()))
+                    .map(CardInstance::sourceOwnedCardId)
+                    .sorted()
+                    .toList();
+            assertEquals(List.of("oc1", "oc2", "oc3"), c001SourceOwnedIds);
+            return null;
+        });
+    }
+
     @Test
     void updateDeckAcceptsDeckOwnedCardIds() throws Exception {
         MockHttpSession session = signUpAndLogin("playerOwned", "playerOwned@example.com", "password123");
