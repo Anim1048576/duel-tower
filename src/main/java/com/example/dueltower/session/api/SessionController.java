@@ -140,15 +140,15 @@ public class SessionController {
                                       @PathVariable String playerId,
                                       @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                       @RequestBody UpdateSessionDeckRequest req) {
-        if (req == null || req.deckCardIds() == null) {
-            throw new ResponseStatusException(BAD_REQUEST, "deckCardIds is required");
+        if (req == null || (req.deckOwnedCardIds() == null && req.deckCardIds() == null)) {
+            throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds is required");
         }
 
         String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
         if (!playerId.equals(actorPlayerId)) {
             throw new ResponseStatusException(FORBIDDEN, "players may only edit their own deck");
         }
-        sessionService.updateDeck(code, actorPlayerId, playerId, req.deckCardIds());
+        sessionService.updateDeck(code, actorPlayerId, playerId, req.deckOwnedCardIds(), req.deckCardIds());
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
     @PostMapping("/{code}/command")
