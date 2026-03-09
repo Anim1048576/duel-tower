@@ -323,8 +323,30 @@ public class SessionService {
             state.cardInstances().remove(id);
         }
 
+        List<OwnedCard> availableOwnedSlots = new ArrayList<>(ps.ownedCards());
+        boolean[] consumedOwnedSlots = new boolean[availableOwnedSlots.size()];
+
         for (String cardId : deckCardIds) {
-            addCardToDeck(state, ps, new CardDefId(cardId));
+            OwnedCard matchedOwnedCard = null;
+            int matchedIndex = -1;
+            for (int i = 0; i < availableOwnedSlots.size(); i++) {
+                if (consumedOwnedSlots[i]) {
+                    continue;
+                }
+                OwnedCard candidate = availableOwnedSlots.get(i);
+                if (cardId.equals(candidate.cardId())) {
+                    matchedOwnedCard = candidate;
+                    matchedIndex = i;
+                    break;
+                }
+            }
+
+            if (matchedOwnedCard == null) {
+                throw new IllegalStateException("owned card slot unavailable while loading deck: " + cardId);
+            }
+
+            consumedOwnedSlots[matchedIndex] = true;
+            addCardToDeck(state, ps, new CardDefId(cardId), matchedOwnedCard.ownedCardId(), matchedOwnedCard.modifiers());
         }
     }
 
@@ -710,7 +732,15 @@ public class SessionService {
     }
 
     private void addCardToDeck(GameState state, PlayerState ps, CardDefId defId) {
-        ZoneOps.createCardInZone(state, ps, defId, Zone.DECK);
+        addCardToDeck(state, ps, defId, null, List.of());
+    }
+
+    private void addCardToDeck(GameState state,
+                               PlayerState ps,
+                               CardDefId defId,
+                               String sourceOwnedCardId,
+                               List<OwnedCardModifier> modifiers) {
+        ZoneOps.createCardInZone(state, ps, defId, Zone.DECK, sourceOwnedCardId, modifiers);
     }
 
     private void addCardToEx(GameState state, PlayerState ps, CardDefId defId) {

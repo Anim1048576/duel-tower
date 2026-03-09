@@ -27,7 +27,9 @@ public final class StateMapper {
                             ci.defId().value(),
                             ci.ownerId().value(),
                             ci.zone().name(),
-                            Map.copyOf(ci.counters())
+                            Map.copyOf(ci.counters()),
+                            ci.sourceOwnedCardId(),
+                            mapModifiers(ci.modifiers())
                     )
             );
         }

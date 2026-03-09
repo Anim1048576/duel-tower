@@ -1,6 +1,8 @@
 package com.example.dueltower.session.api;
 
+import com.example.dueltower.engine.model.CardInstance;
 import com.example.dueltower.engine.model.NodeState;
+import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.member.MemberRepository;
 import com.example.dueltower.session.service.SessionService;
 import jakarta.servlet.http.HttpSession;
@@ -20,8 +22,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -592,6 +593,114 @@ class SessionDeckRuleIntegrationTest {
                 .andReturn();
 
         assertTrue(result.getResponse().getErrorMessage().contains("no forgettable cards"));
+    }
+
+
+
+    @Test
+    void loadDeckAssignsOwnedSlotsDeterministicallyAndPreservesRuntimeMetadata() throws Exception {
+        MockHttpSession session = signUpAndLogin("playerMeta1", "playerMeta1@example.com", "password123");
+        String code = createSession(session);
+
+        String joinBody = """
+                {
+                  "playerId": "playerMeta1",
+                  "ownedCards": [
+                    {"ownedCardId":"oc-strength","cardId":"C001","modifiers":[{"modifierId":"STRENGTHENED","value":1}]},
+                    {"ownedCardId":"oc-plain","cardId":"C001","modifiers":[]},
+                    {"ownedCardId":"oc-c002-1","cardId":"C002"},
+                    {"ownedCardId":"oc-c002-2","cardId":"C002"},
+                    {"ownedCardId":"oc-c002-3","cardId":"C002"},
+                    {"ownedCardId":"oc-c003-1","cardId":"C003"},
+                    {"ownedCardId":"oc-c003-2","cardId":"C003"},
+                    {"ownedCardId":"oc-c003-3","cardId":"C003"},
+                    {"ownedCardId":"oc-c004-1","cardId":"C004"},
+                    {"ownedCardId":"oc-c004-2","cardId":"C004"},
+                    {"ownedCardId":"oc-c004-3","cardId":"C004"},
+                    {"ownedCardId":"oc-c001-3","cardId":"C001"}
+                  ],
+                  "presetDeckCardIds": [
+                    "C001","C001","C001",
+                    "C002","C002","C002",
+                    "C003","C003","C003",
+                    "C004","C004","C004"
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(joinBody))
+                .andExpect(status().isOk());
+
+        sessionService.withSessionLock(code, rt -> {
+            PlayerState ps = rt.state().player(new com.example.dueltower.engine.model.Ids.PlayerId("playerMeta1"));
+            assertNotNull(ps);
+
+            List<CardInstance> c001Cards = ps.deck().stream()
+                    .map(id -> rt.state().cardInstances().get(id))
+                    .filter(ci -> ci != null && "C001".equals(ci.defId().value()))
+                    .toList();
+            assertEquals(3, c001Cards.size());
+
+            List<String> sourceIds = c001Cards.stream().map(CardInstance::sourceOwnedCardId).sorted().toList();
+            assertEquals(List.of("oc-c001-3", "oc-plain", "oc-strength"), sourceIds);
+            long strengthenedCount = c001Cards.stream().filter(ci -> ci.hasModifier("STRENGTHENED")).count();
+            assertEquals(1, strengthenedCount);
+
+            CardInstance exCard = rt.state().cardInstances().get(ps.exCard());
+            assertNotNull(exCard);
+            assertNull(exCard.sourceOwnedCardId());
+            assertTrue(exCard.modifiers().isEmpty());
+            return null;
+        });
+    }
+
+    @Test
+    void sessionStateCardsExposeSourceOwnedCardIdAndModifiers() throws Exception {
+        MockHttpSession session = signUpAndLogin("playerMeta2", "playerMeta2@example.com", "password123");
+        String code = createSession(session);
+
+        mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "playerMeta2",
+                                  "ownedCards": [
+                                    {"ownedCardId":"meta-1","cardId":"C001","modifiers":[{"modifierId":"WEAKENED","value":1}]},
+                                    {"ownedCardId":"meta-2","cardId":"C001"},
+                                    {"cardId":"C001"},
+                                    {"cardId":"C002"},{"cardId":"C002"},{"cardId":"C002"},
+                                    {"cardId":"C003"},{"cardId":"C003"},{"cardId":"C003"},
+                                    {"cardId":"C004"},{"cardId":"C004"},{"cardId":"C004"}
+                                  ],
+                                  "presetDeckCardIds": [
+                                    "C001","C001","C001",
+                                    "C002","C002","C002",
+                                    "C003","C003","C003",
+                                    "C004","C004","C004"
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        String inspectedCardId = sessionService.withSessionLock(code, rt -> {
+            PlayerState ps = rt.state().player(new com.example.dueltower.engine.model.Ids.PlayerId("playerMeta2"));
+            assertNotNull(ps);
+            return ps.deck().stream()
+                    .map(id -> rt.state().cardInstances().get(id))
+                    .filter(ci -> ci != null && ci.hasModifier("WEAKENED"))
+                    .findFirst()
+                    .map(ci -> ci.instanceId().value().toString())
+                    .orElseThrow();
+        });
+
+        mockMvc.perform(get("/api/sessions/{code}", code).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cards['%s'].sourceOwnedCardId".formatted(inspectedCardId)).value("meta-1"))
+                .andExpect(jsonPath("$.cards['%s'].modifiers[0].modifierId".formatted(inspectedCardId)).value("WEAKENED"));
     }
 
 

@@ -8,6 +8,7 @@ import com.example.dueltower.engine.core.effect.keyword.MoveReason;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.EnemyId;
+import com.example.dueltower.content.card.model.OwnedCardModifier;
 
 import java.util.*;
 
@@ -230,10 +231,19 @@ public final class ZoneOps {
      * For runtime token generation in card effects, use {@link #createTokenInZone(GameState, EngineContext, PlayerState, Ids.CardDefId, Zone, List)}.
      */
     public static CardInstId createCardInZone(GameState state, PlayerState ps, Ids.CardDefId defId, Zone zone) {
+        return createCardInZone(state, ps, defId, zone, null, List.of());
+    }
+
+    public static CardInstId createCardInZone(GameState state,
+                                              PlayerState ps,
+                                              Ids.CardDefId defId,
+                                              Zone zone,
+                                              String sourceOwnedCardId,
+                                              List<OwnedCardModifier> modifiers) {
         if (state == null || ps == null || defId == null || zone == null) return null;
 
         CardInstId instId = Ids.newCardInstId();
-        CardInstance ci = new CardInstance(instId, defId, ps.playerId(), zone);
+        CardInstance ci = new CardInstance(instId, defId, ps.playerId(), zone, sourceOwnedCardId, modifiers);
         state.cardInstances().put(instId, ci);
         addToZone(ps, instId, zone);
         return instId;
