@@ -4,6 +4,7 @@ import com.example.dueltower.engine.model.CardInstance;
 import com.example.dueltower.engine.model.NodeState;
 import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.member.MemberRepository;
+import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.session.service.SessionService;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +44,9 @@ class SessionDeckRuleIntegrationTest {
 
     @Autowired
     private SessionService sessionService;
+
+    @Autowired
+    private CharacterProfileRepository characterProfileRepository;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -125,6 +129,37 @@ class SessionDeckRuleIntegrationTest {
             assertEquals(List.of("oc1", "oc2", "oc3"), c001SourceOwnedIds);
             return null;
         });
+    }
+
+
+    @Test
+    void updateDeckPrefersCanonicalDeckOwnedCardIdsWhenLegacyAlsoProvided() throws Exception {
+        MockHttpSession session = signUpAndLogin("playerCanonicalWin", "playerCanonicalWin@example.com", "password123");
+        String code = createSession(session);
+        String playerToken = joinWithOwnedCards(code, session, "playerCanonicalWin", ownedCardsWithExplicitIds());
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "playerCanonicalWin")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "deckOwnedCardIds": [
+                                    "oc2","oc1","oc3",
+                                    "oc4","oc5","oc6",
+                                    "oc7","oc8","oc9",
+                                    "oc10","oc11","oc12"
+                                  ],
+                                  "deckCardIds": [
+                                    "C001","C001","C001",
+                                    "C002","C002","C002",
+                                    "C003","C003","C003",
+                                    "C004","C004","Tig001_Card"
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.playerCanonicalWin.deckOwnedCardIds[0]").value("oc2"))
+                .andExpect(jsonPath("$.players.playerCanonicalWin.deckOwnedCardIds[1]").value("oc1"));
     }
 
     @Test
@@ -241,24 +276,26 @@ class SessionDeckRuleIntegrationTest {
                                 """.formatted(characterIdValue)))
                 .andExpect(status().isOk())
                 .andReturn();
-        String playerToken = extractJsonStringValue(joinResult.getResponse().getContentAsString(), "playerToken");
+        String joinResponse = joinResult.getResponse().getContentAsString();
+        String playerToken = extractJsonStringValue(joinResponse, "playerToken");
+        List<String> currentDeckOwnedCardIds = extractJsonArrayValues(joinResponse, "deckOwnedCardIds");
+        List<String> allOwnedCardIds = extractJsonArrayValues(joinResponse, "ownedCardId");
+
+        List<String> updatedDeckOwnedCardIds = new ArrayList<>(currentDeckOwnedCardIds);
+        String replacementOwnedCardId = allOwnedCardIds.stream()
+                .filter(ownedCardId -> !updatedDeckOwnedCardIds.contains(ownedCardId))
+                .findFirst()
+                .orElseThrow();
+        updatedDeckOwnedCardIds.set(updatedDeckOwnedCardIds.size() - 1, replacementOwnedCardId);
 
         mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "playerPersist")
                         .header("X-Player-Token", playerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(deckUpdateBody("""
-                                "C001","C001","C001",
-                                "C002","C002","C002",
-                                "C003","C003","C003",
-                                "C004","Tig001_Card","Tig001_Card"
-                                """)))
+                        .content(deckUpdateBodyOwned(jsonArrayValues(updatedDeckOwnedCardIds))))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/content/characters/{id}", characterIdValue)
-                        .session(session))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currentSkillDeck[0]").isString())
-                .andExpect(jsonPath("$.currentSkillDeck[11]").isString());
+        var savedProfile = characterProfileRepository.findById(Long.parseLong(characterIdValue)).orElseThrow();
+        assertEquals(updatedDeckOwnedCardIds, savedProfile.getCurrentSkillDeck());
 
         String decksJson = mockMvc.perform(get("/api/content/decks")
                         .session(session))

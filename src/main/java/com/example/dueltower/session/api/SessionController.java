@@ -98,7 +98,7 @@ public class SessionController {
             throw new ResponseStatusException(FORBIDDEN, "playerId must match the authenticated user");
         }
         List<String> requestedPassiveIds = (req.passiveIds() == null) ? List.of() : req.passiveIds();
-        sessionService.join(code, requestedPlayerId, req.characterId(), requestedPassiveIds, req.presetDeckOwnedCardIds(), req.presetDeckCardIds(), req.presetExCardId(), req.ownedCards());
+        sessionService.join(code, requestedPlayerId, req.characterId(), requestedPassiveIds, req.requestedPresetDeckOwnedCardIds(), req.presetExCardId(), req.ownedCards());
 
         SessionStateDto state = sessionService.withSessionLock(code, rt -> {
             log.info("session join code={} playerId={} requestedPassiveIds={} playersNow={}",
@@ -140,7 +140,7 @@ public class SessionController {
                                       @PathVariable String playerId,
                                       @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                       @RequestBody UpdateSessionDeckRequest req) {
-        if (req == null || (req.deckOwnedCardIds() == null && req.deckCardIds() == null)) {
+        if (req == null || req.requestedDeckOwnedCardIds() == null) {
             throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds is required");
         }
 
@@ -148,7 +148,7 @@ public class SessionController {
         if (!playerId.equals(actorPlayerId)) {
             throw new ResponseStatusException(FORBIDDEN, "players may only edit their own deck");
         }
-        sessionService.updateDeck(code, actorPlayerId, playerId, req.deckOwnedCardIds(), req.deckCardIds());
+        sessionService.updateDeck(code, actorPlayerId, playerId, req.requestedDeckOwnedCardIds());
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
     @PostMapping("/{code}/command")
