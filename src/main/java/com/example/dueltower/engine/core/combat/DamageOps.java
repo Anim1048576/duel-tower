@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.core.combat;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierOps;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.event.GameEvent;
@@ -12,11 +13,11 @@ public final class DamageOps {
     private DamageOps() {}
 
     public static void apply(GameState state, EngineContext ctx, List<GameEvent> out, String source, TargetRef target, int amount) {
-        apply(state, ctx, out, null, source, target, amount, DamageFlags.NONE);
+        apply(state, ctx, out, null, null, source, target, amount, DamageFlags.NONE);
     }
 
     public static void apply(GameState state, EngineContext ctx, List<GameEvent> out, TargetRef sourceRef, String source, TargetRef target, int amount) {
-        apply(state, ctx, out, sourceRef, source, target, amount, DamageFlags.NONE);
+        apply(state, ctx, out, sourceRef, null, source, target, amount, DamageFlags.NONE);
     }
 
     public static void apply(
@@ -29,6 +30,20 @@ public final class DamageOps {
             int amount,
             DamageFlags flags
     ) {
+        apply(state, ctx, out, sourceRef, null, source, target, amount, flags);
+    }
+
+    public static void apply(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef sourceRef,
+            Ids.CardInstId sourceCardId,
+            String source,
+            TargetRef target,
+            int amount,
+            DamageFlags flags
+    ) {
         if (amount <= 0) return;
 
         DamageFlags f = (flags == null) ? DamageFlags.NONE : flags;
@@ -36,10 +51,16 @@ public final class DamageOps {
         StatusRuntime rt = new StatusRuntime(state, ctx, out, source);
         int remaining = amount;
 
-        // 0) '주는 피해' 변형 순서: passive -> status
+        // 0) '주는 피해' 변형 순서: passive -> status -> modifier
         if (sourceRef != null) {
             remaining = PassiveOps.onOutgoingDamage(state, ctx, out, sourceRef, target, remaining, source);
             remaining = applyOutgoing(state, ctx, rt, sourceRef, target, remaining);
+            if (sourceCardId != null) {
+                CardInstance ci = state.card(sourceCardId);
+                if (ci != null) {
+                    remaining = CardModifierOps.onOutgoingDamage(state, ctx, out, sourceRef, sourceCardId, ci, ctx.def(ci.defId()), target, remaining, source);
+                }
+            }
         }
         if (remaining <= 0) return;
 

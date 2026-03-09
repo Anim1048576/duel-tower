@@ -1,13 +1,11 @@
 package com.example.dueltower.engine.core.combat;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierOps;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.event.GameEvent;
-import com.example.dueltower.engine.model.CombatState;
-import com.example.dueltower.engine.model.GameState;
-import com.example.dueltower.engine.model.StatusOwnerRef;
-import com.example.dueltower.engine.model.TargetRef;
+import com.example.dueltower.engine.model.*;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -19,7 +17,7 @@ public final class HealOps {
     private record HookEntry(StatusOwnerRef owner, String statusId, int priority) {}
 
     public static void apply(GameState state, EngineContext ctx, List<GameEvent> out, String source, TargetRef target, int amount) {
-        apply(state, ctx, out, null, source, target, amount);
+        apply(state, ctx, out, null, null, source, target, amount);
     }
 
     public static void apply(
@@ -31,15 +29,34 @@ public final class HealOps {
             TargetRef target,
             int amount
     ) {
+        apply(state, ctx, out, sourceRef, null, source, target, amount);
+    }
+
+    public static void apply(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef sourceRef,
+            Ids.CardInstId sourceCardId,
+            String source,
+            TargetRef target,
+            int amount
+    ) {
         if (amount <= 0) return;
 
         StatusRuntime rt = new StatusRuntime(state, ctx, out, source);
         int remaining = amount;
 
-        // 0) '주는 회복' 변형 순서: passive -> status
+        // 0) '주는 회복' 변형 순서: passive -> status -> modifier
         if (sourceRef != null) {
             remaining = PassiveOps.onOutgoingHeal(state, ctx, out, sourceRef, target, remaining, source);
             remaining = applyOutgoing(state, ctx, rt, sourceRef, target, remaining);
+            if (sourceCardId != null) {
+                CardInstance ci = state.card(sourceCardId);
+                if (ci != null) {
+                    remaining = CardModifierOps.onOutgoingHeal(state, ctx, out, sourceRef, sourceCardId, ci, ctx.def(ci.defId()), target, remaining, source);
+                }
+            }
         }
         if (remaining <= 0) return;
 

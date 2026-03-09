@@ -6,6 +6,7 @@ import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.model.OwnedCardModifier;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.deck.service.DeckService;
+import com.example.dueltower.content.cardmodifier.service.CardModifierService;
 import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
@@ -54,6 +55,7 @@ public class SessionService {
     private final StatusService statusService;
     private final KeywordService keywordService;
     private final PassiveService passiveService;
+    private final CardModifierService cardModifierService;
     private final Duration sessionTtl;
     private final Duration cleanupInterval;
 
@@ -69,6 +71,7 @@ public class SessionService {
                           StatusService statusService,
                           KeywordService keywordService,
                           PassiveService passiveService,
+                          CardModifierService cardModifierService,
                           @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.characterProfileRepository = characterProfileRepository;
@@ -77,6 +80,7 @@ public class SessionService {
         this.statusService = statusService;
         this.keywordService = keywordService;
         this.passiveService = passiveService;
+        this.cardModifierService = cardModifierService;
         this.sessionTtl = sessionTtl;
         this.cleanupInterval = cleanupInterval;
     }
@@ -94,7 +98,9 @@ public class SessionService {
                     keywordService.defsMap(),
                     keywordService.effectsMap(),
                     passiveService.defsMap(),
-                    passiveService.effectsMap()
+                    passiveService.effectsMap(),
+                    cardModifierService.defsMap(),
+                    cardModifierService.effectsMap()
             );
             GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
             SessionRuntime rt = new SessionRuntime(code, gmId, generateGmToken(), state, ctx);

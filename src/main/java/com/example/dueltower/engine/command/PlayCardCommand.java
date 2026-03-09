@@ -3,6 +3,7 @@ package com.example.dueltower.engine.command;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.SummonOps;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierOps;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
@@ -59,11 +60,14 @@ public final class PlayCardCommand implements GameCommand {
         // 상태에 의한 카드 사용 제한(예: 기절)
         StatusOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, errors);
 
+        CardModifierOps.validatePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ps, cardId, ci, def, errors);
+
         // 코스트/AP 체크 (passive -> status 순으로 코스트 변형 적용)
         List<GameEvent> dummyOut = new ArrayList<>();
         int needBase = def.cost();
         int needPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, dummyOut, "VALIDATE");
-        int need = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needPassive, dummyOut, "VALIDATE");
+        int needStatus = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needPassive, dummyOut, "VALIDATE");
+        int need = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), cardId, ci, def, needStatus, dummyOut, "VALIDATE");
         int have = ps.ap();
 
         // 키워드에 의한 코스트 규칙(집념 등)
@@ -105,7 +109,8 @@ public final class PlayCardCommand implements GameCommand {
         // 코스트 지불 (상태에 의한 코스트 증감 포함)
         int costBase = def.cost();
         int costPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costBase, events, "PLAY_CARD_COST");
-        int cost = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costPassive, events, "PLAY_CARD_COST");
+        int costStatus = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costPassive, events, "PLAY_CARD_COST");
+        int cost = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), cardId, ci, def, costStatus, events, "PLAY_CARD_COST");
 
         int have = ps.ap();
         int debt = 0;
@@ -131,6 +136,8 @@ public final class PlayCardCommand implements GameCommand {
         // 키워드 후처리(턴당 1장 트래킹, AP debt 기록 등)
         KeywordOps.onAfterPlayCard(state, ctx, ps, cardId, cost, have, debt);
 
+        CardModifierOps.beforeResolvePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ps, cardId, ci, def, events, "PLAY_CARD");
+
         // 효과 해결
         CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, events);
@@ -139,6 +146,7 @@ public final class PlayCardCommand implements GameCommand {
         // 카드 사용 후 훅 순서: passive -> status
         PassiveOps.afterPlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, events, "PLAY_CARD");
         StatusOps.afterPlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, events, "PLAY_CARD");
+        CardModifierOps.afterResolvePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ps, cardId, ci, def, events, "PLAY_CARD");
 
         // 카드 이동 (HAND -> resolveTo)
         if (ps.hand().contains(cardId) && state.card(cardId) != null) {
