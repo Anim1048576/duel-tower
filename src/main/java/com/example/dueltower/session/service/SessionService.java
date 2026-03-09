@@ -491,9 +491,12 @@ public class SessionService {
 
         CharacterProfile profile = characterProfileRepository.findById(characterId)
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId));
-        profile.setCurrentSkillDeck(List.copyOf(deckOwnedCardIds));
+
+        List<String> deckCardIds = currentDeckCardIdsFromOwnedCardIds(deckOwnedCardIds, ownedCards);
+        profile.setCurrentSkillDeck(deckCardIds);
         characterProfileRepository.save(profile);
-        deckService.upsertCharacterCurrentSkillDeck(characterId, currentDeckCardIdsFromOwnedCardIds(deckOwnedCardIds, ownedCards));
+
+        deckService.upsertCharacterCurrentSkillDeck(characterId, deckCardIds);
     }
 
     private CharacterProfile loadCharacterProfile(Long characterIdRaw) {

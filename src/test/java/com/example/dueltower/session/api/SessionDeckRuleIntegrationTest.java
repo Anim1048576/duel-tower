@@ -1,10 +1,10 @@
 package com.example.dueltower.session.api;
 
+import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.engine.model.CardInstance;
 import com.example.dueltower.engine.model.NodeState;
 import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.member.MemberRepository;
-import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.session.service.SessionService;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +21,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -287,7 +289,20 @@ class SessionDeckRuleIntegrationTest {
                 updatedDeckOwnedCardIds,
                 "Tig001_Card"
         );
-        updatedDeckOwnedCardIds.set(updatedDeckOwnedCardIds.size() - 1, replacementOwnedCardId);
+
+        Map<String, String> ownedCardIdToCardId = extractOwnedCardIdToCardIdMap(joinResponse, "playerPersist");
+
+        int replaceIndex = -1;
+        for (int i = 0; i < updatedDeckOwnedCardIds.size(); i++) {
+            String ownedCardId = updatedDeckOwnedCardIds.get(i);
+            if ("C004".equals(ownedCardIdToCardId.get(ownedCardId))) {
+                replaceIndex = i;
+                break;
+            }
+        }
+
+        assertTrue(replaceIndex >= 0, "C004 slot not found in current deck");
+        updatedDeckOwnedCardIds.set(replaceIndex, replacementOwnedCardId);
 
         mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "playerPersist")
                         .header("X-Player-Token", playerToken)
@@ -1159,6 +1174,23 @@ class SessionDeckRuleIntegrationTest {
 
         fail("unused ownedCardId not found for cardId=" + cardId + " playerId=" + playerId);
         return null;
+    }
+
+    private Map<String, String> extractOwnedCardIdToCardIdMap(String json, String playerId) throws Exception {
+        JsonNode root = JSON.readTree(json);
+        JsonNode ownedCards = root.path("state").path("players").path(playerId).path("ownedCards");
+
+        assertTrue(ownedCards.isArray(), "ownedCards array not found in response for playerId=" + playerId);
+
+        Map<String, String> out = new LinkedHashMap<>();
+        for (JsonNode card : ownedCards) {
+            String ownedCardId = card.path("ownedCardId").asText("").trim();
+            String cardId = card.path("cardId").asText("").trim();
+            if (!ownedCardId.isEmpty() && !cardId.isEmpty()) {
+                out.put(ownedCardId, cardId);
+            }
+        }
+        return out;
     }
 
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {
