@@ -364,6 +364,8 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state.players.player8.ownedCardCount").value(20))
                 .andExpect(jsonPath("$.state.players.player8.maxOwnedCardCount").value(20))
+                .andExpect(jsonPath("$.state.players.player8.ownedCards[0].ownedCardId").isNotEmpty())
+                .andExpect(jsonPath("$.state.players.player8.ownedCards[0].modifiers").isArray())
                 .andExpect(jsonPath("$.state.players.player8.forgettingRequired").value(false));
     }
 
@@ -457,6 +459,12 @@ class SessionDeckRuleIntegrationTest {
                 .andReturn();
 
         assertTrue(result.getResponse().getErrorMessage().contains("cannot forget strengthened card"));
+
+        mockMvc.perform(get("/api/sessions/{code}", code)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.player11.ownedCards[0].strengthened").value(true))
+                .andExpect(jsonPath("$.players.player11.ownedCards[0].modifiers[0].modifierId").value("STRENGTHENED"));
     }
 
     @Test
@@ -491,6 +499,12 @@ class SessionDeckRuleIntegrationTest {
                 .andReturn();
 
         assertTrue(result.getResponse().getErrorMessage().contains("cannot forget weakened card"));
+
+        mockMvc.perform(get("/api/sessions/{code}", code)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.player12.ownedCards[0].weakened").value(true))
+                .andExpect(jsonPath("$.players.player12.ownedCards[0].modifiers[0].modifierId").value("WEAKENED"));
     }
 
     @Test

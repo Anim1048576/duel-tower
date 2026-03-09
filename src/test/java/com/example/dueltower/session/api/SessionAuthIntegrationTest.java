@@ -112,7 +112,7 @@ class SessionAuthIntegrationTest {
         mockMvc.perform(post("/api/sessions/{code}/join", code)
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                .content("""
                                 {
                                   "playerId": "tester",
                                   "characterId": %d
@@ -120,7 +120,9 @@ class SessionAuthIntegrationTest {
                                 """.formatted(profile.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.playerToken").isString())
-                .andExpect(jsonPath("$.state.players.tester.passiveIds[0]").value("P001"));
+                .andExpect(jsonPath("$.state.players.tester.passiveIds[0]").value("P001"))
+                .andExpect(jsonPath("$.state.players.tester.ownedCards[0].cardId").value("C001"))
+                .andExpect(jsonPath("$.state.players.tester.ownedCards[0].ownedCardId").isNotEmpty());
     }
 
 
