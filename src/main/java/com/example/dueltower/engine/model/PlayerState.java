@@ -62,6 +62,7 @@ public final class PlayerState {
     private final Map<String, Integer> statusValues = new LinkedHashMap<>();
     private final List<String> passiveIds = new ArrayList<>();
     private final List<OwnedCard> ownedCards = new ArrayList<>();
+    private final List<String> deckOwnedCardIds = new ArrayList<>();
 
     public PlayerState(PlayerId playerId) {
         this.playerId = playerId;
@@ -221,6 +222,20 @@ public final class PlayerState {
      * 보유 카드 슬롯 목록(최대 20).
      */
     public List<OwnedCard> ownedCards() { return Collections.unmodifiableList(ownedCards); }
+
+    public List<String> deckOwnedCardIds() { return Collections.unmodifiableList(deckOwnedCardIds); }
+
+    public void deckOwnedCardIds(Collection<String> value) {
+        Objects.requireNonNull(value, "deckOwnedCardIds is required");
+
+        deckOwnedCardIds.clear();
+        for (String ownedCardId : value) {
+            if (ownedCardId == null || ownedCardId.isBlank()) {
+                throw new IllegalArgumentException("deckOwnedCardIds contains blank id");
+            }
+            deckOwnedCardIds.add(ownedCardId.trim());
+        }
+    }
 
     public void ownedCards(Collection<OwnedCard> value) {
         Objects.requireNonNull(value, "ownedCards is required");

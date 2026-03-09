@@ -187,6 +187,7 @@ public class SessionService {
             }
 
             state.players().put(pid, ps);
+            ps.deckOwnedCardIds(deckOwnedCardIds);
             loadDeck(state, ps, deckOwnedCardIds);
             String exCardId = (characterTemplate != null) ? characterTemplate.exCardId() : presetExCardIdRaw;
             addCardToEx(state, ps, new CardDefId(normalizeExCardId(exCardId)));
@@ -249,7 +250,8 @@ public class SessionService {
             validateDeckEditableState(state.nodeState(), ps);
 
             List<String> deckOwnedCardIds = normalizeDeckOwnedCardIds(deckOwnedCardIdsRaw, legacyDeckCardIdsRaw, ps.ownedCards());
-            validateDeckBuild(deckOwnedCardIds, ps.ownedCards(), currentDeckOwnedCardIds(ps, state));
+            validateDeckBuild(deckOwnedCardIds, ps.ownedCards(), currentDeckOwnedCardIds(ps));
+            ps.deckOwnedCardIds(deckOwnedCardIds);
             loadDeck(state, ps, deckOwnedCardIds);
             shuffleDeck(state, ps);
             persistCharacterDeck(rt, target, deckOwnedCardIds, ps.ownedCards());
@@ -294,7 +296,7 @@ public class SessionService {
             }
 
             Map<String, Integer> ownedCounts = cardCountsFromOwned(ownedCards);
-            List<String> currentDeckOwnedCardIds = currentDeckOwnedCardIds(ps, state);
+            List<String> currentDeckOwnedCardIds = currentDeckOwnedCardIds(ps);
             Map<String, Integer> deckCounts = cardCounts(currentDeckCardIdsFromOwnedCardIds(currentDeckOwnedCardIds, ownedCards));
 
             if (ps.forgettingRequired() && !OwnedCardForgetPolicy.hasForgettableCardWithDeckMembership(
@@ -453,16 +455,8 @@ public class SessionService {
         return counts;
     }
 
-    private List<String> currentDeckOwnedCardIds(PlayerState ps, GameState state) {
-        List<String> deckOwnedCardIds = new ArrayList<>(ps.deck().size());
-        for (CardInstId id : ps.deck()) {
-            CardInstance card = state.cardInstances().get(id);
-            if (card == null || card.sourceOwnedCardId() == null || card.sourceOwnedCardId().isBlank()) {
-                continue;
-            }
-            deckOwnedCardIds.add(card.sourceOwnedCardId());
-        }
-        return List.copyOf(deckOwnedCardIds);
+    private List<String> currentDeckOwnedCardIds(PlayerState ps) {
+        return ps.deckOwnedCardIds();
     }
 
     private List<String> currentDeckCardIdsFromOwnedCardIds(List<String> deckOwnedCardIds, List<OwnedCard> ownedCards) {
