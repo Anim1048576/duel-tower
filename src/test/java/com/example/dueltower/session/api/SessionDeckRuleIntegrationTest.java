@@ -403,21 +403,28 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String playerToken = extractJsonStringValue(joinResult.getResponse().getContentAsString(), "playerToken");
+        String joinResponse = joinResult.getResponse().getContentAsString();
+        String playerToken = extractJsonStringValue(joinResponse, "playerToken");
+        String lockedOwnedCardId = extractLockedOwnedCardId(joinResponse);
+        List<String> currentDeckOwnedCardIds = extractJsonArrayValues(joinResponse, "deckOwnedCardIds");
+        List<String> allOwnedCardIds = extractJsonArrayValues(joinResponse, "ownedCardId");
+
+        List<String> updateDeckOwnedCardIds = new ArrayList<>(currentDeckOwnedCardIds);
+        updateDeckOwnedCardIds.remove(lockedOwnedCardId);
+        String replacementOwnedCardId = allOwnedCardIds.stream()
+                .filter(ownedCardId -> !updateDeckOwnedCardIds.contains(ownedCardId))
+                .findFirst()
+                .orElseThrow();
+        updateDeckOwnedCardIds.add(replacementOwnedCardId);
 
         MvcResult updateResult = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player7")
                         .header("X-Player-Token", playerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(deckUpdateBody("""
-                                "C001","C001",
-                                "C002","C002","C002",
-                                "C003","C003","C003",
-                                "C004","C004","C004",
-                                "Tig001_Card"
-                                """)))
+                        .content(deckUpdateBodyOwned(jsonArrayValues(updateDeckOwnedCardIds))))
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
+        assertTrue(updateResult.getResponse().getErrorMessage().contains(lockedOwnedCardId));
         assertTrue(updateResult.getResponse().getErrorMessage().contains("locked-in-deck card must remain in deck"));
     }
 
@@ -913,6 +920,46 @@ class SessionDeckRuleIntegrationTest {
                   ]
                 }
                 """.formatted(cardsJson);
+    }
+
+    private String jsonArrayValues(List<String> values) {
+        return values.stream()
+                .map(value -> "\"" + value + "\"")
+                .reduce((a, b) -> a + "," + b)
+                .orElse("");
+    }
+
+    private List<String> extractJsonArrayValues(String json, String key) {
+        Pattern arrayPattern = Pattern.compile("\"" + Pattern.quote(key) + "\":\\[(.*?)]", Pattern.DOTALL);
+        Matcher arrayMatcher = arrayPattern.matcher(json);
+        if (arrayMatcher.find()) {
+            return extractJsonStringTokens(arrayMatcher.group(1));
+        }
+
+        Pattern valuePattern = Pattern.compile("\"" + Pattern.quote(key) + "\":\"([^\"]+)\"");
+        Matcher valueMatcher = valuePattern.matcher(json);
+        List<String> values = new ArrayList<>();
+        while (valueMatcher.find()) {
+            values.add(valueMatcher.group(1));
+        }
+        return values;
+    }
+
+    private List<String> extractJsonStringTokens(String jsonFragment) {
+        Pattern tokenPattern = Pattern.compile("\"([^\"]+)\"");
+        Matcher matcher = tokenPattern.matcher(jsonFragment);
+        List<String> out = new ArrayList<>();
+        while (matcher.find()) {
+            out.add(matcher.group(1));
+        }
+        return out;
+    }
+
+    private String extractLockedOwnedCardId(String json) {
+        Pattern pattern = Pattern.compile("\"ownedCardId\":\"([^\"]+)\"[^}]*\"lockedInDeck\":true");
+        Matcher matcher = pattern.matcher(json);
+        assertTrue(matcher.find(), "locked owned card id not found in response");
+        return matcher.group(1);
     }
 
     private String extractJsonStringOrNumberValue(String json, String key) {

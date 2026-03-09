@@ -115,7 +115,7 @@ public final class StateMapper {
                 ps.passiveIds(),
                 mapOwnedCards(ps, state),
                 ps.deck().stream().map(id -> id.value().toString()).toList(),
-                currentDeckOwnedCardIds(ps, state),
+                currentDeckOwnedCardIds(ps),
                 ps.hand().stream().map(id -> id.value().toString()).toList(),
                 ps.grave().stream().map(id -> id.value().toString()).toList(),
                 ps.field().stream().map(id -> id.value().toString()).toList(),
@@ -135,16 +135,8 @@ public final class StateMapper {
     }
 
 
-    private static List<String> currentDeckOwnedCardIds(PlayerState ps, GameState state) {
-        List<String> out = new ArrayList<>(ps.deck().size());
-        for (var cardInstId : ps.deck()) {
-            CardInstance card = state.cardInstances().get(cardInstId);
-            if (card == null || card.sourceOwnedCardId() == null || card.sourceOwnedCardId().isBlank()) {
-                continue;
-            }
-            out.add(card.sourceOwnedCardId());
-        }
-        return List.copyOf(out);
+    private static List<String> currentDeckOwnedCardIds(PlayerState ps) {
+        return ps.deckOwnedCardIds();
     }
 
     private static List<OwnedCardDto> mapOwnedCards(PlayerState ps, GameState state) {
@@ -154,15 +146,15 @@ public final class StateMapper {
         }
 
         Map<String, Integer> deckCounts = new LinkedHashMap<>();
-        Set<String> deckOwnedCardIds = new LinkedHashSet<>();
-        for (var cardInstId : ps.deck()) {
-            CardInstance card = state.cardInstances().get(cardInstId);
-            if (card == null) {
-                continue;
-            }
-            deckCounts.merge(card.defId().value(), 1, Integer::sum);
-            if (card.sourceOwnedCardId() != null && !card.sourceOwnedCardId().isBlank()) {
-                deckOwnedCardIds.add(card.sourceOwnedCardId());
+        Set<String> deckOwnedCardIds = new LinkedHashSet<>(ps.deckOwnedCardIds());
+        Map<String, String> cardIdByOwnedCardId = new LinkedHashMap<>();
+        for (var owned : ps.ownedCards()) {
+            cardIdByOwnedCardId.put(owned.ownedCardId(), owned.cardId());
+        }
+        for (String ownedCardId : ps.deckOwnedCardIds()) {
+            String cardId = cardIdByOwnedCardId.get(ownedCardId);
+            if (cardId != null) {
+                deckCounts.merge(cardId, 1, Integer::sum);
             }
         }
 
