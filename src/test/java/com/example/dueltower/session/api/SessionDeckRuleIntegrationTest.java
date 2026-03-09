@@ -279,13 +279,14 @@ class SessionDeckRuleIntegrationTest {
         String joinResponse = joinResult.getResponse().getContentAsString();
         String playerToken = extractJsonStringValue(joinResponse, "playerToken");
         List<String> currentDeckOwnedCardIds = extractJsonArrayValues(joinResponse, "deckOwnedCardIds");
-        List<String> allOwnedCardIds = extractJsonArrayValues(joinResponse, "ownedCardId");
 
         List<String> updatedDeckOwnedCardIds = new ArrayList<>(currentDeckOwnedCardIds);
-        String replacementOwnedCardId = allOwnedCardIds.stream()
-                .filter(ownedCardId -> !updatedDeckOwnedCardIds.contains(ownedCardId))
-                .findFirst()
-                .orElseThrow();
+        String replacementOwnedCardId = findUnusedOwnedCardIdByCardId(
+                joinResponse,
+                "playerPersist",
+                updatedDeckOwnedCardIds,
+                "Tig001_Card"
+        );
         updatedDeckOwnedCardIds.set(updatedDeckOwnedCardIds.size() - 1, replacementOwnedCardId);
 
         mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "playerPersist")
@@ -1138,6 +1139,26 @@ class SessionDeckRuleIntegrationTest {
         Matcher matcher = pattern.matcher(json);
         assertTrue(matcher.find(), "JSON field not found: " + key);
         return matcher.group(1);
+    }
+
+    private String findUnusedOwnedCardIdByCardId(String json, String playerId, List<String> currentDeckOwnedCardIds, String cardId) throws Exception {
+        JsonNode root = JSON.readTree(json);
+        JsonNode ownedCards = root.path("state").path("players").path(playerId).path("ownedCards");
+
+        assertTrue(ownedCards.isArray(), "ownedCards array not found in response for playerId=" + playerId);
+
+        for (JsonNode card : ownedCards) {
+            String ownedCardId = card.path("ownedCardId").asText("").trim();
+            String currentCardId = card.path("cardId").asText("").trim();
+            if (!ownedCardId.isEmpty()
+                    && cardId.equals(currentCardId)
+                    && !currentDeckOwnedCardIds.contains(ownedCardId)) {
+                return ownedCardId;
+            }
+        }
+
+        fail("unused ownedCardId not found for cardId=" + cardId + " playerId=" + playerId);
+        return null;
     }
 
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {
