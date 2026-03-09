@@ -3,6 +3,7 @@ package com.example.dueltower.session.service;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
+import com.example.dueltower.content.card.model.OwnedCardModifier;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.content.keyword.service.KeywordService;
@@ -16,6 +17,7 @@ import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SessionId;
 import com.example.dueltower.session.dto.OwnedCardDto;
+import com.example.dueltower.session.dto.OwnedCardModifierDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -480,11 +482,26 @@ public class SessionService {
     }
 
     private boolean isStrengthened(OwnedCardDto dto) {
-        return Boolean.TRUE.equals(dto.strengthened());
+        return Boolean.TRUE.equals(dto.strengthened()) || hasModifier(dto, OwnedCard.MODIFIER_STRENGTHENED);
     }
 
     private boolean isWeakened(OwnedCardDto dto) {
-        return Boolean.TRUE.equals(dto.weakened());
+        return Boolean.TRUE.equals(dto.weakened()) || hasModifier(dto, OwnedCard.MODIFIER_WEAKENED);
+    }
+
+    private boolean hasModifier(OwnedCardDto dto, String modifierId) {
+        if (dto.modifiers() == null || dto.modifiers().isEmpty()) {
+            return false;
+        }
+        for (OwnedCardModifierDto modifier : dto.modifiers()) {
+            if (modifier == null || modifier.modifierId() == null) {
+                continue;
+            }
+            if (modifierId.equals(modifier.modifierId().trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private CharacterProfile loadCharacterProfile(Long characterIdRaw) {
@@ -521,13 +538,26 @@ public class SessionService {
                 if (node == null || node.isNull()) continue;
                 if (node.isTextual()) {
                     String cardId = node.asText("").trim();
-                    if (!cardId.isEmpty()) out.add(new OwnedCardDto(cardId, false, false, false, true, null));
+                    if (!cardId.isEmpty()) out.add(new OwnedCardDto(null, cardId, List.of(), false, false, false, true, null));
                     continue;
                 }
                 String cardId = node.path("cardId").asText("").trim();
                 if (cardId.isEmpty()) continue;
+                String ownedCardId = node.path("ownedCardId").asText("").trim();
+                List<OwnedCardModifierDto> modifiers = parseOwnedCardModifierDtos(node.path("modifiers"));
+                boolean strengthened = node.path("strengthened").asBoolean(false);
                 boolean weakened = node.path("weakened").asBoolean(false);
-                out.add(new OwnedCardDto(cardId, false, weakened, false, true, null));
+                boolean lockedInDeck = node.path("lockedInDeck").asBoolean(false);
+                out.add(new OwnedCardDto(
+                        ownedCardId.isEmpty() ? null : ownedCardId,
+                        cardId,
+                        modifiers,
+                        strengthened,
+                        weakened,
+                        lockedInDeck,
+                        true,
+                        null
+                ));
             }
             return List.copyOf(out);
         } catch (Exception e) {
@@ -594,7 +624,47 @@ public class SessionService {
             if (dto == null || dto.cardId() == null || dto.cardId().isBlank()) {
                 throw new ResponseStatusException(BAD_REQUEST, "ownedCards.cardId is required");
             }
-            out.add(new OwnedCard(dto.cardId().trim(), isStrengthened(dto), isWeakened(dto), isLockedInDeck(dto)));
+            String ownedCardId = (dto.ownedCardId() == null || dto.ownedCardId().isBlank()) ? UUID.randomUUID().toString() : dto.ownedCardId().trim();
+            List<OwnedCardModifier> modifiers = toOwnedCardModifiers(dto);
+            out.add(new OwnedCard(ownedCardId, dto.cardId().trim(), modifiers, isLockedInDeck(dto)));
+        }
+        return List.copyOf(out);
+    }
+
+    private List<OwnedCardModifier> toOwnedCardModifiers(OwnedCardDto dto) {
+        List<OwnedCardModifier> out = new ArrayList<>();
+        if (dto.modifiers() != null) {
+            for (OwnedCardModifierDto modifierDto : dto.modifiers()) {
+                if (modifierDto == null || modifierDto.modifierId() == null || modifierDto.modifierId().isBlank()) {
+                    throw new ResponseStatusException(BAD_REQUEST, "ownedCards.modifiers.modifierId is required");
+                }
+                out.add(new OwnedCardModifier(modifierDto.modifierId().trim(), modifierDto.value() == null ? 0 : modifierDto.value()));
+            }
+        }
+        if (Boolean.TRUE.equals(dto.strengthened()) && out.stream().noneMatch(m -> OwnedCard.MODIFIER_STRENGTHENED.equals(m.modifierId()))) {
+            out.add(new OwnedCardModifier(OwnedCard.MODIFIER_STRENGTHENED, 1));
+        }
+        if (Boolean.TRUE.equals(dto.weakened()) && out.stream().noneMatch(m -> OwnedCard.MODIFIER_WEAKENED.equals(m.modifierId()))) {
+            out.add(new OwnedCardModifier(OwnedCard.MODIFIER_WEAKENED, 1));
+        }
+        return List.copyOf(out);
+    }
+
+    private List<OwnedCardModifierDto> parseOwnedCardModifierDtos(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return List.of();
+        }
+        List<OwnedCardModifierDto> out = new ArrayList<>();
+        for (JsonNode modifierNode : node) {
+            if (modifierNode == null || modifierNode.isNull()) {
+                continue;
+            }
+            String modifierId = modifierNode.path("modifierId").asText("").trim();
+            if (modifierId.isEmpty()) {
+                continue;
+            }
+            int value = modifierNode.path("value").asInt(0);
+            out.add(new OwnedCardModifierDto(modifierId, value));
         }
         return List.copyOf(out);
     }
@@ -623,10 +693,10 @@ public class SessionService {
 
     private List<OwnedCard> defaultOwnedCards() {
         List<OwnedCard> owned = new ArrayList<>(20);
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C001", false, false, false));
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C002", false, false, false));
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C003", false, false, false));
-        for (int i = 0; i < 5; i++) owned.add(new OwnedCard("C004", false, false, false));
+        for (int i = 0; i < 5; i++) owned.add(OwnedCard.fromLegacy("C001", false, false, false));
+        for (int i = 0; i < 5; i++) owned.add(OwnedCard.fromLegacy("C002", false, false, false));
+        for (int i = 0; i < 5; i++) owned.add(OwnedCard.fromLegacy("C003", false, false, false));
+        for (int i = 0; i < 5; i++) owned.add(OwnedCard.fromLegacy("C004", false, false, false));
         return List.copyOf(owned);
     }
 

@@ -230,7 +230,10 @@ public final class PlayerState {
             if (card == null || card.cardId() == null || card.cardId().isBlank()) {
                 throw new IllegalArgumentException("ownedCards contains invalid cardId");
             }
-            ownedCards.add(new OwnedCard(card.cardId().trim(), card.strengthened(), card.weakened(), card.lockedInDeck()));
+            if (card.ownedCardId() == null || card.ownedCardId().isBlank()) {
+                throw new IllegalArgumentException("ownedCards contains invalid ownedCardId");
+            }
+            ownedCards.add(new OwnedCard(card.ownedCardId(), card.cardId(), card.modifiers(), card.lockedInDeck()));
         }
     }
 

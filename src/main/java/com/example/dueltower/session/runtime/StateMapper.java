@@ -1,5 +1,6 @@
 package com.example.dueltower.session.runtime;
 
+import com.example.dueltower.content.card.model.OwnedCardModifier;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.session.dto.*;
@@ -148,7 +149,9 @@ public final class StateMapper {
                 .map(c -> {
                     OwnedCardForgetPolicy.ForgetCheck forgetCheck = OwnedCardForgetPolicy.evaluate(c, ownedCounts, deckCounts);
                     return new OwnedCardDto(
+                            c.ownedCardId(),
                             c.cardId(),
+                            mapModifiers(c.modifiers()),
                             c.strengthened(),
                             c.weakened(),
                             c.lockedInDeck(),
@@ -156,6 +159,15 @@ public final class StateMapper {
                             forgetCheck.reason()
                     );
                 })
+                .toList();
+    }
+
+    private static List<OwnedCardModifierDto> mapModifiers(List<OwnedCardModifier> modifiers) {
+        if (modifiers == null || modifiers.isEmpty()) {
+            return List.of();
+        }
+        return modifiers.stream()
+                .map(modifier -> new OwnedCardModifierDto(modifier.modifierId(), modifier.value()))
                 .toList();
     }
 
