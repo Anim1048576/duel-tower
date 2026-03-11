@@ -628,12 +628,18 @@ public class SessionService {
 
     private List<OwnedCardModifier> toOwnedCardModifiers(OwnedCardDto dto) {
         List<OwnedCardModifier> out = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
         if (dto.modifiers() != null) {
             for (OwnedCardModifierDto modifierDto : dto.modifiers()) {
                 if (modifierDto == null || modifierDto.modifierId() == null || modifierDto.modifierId().isBlank()) {
-                    throw new ResponseStatusException(BAD_REQUEST, "ownedCards.modifiers.modifierId is required");
+                    continue;
                 }
-                out.add(new OwnedCardModifier(modifierDto.modifierId().trim(), modifierDto.value() == null ? 0 : modifierDto.value()));
+                String modifierId = modifierDto.modifierId().trim();
+                int value = modifierDto.value() == null ? 0 : modifierDto.value();
+                if (!seen.add(modifierId + "\u0000" + value)) {
+                    continue;
+                }
+                out.add(new OwnedCardModifier(modifierId, value));
             }
         }
         // Legacy boolean flags are compatibility-only input shims; modifiers are canonical.
