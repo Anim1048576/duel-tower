@@ -529,7 +529,8 @@ public class SessionService {
         try {
             List<JsonNode> nodes = JSON.readValue(raw, new TypeReference<>() {});
             List<OwnedCardDto> out = new ArrayList<>();
-            for (JsonNode node : nodes) {
+            for (int i = 0; i < nodes.size(); i++) {
+                JsonNode node = nodes.get(i);
                 if (node == null || node.isNull()) continue;
                 if (node.isTextual()) {
                     String cardId = node.asText("").trim();
@@ -537,7 +538,9 @@ public class SessionService {
                     continue;
                 }
                 String cardId = node.path("cardId").asText("").trim();
-                if (cardId.isEmpty()) continue;
+                if (cardId.isEmpty()) {
+                    throw invalidPersistedOwnedCards("entry[" + i + "] has missing cardId");
+                }
                 String ownedCardId = node.path("ownedCardId").asText("").trim();
                 List<OwnedCardModifierDto> modifiers = parseOwnedCardModifierDtos(node.path("modifiers"));
                 boolean strengthened = node.path("strengthened").asBoolean(false);
@@ -555,9 +558,15 @@ public class SessionService {
                 ));
             }
             return List.copyOf(out);
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
-            throw new ResponseStatusException(BAD_REQUEST, "character ownedCards JSON is invalid");
+            throw invalidPersistedOwnedCards("malformed JSON");
         }
+    }
+
+    private ResponseStatusException invalidPersistedOwnedCards(String detail) {
+        return new ResponseStatusException(BAD_REQUEST, "invalid persisted ownedCards payload: " + detail);
     }
 
     private String parseExCardId(String raw) {

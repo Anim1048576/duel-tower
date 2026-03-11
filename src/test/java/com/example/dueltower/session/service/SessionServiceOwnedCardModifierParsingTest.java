@@ -98,6 +98,58 @@ class SessionServiceOwnedCardModifierParsingTest {
         assertEquals("400 BAD_REQUEST \"ownedCards.cardId is required\"", ex.getMessage());
     }
 
+    @Test
+    void parseOwnedCardsJsonNormalizesRecoverableLegacyEntries() {
+        SessionService service = newSessionService();
+
+        List<OwnedCardDto> parsed = invokeParseOwnedCardsJson(service, """
+                [
+                  " C001 ",
+                  {
+                    "cardId": " C002 ",
+                    "strengthened": true,
+                    "weakened": false,
+                    "lockedInDeck": true
+                  }
+                ]
+                """);
+
+        assertEquals(2, parsed.size());
+
+        OwnedCardDto legacyTextual = parsed.get(0);
+        assertNull(legacyTextual.ownedCardId());
+        assertEquals("C001", legacyTextual.cardId());
+        assertEquals(List.of(), legacyTextual.modifiers());
+        assertFalse(legacyTextual.strengthened());
+        assertFalse(legacyTextual.weakened());
+        assertFalse(legacyTextual.lockedInDeck());
+
+        OwnedCardDto legacyObject = parsed.get(1);
+        assertNull(legacyObject.ownedCardId());
+        assertEquals("C002", legacyObject.cardId());
+        assertEquals(List.of(), legacyObject.modifiers());
+        assertTrue(legacyObject.strengthened());
+        assertFalse(legacyObject.weakened());
+        assertTrue(legacyObject.lockedInDeck());
+    }
+
+    @Test
+    void parseOwnedCardsJsonFailsOnUnrecoverablePersistedEntry() {
+        SessionService service = newSessionService();
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> invokeParseOwnedCardsJson(service, """
+                        [
+                          {"ownedCardId": "oc-1", "cardId": "   "}
+                        ]
+                        """)
+        );
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertEquals("400 BAD_REQUEST \"invalid persisted ownedCards payload: entry[0] has missing cardId\"", ex.getMessage());
+    }
+
     private static SessionService newSessionService() {
         return new SessionService(null, null, null, null, null, null, null, Duration.ofMinutes(30), Duration.ofMinutes(5));
     }
@@ -115,6 +167,23 @@ class SessionServiceOwnedCardModifierParsingTest {
             Method method = SessionService.class.getDeclaredMethod("parseOwnedCards", List.class);
             method.setAccessible(true);
             return (List<OwnedCard>) method.invoke(service, dtos);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<OwnedCardDto> invokeParseOwnedCardsJson(SessionService service, String raw) {
+        try {
+            Method method = SessionService.class.getDeclaredMethod("parseOwnedCardsJson", String.class);
+            method.setAccessible(true);
+            return (List<OwnedCardDto>) method.invoke(service, raw);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof RuntimeException runtimeException) {
