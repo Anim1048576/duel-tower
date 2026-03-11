@@ -312,14 +312,7 @@ class SessionDeckRuleIntegrationTest {
 
         var savedProfile = characterProfileRepository.findById(Long.parseLong(characterIdValue)).orElseThrow();
 
-        List<String> expectedPersistedDeckCardIds = new ArrayList<>();
-        for (String ownedCardId : updatedDeckOwnedCardIds) {
-            String cardId = ownedCardIdToCardId.get(ownedCardId);
-            assertNotNull(cardId, "cardId not found for ownedCardId=" + ownedCardId);
-            expectedPersistedDeckCardIds.add(cardId);
-        }
-
-        assertEquals(expectedPersistedDeckCardIds, savedProfile.getCurrentSkillDeck());
+        assertEquals(updatedDeckOwnedCardIds, savedProfile.getCurrentSkillDeck());
 
         String decksJson = mockMvc.perform(get("/api/content/decks")
                         .session(session))

@@ -493,7 +493,7 @@ public class SessionService {
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId));
 
         List<String> deckCardIds = currentDeckCardIdsFromOwnedCardIds(deckOwnedCardIds, ownedCards);
-        profile.setCurrentSkillDeck(deckCardIds);
+        profile.setCurrentSkillDeck(List.copyOf(deckOwnedCardIds));
         characterProfileRepository.save(profile);
 
         deckService.upsertCharacterCurrentSkillDeck(characterId, deckCardIds);
