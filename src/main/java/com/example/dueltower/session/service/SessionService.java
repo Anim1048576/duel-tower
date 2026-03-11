@@ -4,8 +4,6 @@ import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.model.OwnedCardModifier;
-import com.example.dueltower.content.card.model.OwnedCardModifierSemantics;
-import com.example.dueltower.content.cardmodifier.cmdb.CardModifierIds;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.content.cardmodifier.service.CardModifierService;
@@ -622,48 +620,11 @@ public class SessionService {
         if (ownedCardsRaw == null || ownedCardsRaw.isEmpty()) {
             return defaultOwnedCards();
         }
-
-        List<OwnedCard> out = new ArrayList<>(ownedCardsRaw.size());
-        for (OwnedCardDto dto : ownedCardsRaw) {
-            if (dto == null || dto.cardId() == null || dto.cardId().isBlank()) {
-                throw new ResponseStatusException(BAD_REQUEST, "ownedCards.cardId is required");
-            }
-            String ownedCardId = (dto.ownedCardId() == null || dto.ownedCardId().isBlank()) ? UUID.randomUUID().toString() : dto.ownedCardId().trim();
-            List<OwnedCardModifier> modifiers = toOwnedCardModifiers(dto);
-            out.add(new OwnedCard(ownedCardId, dto.cardId().trim(), modifiers));
-        }
-        return List.copyOf(out);
+        return SessionNormalizationSupport.normalizeOwnedCards(ownedCardsRaw);
     }
 
     private List<OwnedCardModifier> toOwnedCardModifiers(OwnedCardDto dto) {
-        List<OwnedCardModifier> out = new ArrayList<>();
-        Set<String> seen = new LinkedHashSet<>();
-        if (dto.modifiers() != null) {
-            for (OwnedCardModifierDto modifierDto : dto.modifiers()) {
-                if (modifierDto == null || modifierDto.modifierId() == null || modifierDto.modifierId().isBlank()) {
-                    continue;
-                }
-                String modifierId = modifierDto.modifierId().trim();
-                int value = modifierDto.value() == null ? 0 : modifierDto.value();
-                if (!seen.add(modifierId + "\u0000" + value)) {
-                    continue;
-                }
-                out.add(new OwnedCardModifier(modifierId, value));
-            }
-        }
-        // Legacy boolean flags are compatibility-only input shims; modifiers are canonical.
-        if (Boolean.TRUE.equals(dto.strengthened()) && out.stream().noneMatch(m -> CardModifierIds.STRENGTHENED.equals(m.modifierId()))) {
-            out.add(new OwnedCardModifier(CardModifierIds.STRENGTHENED, 1));
-        }
-        if (Boolean.TRUE.equals(dto.weakened())
-                && out.stream().noneMatch(m -> CardModifierIds.WEAKENED.equals(m.modifierId()))
-                && !OwnedCardModifierSemantics.hasConcreteWeakenedModifier(out)) {
-            out.add(new OwnedCardModifier(CardModifierIds.WEAKENED, 1));
-        }
-        if (Boolean.TRUE.equals(dto.lockedInDeck()) && out.stream().noneMatch(m -> CardModifierIds.LOCKED_IN_DECK.equals(m.modifierId()))) {
-            out.add(new OwnedCardModifier(CardModifierIds.LOCKED_IN_DECK, 1));
-        }
-        return List.copyOf(out);
+        return SessionNormalizationSupport.normalizeOwnedCardModifiers(dto);
     }
 
     private List<OwnedCardModifierDto> parseOwnedCardModifierDtos(JsonNode node) {
@@ -689,82 +650,34 @@ public class SessionService {
                                                     List<String> requestedPresetDeckOwnedCardIdsRaw,
                                                     List<OwnedCard> ownedCards) {
         if (characterTemplate != null) {
-            List<String> fromProfile = resolveStoredDeckToOwnedCardIds(characterTemplate.currentSkillDeck(), ownedCards);
+            List<String> fromProfile = SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(characterTemplate.currentSkillDeck(), ownedCards);
             if (fromProfile != null) {
                 return fromProfile;
             }
-            return resolveCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards, "deckCardIds must not contain blank values");
+            return SessionNormalizationSupport.resolveCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards, "deckCardIds must not contain blank values");
         }
 
         if (requestedPresetDeckOwnedCardIdsRaw != null) {
-            return resolveStoredDeckToOwnedCardIds(requestedPresetDeckOwnedCardIdsRaw, ownedCards);
+            return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(requestedPresetDeckOwnedCardIdsRaw, ownedCards);
         }
-        return resolveCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards, "deckCardIds must not contain blank values");
+        return SessionNormalizationSupport.resolveCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards, "deckCardIds must not contain blank values");
     }
 
     private List<String> resolveRequestedDeckOwnedCardIds(List<String> deckOwnedCardIdsRaw, List<OwnedCard> ownedCards) {
         if (deckOwnedCardIdsRaw != null) {
-            return resolveStoredDeckToOwnedCardIds(deckOwnedCardIdsRaw, ownedCards);
+            return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(deckOwnedCardIdsRaw, ownedCards);
         }
         throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds is required");
     }
 
     private List<String> resolveStoredDeckToOwnedCardIds(List<String> storedDeckEntries, List<OwnedCard> ownedCards) {
-        if (storedDeckEntries == null) {
-            return null;
-        }
-        Map<String, OwnedCard> ownedById = ownedCardMap(ownedCards);
-        boolean allOwnedCardIds = true;
-        for (String entry : storedDeckEntries) {
-            if (entry == null || entry.isBlank() || !ownedById.containsKey(entry.trim())) {
-                allOwnedCardIds = false;
-                break;
-            }
-        }
-        if (allOwnedCardIds) {
-            List<String> normalized = new ArrayList<>();
-            for (String ownedCardId : storedDeckEntries) {
-                if (ownedCardId == null || ownedCardId.isBlank()) {
-                    throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds must not contain blank values");
-                }
-                normalized.add(ownedCardId.trim());
-            }
-            return List.copyOf(normalized);
-        }
-        return resolveCardIdsToOwnedCardIds(storedDeckEntries, ownedCards, "deckCardIds must not contain blank values");
+        return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(storedDeckEntries, ownedCards);
     }
 
     private List<String> resolveCardIdsToOwnedCardIds(List<String> cardIdsRaw,
                                                   List<OwnedCard> ownedCards,
                                                   String blankValueMessage) {
-        List<String> normalizedCardIds = new ArrayList<>();
-        for (String cardId : cardIdsRaw) {
-            if (cardId == null || cardId.isBlank()) {
-                throw new ResponseStatusException(BAD_REQUEST, blankValueMessage);
-            }
-            normalizedCardIds.add(cardId.trim());
-        }
-
-        boolean[] consumed = new boolean[ownedCards.size()];
-        List<String> resolvedOwnedCardIds = new ArrayList<>(normalizedCardIds.size());
-        for (String cardId : normalizedCardIds) {
-            int matchedIndex = -1;
-            for (int i = 0; i < ownedCards.size(); i++) {
-                if (consumed[i]) {
-                    continue;
-                }
-                if (cardId.equals(ownedCards.get(i).cardId())) {
-                    matchedIndex = i;
-                    break;
-                }
-            }
-            if (matchedIndex < 0) {
-                throw new ResponseStatusException(BAD_REQUEST, "owned card unavailable: " + cardId);
-            }
-            consumed[matchedIndex] = true;
-            resolvedOwnedCardIds.add(ownedCards.get(matchedIndex).ownedCardId());
-        }
-        return List.copyOf(resolvedOwnedCardIds);
+        return SessionNormalizationSupport.resolveCardIdsToOwnedCardIds(cardIdsRaw, ownedCards, blankValueMessage);
     }
 
     private Map<String, OwnedCard> ownedCardMap(List<OwnedCard> ownedCards) {
