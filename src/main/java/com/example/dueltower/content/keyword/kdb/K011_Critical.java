@@ -1,5 +1,6 @@
 package com.example.dueltower.content.keyword.kdb;
 
+import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.content.keyword.model.KeywordBlueprint;
 import com.example.dueltower.engine.core.effect.keyword.DamageKeywordCtx;
 import com.example.dueltower.engine.core.effect.keyword.KeywordRuntime;
@@ -41,8 +42,8 @@ public class K011_Critical implements KeywordBlueprint {
     }
 
     @Override
-    public double criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) {
-        if (rt.value() <= 0) return 1d;
-        return 1.5d;
+    public Rational criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) {
+        if (rt.value() <= 0) return Rational.ONE;
+        return Rational.of(3, 2);
     }
 }

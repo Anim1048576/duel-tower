@@ -1,5 +1,6 @@
 package com.example.dueltower.engine.core.effect.status;
 
+import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.engine.model.*;
 
 import java.util.List;
@@ -40,7 +41,7 @@ public interface StatusEffect {
      * 치명타 배율을 조정하는 훅.
      * - kind: "damage" | "heal"
      */
-    default double onCriticalAmountMultiplier(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, double currentMultiplier) {
+    default Rational onCriticalAmountMultiplier(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, Rational currentMultiplier) {
         return currentMultiplier;
     }
 
@@ -56,7 +57,7 @@ public interface StatusEffect {
      * 피격/피회복 대상 관점에서 치명타 배율을 조정하는 훅.
      * - kind: "damage" | "heal"
      */
-    default double onIncomingCriticalAmountMultiplier(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, double currentMultiplier) {
+    default Rational onIncomingCriticalAmountMultiplier(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, String kind, Rational currentMultiplier) {
         return currentMultiplier;
     }
 

@@ -1,5 +1,6 @@
 package com.example.dueltower.engine.core.effect.keyword;
 
+import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.combat.DamageFlags;
 import com.example.dueltower.engine.model.*;
@@ -439,7 +440,7 @@ public final class KeywordOps {
     /**
      * Compute critical amount multiplier from keywords on the card.
      */
-    public static double criticalAmountMultiplier(
+    public static Rational criticalAmountMultiplier(
             GameState state,
             EngineContext ctx,
             TargetRef source,
@@ -447,16 +448,16 @@ public final class KeywordOps {
             TargetRef target,
             String kind
     ) {
-        if (cardId == null) return 1d;
+        if (cardId == null) return Rational.ONE;
         CardInstance ci = state.card(cardId);
-        if (ci == null) return 1d;
+        if (ci == null) return Rational.ONE;
 
         CardDefinition def = ctx.def(ci.defId());
         Map<String, Integer> kws = def.keywords();
-        if (kws == null || kws.isEmpty()) return 1d;
+        if (kws == null || kws.isEmpty()) return Rational.ONE;
 
         DamageKeywordCtx dc = new DamageKeywordCtx(source, cardId, target);
-        double multiplier = 1d;
+        Rational multiplier = Rational.ONE;
 
         for (var e : kws.entrySet()) {
             String kid = (e.getKey() == null) ? "" : e.getKey().trim();
@@ -466,11 +467,11 @@ public final class KeywordOps {
             if (!rt.present()) continue;
             if (!ctx.hasKeywordEffect(rt.id())) continue;
 
-            double next = ctx.keywordEffect(rt.id()).criticalAmountMultiplier(rt, dc, kind);
-            if (next > multiplier) multiplier = next;
+            Rational next = ctx.keywordEffect(rt.id()).criticalAmountMultiplier(rt, dc, kind);
+            multiplier = Rational.max(multiplier, next);
         }
 
-        return Math.max(1d, multiplier);
+        return Rational.max(Rational.ONE, multiplier);
     }
 
 }

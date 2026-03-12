@@ -1,5 +1,6 @@
 package com.example.dueltower.engine.core.effect;
 
+import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.engine.core.combat.DamageFlags;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.combat.HealOps;
@@ -11,6 +12,7 @@ import com.example.dueltower.engine.core.effect.status.StatusOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -178,9 +180,9 @@ public final class EffectOps {
 
     private void applyDamage(TargetRef ref, int amount) {
         int finalAmount = amount;
-        double multiplier = criticalAmountMultiplier(ref, "damage");
-        if (multiplier > 1d && isCritical(ref, "damage")) {
-            finalAmount = (int) Math.round(finalAmount * multiplier);
+        Rational multiplier = criticalAmountMultiplier(ref, "damage");
+        if (multiplier.compareTo(Rational.ONE) > 0 && isCritical(ref, "damage")) {
+            finalAmount = multiplyAndRound(finalAmount, multiplier);
             ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! damage x" + formatMultiplier(multiplier)));
         }
 
@@ -206,9 +208,9 @@ public final class EffectOps {
 
     private void applyHeal(TargetRef ref, int amount) {
         int finalAmount = amount;
-        double multiplier = criticalAmountMultiplier(ref, "heal");
-        if (multiplier > 1d && isCritical(ref, "heal")) {
-            finalAmount = (int) Math.round(finalAmount * multiplier);
+        Rational multiplier = criticalAmountMultiplier(ref, "heal");
+        if (multiplier.compareTo(Rational.ONE) > 0 && isCritical(ref, "heal")) {
+            finalAmount = multiplyAndRound(finalAmount, multiplier);
             ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! heal x" + formatMultiplier(multiplier)));
         }
         HealOps.apply(
@@ -223,9 +225,9 @@ public final class EffectOps {
         );
     }
 
-    private double criticalAmountMultiplier(TargetRef target, String kind) {
+    private Rational criticalAmountMultiplier(TargetRef target, String kind) {
         TargetRef source = actorRef();
-        double multiplier = KeywordOps.criticalAmountMultiplier(
+        Rational multiplier = KeywordOps.criticalAmountMultiplier(
                 ec.state(),
                 ec.ctx(),
                 source,
@@ -338,16 +340,16 @@ public final class EffectOps {
         return Math.max(0, Math.min(100, cur));
     }
 
-    private double applyStatusCriticalAmountMultiplier(TargetRef source, TargetRef target, String kind, double baseMultiplier) {
+    private Rational applyStatusCriticalAmountMultiplier(TargetRef source, TargetRef target, String kind, Rational baseMultiplier) {
         StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
-        double cur = Math.max(1d, baseMultiplier);
+        Rational cur = Rational.max(Rational.ONE, baseMultiplier);
         for (HookEntry it : collectStatusEntries(rt, source)) {
             if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
             int stacks = rt.stacks(it.owner(), it.statusId());
             if (stacks <= 0) continue;
             cur = ec.ctx().statusEffect(it.statusId()).onCriticalAmountMultiplier(rt, it.owner(), source, target, kind, cur);
         }
-        return Math.max(1d, cur);
+        return Rational.max(Rational.ONE, cur);
     }
 
 
@@ -363,16 +365,16 @@ public final class EffectOps {
         return Math.max(0, Math.min(100, cur));
     }
 
-    private double applyStatusIncomingCriticalAmountMultiplier(TargetRef source, TargetRef target, String kind, double baseMultiplier) {
+    private Rational applyStatusIncomingCriticalAmountMultiplier(TargetRef source, TargetRef target, String kind, Rational baseMultiplier) {
         StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
-        double cur = Math.max(1d, baseMultiplier);
+        Rational cur = Rational.max(Rational.ONE, baseMultiplier);
         for (HookEntry it : collectStatusEntries(rt, target)) {
             if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
             int stacks = rt.stacks(it.owner(), it.statusId());
             if (stacks <= 0) continue;
             cur = ec.ctx().statusEffect(it.statusId()).onIncomingCriticalAmountMultiplier(rt, it.owner(), source, target, kind, cur);
         }
-        return Math.max(1d, cur);
+        return Rational.max(Rational.ONE, cur);
     }
 
     private record HookEntry(StatusOwnerRef owner, String statusId, int priority) {}
@@ -411,11 +413,24 @@ public final class EffectOps {
         }
     }
 
-    private static String formatMultiplier(double multiplier) {
-        if (Math.abs(multiplier - Math.rint(multiplier)) < 1e-9) {
-            return Long.toString(Math.round(multiplier));
+    private static String formatMultiplier(Rational multiplier) {
+        if (multiplier.getDenominator() == 1L) {
+            return Long.toString(multiplier.getNumerator());
         }
-        return Double.toString(multiplier);
+        return multiplier.getNumerator() + "/" + multiplier.getDenominator();
+    }
+
+    private static int multiplyAndRound(int amount, Rational multiplier) {
+        BigInteger numerator = BigInteger.valueOf(amount).multiply(BigInteger.valueOf(multiplier.getNumerator()));
+        BigInteger denominator = BigInteger.valueOf(multiplier.getDenominator());
+
+        BigInteger[] divRem = numerator.divideAndRemainder(denominator);
+        BigInteger quotient = divRem[0];
+        BigInteger absTwiceRem = divRem[1].abs().shiftLeft(1);
+        if (absTwiceRem.compareTo(denominator) >= 0) {
+            quotient = quotient.add(BigInteger.valueOf(numerator.signum() >= 0 ? 1L : -1L));
+        }
+        return quotient.intValueExact();
     }
 
 
