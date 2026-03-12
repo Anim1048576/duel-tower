@@ -12,13 +12,13 @@
     detail: DetailItem
   }
 
-  function toDetail(item: any): DetailItem {
+  function toDetail(slot: any): DetailItem {
     return {
-      kind: item.battleUsable ? 'card' : 'status',
-      name: item.name,
-      summary: item.summary,
-      description: item.description,
-      tags: item.tags ?? [],
+      kind: slot.battleUsable ? 'card' : 'status',
+      name: slot.name,
+      summary: slot.summary,
+      description: slot.description,
+      tags: slot.tags ?? [],
     }
   }
 
@@ -47,9 +47,7 @@
 
   <section class="panel">
     <div class="panelTitle">인벤토리 ({slots.length} 슬롯)</div>
-    {#if !$combat.state}
-      <div class="hint">세션 상태를 불러오는 중...</div>
-    {:else if !slots.length}
+    {#if !slots.length}
       <div class="hint">표시할 인벤토리 항목이 없다.</div>
     {:else}
       <div class="slotGrid">
