@@ -27,7 +27,6 @@ public record SelectNodeChoiceCommand(
         }
         if (!state.players().containsKey(playerId)) {
             errors.add("player not found");
-            return errors;
         }
         if (state.combat() != null || state.nodeState() == NodeState.COMBAT) {
             errors.add("cannot select node during combat");
@@ -36,7 +35,6 @@ public record SelectNodeChoiceCommand(
             errors.add("choiceId is required");
             return errors;
         }
-
         RunState.NodeChoice choice = state.runState().findChoice(choiceId);
         if (choice == null) {
             errors.add("choice not found");
@@ -45,7 +43,6 @@ public record SelectNodeChoiceCommand(
         if (choice.disabled()) {
             errors.add(choice.disabledReason() == null ? "choice is disabled" : choice.disabledReason());
         }
-
         return errors;
     }
 
@@ -54,12 +51,15 @@ public record SelectNodeChoiceCommand(
         RunState.NodeChoice choice = state.runState().findChoice(choiceId);
         state.runState().select(choice, state.seed());
 
+        List<GameEvent> events = new ArrayList<>();
+        events.add(new GameEvent.LogAppended("노드 선택: " + choice.name() + " (" + choice.typeLabel() + ")"));
         if (choice.phase() == RunState.NodePhase.COMBAT) {
             state.nodeState(NodeState.COMBAT);
+            events.add(new GameEvent.LogAppended("전투 노드를 선택했다. START_COMBAT 명령 대기 중."));
         } else {
             state.nodeState(NodeState.NON_COMBAT);
+            events.add(new GameEvent.LogAppended("노드 결과가 recentResults에 기록되었다."));
         }
-
-        return List.of(new GameEvent.LogAppended("node selected: " + choice.name() + " (" + choice.typeLabel() + ")"));
+        return events;
     }
 }
