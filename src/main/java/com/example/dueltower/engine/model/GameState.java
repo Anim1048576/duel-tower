@@ -21,10 +21,12 @@ public final class GameState {
 
     private CombatState combat;
     private NodeState nodeState = NodeState.NON_COMBAT;
+    private final RunState runState = new RunState();
 
     public GameState(SessionId sessionId, long seed) {
         this.sessionId = sessionId;
         this.seed = seed;
+        this.runState.initialize(seed);
     }
 
     public SessionId sessionId() { return sessionId; }
@@ -61,4 +63,6 @@ public final class GameState {
 
     public NodeState nodeState() { return nodeState; }
     public void nodeState(NodeState nodeState) { this.nodeState = nodeState; }
+
+    public RunState runState() { return runState; }
 }
