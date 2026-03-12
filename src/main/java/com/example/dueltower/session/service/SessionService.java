@@ -647,20 +647,21 @@ public class SessionService {
     }
 
     private List<String> resolveJoinDeckOwnedCardIds(CharacterJoinTemplate characterTemplate,
-                                                    List<String> requestedPresetDeckOwnedCardIdsRaw,
-                                                    List<OwnedCard> ownedCards) {
+                                                     List<String> requestedPresetDeckOwnedCardIdsRaw,
+                                                     List<OwnedCard> ownedCards) {
         if (characterTemplate != null) {
-            List<String> fromProfile = SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(characterTemplate.currentSkillDeck(), ownedCards);
-            if (fromProfile != null) {
-                return fromProfile;
+            List<String> currentSkillDeck = characterTemplate.currentSkillDeck();
+            if (currentSkillDeck == null || currentSkillDeck.isEmpty()) {
+                return List.of();
             }
-            return SessionNormalizationSupport.resolveCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards, "deckCardIds must not contain blank values");
+            return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(currentSkillDeck, ownedCards);
         }
 
         if (requestedPresetDeckOwnedCardIdsRaw != null) {
             return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(requestedPresetDeckOwnedCardIdsRaw, ownedCards);
         }
-        return SessionNormalizationSupport.resolveCardIdsToOwnedCardIds(defaultPresetDeckCardIds(), ownedCards, "deckCardIds must not contain blank values");
+
+        return List.of();
     }
 
     private List<String> resolveRequestedDeckOwnedCardIds(List<String> deckOwnedCardIdsRaw, List<OwnedCard> ownedCards) {

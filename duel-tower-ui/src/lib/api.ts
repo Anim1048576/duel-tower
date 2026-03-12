@@ -232,7 +232,7 @@ export async function joinSession(
   ownedCards?: OwnedCard[] | null,
   characterId?: number | null,
 ): Promise<JoinSessionResponse> {
-  const hasPresetDeck = Array.isArray(presetDeckCardIds) && presetDeckCardIds.length > 0
+  const hasPresetDeck = Array.isArray(presetDeckCardIds)
   const hasPresetEx = typeof presetExCardId === 'string' && presetExCardId.trim().length > 0
 
   const raw = await request<any>(`/api/sessions/${encodeURIComponent(code)}/join`, {
