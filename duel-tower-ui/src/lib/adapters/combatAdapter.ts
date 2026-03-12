@@ -116,6 +116,7 @@ export function adaptSessionSnapshot(raw: any): SessionSnapshot {
     players,
     combat,
     cards: (raw?.cards ?? {}) as SessionSnapshot['cards'],
+    run: (raw?.run ?? null) as SessionSnapshot['run'],
   }
 
   const enrichedPlayers = Object.fromEntries(
