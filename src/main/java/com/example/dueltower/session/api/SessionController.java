@@ -41,7 +41,9 @@ public class SessionController {
             "DISCARD_TO_HAND_LIMIT",
             "RESOLVE_INITIATIVE_TIE",
             "SEARCH_PICK",
-            "RESOLVE_SEARCH_PICK"
+            "RESOLVE_SEARCH_PICK",
+            "SELECT_NODE_CHOICE",
+            "CLEAR_RECENT_RESULTS"
     );
 
     private static final Set<String> GM_AUTH_REQUIRED_TYPES = Set.of(
@@ -445,6 +447,17 @@ public class SessionController {
                 PlayerId playerId = parsePlayerId(req.playerId());
                 List<CardInstId> ids = parseCardInstIds(req.selectedIds(), "selectedIds");
                 return new ResolveSearchPickCommand(commandId, expectedVersion, playerId, ids);
+            }
+            case "SELECT_NODE_CHOICE" -> {
+                PlayerId playerId = parsePlayerId(req.playerId());
+                if (req.choiceId() == null || req.choiceId().isBlank()) {
+                    throw new ResponseStatusException(BAD_REQUEST, "choiceId is required");
+                }
+                return new SelectNodeChoiceCommand(commandId, expectedVersion, playerId, req.choiceId().trim());
+            }
+            case "CLEAR_RECENT_RESULTS" -> {
+                PlayerId playerId = parsePlayerId(req.playerId());
+                return new ClearRecentResultsCommand(commandId, expectedVersion, playerId);
             }
             default -> throw new ResponseStatusException(BAD_REQUEST, "unknown command type: " + req.type());
         }
