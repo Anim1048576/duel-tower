@@ -1,7 +1,7 @@
 <script lang="ts">
   import PageSkeleton from '../lib/PageSkeleton.svelte'
   import { navigate } from '../lib/router'
-  import { combat } from '../stores/combat'
+  import { combat, command } from '../stores/combat'
   import { logs } from '../stores/log'
 
   function tone(type: string) {
@@ -13,10 +13,15 @@
   $: resultCards = $combat.state?.run?.recentResults ?? []
   $: recentLogs = $logs.slice(0, 5)
   $: detailLogs = $combat.lastResolutionLogs.slice(0, 5)
+
+  async function backToNode() {
+    await command({ type: 'CLEAR_RECENT_RESULTS' })
+    navigate('/node')
+  }
 </script>
 
 <PageSkeleton title="Results" summary="전투 종료/탐사 실패/보상 획득 공통 결과 카드">
-  <button slot="actions" class="btn" on:click={() => navigate('/node')}>노드로 복귀</button>
+  <button slot="actions" class="btn" on:click={backToNode}>노드로 복귀</button>
 
   {#if !$combat.state}
     <div class="hint">세션 상태를 불러오는 중...</div>
