@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,7 +25,7 @@ class SessionServiceOwnedCardModifierParsingTest {
         OwnedCardDto dto = new OwnedCardDto(
                 "oc-1",
                 "C001",
-                List.of(
+                Arrays.asList(
                         null,
                         new OwnedCardModifierDto(null, 2),
                         new OwnedCardModifierDto("   ", 3),
