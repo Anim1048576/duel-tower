@@ -1,10 +1,8 @@
 <script lang="ts">
   import PageSkeleton from '../lib/PageSkeleton.svelte'
   import { navigate } from '../lib/router'
-  import { combat, command, refreshState } from '../stores/combat'
-  import { logs, warn } from '../stores/log'
-
-  let acknowledging = false
+  import { combat, command } from '../stores/combat'
+  import { logs } from '../stores/log'
 
   function tone(type: string) {
     if (type === 'reward') return 'ok'
@@ -16,27 +14,14 @@
   $: recentLogs = $logs.slice(0, 5)
   $: detailLogs = $combat.lastResolutionLogs.slice(0, 5)
 
-  async function acknowledgeResults() {
-    if (acknowledging) return
-    acknowledging = true
-    try {
-      const res = await command({ type: 'CLEAR_RECENT_RESULTS' })
-      if (!res?.accepted) {
-        warn('결과 정리 실패', '결과 상태 동기화를 위해 다시 불러온다.')
-        await refreshState()
-        return
-      }
-      navigate('/node')
-    } finally {
-      acknowledging = false
-    }
+  async function backToNode() {
+    await command({ type: 'CLEAR_RECENT_RESULTS' })
+    navigate('/node')
   }
 </script>
 
 <PageSkeleton title="Results" summary="전투 종료/탐사 실패/보상 획득 공통 결과 카드">
-  <button slot="actions" class="btn" on:click={acknowledgeResults} disabled={acknowledging}>
-    {acknowledging ? '정리 중...' : '노드로 복귀'}
-  </button>
+  <button slot="actions" class="btn" on:click={backToNode}>노드로 복귀</button>
 
   {#if !$combat.state}
     <div class="hint">세션 상태를 불러오는 중...</div>

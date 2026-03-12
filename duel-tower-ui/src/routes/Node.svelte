@@ -2,9 +2,9 @@
   import PageSkeleton from '../lib/PageSkeleton.svelte'
   import { navigate } from '../lib/router'
   import { info, warn } from '../stores/log'
-  import { combat, command, refreshState } from '../stores/combat'
   import NodeChoiceCard, { type NodeChoice } from '../lib/components/node/NodeChoiceCard.svelte'
   import NodeConfirmModal from '../lib/components/node/NodeConfirmModal.svelte'
+  import { combat, command } from '../stores/combat'
 
   let selectedNode: NodeChoice | null = null
   let confirmOpen = false
@@ -23,8 +23,7 @@
     return 'event'
   }
 
-  $: choices = $combat.state?.run?.availableChoices ?? []
-  $: nodes = choices.map((choice) => ({
+  $: nodes = ($combat.state?.run?.availableChoices ?? []).map((choice) => ({
     id: choice.id,
     name: choice.name,
     typeLabel: choice.typeLabel,
@@ -35,7 +34,7 @@
     disabledReason: choice.disabledReason,
   })) as NodeChoice[]
 
-  function selectNode(node: NodeChoice) {
+  async function selectNode(node: NodeChoice) {
     selectedNode = node
     confirmOpen = true
     info('노드 선택', `${node.name} (${node.typeLabel})`)
@@ -47,46 +46,29 @@
 
   async function confirmNode(node: NodeChoice) {
     confirmOpen = false
-
-    const res = await command({
-      type: 'SELECT_NODE_CHOICE',
-      choiceId: node.id,
-    })
-    if (!res?.accepted) {
-      warn('노드 선택 실패', node.name)
-      await refreshState()
-      return
-    }
+    const res = await command({ type: 'SELECT_NODE_CHOICE', choiceId: node.id })
+    if (!res?.accepted) return
 
     if (node.phase === 'combat') {
-      const startCombatRes = await command({ type: 'START_COMBAT' })
-      if (!startCombatRes?.accepted) {
-        warn('전투 시작 실패', `${node.name} 선택은 반영됐지만 전투 시작에 실패했다.`)
-        await refreshState()
-        return
+      const started = await command({ type: 'START_COMBAT' })
+      if (started?.accepted) {
+        info('노드 확정', `${node.name} 진입 · 전투 페이즈 이동`)
+        navigate('/combat')
       }
-      if (!startCombatRes.state?.combat) {
-        warn('전투 상태 동기화 필요', '전투 초기화 확인을 위해 상태를 다시 불러온다.')
-        await refreshState()
-        return
-      }
-
-      info('노드 확정', `${node.name} 진입 · 전투 페이즈 이동`)
-      navigate('/combat')
       return
     }
 
-    info('노드 확정', `${node.name} 결과 확인`)
+    if (node.phase === 'judgement') info('Judgement 성공', `${node.name} 판정 결과를 기록했다.`)
+    else warn('탐색 결과', `${node.name} 이벤트 결과를 기록했다.`)
+
     navigate('/results')
   }
 </script>
 
-<PageSkeleton title="Node" summary="서버 상태 기반 노드 선택">
-  <div class="hint">세션 run.availableChoices를 기준으로 노드를 렌더링한다.</div>
+<PageSkeleton title="Node" summary="탐색 플로우 전용 UI">
+  <div class="hint">서버 상태 기반 노드 선택</div>
 
-  {#if !$combat.state}
-    <div class="hint" style="margin-top:12px">세션 상태를 불러오는 중...</div>
-  {:else if !nodes.length}
+  {#if !nodes.length}
     <div class="hint" style="margin-top:12px">표시할 노드 선택지가 없다.</div>
   {:else}
     <div class="list" style="margin-top:12px">

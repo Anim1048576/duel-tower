@@ -31,6 +31,6 @@ public record ClearRecentResultsCommand(
     @Override
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         state.runState().clearRecentResults();
-        return List.of(new GameEvent.LogAppended("recent results cleared"));
+        return List.of(new GameEvent.LogAppended("결과 화면 확인 완료: recentResults 초기화"));
     }
 }
