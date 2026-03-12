@@ -10,5 +10,6 @@ public record SessionStateDto(
         String nodeState,
         Map<String, PlayerStateDto> players,
         CombatStateDto combat,
-        Map<String, CardInstanceDto> cards
+        Map<String, CardInstanceDto> cards,
+        RunStateDto run
 ) {}

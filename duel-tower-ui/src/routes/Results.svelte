@@ -3,23 +3,24 @@
   import { navigate } from '../lib/router'
   import { combat } from '../stores/combat'
   import { logs } from '../stores/log'
-  import { clearExplorationResult, explorationResult, type ResultCard } from '../stores/exploration'
 
-  function tone(type: ResultCard['type']) {
+  function tone(type: string) {
     if (type === 'reward') return 'ok'
     if (type === 'explore_fail') return 'no'
     return 'info'
   }
 
-  $: resultCards = $explorationResult?.cards ?? []
+  $: resultCards = $combat.state?.run?.recentResults ?? []
   $: recentLogs = $logs.slice(0, 5)
   $: detailLogs = $combat.lastResolutionLogs.slice(0, 5)
 </script>
 
 <PageSkeleton title="Results" summary="전투 종료/탐사 실패/보상 획득 공통 결과 카드">
-  <button slot="actions" class="btn" on:click={() => { clearExplorationResult(); navigate('/node') }}>노드로 복귀</button>
+  <button slot="actions" class="btn" on:click={() => navigate('/node')}>노드로 복귀</button>
 
-  {#if !resultCards.length}
+  {#if !$combat.state}
+    <div class="hint">세션 상태를 불러오는 중...</div>
+  {:else if !resultCards.length}
     <div class="hint">최근 탐색 결과가 없어 기본 로그만 표시한다.</div>
   {:else}
     <div class="table" style="margin-top:10px">
