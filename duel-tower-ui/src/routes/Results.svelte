@@ -1,23 +1,27 @@
 <script lang="ts">
   import PageSkeleton from '../lib/PageSkeleton.svelte'
   import { navigate } from '../lib/router'
-  import { combat } from '../stores/combat'
+  import { combat, command } from '../stores/combat'
   import { logs } from '../stores/log'
-  import { clearExplorationResult, explorationResult, type ResultCard } from '../stores/exploration'
 
-  function tone(type: ResultCard['type']) {
+  function tone(type: string) {
     if (type === 'reward') return 'ok'
     if (type === 'explore_fail') return 'no'
     return 'info'
   }
 
-  $: resultCards = $explorationResult?.cards ?? []
+  $: resultCards = $combat.state?.run?.recentResults ?? []
   $: recentLogs = $logs.slice(0, 5)
   $: detailLogs = $combat.lastResolutionLogs.slice(0, 5)
+
+  async function backToNode() {
+    await command({ type: 'CLEAR_RECENT_RESULTS' })
+    navigate('/node')
+  }
 </script>
 
 <PageSkeleton title="Results" summary="전투 종료/탐사 실패/보상 획득 공통 결과 카드">
-  <button slot="actions" class="btn" on:click={() => { clearExplorationResult(); navigate('/node') }}>노드로 복귀</button>
+  <button slot="actions" class="btn" on:click={backToNode}>노드로 복귀</button>
 
   {#if !resultCards.length}
     <div class="hint">최근 탐색 결과가 없어 기본 로그만 표시한다.</div>
