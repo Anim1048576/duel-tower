@@ -99,6 +99,64 @@ export type CombatState = {
   summons?: SummonState[]
 }
 
+
+
+export type RunCurrentNode = {
+  id: string
+  name: string
+  typeLabel: string
+  phase: string
+  danger: string
+  floor: number
+}
+
+export type RunChoice = {
+  id: string
+  name: string
+  typeLabel: string
+  rule: string
+  phase: string
+  danger: string
+  disabled?: boolean
+  disabledReason?: string
+}
+
+export type RunResult = {
+  id: string
+  type: string
+  title: string
+  summary: string
+  detail?: string
+  source?: string
+  at?: string
+}
+
+export type RunInventoryItem = {
+  id: string
+  name: string
+  count: number
+  bound: boolean
+  battleUsable: boolean
+  summary: string
+  description: string
+  tags: string[]
+}
+
+export type RunInventory = {
+  keys: number
+  chests: number
+  gold: number
+  items: RunInventoryItem[]
+}
+
+export type RunSnapshot = {
+  floor: number
+  currentNode: RunCurrentNode | null
+  availableChoices: RunChoice[]
+  recentResults: RunResult[]
+  inventory: RunInventory
+}
+
 export type SessionSnapshot = {
   sessionCode: string
   sessionId: string
@@ -107,6 +165,7 @@ export type SessionSnapshot = {
   players: Record<string, CharacterView>
   combat: CombatSnapshot | null
   cards: Record<string, CardInstance>
+  run: RunSnapshot | null
 }
 
 // Backward-compat alias while migrating views.
@@ -167,6 +226,7 @@ export type CommandRequest = {
    * Required when type === 'RESOLVE_INITIATIVE_TIE': final actor key order chosen by the user.
    */
   orderedActorKeys?: string[]
+  choiceId?: string
 }
 
 export type OwnedCard = {
