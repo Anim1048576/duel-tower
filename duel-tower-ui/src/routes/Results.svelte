@@ -23,7 +23,9 @@
 <PageSkeleton title="Results" summary="전투 종료/탐사 실패/보상 획득 공통 결과 카드">
   <button slot="actions" class="btn" on:click={backToNode}>노드로 복귀</button>
 
-  {#if !resultCards.length}
+  {#if !$combat.state}
+    <div class="hint">세션 상태를 불러오는 중...</div>
+  {:else if !resultCards.length}
     <div class="hint">최근 탐색 결과가 없어 기본 로그만 표시한다.</div>
   {:else}
     <div class="table" style="margin-top:10px">
