@@ -1,5 +1,6 @@
 package com.example.dueltower.engine.core.effect.passive;
 
+import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
@@ -155,23 +156,23 @@ public final class PassiveOps {
         return Math.max(0, Math.min(100, cur));
     }
 
-    public static double criticalAmountMultiplier(
+    public static Rational criticalAmountMultiplier(
             GameState state,
             EngineContext ctx,
             List<GameEvent> out,
             TargetRef source,
             TargetRef target,
             String kind,
-            double baseMultiplier,
+            Rational baseMultiplier,
             String hookSource
     ) {
         PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
-        double cur = Math.max(1d, baseMultiplier);
+        Rational cur = Rational.max(Rational.ONE, baseMultiplier);
         for (HookEntry it : collectEntries(state, ctx, source)) {
             if (!ctx.hasPassiveEffect(it.passiveId())) continue;
             cur = ctx.passiveEffect(it.passiveId()).onCriticalAmountMultiplier(rt, source, target, kind, cur);
         }
-        return Math.max(1d, cur);
+        return Rational.max(Rational.ONE, cur);
     }
 
     public static int incomingCriticalChancePercent(
@@ -193,23 +194,23 @@ public final class PassiveOps {
         return Math.max(0, Math.min(100, cur));
     }
 
-    public static double incomingCriticalAmountMultiplier(
+    public static Rational incomingCriticalAmountMultiplier(
             GameState state,
             EngineContext ctx,
             List<GameEvent> out,
             TargetRef source,
             TargetRef target,
             String kind,
-            double baseMultiplier,
+            Rational baseMultiplier,
             String hookSource
     ) {
         PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
-        double cur = Math.max(1d, baseMultiplier);
+        Rational cur = Rational.max(Rational.ONE, baseMultiplier);
         for (HookEntry it : collectEntries(state, ctx, target)) {
             if (!ctx.hasPassiveEffect(it.passiveId())) continue;
             cur = ctx.passiveEffect(it.passiveId()).onIncomingCriticalAmountMultiplier(rt, source, target, kind, cur);
         }
-        return Math.max(1d, cur);
+        return Rational.max(Rational.ONE, cur);
     }
 
     public static int onIncomingHeal(

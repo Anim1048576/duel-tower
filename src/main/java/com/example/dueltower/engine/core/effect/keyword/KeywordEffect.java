@@ -1,5 +1,6 @@
 package com.example.dueltower.engine.core.effect.keyword;
 
+import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.engine.model.Zone;
 
 import java.util.List;
@@ -88,5 +89,5 @@ public interface KeywordEffect {
      *
      * @return multiplier for critical amount (damage/heal). 1 means no change.
      */
-    default double criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) { return 1d; }
+    default Rational criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) { return Rational.ONE; }
 }

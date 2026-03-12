@@ -3,6 +3,7 @@ package com.example.dueltower.engine;
 import com.example.dueltower.content.keyword.kdb.K008_Accurate;
 import com.example.dueltower.content.keyword.kdb.K009_Penetration;
 import com.example.dueltower.content.keyword.kdb.K010_Tenacity;
+import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.content.keyword.kdb.K011_Critical;
 import com.example.dueltower.content.status.model.StatusBlueprint;
 import com.example.dueltower.content.status.sdb.*;
@@ -17,7 +18,9 @@ import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.combat.TurnPhases;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
+import com.example.dueltower.engine.core.effect.keyword.DamageKeywordCtx;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
+import com.example.dueltower.engine.core.effect.keyword.KeywordRuntime;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.model.*;
@@ -164,7 +167,7 @@ class RuleEngineRegressionTest {
 
         assertEquals(10, chance);
 
-        double multiplier = KeywordOps.criticalAmountMultiplier(
+        Rational multiplier = KeywordOps.criticalAmountMultiplier(
                 fx.state,
                 fx.ctx,
                 TargetRef.ofPlayer(fx.playerId),
@@ -172,7 +175,31 @@ class RuleEngineRegressionTest {
                 TargetRef.ofEnemy(fx.enemyId),
                 "damage"
         );
-        assertEquals(1.5d, multiplier);
+        assertEquals(Rational.of(3, 2), multiplier);
+    }
+
+
+    @Test
+    void keywordCriticalMultiplierUsesMaxNotProduct() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId dual = fx.addHandCard(fx.player, "DUAL_CRITICAL_STRIKE");
+
+        Rational multiplier = KeywordOps.criticalAmountMultiplier(
+                fx.state,
+                fx.ctx,
+                TargetRef.ofPlayer(fx.playerId),
+                dual,
+                TargetRef.ofEnemy(fx.enemyId),
+                "damage"
+        );
+
+        assertEquals(Rational.of(3, 2), multiplier);
+    }
+
+    @Test
+    void rationalCriticalRoundingMatchesPreviousBehaviorForPositiveValues() {
+        assertEquals(8, invokeMultiplyAndRound(5, Rational.of(3, 2)));
+        assertEquals(6, invokeMultiplyAndRound(4, Rational.of(3, 2)));
     }
 
     @Test
@@ -196,6 +223,24 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    void criticalLogUsesExactRationalFormatting() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId critical = fx.addHandCard(fx.player, "CRITICAL_STRIKE");
+
+        fx.player.statusSet(TestCriticalChanceOnlyStatus.ID, 1);
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        int hpBefore = fx.enemy.hp();
+        EngineResult play = fx.process(new PlayCardCommand(UUID.randomUUID(), fx.state.version(), fx.playerId, critical,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))));
+
+        assertTrue(play.accepted());
+        assertEquals(hpBefore - 8, fx.enemy.hp());
+        assertTrue(play.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("critical! damage x3/2")));
+    }
+
+    @Test
     void incomingCriticalHooksCanModifyReceivedCriticalDamage() {
         TestFixture fx = TestFixture.basic();
         CardInstId enemyCritical = fx.addEnemyHandCard("CRITICAL_STRIKE");
@@ -213,8 +258,8 @@ class RuleEngineRegressionTest {
                 new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))));
 
         assertTrue(play.accepted());
-        assertEquals(hpBefore - 18, fx.player.hp(), "keyword x1.5 -> incoming passive +1 -> incoming status +1 => x3.5");
-        assertTrue(play.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("critical! damage x3.5")));
+        assertEquals(hpBefore - 18, fx.player.hp(), "keyword x3/2 -> incoming passive +1 -> incoming status +1 => x7/2");
+        assertTrue(play.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("critical! damage x7/2")));
     }
 
     @Test
@@ -441,6 +486,11 @@ class RuleEngineRegressionTest {
         assertTrue(draw.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("cannot draw: deck+grave empty")));
     }
 
+
+    private static int invokeMultiplyAndRound(int amount, Rational multiplier) {
+        return TestCardEffect.multiplyAndRound(amount, multiplier);
+    }
+
     private static final class TestFixture {
         final GameState state = new GameState(new SessionId(UUID.randomUUID()), 7L);
         final GameEngine engine = new GameEngine();
@@ -470,6 +520,7 @@ class RuleEngineRegressionTest {
             registerCard(defs, effects, new TestCardEffect("ACCURATE_STRIKE", CardType.SKILL, 1, Map.of(K008_Accurate.ID, 1), 5));
             registerCard(defs, effects, new TestCardEffect("PIERCE_STRIKE", CardType.SKILL, 1, Map.of(K009_Penetration.ID, 1), 5));
             registerCard(defs, effects, new TestCardEffect("CRITICAL_STRIKE", CardType.SKILL, 1, Map.of(K011_Critical.ID, 2), 5));
+            registerCard(defs, effects, new TestCardEffect("DUAL_CRITICAL_STRIKE", CardType.SKILL, 1, Map.of(K011_Critical.ID, 2, "FAKE_CRIT_HALF", 1), 5));
             registerCard(defs, effects, new TestCardEffect("EX_BLAST", CardType.EX, 1, Map.of(), 4));
 
             Map<String, StatusDefinition> statusDefs = new HashMap<>();
@@ -478,7 +529,7 @@ class RuleEngineRegressionTest {
                     new S001_Shield(), new S002_Regeneration(), new S004_Evasion(),
                     new S101_Pain(), new S102_Stun(), new S103_Pressure(), new S104_Destruction(),
                     new S105_Weak(), new S106_Vulnerable(), new S108_Seal(), new S301_Barrier(),
-                    new TestCriticalStatus(), new TestIncomingCriticalStatus()
+                    new TestCriticalStatus(), new TestIncomingCriticalStatus(), new TestCriticalChanceOnlyStatus()
             )) {
                 statusDefs.put(bp.id(), bp.definition());
                 statusEffects.put(bp.id(), bp);
@@ -486,7 +537,7 @@ class RuleEngineRegressionTest {
 
             Map<String, KeywordDefinition> keywordDefs = new HashMap<>();
             Map<String, com.example.dueltower.engine.core.effect.keyword.KeywordEffect> keywordEffects = new HashMap<>();
-            for (var bp : List.of(new K008_Accurate(), new K009_Penetration(), new K010_Tenacity(), new K011_Critical())) {
+            for (var bp : List.of(new K008_Accurate(), new K009_Penetration(), new K010_Tenacity(), new K011_Critical(), new FakeCriticalHalfKeyword())) {
                 keywordDefs.put(bp.id(), bp.definition());
                 keywordEffects.put(bp.id(), bp);
             }
@@ -599,6 +650,48 @@ class RuleEngineRegressionTest {
         }
     }
 
+
+    private static final class FakeCriticalHalfKeyword implements com.example.dueltower.content.keyword.model.KeywordBlueprint {
+        @Override
+        public String id() {
+            return "FAKE_CRIT_HALF";
+        }
+
+        @Override
+        public KeywordDefinition definition() {
+            return new KeywordDefinition(id(), "가짜 반치명", true, "테스트용 치명 절반");
+        }
+
+        @Override
+        public Rational criticalAmountMultiplier(KeywordRuntime rt, DamageKeywordCtx c, String kind) {
+            return rt.value() > 0 ? Rational.of(4, 3) : Rational.ONE;
+        }
+    }
+
+    private static final class TestCriticalChanceOnlyStatus implements com.example.dueltower.content.status.model.StatusBlueprint {
+        static final String ID = "TEST_CRITICAL_CHANCE_ONLY_STATUS";
+
+        @Override
+        public String id() {
+            return ID;
+        }
+
+        @Override
+        public StatusDefinition definition() {
+            return new StatusDefinition(ID, "치명 확률 상태", StatusKind.BUFF, StatusScope.CHARACTER, Set.of(), 10, false, "치명 확률만 증가시킨다.");
+        }
+
+        @Override
+        public int onCriticalChancePercent(com.example.dueltower.engine.core.effect.status.StatusRuntime rt,
+                                           StatusOwnerRef owner,
+                                           TargetRef source,
+                                           TargetRef target,
+                                           String kind,
+                                           int currentChance) {
+            return currentChance + 90;
+        }
+    }
+
     private static final class TestCriticalStatus implements com.example.dueltower.content.status.model.StatusBlueprint {
         static final String ID = "TEST_CRITICAL_STATUS";
 
@@ -623,13 +716,13 @@ class RuleEngineRegressionTest {
         }
 
         @Override
-        public double onCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.status.StatusRuntime rt,
+        public Rational onCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.status.StatusRuntime rt,
                                               StatusOwnerRef owner,
                                               TargetRef source,
                                               TargetRef target,
                                               String kind,
-                                              double currentMultiplier) {
-            return Math.max(currentMultiplier, 3d);
+                                              Rational currentMultiplier) {
+            return Rational.max(currentMultiplier, Rational.of(3));
         }
     }
 
@@ -655,12 +748,12 @@ class RuleEngineRegressionTest {
         }
 
         @Override
-        public double onCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.passive.PassiveRuntime rt,
+        public Rational onCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.passive.PassiveRuntime rt,
                                               TargetRef source,
                                               TargetRef target,
                                               String kind,
-                                              double currentMultiplier) {
-            return currentMultiplier + 1;
+                                              Rational currentMultiplier) {
+            return currentMultiplier.add(1);
         }
     }
 
@@ -678,13 +771,13 @@ class RuleEngineRegressionTest {
         }
 
         @Override
-        public double onIncomingCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.status.StatusRuntime rt,
+        public Rational onIncomingCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.status.StatusRuntime rt,
                                                       StatusOwnerRef owner,
                                                       TargetRef source,
                                                       TargetRef target,
                                                       String kind,
-                                                      double currentMultiplier) {
-            return currentMultiplier + 1;
+                                                      Rational currentMultiplier) {
+            return currentMultiplier.add(1);
         }
     }
 
@@ -701,12 +794,12 @@ class RuleEngineRegressionTest {
         }
 
         @Override
-        public double onIncomingCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.passive.PassiveRuntime rt,
+        public Rational onIncomingCriticalAmountMultiplier(com.example.dueltower.engine.core.effect.passive.PassiveRuntime rt,
                                                       TargetRef source,
                                                       TargetRef target,
                                                       String kind,
-                                                      double currentMultiplier) {
-            return currentMultiplier + 1;
+                                                      Rational currentMultiplier) {
+            return currentMultiplier.add(1);
         }
     }
 
@@ -751,9 +844,9 @@ class RuleEngineRegressionTest {
                     : TargetRef.ofPlayer(ec.actor());
 
             int finalAmount = damage;
-            double multiplier = criticalAmountMultiplier(ec, src, target, "damage");
-            if (multiplier > 1d && isCritical(ec, src, target, "damage")) {
-                finalAmount = (int) Math.round(finalAmount * multiplier);
+            Rational multiplier = criticalAmountMultiplier(ec, src, target, "damage");
+            if (multiplier.compareTo(Rational.ONE) > 0 && isCritical(ec, src, target, "damage")) {
+                finalAmount = multiplyAndRound(finalAmount, multiplier);
                 ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! damage x" + formatMultiplier(multiplier)));
             }
 
@@ -762,16 +855,28 @@ class RuleEngineRegressionTest {
         }
 
 
-        private static String formatMultiplier(double multiplier) {
-            if (Math.abs(multiplier - Math.rint(multiplier)) < 1e-9) {
-                return Long.toString(Math.round(multiplier));
+        private static String formatMultiplier(Rational multiplier) {
+            if (multiplier.getDenominator() == 1L) {
+                return Long.toString(multiplier.getNumerator());
             }
-            return Double.toString(multiplier);
+            return multiplier.getNumerator() + "/" + multiplier.getDenominator();
+        }
+
+        static int multiplyAndRound(int amount, Rational multiplier) {
+            java.math.BigInteger numerator = java.math.BigInteger.valueOf(amount).multiply(java.math.BigInteger.valueOf(multiplier.getNumerator()));
+            java.math.BigInteger denominator = java.math.BigInteger.valueOf(multiplier.getDenominator());
+            java.math.BigInteger[] divRem = numerator.divideAndRemainder(denominator);
+            java.math.BigInteger quotient = divRem[0];
+            java.math.BigInteger absTwiceRem = divRem[1].abs().shiftLeft(1);
+            if (absTwiceRem.compareTo(denominator) >= 0) {
+                quotient = quotient.add(java.math.BigInteger.valueOf(numerator.signum() >= 0 ? 1L : -1L));
+            }
+            return quotient.intValueExact();
         }
 
 
-        private double criticalAmountMultiplier(EffectContext ec, TargetRef source, TargetRef target, String kind) {
-            double multiplier = KeywordOps.criticalAmountMultiplier(ec.state(), ec.ctx(), source, ec.cardId(), target, kind);
+        private Rational criticalAmountMultiplier(EffectContext ec, TargetRef source, TargetRef target, String kind) {
+            Rational multiplier = KeywordOps.criticalAmountMultiplier(ec.state(), ec.ctx(), source, ec.cardId(), target, kind);
 
             multiplier = PassiveOps.incomingCriticalAmountMultiplier(ec.state(), ec.ctx(), ec.out(), source, target, kind, multiplier, ec.actor().value());
             multiplier = applyStatusIncomingCriticalAmountMultiplier(ec, source, target, kind, multiplier);
@@ -813,16 +918,16 @@ class RuleEngineRegressionTest {
             return Math.max(0, Math.min(100, cur));
         }
 
-        private double applyStatusCriticalAmountMultiplier(EffectContext ec, TargetRef source, TargetRef target, String kind, double baseMultiplier) {
+        private Rational applyStatusCriticalAmountMultiplier(EffectContext ec, TargetRef source, TargetRef target, String kind, Rational baseMultiplier) {
             StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
-            double cur = Math.max(1d, baseMultiplier);
+            Rational cur = Rational.max(Rational.ONE, baseMultiplier);
             for (HookEntry it : collectStatusEntries(ec, rt, source)) {
                 if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
                 int stacks = rt.stacks(it.owner(), it.statusId());
                 if (stacks <= 0) continue;
                 cur = ec.ctx().statusEffect(it.statusId()).onCriticalAmountMultiplier(rt, it.owner(), source, target, kind, cur);
             }
-            return Math.max(1d, cur);
+            return Rational.max(Rational.ONE, cur);
         }
 
         private int applyStatusIncomingCriticalChancePercent(EffectContext ec, TargetRef source, TargetRef target, String kind, int baseChance) {
@@ -837,16 +942,16 @@ class RuleEngineRegressionTest {
             return Math.max(0, Math.min(100, cur));
         }
 
-        private double applyStatusIncomingCriticalAmountMultiplier(EffectContext ec, TargetRef source, TargetRef target, String kind, double baseMultiplier) {
+        private Rational applyStatusIncomingCriticalAmountMultiplier(EffectContext ec, TargetRef source, TargetRef target, String kind, Rational baseMultiplier) {
             StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
-            double cur = Math.max(1d, baseMultiplier);
+            Rational cur = Rational.max(Rational.ONE, baseMultiplier);
             for (HookEntry it : collectStatusEntries(ec, rt, target)) {
                 if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
                 int stacks = rt.stacks(it.owner(), it.statusId());
                 if (stacks <= 0) continue;
                 cur = ec.ctx().statusEffect(it.statusId()).onIncomingCriticalAmountMultiplier(rt, it.owner(), source, target, kind, cur);
             }
-            return Math.max(1d, cur);
+            return Rational.max(Rational.ONE, cur);
         }
 
         private record HookEntry(StatusOwnerRef owner, String statusId, int priority) {}
