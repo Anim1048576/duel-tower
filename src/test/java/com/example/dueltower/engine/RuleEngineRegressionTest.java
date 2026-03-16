@@ -12,7 +12,6 @@ import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
-import com.example.dueltower.engine.core.combat.CombatEntityOps;
 import com.example.dueltower.engine.core.combat.CombatStatuses;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.combat.TurnPhases;
@@ -484,15 +483,21 @@ class RuleEngineRegressionTest {
     void hpZeroBattleIncapacitationPersistsAcrossCombatRestart() {
         TestFixture fx = TestFixture.basic();
         fx.addDeckCards(fx.player, "FILLER", 6);
+        CardInstId enemyCard = fx.addEnemyHandCard("NORMAL_STRIKE");
+        fx.enemy.ap(3);
+        fx.player.hp(5);
+
         fx.startSimpleCombat();
+        fx.forceMainTurnForEnemy();
 
-        List<GameEvent> events = new ArrayList<>();
-        CombatEntityOps.adjustHp(fx.state, fx.ctx, events, TargetRef.ofPlayer(fx.playerId), -fx.player.hp());
+        EngineResult defeat = fx.process(new EnemyPlayCardCommand(UUID.randomUUID(), fx.state.version(), fx.enemyId, enemyCard,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))));
 
+        assertTrue(defeat.accepted());
+        assertNull(fx.state.combat());
         assertEquals(1, fx.player.status(CombatStatuses.BATTLE_INCAPACITATED_PERSISTENT));
         assertTrue(CombatStatuses.isBattleIncapacitated(fx.player));
 
-        fx.state.combat().phase(CombatPhase.END);
         EngineResult restart = fx.process(new StartCombatCommand(UUID.randomUUID(), fx.state.version(), fx.playerId));
 
         assertTrue(restart.accepted());
@@ -514,10 +519,10 @@ class RuleEngineRegressionTest {
         EngineResult draw = fx.process(new DrawCommand(UUID.randomUUID(), fx.state.version(), fx.playerId, 1));
 
         assertTrue(draw.accepted());
+        assertNull(fx.state.combat());
         assertEquals(1, fx.player.status(CombatStatuses.BATTLE_INCAPACITATED));
         assertEquals(0, fx.player.status(CombatStatuses.BATTLE_INCAPACITATED_PERSISTENT));
 
-        fx.state.combat().phase(CombatPhase.END);
         EngineResult restart = fx.process(new StartCombatCommand(UUID.randomUUID(), fx.state.version(), fx.playerId));
 
         assertTrue(restart.accepted());
