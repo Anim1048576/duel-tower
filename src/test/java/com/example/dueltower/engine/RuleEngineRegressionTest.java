@@ -422,6 +422,58 @@ class RuleEngineRegressionTest {
         assertEquals(Zone.GRAVE, fx.state.card(enemyCard).zone());
     }
 
+    @Test
+    void victoryPostStateKeepsCombatContextAndDoesNotCreateRunResult() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId strike = fx.addHandCard(fx.player, "NORMAL_STRIKE");
+
+        PlayerId allyId = new PlayerId("P2");
+        PlayerState ally = new PlayerState(allyId);
+        fx.state.players().put(allyId, ally);
+        ally.pendingDecision(new PendingDecision.SearchPick(
+                "manual pending",
+                1,
+                List.of(strike),
+                Zone.HAND,
+                false
+        ));
+
+        fx.enemy.hp(5);
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        EngineResult play = fx.process(new PlayCardCommand(UUID.randomUUID(), fx.state.version(), fx.playerId, strike,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))));
+
+        assertTrue(play.accepted());
+        assertNotNull(fx.state.combat());
+        assertEquals(CombatPhase.END, fx.state.combat().phase());
+        assertEquals(NodeState.COMBAT, fx.state.nodeState());
+        assertNull(ally.pendingDecision(), "combat end should clear pending decisions for all players");
+        assertTrue(fx.state.runState().recentResults().isEmpty(), "combat victory does not append run recentResults");
+    }
+
+    @Test
+    void defeatPostStateKeepsCombatContextAndDoesNotCreateRunResult() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId enemyCard = fx.addEnemyHandCard("NORMAL_STRIKE");
+        fx.enemy.ap(3);
+        fx.player.hp(5);
+
+        fx.startSimpleCombat();
+        fx.forceMainTurnForEnemy();
+
+        EngineResult play = fx.process(new EnemyPlayCardCommand(UUID.randomUUID(), fx.state.version(), fx.enemyId, enemyCard,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))));
+
+        assertTrue(play.accepted());
+        assertEquals(0, fx.player.hp());
+        assertNotNull(fx.state.combat());
+        assertEquals(CombatPhase.END, fx.state.combat().phase());
+        assertEquals(NodeState.COMBAT, fx.state.nodeState());
+        assertTrue(fx.state.runState().recentResults().isEmpty(), "combat defeat does not append run recentResults");
+    }
+
 
     @Test
     void hpZeroBattleIncapacitationPersistsAcrossCombatRestart() {
