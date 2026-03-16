@@ -38,6 +38,8 @@ public class SecurityConfig {
                                 "/assets/**", "/css/**", "/js/**"
                         ).permitAll()
 
+                        .requestMatchers(HttpMethod.GET, "/api/content/**").permitAll()
+
                         .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
 
