@@ -503,7 +503,7 @@ class RuleEngineRegressionTest {
 
         assertTrue(restart.accepted());
         assertEquals(1, fx.player.status(CombatStatuses.BATTLE_INCAPACITATED_PERSISTENT));
-        assertFalse(fx.state.combat().turnOrder().contains(TargetRef.ofPlayer(fx.playerId)));
+        assertNull(fx.state.combat(), "restart immediately re-resolves defeat when all players remain persistently incapacitated");
         assertEquals(0, fx.player.hand().size(), "persistently incapacitated players do not receive opening draw");
     }
 
