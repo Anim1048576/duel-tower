@@ -63,9 +63,6 @@ public final class VictoryOps {
             }
         }
 
-        // Execute combat-end cleanup before releasing combat context.
-        CombatCleanupOps.cleanupAfterCombatEnd(state, ctx);
-
         // Record post-combat result and release combat context.
         state.runState().appendCombatResult(oc == Outcome.PLAYERS_WIN);
         state.combat(null);
