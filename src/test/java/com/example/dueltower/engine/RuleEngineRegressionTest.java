@@ -423,7 +423,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
-    void victoryPostStateKeepsCombatContextAndDoesNotCreateRunResult() {
+    void victoryPostStateClearsCombatContextAndCreatesRunResult() {
         TestFixture fx = TestFixture.basic();
         CardInstId strike = fx.addHandCard(fx.player, "NORMAL_STRIKE");
 
@@ -447,15 +447,17 @@ class RuleEngineRegressionTest {
                 new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))));
 
         assertTrue(play.accepted());
-        assertNotNull(fx.state.combat());
-        assertEquals(CombatPhase.END, fx.state.combat().phase());
-        assertEquals(NodeState.COMBAT, fx.state.nodeState());
+        assertNull(fx.state.combat());
+        assertEquals(NodeState.NON_COMBAT, fx.state.nodeState());
         assertNull(ally.pendingDecision(), "combat end should clear pending decisions for all players");
-        assertTrue(fx.state.runState().recentResults().isEmpty(), "combat victory does not append run recentResults");
+        assertFalse(fx.state.runState().recentResults().isEmpty(), "combat victory should append run recentResults");
+        RunState.RecentResult result = fx.state.runState().recentResults().get(0);
+        assertEquals("combat", result.type());
+        assertEquals("전투 승리", result.summary());
     }
 
     @Test
-    void defeatPostStateKeepsCombatContextAndDoesNotCreateRunResult() {
+    void defeatPostStateClearsCombatContextAndCreatesRunResult() {
         TestFixture fx = TestFixture.basic();
         CardInstId enemyCard = fx.addEnemyHandCard("NORMAL_STRIKE");
         fx.enemy.ap(3);
@@ -469,10 +471,12 @@ class RuleEngineRegressionTest {
 
         assertTrue(play.accepted());
         assertEquals(0, fx.player.hp());
-        assertNotNull(fx.state.combat());
-        assertEquals(CombatPhase.END, fx.state.combat().phase());
-        assertEquals(NodeState.COMBAT, fx.state.nodeState());
-        assertTrue(fx.state.runState().recentResults().isEmpty(), "combat defeat does not append run recentResults");
+        assertNull(fx.state.combat());
+        assertEquals(NodeState.NON_COMBAT, fx.state.nodeState());
+        assertFalse(fx.state.runState().recentResults().isEmpty(), "combat defeat should append run recentResults");
+        RunState.RecentResult result = fx.state.runState().recentResults().get(0);
+        assertEquals("combat", result.type());
+        assertEquals("전투 패배", result.summary());
     }
 
 

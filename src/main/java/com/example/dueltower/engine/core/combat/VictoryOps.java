@@ -62,6 +62,11 @@ public final class VictoryOps {
             }
         }
 
+
+        // Record post-combat result and release combat context.
+        state.runState().appendCombatResult(oc == Outcome.PLAYERS_WIN);
+        state.combat(null);
+
         out.add(new GameEvent.LogAppended("combat ends: " + oc));
         return oc;
     }
