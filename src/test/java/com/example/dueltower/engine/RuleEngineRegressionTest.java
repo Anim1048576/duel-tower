@@ -471,6 +471,78 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    void combatRestartClearsPendingDecision() {
+        TestFixture fx = TestFixture.basic();
+        fx.state.combat(new CombatState());
+        fx.player.pendingDecision(new PendingDecision.DiscardToHandLimit("manual test", 6));
+
+        fx.state.combat().phase(CombatPhase.END);
+        EngineResult restart = fx.process(new StartCombatCommand(UUID.randomUUID(), fx.state.version(), fx.playerId));
+
+        assertTrue(restart.accepted());
+        assertNull(fx.player.pendingDecision());
+    }
+
+    @Test
+    void combatRestartRemovesActiveSummons() {
+        TestFixture fx = TestFixture.basic();
+        fx.state.combat(new CombatState());
+
+        CardInstId sourceCard = fx.addCard(fx.player, "FILLER", Zone.FIELD);
+        SummonInstId summonId = new SummonInstId(UUID.randomUUID());
+        SummonState summon = new SummonState(summonId, fx.playerId, sourceCard, 5, 5, 1, 0, 1, false);
+
+        fx.state.summons().put(summonId, summon);
+        fx.player.activeSummons().add(summonId);
+        fx.player.summonByCard().put(sourceCard, summonId);
+
+        fx.state.combat().phase(CombatPhase.END);
+        EngineResult restart = fx.process(new StartCombatCommand(UUID.randomUUID(), fx.state.version(), fx.playerId));
+
+        assertTrue(restart.accepted());
+        assertFalse(fx.state.summons().containsKey(summonId));
+        assertTrue(fx.player.activeSummons().isEmpty());
+        assertTrue(fx.player.summonByCard().isEmpty());
+    }
+
+    @Test
+    void combatRestartGathersNonExOwnedCardsFromCombatZonesToDeck() {
+        TestFixture fx = TestFixture.basic();
+        fx.state.combat(new CombatState());
+
+        CardInstId hand = fx.addCard(fx.player, "FILLER", Zone.HAND);
+        CardInstId grave = fx.addCard(fx.player, "FILLER", Zone.GRAVE);
+        CardInstId field = fx.addCard(fx.player, "FILLER", Zone.FIELD);
+        CardInstId excluded = fx.addCard(fx.player, "FILLER", Zone.EXCLUDED);
+        CardInstId ex = fx.addCard(fx.player, "EX_BLAST", Zone.EX);
+
+        fx.player.statusSet(CombatStatuses.BATTLE_INCAPACITATED_PERSISTENT, 1);
+
+        fx.state.combat().phase(CombatPhase.END);
+        EngineResult restart = fx.process(new StartCombatCommand(UUID.randomUUID(), fx.state.version(), fx.playerId));
+
+        assertTrue(restart.accepted());
+
+        assertTrue(fx.player.hand().isEmpty());
+        assertTrue(fx.player.grave().isEmpty());
+        assertTrue(fx.player.field().isEmpty());
+        assertTrue(fx.player.excluded().isEmpty());
+
+        assertTrue(fx.player.deck().contains(hand));
+        assertTrue(fx.player.deck().contains(grave));
+        assertTrue(fx.player.deck().contains(field));
+        assertTrue(fx.player.deck().contains(excluded));
+
+        assertEquals(Zone.DECK, fx.state.card(hand).zone());
+        assertEquals(Zone.DECK, fx.state.card(grave).zone());
+        assertEquals(Zone.DECK, fx.state.card(field).zone());
+        assertEquals(Zone.DECK, fx.state.card(excluded).zone());
+
+        assertEquals(Zone.EX, fx.state.card(ex).zone());
+        assertEquals(ex, fx.player.exCard());
+    }
+
+    @Test
     void drawFailsWithEmptyDeckAndGraveMarksBattleIncapacitated() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
