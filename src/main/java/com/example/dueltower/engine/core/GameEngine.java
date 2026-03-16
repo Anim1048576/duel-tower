@@ -69,7 +69,7 @@ public final class GameEngine {
         List<GameEvent> events = new ArrayList<>(cmd.handle(state, ctx));
 
         // Post-processing: victory/defeat check after ANY command
-        VictoryOps.postHandleCheck(state, events);
+        VictoryOps.postHandleCheck(state, ctx, events);
 
         // Debug safety net: detect zone/list inconsistencies as early as possible.
         if (log.isDebugEnabled()) {
