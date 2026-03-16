@@ -18,14 +18,18 @@ public final class CombatCleanupOps {
     private CombatCleanupOps() {}
 
     public static void cleanupAfterCombatEnd(GameState state, EngineContext ctx) {
+        cleanupAfterCombatEnd(state, ctx, true);
+    }
+
+    public static void cleanupAfterCombatEnd(GameState state, EngineContext ctx, boolean clearTransientBattleIncapacitation) {
         StatusPhases.combatEndCleanup(state, ctx);
 
         for (PlayerState ps : state.players().values()) {
-            resetPlayerForCombat(ps, state);
+            resetPlayerForCombat(ps, state, clearTransientBattleIncapacitation);
         }
     }
 
-    private static void resetPlayerForCombat(PlayerState ps, GameState state) {
+    private static void resetPlayerForCombat(PlayerState ps, GameState state, boolean clearTransientBattleIncapacitation) {
         LinkedHashSet<Ids.CardInstId> toDeck = new LinkedHashSet<>();
         toDeck.addAll(ps.hand());
         toDeck.addAll(ps.grave());
@@ -63,7 +67,9 @@ public final class CombatCleanupOps {
         ps.tenacityDebtThisTurn(0);
         ps.exCooldownUntilRound(0);
         ps.exActivatable(true);
-        ps.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 0);
+        if (clearTransientBattleIncapacitation) {
+            ps.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 0);
+        }
 
         for (Ids.SummonInstId summonId : new ArrayList<>(ps.activeSummons())) {
             state.summons().remove(summonId);
