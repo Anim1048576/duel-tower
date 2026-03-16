@@ -4,9 +4,9 @@ import com.example.dueltower.common.util.DiceUtility;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.combat.CombatCleanupOps;
 import com.example.dueltower.engine.core.combat.CombatStatuses;
 import com.example.dueltower.engine.core.combat.TurnFlow;
-import com.example.dueltower.engine.core.effect.status.StatusPhases;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -204,60 +204,9 @@ public final class StartCombatCommand implements GameCommand {
             return;
         }
 
-        StatusPhases.combatEndCleanup(state, ctx);
-
-        for (PlayerState ps : state.players().values()) {
-            resetPlayerForCombat(ps, state);
-        }
+        CombatCleanupOps.cleanupAfterCombatEnd(state, ctx);
 
         state.combat(null);
         events.add(new GameEvent.LogAppended("combat state reset"));
-    }
-
-    private static void resetPlayerForCombat(PlayerState ps, GameState state) {
-        LinkedHashSet<Ids.CardInstId> toDeck = new LinkedHashSet<>();
-        toDeck.addAll(ps.hand());
-        toDeck.addAll(ps.grave());
-        toDeck.addAll(ps.field());
-        toDeck.addAll(ps.excluded());
-
-        // 전투 중 테스트/효과 처리에서 존 리스트와 CardInstance가 어긋난 경우를 대비해
-        // 소유자 기준으로 누락 카드도 회수한다.
-        for (Map.Entry<Ids.CardInstId, CardInstance> e : state.cardInstances().entrySet()) {
-            CardInstance ci = e.getValue();
-            if (ci == null) continue;
-            if (!Objects.equals(ci.ownerId(), ps.playerId())) continue;
-            if (ci.zone() == Zone.EX) continue;
-            toDeck.add(e.getKey());
-        }
-
-        ps.hand().clear();
-        ps.grave().clear();
-        ps.field().clear();
-        ps.excluded().clear();
-
-        for (Ids.CardInstId id : toDeck) {
-            CardInstance ci = state.card(id);
-            if (ci != null) {
-                ci.zone(Zone.DECK);
-            }
-            ps.deck().addLast(id);
-        }
-
-        ps.pendingDecision(null);
-        ps.swappedThisTurn(false);
-        ps.cardsPlayedThisTurn(0);
-        ps.usedExThisTurn(false);
-        ps.usedTenacityThisTurn(false);
-        ps.tenacityDebtThisTurn(0);
-        ps.exCooldownUntilRound(0);
-        ps.exActivatable(true);
-        ps.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 0);
-
-        for (Ids.SummonInstId summonId : new ArrayList<>(ps.activeSummons())) {
-            state.summons().remove(summonId);
-        }
-        ps.activeSummons().clear();
-        ps.summonByCard().clear();
     }
 }

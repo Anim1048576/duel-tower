@@ -1,5 +1,6 @@
 package com.example.dueltower.engine.core.combat;
 
+import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -36,7 +37,7 @@ public final class VictoryOps {
      *
      * @return outcome (NONE if not ended)
      */
-    public static Outcome postHandleCheck(GameState state, List<GameEvent> out) {
+    public static Outcome postHandleCheck(GameState state, EngineContext ctx, List<GameEvent> out) {
         CombatState cs = state.combat();
         if (cs == null) return Outcome.NONE;
         if (cs.phase() == CombatPhase.END) return Outcome.NONE;
@@ -61,7 +62,6 @@ public final class VictoryOps {
                 ps.pendingDecision(null);
             }
         }
-
 
         // Record post-combat result and release combat context.
         state.runState().appendCombatResult(oc == Outcome.PLAYERS_WIN);

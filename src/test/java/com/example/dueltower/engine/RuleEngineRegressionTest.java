@@ -13,6 +13,7 @@ import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
 import com.example.dueltower.engine.core.combat.CombatStatuses;
+import com.example.dueltower.engine.core.combat.VictoryOps;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.combat.TurnPhases;
 import com.example.dueltower.engine.core.effect.EffectContext;
