@@ -181,6 +181,19 @@ public final class RunState {
         recentResults.clear();
     }
 
+    public void appendCombatResult(boolean playersWin) {
+        String source = (currentNode != null) ? currentNode.name() : "전투";
+        appendResult(new RecentResult(
+                "result-" + UUID.randomUUID(),
+                "combat",
+                "전투 결과",
+                playersWin ? "전투 승리" : "전투 패배",
+                playersWin ? "전투를 승리로 마무리했다." : "전투에서 패배했다.",
+                source,
+                Instant.now().toString()
+        ));
+    }
+
     private void appendResult(RecentResult result) {
         recentResults.add(0, result);
         if (recentResults.size() > 20) {
