@@ -432,10 +432,11 @@ class RuleEngineRegressionTest {
         fx.state.players().put(allyId, ally);
         ally.pendingDecision(new PendingDecision.SearchPick(
                 "manual pending",
-                1,
                 List.of(strike),
+                1,
                 Zone.HAND,
-                false
+                false,
+                UUID.randomUUID()
         ));
 
         fx.enemy.hp(5);
