@@ -105,7 +105,7 @@ public final class StartCombatCommand implements GameCommand {
                 break;
             }
         }
-        cs.currentTurnIndex(firstPlayerIndex >= 0 ? firstPlayerIndex : 0);
+        cs.currentTurnIndex(Math.max(firstPlayerIndex, 0));
         cs.round(1);
 
         state.combat(cs);
