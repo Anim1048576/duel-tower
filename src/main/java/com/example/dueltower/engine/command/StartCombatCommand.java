@@ -43,6 +43,7 @@ public final class StartCombatCommand implements GameCommand {
         List<GameEvent> events = new ArrayList<>();
 
         resetBeforeCombatStart(state, ctx, events);
+        clearTransientBattleIncapacitation(state);
 
         // 1) 참가자 목록(플레이어 + 적)
         List<TargetRef> order = new ArrayList<>();
@@ -178,6 +179,14 @@ public final class StartCombatCommand implements GameCommand {
             Ids.CardInstId top = ps.deck().removeFirst();
             ps.hand().add(top);
             state.card(top).zone(Zone.HAND);
+        }
+    }
+
+    private static void clearTransientBattleIncapacitation(GameState state) {
+        for (PlayerState ps : state.players().values()) {
+            if (ps != null) {
+                ps.statusSet(CombatStatuses.BATTLE_INCAPACITATED, 0);
+            }
         }
     }
 
