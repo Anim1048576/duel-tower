@@ -1,19 +1,17 @@
 package com.example.dueltower.engine;
 
+import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.content.keyword.kdb.K008_Accurate;
 import com.example.dueltower.content.keyword.kdb.K009_Penetration;
 import com.example.dueltower.content.keyword.kdb.K010_Tenacity;
-import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.content.keyword.kdb.K011_Critical;
 import com.example.dueltower.content.status.model.StatusBlueprint;
 import com.example.dueltower.content.status.sdb.*;
 import com.example.dueltower.engine.command.*;
-import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
 import com.example.dueltower.engine.core.combat.CombatStatuses;
-import com.example.dueltower.engine.core.combat.VictoryOps;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.combat.TurnPhases;
 import com.example.dueltower.engine.core.effect.EffectContext;
@@ -23,6 +21,7 @@ import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.keyword.KeywordRuntime;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
+import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.*;
 import org.junit.jupiter.api.Test;
