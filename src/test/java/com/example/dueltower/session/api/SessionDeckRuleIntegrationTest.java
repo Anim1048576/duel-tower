@@ -230,7 +230,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
-        assertTrue(result.getResponse().getErrorMessage().contains("required by current deck"));
+        assertErrorDebugMessageContains(result, "required by current deck");
     }
 
     @Test
@@ -349,7 +349,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andReturn();
 
-        assertTrue(result.getResponse().getErrorMessage().contains("deck edit unavailable during combat"));
+        assertErrorDebugMessageContains(result, "deck edit unavailable during combat");
     }
 
     @Test
@@ -375,7 +375,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andReturn();
 
-        assertTrue(result.getResponse().getErrorMessage().contains("deck edit unavailable during curse"));
+        assertErrorDebugMessageContains(result, "deck edit unavailable during curse");
     }
 
     @Test
@@ -414,7 +414,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
-        assertTrue(result.getResponse().getErrorMessage().contains("deck edit invalid: at most 2 cards"));
+        assertErrorDebugMessageContains(result, "deck edit invalid: at most 2 cards");
     }
 
     @Test
@@ -702,7 +702,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
-        assertTrue(result.getResponse().getErrorMessage().contains("cannot forget weakened card"));
+        assertErrorDebugMessageContains(result, "cannot forget weakened card");
 
         mockMvc.perform(get("/api/sessions/{code}", code)
                         .session(session))
@@ -742,7 +742,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
-        assertTrue(result.getResponse().getErrorMessage().contains("cannot forget weakened card"));
+        assertErrorDebugMessageContains(result, "cannot forget weakened card");
 
         mockMvc.perform(get("/api/sessions/{code}", code)
                         .session(session))
@@ -782,7 +782,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
-        assertTrue(result.getResponse().getErrorMessage().contains("cannot forget locked-in-deck card"));
+        assertErrorDebugMessageContains(result, "cannot forget locked-in-deck card");
 
         mockMvc.perform(get("/api/sessions/{code}", code)
                         .session(session))
@@ -821,7 +821,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
-        assertTrue(result.getResponse().getErrorMessage().contains("required by current deck"));
+        assertErrorDebugMessageContains(result, "required by current deck");
     }
 
     @Test
@@ -1162,6 +1162,13 @@ class SessionDeckRuleIntegrationTest {
         Matcher matcher = pattern.matcher(json);
         assertTrue(matcher.find(), "JSON field not found: " + key);
         return matcher.group(1);
+    }
+
+    private void assertErrorDebugMessageContains(MvcResult result, String expectedFragment) throws Exception {
+        String responseJson = result.getResponse().getContentAsString();
+        String debugMessage = extractJsonStringValue(responseJson, "debugMessage");
+        assertTrue(debugMessage.contains(expectedFragment),
+                () -> "Expected debugMessage to contain '" + expectedFragment + "' but was: " + responseJson);
     }
 
     private String findUnusedOwnedCardIdByCardId(String json, String playerId, List<String> currentDeckOwnedCardIds, String cardId) throws Exception {
