@@ -27,6 +27,8 @@ public final class CombatCleanupOps {
         for (PlayerState ps : state.players().values()) {
             resetPlayerForCombat(ps, state, clearTransientBattleIncapacitation);
         }
+
+        removeEnemyOwnedCardInstances(state);
     }
 
     private static void resetPlayerForCombat(PlayerState ps, GameState state, boolean clearTransientBattleIncapacitation) {
@@ -76,5 +78,25 @@ public final class CombatCleanupOps {
         }
         ps.activeSummons().clear();
         ps.summonByCard().clear();
+    }
+
+    private static void removeEnemyOwnedCardInstances(GameState state) {
+        if (state == null || state.enemies().isEmpty()) {
+            return;
+        }
+
+        LinkedHashSet<String> enemyOwnerKeys = new LinkedHashSet<>();
+        for (Ids.EnemyId enemyId : state.enemies().keySet()) {
+            if (enemyId != null) {
+                enemyOwnerKeys.add(enemyId.value());
+            }
+        }
+
+        state.cardInstances().entrySet().removeIf(entry -> {
+            CardInstance ci = entry.getValue();
+            return ci != null
+                    && ci.ownerId() != null
+                    && enemyOwnerKeys.contains(ci.ownerId().value());
+        });
     }
 }
