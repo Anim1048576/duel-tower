@@ -36,7 +36,7 @@ class SelectNodeChoiceCommandTest {
         assertTrue(result.accepted());
         assertNotNull(state.runState().currentNode());
         assertEquals(choiceId, state.runState().currentNode().id());
-        assertEquals(2, state.runState().floor());
+        assertEquals(1, state.runState().floor());
         assertTrue(state.nodeState() == NodeState.NON_COMBAT || state.nodeState() == NodeState.COMBAT);
     }
 

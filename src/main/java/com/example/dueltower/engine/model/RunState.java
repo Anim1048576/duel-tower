@@ -168,18 +168,16 @@ public final class RunState {
         if (choice == null) {
             return;
         }
-        int nodeFloor = floor;
         this.currentNode = new CurrentNode(
                 choice.id(),
                 choice.name(),
                 choice.typeLabel(),
                 choice.phase(),
                 choice.danger(),
-                nodeFloor
+                floor
         );
         this.resultPending = false;
         availableChoices.clear();
-        floor = nodeFloor + 1;
     }
 
     public void resolveCurrentNode(String type,
@@ -213,6 +211,9 @@ public final class RunState {
     }
 
     public void completeResultAndPrepareNext(long seed) {
+        if (resultPending && currentNode != null) {
+            floor = Math.max(floor, currentNode.floor() + 1);
+        }
         clearRecentResults();
         if (status() == LoopStatus.CHOOSE_NODE && availableChoices.isEmpty()) {
             availableChoices.addAll(generateChoices(floor, seed, inventory));
