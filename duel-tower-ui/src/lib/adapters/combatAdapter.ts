@@ -5,6 +5,8 @@ import type {
   CombatTarget,
   EngineEvent,
   EngineResponse,
+  OwnedCardModifier,
+  PlayerOwnedCard,
   ResolutionLog,
   SessionSnapshot,
   TargetRef,
@@ -22,6 +24,33 @@ type RawApiResponse = {
 
 function asStringArray(input: unknown): string[] {
   return Array.isArray(input) ? input.map(String) : []
+}
+
+function asOwnedCardModifiers(input: unknown): OwnedCardModifier[] {
+  if (!Array.isArray(input)) return []
+  return input.map((entry) => ({
+    modifierId: String((entry as any)?.modifierId ?? ''),
+    value: Number((entry as any)?.value ?? 0),
+  })).filter((entry) => entry.modifierId.length > 0)
+}
+
+function asOwnedCards(input: unknown): PlayerOwnedCard[] {
+  if (!Array.isArray(input)) return []
+  return input.map((entry, index) => {
+    const raw = (entry ?? {}) as any
+    const cardId = String(raw.cardId ?? '').trim()
+    const ownedCardId = String(raw.ownedCardId ?? raw.id ?? `${cardId || 'owned'}:${index}`)
+    return {
+      ownedCardId,
+      cardId,
+      modifiers: asOwnedCardModifiers(raw.modifiers),
+      strengthened: Boolean(raw.strengthened),
+      weakened: Boolean(raw.weakened),
+      lockedInDeck: Boolean(raw.lockedInDeck),
+      forgettable: raw.forgettable == null ? true : Boolean(raw.forgettable),
+      notForgettableReason: raw.notForgettableReason ? String(raw.notForgettableReason) : undefined,
+    }
+  }).filter((entry) => entry.cardId.length > 0 && entry.ownedCardId.length > 0)
 }
 
 function targetKey(target: CombatTarget) {
@@ -102,7 +131,30 @@ function buildActionDescriptors(state: SessionSnapshot, player: CharacterView): 
 export function adaptSessionSnapshot(raw: any): SessionSnapshot {
   const players = Object.fromEntries(
     Object.entries(raw?.players ?? {}).map(([playerId, pRaw]) => {
-      const player = { ...(pRaw as CharacterView), playerId } as CharacterView
+      const rawPlayer = (pRaw ?? {}) as any
+      const player = {
+        ...rawPlayer,
+        playerId,
+        ownedCards: asOwnedCards(rawPlayer.ownedCards),
+        deck: asStringArray(rawPlayer.deck),
+        deckOwnedCardIds: asStringArray(rawPlayer.deckOwnedCardIds),
+        hand: asStringArray(rawPlayer.hand),
+        grave: asStringArray(rawPlayer.grave),
+        field: asStringArray(rawPlayer.field),
+        excluded: asStringArray(rawPlayer.excluded),
+        passiveIds: asStringArray(rawPlayer.passiveIds),
+        exCard: rawPlayer.exCard == null ? null : String(rawPlayer.exCard),
+        exOnCooldown: Boolean(rawPlayer.exOnCooldown),
+        pendingDecision: rawPlayer.pendingDecision ?? null,
+        swappedThisTurn: Boolean(rawPlayer.swappedThisTurn),
+        cardsPlayedThisTurn: Number(rawPlayer.cardsPlayedThisTurn ?? 0),
+        usedExThisTurn: Boolean(rawPlayer.usedExThisTurn),
+        handLimit: Number(rawPlayer.handLimit ?? 0),
+        fieldLimit: Number(rawPlayer.fieldLimit ?? 0),
+        ownedCardCount: Number(rawPlayer.ownedCardCount ?? asOwnedCards(rawPlayer.ownedCards).length),
+        maxOwnedCardCount: Number(rawPlayer.maxOwnedCardCount ?? 0),
+        forgettingRequired: Boolean(rawPlayer.forgettingRequired),
+      } as CharacterView
       return [playerId, player]
     }),
   ) as Record<string, CharacterView>
