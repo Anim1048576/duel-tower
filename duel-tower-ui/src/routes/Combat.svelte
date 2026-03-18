@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { navigate } from '../lib/router'
-  import { explainApiError } from '../lib/api'
+  import { explainApiError, explainEngineRejection } from '../lib/api'
   import { combat, command, refreshState } from '../stores/combat'
   import { session } from '../stores/session'
   import { content, ensureCards } from '../stores/content'
@@ -198,7 +198,7 @@
         return
       }
       if (!res.accepted) {
-        pendingError = res.errors?.join('\n') || '커맨드가 거부되었습니다.'
+        pendingError = explainEngineRejection(res.errorDetails, res.errors)
         return
       }
       discardSelection = []

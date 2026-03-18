@@ -3,6 +3,7 @@ import type {
   CharacterView,
   CombatSnapshot,
   CombatTarget,
+  ApiErrorShape,
   EngineEvent,
   EngineResponse,
   OwnedCardModifier,
@@ -15,6 +16,7 @@ import type {
 type RawApiResponse = {
   accepted?: boolean
   errors?: unknown[]
+  errorDetails?: unknown[]
   events?: EngineEvent[]
   state?: unknown
   resolutionLogs?: unknown[]
@@ -242,8 +244,31 @@ export function adaptEngineResponse(raw: RawApiResponse): EngineResponse {
   return {
     accepted: Boolean(raw.accepted),
     errors: asStringArray(raw.errors),
+    errorDetails: asApiErrors(raw.errorDetails),
     events: Array.isArray(raw.events) ? raw.events : [],
     state: adaptSessionSnapshot(raw.state ?? {}),
     resolutionLogs: toResolutionLogs(raw),
   }
+}
+
+function asApiErrors(input: unknown): ApiErrorShape[] {
+  if (!Array.isArray(input)) return []
+  const out: ApiErrorShape[] = []
+  for (const entry of input) {
+    const raw = (entry ?? {}) as any
+    const code = String(raw.code ?? '').trim()
+    const category = String(raw.category ?? '').trim()
+    const userMessage = String(raw.userMessage ?? '').trim()
+    if (!code || !category || !userMessage) continue
+    out.push({
+      code,
+      category,
+      userMessage,
+      debugMessage: raw.debugMessage == null ? undefined : String(raw.debugMessage),
+      details: raw.details == null ? undefined : raw.details,
+      status: raw.status == null ? undefined : Number(raw.status),
+      path: raw.path == null ? undefined : String(raw.path),
+    })
+  }
+  return out
 }

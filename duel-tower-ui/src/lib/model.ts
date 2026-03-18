@@ -1,5 +1,15 @@
 // Shared UI models (client-side friendly)
 
+export type ApiErrorShape = {
+  code: string
+  category: string
+  userMessage: string
+  debugMessage?: string | null
+  details?: Record<string, unknown> | string[] | null
+  status?: number
+  path?: string | null
+}
+
 export type CardDefId = string
 
 export type CardDef = {
@@ -205,6 +215,7 @@ export type EngineEvent = {
 export type EngineResponse = {
   accepted: boolean
   errors: string[]
+  errorDetails?: ApiErrorShape[]
   events: EngineEvent[]
   state: SessionSnapshot
   resolutionLogs?: ResolutionLog[]

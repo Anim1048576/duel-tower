@@ -1,5 +1,6 @@
 package com.example.dueltower.session.api;
 
+import com.example.dueltower.common.api.ApiErrorResolver;
 import com.example.dueltower.engine.command.*;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.model.Ids;
@@ -222,6 +223,7 @@ public class SessionController {
         return new EngineResponseDto(
                 res.accepted(),
                 res.errors(),
+                res.accepted() ? List.of() : List.of(ApiErrorResolver.commandRejection(res.errors())),
                 StateMapper.toEventDtos(res.events()),
                 state
         );

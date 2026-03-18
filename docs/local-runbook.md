@@ -79,3 +79,22 @@ npm run check
 - 백엔드 테스트는 **코드 문제보다 캐시 문제** 때문에 현재 오프라인에서 막혀 있다.
 - 백엔드 실행은 **DB 미기동** 상태에서는 실패한다.
 - 프론트엔드는 로컬 기준으로 설치/개발/빌드/타입체크 경로가 모두 정리되어 있다.
+
+
+## API error schema
+
+Gameplay/API failures are being normalized onto a small shared shape for the main session flows. The backend now prefers this JSON body for HTTP failures, and command rejections can include the same payload in `errorDetails` while preserving the legacy `errors` array during migration.
+
+```json
+{
+  "code": "DECK_EDIT_INVALID",
+  "category": "RULE",
+  "userMessage": "현재 덱에서는 최대 2장까지만 교체할 수 있습니다.",
+  "debugMessage": "deck edit invalid: at most 2 cards can be changed (requested 3)",
+  "details": { "maxChangedCards": 2, "actualChangedCards": 3 },
+  "status": 400,
+  "path": "/api/sessions/ABCD1234/players/me/deck"
+}
+```
+
+Current high-value coverage: session deck edits, forgetting restrictions, and session command rejections such as pending-decision/search-pick validation. Legacy string/message fallbacks still remain available in the frontend for older endpoints.

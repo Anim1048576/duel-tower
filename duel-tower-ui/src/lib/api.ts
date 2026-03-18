@@ -3,6 +3,7 @@ import type {
   CommandRequest,
   CreateSessionResponse,
   EngineResponse,
+  ApiErrorShape,
   JoinSessionResponse,
   OwnedCard,
   PassiveDefinition,
@@ -93,7 +94,7 @@ export type LoginRequest = {
   password: string
 }
 
-type ApiError = Error & { status?: number; body?: any }
+type ApiError = Error & { status?: number; body?: any; apiError?: ApiErrorShape }
 
 type RequestAuthOptions = {
   gmToken?: string
@@ -110,6 +111,56 @@ async function readJson(res: Response) {
   } catch {
     return text
   }
+}
+
+
+function normalizeApiErrorShape(status: number | undefined, body: any, fallbackMessage: string): ApiErrorShape {
+  const code = typeof body?.code === 'string' && body.code.trim() ? body.code.trim() : inferLegacyErrorCode(status, body, fallbackMessage)
+  const category = typeof body?.category === 'string' && body.category.trim() ? body.category.trim() : inferLegacyErrorCategory(status)
+  const userMessageRaw = body?.userMessage ?? body?.message ?? body?.error ?? fallbackMessage
+  const userMessage = normalizeApiErrorMessage(status, userMessageRaw)
+  const debugMessage = typeof body?.debugMessage === 'string' && body.debugMessage.trim() ? body.debugMessage : String(userMessageRaw || fallbackMessage)
+  const details = body?.details ?? null
+  const path = typeof body?.path === 'string' ? body.path : undefined
+  return { code, category, userMessage, debugMessage, details, status, path }
+}
+
+function inferLegacyErrorCategory(status: number | undefined): string {
+  if (status === 404) return 'NOT_FOUND'
+  if (status === 409) return 'CONFLICT'
+  if (status && status >= 500) return 'INTERNAL'
+  if (status === 401 || status === 403) return 'RULE'
+  return 'VALIDATION'
+}
+
+function inferLegacyErrorCode(status: number | undefined, body: any, fallbackMessage: string): string {
+  const message = String(body?.message ?? body?.error ?? fallbackMessage ?? '')
+  if (message.includes('deck edit invalid')) return 'DECK_EDIT_INVALID'
+  if (message.includes('locked-in-deck')) return 'CARD_LOCKED_IN_DECK'
+  if (message.includes('cannot forget') || message.includes('not forgettable')) return 'CARD_NOT_FORGETTABLE'
+  if (message.includes('forgetting required')) return 'FORGET_REQUIRED'
+  if (message.includes('pending decision')) return 'INVALID_PENDING_DECISION'
+  if (status === 404) return 'NOT_FOUND'
+  if (status === 409) return 'CONFLICT'
+  if (status === 401) return 'UNAUTHORIZED'
+  if (status === 403) return 'FORBIDDEN'
+  if (status && status >= 500) return 'INTERNAL_ERROR'
+  return 'INVALID_REQUEST'
+}
+
+export function getApiErrorShape(e: unknown): ApiErrorShape {
+  const err = e as ApiError
+  if (!err) {
+    return { code: 'UNKNOWN_ERROR', category: 'INTERNAL', userMessage: 'Unknown error' }
+  }
+  if (err.apiError) return err.apiError
+  return normalizeApiErrorShape(err.status, err.body, err.message || 'Unknown error')
+}
+
+export function explainEngineRejection(errorDetails?: ApiErrorShape[] | null, errors?: string[] | null) {
+  const primary = errorDetails?.[0]
+  if (primary?.userMessage) return primary.userMessage
+  return (errors && errors.length ? errors.join('\n') : '') || '커맨드가 거부되었습니다.'
 }
 
 function createAuthHeaders(auth?: RequestAuthOptions): Record<string, string> {
@@ -141,6 +192,7 @@ async function request<T>(path: string, init?: RequestInit, auth?: RequestAuthOp
     const e: ApiError = new Error(`HTTP ${res.status}`)
     e.status = res.status
     e.body = await readJson(res)
+    e.apiError = normalizeApiErrorShape(e.status, e.body, e.message)
     throw e
   }
 
@@ -148,14 +200,9 @@ async function request<T>(path: string, init?: RequestInit, auth?: RequestAuthOp
 }
 
 export function explainApiError(e: unknown) {
-  const err = e as ApiError
-  if (!err) return 'Unknown error'
-
-  const status = err.status
-  const rawMsg = (err.body && (err.body.message || err.body.error)) || err.message
-  const msg = normalizeApiErrorMessage(status, rawMsg)
-  const detail = err.body && err.body.path ? ` (${err.body.path})` : ''
-  return status ? `${status} · ${msg}${detail}` : String(msg)
+  const apiError = getApiErrorShape(e)
+  const detail = apiError.path ? ` (${apiError.path})` : ''
+  return apiError.status ? `${apiError.status} · ${apiError.userMessage}${detail}` : String(apiError.userMessage)
 }
 
 function normalizeApiErrorMessage(status: number | undefined, message: unknown): string {
