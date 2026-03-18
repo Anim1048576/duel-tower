@@ -67,16 +67,21 @@ export function dismissToast(id: string) {
   toasts.update((v) => v.filter((x) => x.id !== id))
 }
 
+function appendLog(level: LogItem['level'], title: string, message?: string) {
+  const item: LogItem = { id: uid(), at: new Date().toISOString(), level, title, message }
+  logs.update((v) => [item, ...v].slice(0, 200))
+}
+
 export function info(title: string, message?: string) {
-  logs.update((v) => [{ id: uid(), at: new Date().toISOString(), level: 'info', title, message }, ...v].slice(0, 200))
+  appendLog('info', title, message)
 }
 
 export function warn(title: string, message?: string) {
-  logs.update((v) => [{ id: uid(), at: new Date().toISOString(), level: 'warn', title, message }, ...v].slice(0, 200))
+  appendLog('warn', title, message)
 }
 
 export function error(title: string, message?: string) {
-  logs.update((v) => [{ id: uid(), at: new Date().toISOString(), level: 'error', title, message }, ...v].slice(0, 200))
+  appendLog('error', title, message)
   pushToast(title, message)
 }
 

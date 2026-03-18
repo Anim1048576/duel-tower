@@ -60,9 +60,17 @@
 * 로그 파일이 저장되었는지 확인
 
 ## 8. 최근 실행 결과
-* 날짜: `2026-03-14`
+* 날짜: `2026-03-18`
 * 명령: `./gradlew --offline --no-daemon test`
-* 성공/실패: 성공
-* 첫 차단 요인: 없음
-* 분류: 해당 없음
-* 우회안: 해당 없음
+* 성공/실패: 실패
+* 첫 차단 요인:
+    * `org.springframework.boot:spring-boot-starter-test:4.0.3`
+    * `org.springframework.boot:spring-boot-starter-data-jpa-test:4.0.3`
+    * `org.springframework.boot:spring-boot-starter-security-test:4.0.3`
+    * `org.springframework.boot:spring-boot-starter-thymeleaf-test:4.0.3`
+    * `org.springframework.boot:spring-boot-starter-validation-test:4.0.3`
+    * `org.springframework.boot:spring-boot-starter-webmvc-test:4.0.3`
+* 분류: Dependency / offline cache miss
+* 우회안:
+    * 정상적인 해결은 Maven Central(`repo.maven.apache.org`)에서 위 테스트 의존성을 1회 캐시한 뒤 다시 `--offline`으로 검증하는 것이다.
+    * 일반 검증 경로는 계속 `./gradlew --offline --no-daemon test`를 유지한다.

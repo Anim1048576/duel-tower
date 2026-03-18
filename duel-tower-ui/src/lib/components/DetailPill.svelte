@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
   import { hideRuleTooltip, showRuleTooltip } from '../../stores/ui'
-  import type { DetailItem } from './DetailDrawer.svelte'
+  import type { DetailItem } from './detail'
 
   const dispatch = createEventDispatcher<{ select: { item: DetailItem } }>()
 

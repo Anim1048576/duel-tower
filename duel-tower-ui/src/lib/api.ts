@@ -9,6 +9,8 @@ import type {
   SessionSnapshot,
 } from './model'
 
+export type { CardDef, PassiveDefinition } from './model'
+
 import { normalizeCardDef, normalizePassiveDefinition } from './model'
 import { adaptEngineResponse, adaptSessionSnapshot } from './adapters/combatAdapter'
 

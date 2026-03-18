@@ -1,18 +1,6 @@
 <script lang="ts">
   import StatusBadge from '../StatusBadge.svelte'
-
-  export type NodePhase = 'judgement' | 'combat' | 'event'
-
-  export type NodeChoice = {
-    id: string
-    name: string
-    typeLabel: string
-    rule: string
-    phase: NodePhase
-    danger: 'low' | 'mid' | 'high'
-    disabled?: boolean
-    disabledReason?: string
-  }
+  import type { NodeChoice } from './types'
 
   export let node: NodeChoice
   export let onSelect: ((node: NodeChoice) => void) | undefined = undefined

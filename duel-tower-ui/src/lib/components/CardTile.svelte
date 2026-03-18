@@ -1,5 +1,5 @@
 <script lang="ts">
-  export type CardLite = {
+  type CardLite = {
     id: string
     name: string
     cost: number
