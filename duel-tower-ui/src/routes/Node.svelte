@@ -34,8 +34,15 @@
     disabled: Boolean(choice.disabled),
     disabledReason: choice.disabledReason,
   })) as NodeChoice[]
+  $: runState = $combat.state?.run ?? null
+  $: resultPending = Boolean(runState?.resultPending)
+  $: currentNode = runState?.currentNode ?? null
 
   async function selectNode(node: NodeChoice) {
+    if (resultPending) {
+      navigate('/results')
+      return
+    }
     selectedNode = node
     confirmOpen = true
     info('노드 선택', `${node.name} (${node.typeLabel})`)
@@ -69,14 +76,22 @@
 <PageSkeleton title="Node" summary="탐색 플로우 전용 UI">
   <div class="hint">서버 상태 기반 노드 선택</div>
 
-  {#if !nodes.length}
-    <div class="hint" style="margin-top:12px">표시할 노드 선택지가 없다.</div>
-  {:else}
-    <div class="list" style="margin-top:12px">
-      {#each nodes as node (node.id)}
-        <NodeChoiceCard {node} onSelect={selectNode} />
-      {/each}
+  {#if resultPending}
+    <div class="hint" style="margin-top:12px">현재 노드 <b>{currentNode?.name ?? '—'}</b> 결과를 먼저 확인해야 다음 선택지가 열립니다.</div>
+    <div style="margin-top:12px">
+      <button class="btn primary" on:click={() => navigate('/results')}>결과 확인</button>
     </div>
+  {:else}
+
+    {#if !nodes.length}
+      <div class="hint" style="margin-top:12px">표시할 노드 선택지가 없다.</div>
+    {:else}
+      <div class="list" style="margin-top:12px">
+        {#each nodes as node (node.id)}
+          <NodeChoiceCard {node} onSelect={selectNode} />
+        {/each}
+      </div>
+    {/if}
   {/if}
 </PageSkeleton>
 

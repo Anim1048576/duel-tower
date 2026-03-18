@@ -33,13 +33,21 @@ class RunStateTest {
 
         int beforeGold = run.inventory().gold();
 
-        run.select(nonCombat, 42L);
+        run.beginNode(nonCombat);
+        run.resolveCurrentNode("reward", "보상 획득", nonCombat.name() + " 결과 확인", "테스트 보상", 200, 0, 0);
 
         assertNotNull(run.currentNode());
         assertEquals(nonCombat.id(), run.currentNode().id());
-        assertEquals(2, run.floor());
+        assertEquals(1, run.floor());
+        assertTrue(run.resultPending());
         assertFalse(run.recentResults().isEmpty());
         assertTrue(run.inventory().gold() > beforeGold);
+
+        run.completeResultAndPrepareNext(42L);
+
+        assertEquals(2, run.floor());
+        assertFalse(run.resultPending());
+        assertNull(run.currentNode());
     }
 
     @Test
@@ -51,11 +59,13 @@ class RunStateTest {
                 .findFirst()
                 .orElseThrow();
 
-        run.select(nonCombat, 99L);
+        run.beginNode(nonCombat);
+        run.resolveCurrentNode("reward", "탐색 완료", nonCombat.name() + " 결과 확인", "테스트", 120, 0, 0);
         assertFalse(run.recentResults().isEmpty());
 
-        run.clearRecentResults();
+        run.completeResultAndPrepareNext(99L);
 
         assertTrue(run.recentResults().isEmpty());
+        assertEquals(2, run.floor());
     }
 }

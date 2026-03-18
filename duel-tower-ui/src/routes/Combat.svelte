@@ -28,6 +28,7 @@
   let discardSelection: string[] = []
   let tieOrderDraft: string[] = []
   let searchPickSelection: string[] = []
+  let autoEnemyBusy = false
 
   const DEV = Boolean(import.meta.env.DEV)
 
@@ -43,6 +44,7 @@
   $: combatState = state?.combat
   $: inCombat = Boolean(combatState)
   $: version = state?.version
+  $: runState = state?.run ?? null
 
   $: myPendingDecision = me?.pendingDecision ?? null
   $: hasPendingDecision = Boolean(myPendingDecision)
@@ -89,6 +91,19 @@
     myPendingDecision?.type === 'INITIATIVE_TIE_ORDER' &&
     tieOrderDraft.length > 0 &&
     sameMembers(tieOrderDraft, myPendingDecision.actorKeys ?? [])
+
+  $: if (!inCombat && runState?.resultPending) {
+    navigate('/results')
+  }
+
+  $: if (
+    combatState &&
+    combatState.currentTurnPlayer?.startsWith('E:') &&
+    $session.gmToken &&
+    !autoEnemyBusy
+  ) {
+    autoAdvanceEnemyTurn(combatState.currentTurnPlayer)
+  }
 
   function syncTieOrderDraft(current: string[], source: string[]) {
     if (!current.length) return [...source]
@@ -250,6 +265,21 @@
       cancelAction()
     } finally {
       busy = false
+    }
+  }
+
+  async function autoAdvanceEnemyTurn(actorKey: string) {
+    const enemyId = actorKey.replace(/^E:/, '')
+    if (!enemyId) return
+    autoEnemyBusy = true
+    try {
+      await command({
+        type: 'ENEMY_END_TURN',
+        enemyId,
+        expectedVersion: version,
+      })
+    } finally {
+      autoEnemyBusy = false
     }
   }
 </script>

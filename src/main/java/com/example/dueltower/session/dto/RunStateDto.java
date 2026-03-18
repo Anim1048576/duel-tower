@@ -4,6 +4,8 @@ import java.util.List;
 
 public record RunStateDto(
         int floor,
+        String status,
+        boolean resultPending,
         CurrentNodeDto currentNode,
         List<NodeChoiceDto> availableChoices,
         List<RecentResultDto> recentResults,

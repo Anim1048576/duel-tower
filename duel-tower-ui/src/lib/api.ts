@@ -310,7 +310,7 @@ export async function sendCommand(
   }, {
     gmToken,
     playerToken,
-    includeGmToken: req.type?.toUpperCase() === 'START_COMBAT',
+    includeGmToken: ['START_COMBAT', 'ENEMY_PLAY_CARD', 'ENEMY_USE_EX', 'ENEMY_END_TURN'].includes(req.type?.toUpperCase?.() ?? ''),
     includePlayerToken: true,
   })
   return adaptEngineResponse(raw)

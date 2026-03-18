@@ -187,6 +187,8 @@ export type RunInventory = {
 
 export type RunSnapshot = {
   floor: number
+  status: string
+  resultPending: boolean
   currentNode: RunCurrentNode | null
   availableChoices: RunChoice[]
   recentResults: RunResult[]
@@ -249,6 +251,7 @@ export type CommandRequest = {
   expectedVersion?: number
   playerId: string
   count?: number
+  enemyId?: string
   discardIds?: string[]
   cardId?: string
   summonId?: string
