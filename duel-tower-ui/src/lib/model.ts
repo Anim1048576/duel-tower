@@ -22,10 +22,13 @@ export type CardInstance = {
 }
 
 export type PendingDecision = {
-  type: 'DISCARD_TO_HAND_LIMIT' | 'SEARCH_PICK' | string
+  type: 'DISCARD_TO_HAND_LIMIT' | 'SEARCH_PICK' | 'INITIATIVE_TIE_ORDER' | string
   reason?: string
   limit?: number
   pickCount?: number
+  candidateIds?: string[]
+  destination?: string
+  shuffleAfterPick?: boolean
   groupIndex?: number
   actorKeys?: string[]
 }
@@ -226,6 +229,7 @@ export type CommandRequest = {
    * Required when type === 'RESOLVE_INITIATIVE_TIE': final actor key order chosen by the user.
    */
   orderedActorKeys?: string[]
+  selectedIds?: string[]
   choiceId?: string
 }
 
