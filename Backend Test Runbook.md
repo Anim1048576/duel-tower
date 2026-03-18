@@ -4,8 +4,18 @@
 백엔드 테스트를 동일한 전제조건과 절차로 재현 가능하게 한다.
 
 ## 2. 표준 실행 명령
-* 표준 명령: `./gradlew --offline --no-daemon test`
-* Windows PowerShell/CMD에서의 대응 명령: `.\gradlew.bat --offline --no-daemon test`
+* 표준 검증 명령: `./gradlew --offline --no-daemon test`
+* Windows PowerShell/CMD 대응: `.\gradlew.bat --offline --no-daemon test`
+
+## 2.1 사전 캐시 준비 명령
+* 목적: 오프라인 테스트에 필요한 Gradle 의존성을 최초 1회 캐시에 채운다.
+* 실행 위치: Codex/CI의 setup 또는 prebuild 단계
+* 권장 명령:
+    * Git Bash / Linux / macOS: `./gradlew --no-daemon test --refresh-dependencies || true`
+    * Windows PowerShell/CMD: `.\gradlew.bat --no-daemon test --refresh-dependencies`
+* 주의:
+    * 이 단계는 표준 검증 명령을 대체하지 않는다.
+    * 캐시 준비가 끝난 뒤 실제 검증은 반드시 `--offline`으로 다시 수행한다.
 
 ## 3. 전제조건
 * JDK: 17
@@ -32,11 +42,9 @@
 ## 4. 실행 절차
 1. 프로젝트 루트로 이동한다.
 2. Java 버전을 확인한다.
-    * 예: `java -version`
 3. Gradle Wrapper 파일 존재 여부를 확인한다.
-4. 오프라인 실행에 필요한 의존성 캐시가 준비되어 있는지 확인한다.
-5. 테스트 명령을 실행한다.
-    * 예: `./gradlew --offline --no-daemon test`
+4. Codex/CI 환경에서 setup 또는 prebuild 단계가 있다면, 먼저 의존성 캐시를 준비한다.
+5. 표준 검증 명령 `./gradlew --offline --no-daemon test` 를 실행한다.
 6. 결과 로그를 저장한다.
 
 ## 5. 로그 저장 예시

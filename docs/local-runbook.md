@@ -15,6 +15,14 @@
 ./gradlew --offline --no-daemon assemble
 ```
 
+### 최초 1회 캐시 준비
+오프라인 검증 전에 Gradle 테스트 의존성을 1회 캐시에 채운다.
+이 단계는 setup/prebuild 또는 네트워크가 허용된 초기 환경에서만 수행한다.
+
+```bash
+./gradlew --no-daemon test --refresh-dependencies || true
+```
+
 ### 표준 테스트
 ```bash
 ./gradlew --offline --no-daemon test

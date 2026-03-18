@@ -11,13 +11,19 @@ Key constraints:
 
 Offline dependency policy:
 - Default validation is offline-first.
-- Preferred validation command:
+- Normal validation command:
   ./gradlew --offline --no-daemon test
-- If offline validation fails because required Gradle artifacts are not present in the local cache, do not switch the normal validation flow to online.
-- Instead, report the exact missing artifact coordinates and/or blocked repository domain.
-- If a dedicated environment setup script is available, it may pre-warm dependencies with a command such as:
-  ./gradlew --no-daemon test --refresh-dependencies || true
-- After any approved pre-warm/setup step, return to the prescribed offline validation command.
+
+Validation order for Codex or CI-like environments:
+1. If the environment provides a dedicated setup/prebuild step, use that step only to warm Gradle dependencies.
+2. Preferred dependency warm-up command:
+   ./gradlew --no-daemon test --refresh-dependencies || true
+3. After the warm-up step, return to the normal validation command:
+   ./gradlew --offline --no-daemon test
+4. Do not replace the normal validation flow with online Gradle test execution.
+5. If offline validation still fails because artifacts are missing, report the exact missing artifact coordinates and/or blocked repository domain (for example `repo.maven.apache.org`).
+
+Do not modify dependency declarations only to bypass an offline cache miss.
 
 Global goals:
 - Keep the current architecture style.
