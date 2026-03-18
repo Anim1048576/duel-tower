@@ -43,4 +43,23 @@ class StartCombatCommandRunLoopTest {
         assertFalse(state.enemies().isEmpty(), "combat node should provide a placeholder encounter");
         assertFalse(state.runState().resultPending(), "combat should not skip directly to result pending");
     }
+
+    @Test
+    void startCombatPreservesPreSeededEnemiesWithoutExistingCombat() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 456L);
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        Ids.EnemyId enemyId = new Ids.EnemyId("seeded-enemy");
+        state.players().put(playerId, new PlayerState(playerId));
+        state.enemies().put(enemyId, new com.example.dueltower.engine.model.EnemyState(enemyId, 25));
+
+        EngineResult result = new GameEngine().process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new StartCombatCommand(UUID.randomUUID(), state.version(), playerId)
+        );
+
+        assertTrue(result.accepted());
+        assertNotNull(state.combat());
+        assertTrue(state.enemies().containsKey(enemyId), "pre-seeded enemies must survive combat start");
+    }
 }
