@@ -272,14 +272,14 @@ export async function sendCommand(
 export async function updateSessionDeck(
   code: string,
   playerId: string,
-  deckCardIds: string[],
+  deckOwnedCardIds: string[],
   playerToken?: string,
 ): Promise<SessionSnapshot> {
   const raw = await request<any>(
     `/api/sessions/${encodeURIComponent(code)}/players/${encodeURIComponent(playerId)}/deck`,
     {
       method: 'POST',
-      body: JSON.stringify({ deckCardIds }),
+      body: JSON.stringify({ deckOwnedCardIds }),
     },
     {
       playerToken,

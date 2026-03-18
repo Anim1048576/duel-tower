@@ -33,10 +33,27 @@ export type PendingDecision = {
   actorKeys?: string[]
 }
 
+export type OwnedCardModifier = {
+  modifierId: string
+  value: number
+}
+
+export type PlayerOwnedCard = {
+  ownedCardId: string
+  cardId: string
+  modifiers: OwnedCardModifier[]
+  strengthened: boolean
+  weakened: boolean
+  lockedInDeck: boolean
+  forgettable: boolean
+  notForgettableReason?: string
+}
+
 export type PlayerState = {
   playerId: string
-  ownedCards?: { cardId: string; strengthened?: boolean; weakened?: boolean; lockedInDeck?: boolean }[]
+  ownedCards?: PlayerOwnedCard[]
   deck: string[]
+  deckOwnedCardIds?: string[]
   hand: string[]
   grave: string[]
   field: string[]
@@ -45,8 +62,14 @@ export type PlayerState = {
   passiveIds: string[]
   exOnCooldown: boolean
   pendingDecision: PendingDecision | null
+  swappedThisTurn?: boolean
+  cardsPlayedThisTurn?: number
+  usedExThisTurn?: boolean
   handLimit: number
   fieldLimit: number
+  ownedCardCount?: number
+  maxOwnedCardCount?: number
+  forgettingRequired?: boolean
 }
 
 export type SummonState = {
@@ -234,8 +257,12 @@ export type CommandRequest = {
 }
 
 export type OwnedCard = {
+  ownedCardId?: string
   cardId: string
+  modifiers?: OwnedCardModifier[]
+  strengthened?: boolean
   weakened: boolean
+  lockedInDeck?: boolean
 }
 
 export type PassiveDefinition = {
