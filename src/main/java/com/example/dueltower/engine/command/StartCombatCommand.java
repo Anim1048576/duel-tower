@@ -229,7 +229,6 @@ public final class StartCombatCommand implements GameCommand {
 
     private static void resetBeforeCombatStart(GameState state, EngineContext ctx, List<GameEvent> events) {
         if (state.combat() == null) {
-            state.enemies().clear();
             return;
         }
 
