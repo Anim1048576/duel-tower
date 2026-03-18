@@ -16,6 +16,7 @@
   import FieldZone from '../lib/combat/FieldZone.svelte'
   import SummonZone from '../lib/combat/SummonZone.svelte'
   import CardDetailDrawer from '../lib/components/CardDetailDrawer.svelte'
+  import CardSummaryTile from '../lib/components/CardSummaryTile.svelte'
   import type { ActionStage, PendingAction } from '../lib/combat/types'
 
   let busy = false
@@ -26,6 +27,7 @@
   let pendingError = ''
   let discardSelection: string[] = []
   let tieOrderDraft: string[] = []
+  let searchPickSelection: string[] = []
 
   const DEV = Boolean(import.meta.env.DEV)
 
@@ -46,6 +48,7 @@
   $: hasPendingDecision = Boolean(myPendingDecision)
   $: pendingGuide = hasPendingDecision ? '결정 처리를 완료해야 일반 행동을 사용할 수 있습니다.' : ''
   $: if (myPendingDecision?.type !== 'DISCARD_TO_HAND_LIMIT') discardSelection = []
+  $: if (myPendingDecision?.type !== 'SEARCH_PICK') searchPickSelection = []
   $: if (myPendingDecision?.type === 'INITIATIVE_TIE_ORDER') {
     tieOrderDraft = syncTieOrderDraft(tieOrderDraft, myPendingDecision.actorKeys ?? [])
   } else {
@@ -63,6 +66,10 @@
   $: handCards = mapCardInstances(me?.hand ?? [])
   $: fieldCards = mapCardInstances(me?.field ?? [])
   $: exCard = me?.exCard ? cardById[me.exCard] ?? null : null
+  $: searchPickCandidateIds = myPendingDecision?.type === 'SEARCH_PICK' ? myPendingDecision.candidateIds ?? [] : []
+  $: searchPickCandidates = mapCardInstances(searchPickCandidateIds)
+  $: searchPickCount = Math.max(0, Number(myPendingDecision?.pickCount ?? 0))
+  $: canSubmitSearchPick = myPendingDecision?.type === 'SEARCH_PICK' && searchPickSelection.length === searchPickCount
 
   $: selectedCard = selectedCardId ? cardById[selectedCardId] ?? null : null
   $: selectedCardDef = selectedCard ? $content.cardsById[selectedCard.defId] ?? null : null
@@ -151,6 +158,16 @@
     discardSelection = [...discardSelection, cardId]
   }
 
+  function toggleSearchPickSelection(cardId: string) {
+    const selected = searchPickSelection.includes(cardId)
+    if (selected) {
+      searchPickSelection = searchPickSelection.filter((id) => id !== cardId)
+      return
+    }
+    if (searchPickSelection.length >= searchPickCount) return
+    searchPickSelection = [...searchPickSelection, cardId]
+  }
+
   function moveTieActor(index: number, offset: number) {
     const nextIndex = index + offset
     if (nextIndex < 0 || nextIndex >= tieOrderDraft.length) return
@@ -164,6 +181,7 @@
     payload: {
       type: string
       discardIds?: string[]
+      selectedIds?: string[]
       /** Required when type === 'RESOLVE_INITIATIVE_TIE'. */
       tieGroupIndex?: number
       /** Required when type === 'RESOLVE_INITIATIVE_TIE'. */
@@ -184,6 +202,7 @@
         return
       }
       discardSelection = []
+      searchPickSelection = []
       await refreshState()
     } catch (e) {
       pendingError = explainApiError(e)
@@ -197,6 +216,14 @@
     await sendPendingDecisionCommand({
       type: 'DISCARD_TO_HAND_LIMIT',
       discardIds: discardSelection,
+    })
+  }
+
+  async function submitSearchPick() {
+    if (!canSubmitSearchPick) return
+    await sendPendingDecisionCommand({
+      type: 'RESOLVE_SEARCH_PICK',
+      selectedIds: searchPickSelection,
     })
   }
 
@@ -263,6 +290,41 @@
         <div class="spacer"></div>
         <div class="row" style="justify-content:flex-end">
           <button class="btn primary" disabled={!canSubmitDiscard || busy} on:click={submitDiscardToLimit}>DISCARD_TO_HAND_LIMIT 전송</button>
+        </div>
+      {:else if myPendingDecision?.type === 'SEARCH_PICK'}
+        <div class="pendingDecisionMeta">
+          <span class="pill">선택 수 {searchPickSelection.length}/{searchPickCount}</span>
+          {#if myPendingDecision.destination}
+            <span class="pill">이동 위치 {myPendingDecision.destination}</span>
+          {/if}
+          <span class="pill">후처리 {myPendingDecision.shuffleAfterPick ? '선택 후 셔플' : '셔플 없음'}</span>
+        </div>
+        <div class="hint">후보 카드에서 정확히 {searchPickCount}장을 선택하세요. 카드 클릭으로 상세 정보를 확인할 수 있습니다.</div>
+        <div class="searchPickGrid">
+          {#each searchPickCandidates as card (card.instanceId)}
+            {@const def = $content.cardsById[card.defId] ?? null}
+            {@const selected = searchPickSelection.includes(card.instanceId)}
+            <div class:selected class="searchPickCandidate">
+              <CardSummaryTile def={def} instance={card} on:inspect={() => (selectedCardId = card.instanceId)}>
+                <div class="candidateActions">
+                  <button
+                    class={`btn ${selected ? 'primary' : ''}`}
+                    disabled={!selected && searchPickSelection.length >= searchPickCount}
+                    on:click|stopPropagation={() => toggleSearchPickSelection(card.instanceId)}
+                  >
+                    {selected ? '선택 해제' : '선택'}
+                  </button>
+                </div>
+              </CardSummaryTile>
+            </div>
+          {/each}
+        </div>
+        {#if !searchPickCandidates.length}
+          <div class="hint pendingError">표시할 후보 카드가 없습니다. 상태를 새로고침한 뒤 다시 시도하세요.</div>
+        {/if}
+        <div class="spacer"></div>
+        <div class="row" style="justify-content:flex-end">
+          <button class="btn primary" disabled={!canSubmitSearchPick || busy} on:click={submitSearchPick}>RESOLVE_SEARCH_PICK 전송</button>
         </div>
       {:else if myPendingDecision?.type === 'INITIATIVE_TIE_ORDER'}
         <div class="hint">동률 그룹 #{myPendingDecision.groupIndex ?? 0} 순서를 조정하세요.</div>
@@ -358,8 +420,12 @@
   .logItem{padding:8px; border:1px solid var(--line-default); border-radius:12px; background:var(--surface-2); margin-bottom:8px}
   .logItem pre{white-space:pre-wrap}
   .pendingPanel{border-color:rgba(255, 93, 116, 0.45); background:rgba(255, 93, 116, 0.08)}
-  .pendingError{color:var(--danger)}
-  .wrap{flex-wrap:wrap}
+  .pendingError{color:var(--state-danger)}
+  .pendingDecisionMeta{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px}
+  .searchPickGrid{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-top:12px}
+  .searchPickCandidate{border:1px solid transparent; border-radius:18px; transition:border-color .15s ease, box-shadow .15s ease}
+  .searchPickCandidate.selected{border-color:var(--line-info); box-shadow:0 12px 26px rgba(69,153,255,.18)}
+  .candidateActions{display:flex; justify-content:flex-end; margin-top:10px}
   .stack{display:flex; flex-direction:column; gap:8px}
   @media (max-width: 1200px){
     .layoutTop,.layoutBottom{grid-template-columns:1fr}
