@@ -17,6 +17,8 @@ import com.example.dueltower.engine.model.Ids.CardDefId;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SessionId;
+import com.example.dueltower.common.api.ApiErrorException;
+import com.example.dueltower.common.api.ApiErrorResolver;
 import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.dto.OwnedCardModifierDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
@@ -290,8 +292,14 @@ public class SessionService {
 
             List<OwnedCard> ownedCards = new ArrayList<>(ps.ownedCards());
             if (ownedCardIndexRaw < 0 || ownedCardIndexRaw >= ownedCards.size()) {
-                throw new ResponseStatusException(BAD_REQUEST,
-                        "ownedCardIndex out of range: " + ownedCardIndexRaw + " (size " + ownedCards.size() + ")");
+                throw new ApiErrorException(
+                        BAD_REQUEST,
+                        "INVALID_OWNED_CARD_INDEX",
+                        "VALIDATION",
+                        "선택한 카드 위치를 다시 확인해 주세요.",
+                        "ownedCardIndex out of range: " + ownedCardIndexRaw + " (size " + ownedCards.size() + ")",
+                        ApiErrorResolver.details("ownedCardIndex", ownedCardIndexRaw, "ownedCardCount", ownedCards.size())
+                );
             }
 
             Map<String, Integer> ownedCounts = cardCountsFromOwned(ownedCards);
@@ -304,8 +312,14 @@ public class SessionService {
                     deckCounts,
                     new LinkedHashSet<>(currentDeckOwnedCardIds)
             )) {
-                throw new ResponseStatusException(BAD_REQUEST,
-                        "cannot resolve forgetting required: no forgettable cards (all are strengthened/weakened/locked or required by current deck)");
+                throw new ApiErrorException(
+                        BAD_REQUEST,
+                        "FORGET_REQUIRED",
+                        "RULE",
+                        "먼저 잊을 수 있는 카드를 정리해야 다음 단계로 진행할 수 있습니다.",
+                        "cannot resolve forgetting required: no forgettable cards (all are strengthened/weakened/locked or required by current deck)",
+                        ApiErrorResolver.details("playerId", target.value(), "ownedCardCount", ownedCards.size())
+                );
             }
 
             OwnedCard selectedCard = ownedCards.get(ownedCardIndexRaw);
@@ -317,8 +331,14 @@ public class SessionService {
                     inCurrentDeck
             );
             if (!forgetCheck.forgettable()) {
-                throw new ResponseStatusException(BAD_REQUEST,
-                        "cannot forget owned card at index " + ownedCardIndexRaw + ": " + forgetCheck.reason());
+                throw new ApiErrorException(
+                        BAD_REQUEST,
+                        "CARD_NOT_FORGETTABLE",
+                        "RULE",
+                        "선택한 카드는 지금 잊을 수 없습니다.",
+                        "cannot forget owned card at index " + ownedCardIndexRaw + ": " + forgetCheck.reason(),
+                        ApiErrorResolver.details("ownedCardIndex", ownedCardIndexRaw, "reason", forgetCheck.reason())
+                );
             }
 
             ownedCards.remove((int) ownedCardIndexRaw);
@@ -357,7 +377,14 @@ public class SessionService {
 
     private void validateDeckBuild(List<String> deckOwnedCardIds, List<OwnedCard> ownedCards, List<String> currentDeckOwnedCardIds) {
         if (deckOwnedCardIds.size() != DECK_SIZE) {
-            throw new ResponseStatusException(BAD_REQUEST, "deck must contain exactly 12 cards");
+            throw new ApiErrorException(
+                    BAD_REQUEST,
+                    "DECK_EDIT_INVALID",
+                    "VALIDATION",
+                    "덱은 정확히 12장으로 맞춰야 합니다.",
+                    "deck must contain exactly 12 cards",
+                    ApiErrorResolver.details("requiredDeckSize", DECK_SIZE, "actualDeckSize", deckOwnedCardIds.size())
+            );
         }
 
         Map<String, OwnedCard> ownedById = ownedCardMap(ownedCards);
@@ -369,11 +396,25 @@ public class SessionService {
             }
             String normalizedOwnedCardId = ownedCardId.trim();
             if (!seenOwnedCardIds.add(normalizedOwnedCardId)) {
-                throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds must not contain duplicate values: " + normalizedOwnedCardId);
+                throw new ApiErrorException(
+                        BAD_REQUEST,
+                        "DECK_EDIT_INVALID",
+                        "VALIDATION",
+                        "덱에 같은 보유 사본을 중복해서 넣을 수 없습니다.",
+                        "deckOwnedCardIds must not contain duplicate values: " + normalizedOwnedCardId,
+                        ApiErrorResolver.details("ownedCardId", normalizedOwnedCardId)
+                );
             }
             OwnedCard owned = ownedById.get(normalizedOwnedCardId);
             if (owned == null) {
-                throw new ResponseStatusException(BAD_REQUEST, "owned card unavailable: " + normalizedOwnedCardId);
+                throw new ApiErrorException(
+                        BAD_REQUEST,
+                        "OWNED_CARD_UNAVAILABLE",
+                        "VALIDATION",
+                        "선택한 카드 사본을 현재 보유 목록에서 찾을 수 없습니다.",
+                        "owned card unavailable: " + normalizedOwnedCardId,
+                        ApiErrorResolver.details("ownedCardId", normalizedOwnedCardId)
+                );
             }
             deckCardIds.add(owned.cardId());
         }
@@ -381,26 +422,40 @@ public class SessionService {
         Map<String, Integer> deckCounts = cardCounts(deckCardIds);
         for (var e : deckCounts.entrySet()) {
             if (e.getValue() > MAX_DECK_COPIES) {
-                throw new ResponseStatusException(BAD_REQUEST,
-                        "card copy limit exceeded: " + e.getKey() + " (max 3)");
+                throw new ApiErrorException(
+                        BAD_REQUEST,
+                        "DECK_EDIT_INVALID",
+                        "VALIDATION",
+                        "같은 카드는 덱에 최대 3장까지 넣을 수 있습니다.",
+                        "card copy limit exceeded: " + e.getKey() + " (max 3)",
+                        ApiErrorResolver.details("cardId", e.getKey(), "maxCopies", MAX_DECK_COPIES, "actualCopies", e.getValue())
+                );
             }
         }
 
         if (currentDeckOwnedCardIds != null) {
             int changedCards = calculateDeckChangedCards(currentDeckOwnedCardIds, deckOwnedCardIds);
             if (changedCards > MAX_DECK_EDIT_CHANGES) {
-                throw new ResponseStatusException(
+                throw new ApiErrorException(
                         BAD_REQUEST,
-                        "deck edit invalid: at most 2 cards can be changed (requested " + changedCards + ")"
+                        "DECK_EDIT_INVALID",
+                        "RULE",
+                        "현재 덱에서는 최대 2장까지만 교체할 수 있습니다.",
+                        "deck edit invalid: at most 2 cards can be changed (requested " + changedCards + ")",
+                        ApiErrorResolver.details("maxChangedCards", MAX_DECK_EDIT_CHANGES, "actualChangedCards", changedCards)
                 );
             }
 
             Set<String> requiredLockedOwnedCardIds = lockedOwnedCardIdsRequiredInDeck(currentDeckOwnedCardIds, ownedCards);
             for (String requiredLockedOwnedCardId : requiredLockedOwnedCardIds) {
                 if (!seenOwnedCardIds.contains(requiredLockedOwnedCardId)) {
-                    throw new ResponseStatusException(
+                    throw new ApiErrorException(
                             BAD_REQUEST,
-                            "deck edit invalid: locked-in-deck card must remain in deck: " + requiredLockedOwnedCardId
+                            "CARD_LOCKED_IN_DECK",
+                            "RULE",
+                            "잠금된 카드는 현재 덱에 유지해야 합니다.",
+                            "deck edit invalid: locked-in-deck card must remain in deck: " + requiredLockedOwnedCardId,
+                            ApiErrorResolver.details("ownedCardId", requiredLockedOwnedCardId)
                     );
                 }
             }
@@ -409,21 +464,27 @@ public class SessionService {
 
     private void validateDeckEditableState(NodeState nodeState, PlayerState ps) {
         if (nodeState == NodeState.COMBAT) {
-            throw new ResponseStatusException(FORBIDDEN, "deck edit unavailable during combat");
+            throw new ApiErrorException(FORBIDDEN, "DECK_EDIT_FORBIDDEN", "RULE", "전투 중에는 덱을 수정할 수 없습니다.", "deck edit unavailable during combat", null);
         }
         if (nodeState.curseBlocked()) {
-            throw new ResponseStatusException(FORBIDDEN, "deck edit unavailable during curse");
+            throw new ApiErrorException(FORBIDDEN, "DECK_EDIT_FORBIDDEN", "RULE", "현재 저주 상태에서는 덱을 수정할 수 없습니다.", "deck edit unavailable during curse", null);
         }
         if (!nodeState.deckEditable()) {
-            throw new ResponseStatusException(FORBIDDEN, "deck cannot be edited in current node state: " + nodeState.name());
+            throw new ApiErrorException(FORBIDDEN, "DECK_EDIT_FORBIDDEN", "RULE", "현재 노드 상태에서는 덱을 수정할 수 없습니다.", "deck cannot be edited in current node state: " + nodeState.name(), ApiErrorResolver.details("nodeState", nodeState.name()));
         }
         if (ps.forgettingRequired()) {
-            throw new ResponseStatusException(FORBIDDEN,
+            throw new ApiErrorException(
+                    FORBIDDEN,
+                    "FORGET_REQUIRED",
+                    "RULE",
+                    "카드 잊기 상태를 먼저 해결해야 덱을 수정할 수 있습니다.",
                     "forgetting required: owned card limit exceeded ("
                             + ps.ownedCardCount()
                             + "/"
                             + ps.maxOwnedCardCount()
-                            + ")");
+                            + ")",
+                    ApiErrorResolver.details("ownedCardCount", ps.ownedCardCount(), "maxOwnedCardCount", ps.maxOwnedCardCount())
+            );
         }
     }
 

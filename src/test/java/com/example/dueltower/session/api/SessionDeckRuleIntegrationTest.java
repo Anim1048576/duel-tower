@@ -540,15 +540,16 @@ class SessionDeckRuleIntegrationTest {
 
         assertFalse(updateDeckOwnedCardIds.contains(lockedOwnedCardId));
 
-        MvcResult updateResult = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player7")
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player7")
                         .header("X-Player-Token", playerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(deckUpdateBodyOwned(jsonArrayValues(updateDeckOwnedCardIds))))
                 .andExpect(status().isBadRequest())
-                .andReturn();
-
-        assertTrue(updateResult.getResponse().getErrorMessage().contains(lockedOwnedCardId));
-        assertTrue(updateResult.getResponse().getErrorMessage().contains("locked-in-deck card must remain in deck"));
+                .andExpect(jsonPath("$.code").value("CARD_LOCKED_IN_DECK"))
+                .andExpect(jsonPath("$.category").value("RULE"))
+                .andExpect(jsonPath("$.userMessage").value("잠금된 카드는 현재 덱에 유지해야 합니다."))
+                .andExpect(jsonPath("$.debugMessage").value(org.hamcrest.Matchers.containsString(lockedOwnedCardId)))
+                .andExpect(jsonPath("$.details.ownedCardId").value(lockedOwnedCardId));
     }
 
     @Test
@@ -585,7 +586,7 @@ class SessionDeckRuleIntegrationTest {
 
         String playerToken = extractJsonStringValue(joinResult.getResponse().getContentAsString(), "playerToken");
 
-        MvcResult updateResult = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player9")
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/deck", code, "player9")
                         .header("X-Player-Token", playerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(deckUpdateBody("""
@@ -595,9 +596,11 @@ class SessionDeckRuleIntegrationTest {
                                 "C004","C004","C004"
                                 """)))
                 .andExpect(status().isForbidden())
-                .andReturn();
-
-        assertTrue(updateResult.getResponse().getErrorMessage().contains("forgetting required"));
+                .andExpect(jsonPath("$.code").value("FORGET_REQUIRED"))
+                .andExpect(jsonPath("$.category").value("RULE"))
+                .andExpect(jsonPath("$.userMessage").value("카드 잊기 상태를 먼저 해결해야 덱을 수정할 수 있습니다."))
+                .andExpect(jsonPath("$.details.ownedCardCount").value(21))
+                .andExpect(jsonPath("$.details.maxOwnedCardCount").value(20));
 
         mockMvc.perform(get("/api/sessions/{code}", code)
                         .session(session))
@@ -646,7 +649,7 @@ class SessionDeckRuleIntegrationTest {
                 {"cardId":"Tig001_Card","weakened":false}
                 """);
 
-        MvcResult result = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/forget", code, "player11")
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/forget", code, "player11")
                         .header("X-Player-Token", playerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -655,9 +658,11 @@ class SessionDeckRuleIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andReturn();
-
-        assertTrue(result.getResponse().getErrorMessage().contains("cannot forget strengthened card"));
+                .andExpect(jsonPath("$.code").value("CARD_NOT_FORGETTABLE"))
+                .andExpect(jsonPath("$.category").value("RULE"))
+                .andExpect(jsonPath("$.userMessage").value("선택한 카드는 지금 잊을 수 없습니다."))
+                .andExpect(jsonPath("$.debugMessage").value(org.hamcrest.Matchers.containsString("cannot forget strengthened card")))
+                .andExpect(jsonPath("$.details.ownedCardIndex").value(0));
 
         mockMvc.perform(get("/api/sessions/{code}", code)
                         .session(session))
@@ -825,7 +830,7 @@ class SessionDeckRuleIntegrationTest {
         String code = createSession(session);
         String playerToken = joinWithOwnedCards(code, session, "player15", twentyOneLockedOwnedCardsJson());
 
-        MvcResult result = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/forget", code, "player15")
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/forget", code, "player15")
                         .header("X-Player-Token", playerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -834,9 +839,11 @@ class SessionDeckRuleIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andReturn();
-
-        assertTrue(result.getResponse().getErrorMessage().contains("no forgettable cards"));
+                .andExpect(jsonPath("$.code").value("FORGET_REQUIRED"))
+                .andExpect(jsonPath("$.category").value("RULE"))
+                .andExpect(jsonPath("$.userMessage").value("먼저 잊을 수 있는 카드를 정리해야 다음 단계로 진행할 수 있습니다."))
+                .andExpect(jsonPath("$.debugMessage").value(org.hamcrest.Matchers.containsString("no forgettable cards")))
+                .andExpect(jsonPath("$.details.playerId").value("player15"));
     }
 
 

@@ -2,7 +2,7 @@ import { writable, get } from 'svelte/store'
 import { KEY } from '../lib/keys'
 import { load, save } from '../lib/storage'
 import type { CommandRequest, EngineResponse, ResolutionLog, SessionSnapshot } from '../lib/model'
-import { explainApiError, getSessionState, joinSession, sendCommand } from '../lib/api'
+import { explainApiError, explainEngineRejection, getSessionState, joinSession, sendCommand } from '../lib/api'
 import { session, setPlayerToken } from './session'
 import { presets } from './presets'
 import { error as logError, info as logInfo, pushEngineEvents } from './log'
@@ -90,7 +90,7 @@ export async function command(req: Omit<CommandRequest, 'playerId'> & { playerId
     // are forwarded without mutation.
     const res: EngineResponse = await sendCommand(code, { ...req, playerId, expectedVersion }, s.gmToken, s.playerToken)
     if (!res.accepted) {
-      logError('커맨드 거부', (res.errors || []).join('\n') || 'unknown')
+      logError('커맨드 거부', explainEngineRejection(res.errorDetails, res.errors))
     } else {
       logInfo('커맨드', req.type)
     }
