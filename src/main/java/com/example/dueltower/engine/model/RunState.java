@@ -13,6 +13,12 @@ import java.util.UUID;
 
 public final class RunState {
 
+    public enum LoopStatus {
+        CHOOSE_NODE,
+        RESOLVE_NODE,
+        SHOW_RESULTS
+    }
+
     public enum NodePhase {
         JUDGEMENT,
         COMBAT,
@@ -101,6 +107,7 @@ public final class RunState {
 
     private int floor = 1;
     private CurrentNode currentNode;
+    private boolean resultPending;
     private final List<NodeChoice> availableChoices = new ArrayList<>();
     private final List<RecentResult> recentResults = new ArrayList<>();
     private final Inventory inventory = new Inventory();
@@ -108,6 +115,18 @@ public final class RunState {
     public int floor() { return floor; }
 
     public CurrentNode currentNode() { return currentNode; }
+
+    public boolean resultPending() { return resultPending; }
+
+    public LoopStatus status() {
+        if (resultPending) {
+            return LoopStatus.SHOW_RESULTS;
+        }
+        if (currentNode != null) {
+            return LoopStatus.RESOLVE_NODE;
+        }
+        return LoopStatus.CHOOSE_NODE;
+    }
 
     public List<NodeChoice> availableChoices() {
         return Collections.unmodifiableList(availableChoices);
@@ -122,12 +141,15 @@ public final class RunState {
     }
 
     public void initialize(long seed) {
+        floor = 1;
+        currentNode = null;
+        resultPending = false;
         inventory.keys(2);
         inventory.chests(1);
         inventory.gold(12450);
         inventory.replaceItems(defaultInventoryItems());
         availableChoices.clear();
-        availableChoices.addAll(generateChoices(floor, seed));
+        availableChoices.addAll(generateChoices(floor, seed, inventory));
     }
 
     public NodeChoice findChoice(String choiceId) {
@@ -142,7 +164,7 @@ public final class RunState {
         return null;
     }
 
-    public void select(NodeChoice choice, long seed) {
+    public void beginNode(NodeChoice choice) {
         if (choice == null) {
             return;
         }
@@ -154,44 +176,49 @@ public final class RunState {
                 choice.danger(),
                 floor
         );
-
-        if (choice.phase() != NodePhase.COMBAT) {
-            String title = (choice.phase() == NodePhase.JUDGEMENT) ? "보상 획득" : "탐색 완료";
-            String type = (choice.phase() == NodePhase.JUDGEMENT) ? "reward" : "reward";
-            appendResult(new RecentResult(
-                    "result-" + UUID.randomUUID(),
-                    type,
-                    title,
-                    choice.name() + " 결과 확인",
-                    (choice.phase() == NodePhase.JUDGEMENT)
-                            ? "판정을 통과해 추가 보상을 획득했다."
-                            : "노드 이벤트 보상을 획득했다.",
-                    choice.name(),
-                    Instant.now().toString()
-            ));
-            inventory.gold(inventory.gold() + ((choice.phase() == NodePhase.JUDGEMENT) ? 200 : 120));
-        }
-
-        floor += 1;
+        this.resultPending = false;
         availableChoices.clear();
-        availableChoices.addAll(generateChoices(floor, seed));
+    }
+
+    public void resolveCurrentNode(String type,
+                                   String title,
+                                   String summary,
+                                   String detail,
+                                   int goldDelta,
+                                   int keyDelta,
+                                   int chestDelta) {
+        if (currentNode == null) {
+            return;
+        }
+        appendResult(new RecentResult(
+                "result-" + UUID.randomUUID(),
+                type,
+                title,
+                summary,
+                detail,
+                currentNode.name(),
+                Instant.now().toString()
+        ));
+        inventory.gold(inventory.gold() + goldDelta);
+        inventory.keys(inventory.keys() + keyDelta);
+        inventory.chests(inventory.chests() + chestDelta);
+        resultPending = true;
     }
 
     public void clearRecentResults() {
         recentResults.clear();
+        if (resultPending) {
+            currentNode = null;
+            resultPending = false;
+            floor += 1;
+        }
     }
 
-    public void appendCombatResult(boolean playersWin) {
-        String source = (currentNode != null) ? currentNode.name() : "전투";
-        appendResult(new RecentResult(
-                "result-" + UUID.randomUUID(),
-                "combat",
-                "전투 결과",
-                playersWin ? "전투 승리" : "전투 패배",
-                playersWin ? "전투를 승리로 마무리했다." : "전투에서 패배했다.",
-                source,
-                Instant.now().toString()
-        ));
+    public void completeResultAndPrepareNext(long seed) {
+        clearRecentResults();
+        if (status() == LoopStatus.CHOOSE_NODE && availableChoices.isEmpty()) {
+            availableChoices.addAll(generateChoices(floor, seed, inventory));
+        }
     }
 
     private void appendResult(RecentResult result) {
@@ -201,7 +228,7 @@ public final class RunState {
         }
     }
 
-    private static List<NodeChoice> generateChoices(int floor, long seed) {
+    private static List<NodeChoice> generateChoices(int floor, long seed, Inventory inventory) {
         Random random = new Random(seed ^ ((long) floor * 9973L));
         List<Integer> order = new ArrayList<>();
         for (int i = 0; i < NODE_POOL.size(); i++) {
@@ -216,6 +243,7 @@ public final class RunState {
             if (usedTypes.contains(base.typeLabel())) {
                 continue;
             }
+            boolean disabled = base.id().equals("N-4") && inventory.keys() <= 0;
             selected.add(new NodeChoice(
                     base.id(),
                     base.name(),
@@ -223,8 +251,8 @@ public final class RunState {
                     base.rule(),
                     base.phase(),
                     base.danger(),
-                    base.disabled(),
-                    base.disabledReason()
+                    disabled,
+                    disabled ? "균열 열쇠가 없어 진입할 수 없음" : null
             ));
             usedTypes.add(base.typeLabel());
             if (selected.size() >= 3) {

@@ -28,7 +28,8 @@ class ClearRecentResultsCommandTest {
                 .findFirst()
                 .orElseThrow();
 
-        state.runState().select(eventChoice, state.seed());
+        state.runState().beginNode(eventChoice);
+        state.runState().resolveCurrentNode("reward", "탐색 완료", eventChoice.name() + " 결과 확인", "테스트", 120, 0, 0);
         assertFalse(state.runState().recentResults().isEmpty());
 
         ClearRecentResultsCommand command = new ClearRecentResultsCommand(UUID.randomUUID(), state.version(), playerId);
@@ -37,6 +38,8 @@ class ClearRecentResultsCommandTest {
 
         assertTrue(result.accepted());
         assertTrue(state.runState().recentResults().isEmpty());
+        assertEquals(2, state.runState().floor());
+        assertNull(state.runState().currentNode());
     }
 
     @Test

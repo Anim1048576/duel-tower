@@ -67,8 +67,29 @@ public final class VictoryOps {
         CombatCleanupOps.cleanupAfterCombatEnd(state, ctx, false);
 
         // Record post-combat result and release combat context.
-        state.runState().appendCombatResult(oc == Outcome.PLAYERS_WIN);
+        if (oc == Outcome.PLAYERS_WIN) {
+            state.runState().resolveCurrentNode(
+                    "combat",
+                    "전투 결과",
+                    "전투 승리",
+                    "적을 제압하고 180G와 상자 1개를 확보했다.",
+                    180,
+                    0,
+                    1
+            );
+        } else {
+            state.runState().resolveCurrentNode(
+                    "combat",
+                    "전투 결과",
+                    "전투 패배",
+                    "전열이 무너져 추가 보상 없이 후퇴했다.",
+                    0,
+                    0,
+                    0
+            );
+        }
         state.combat(null);
+        state.enemies().clear();
 
         out.add(new GameEvent.LogAppended("combat ends: " + oc));
         return oc;

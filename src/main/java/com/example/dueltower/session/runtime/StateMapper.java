@@ -249,7 +249,15 @@ public final class StateMapper {
                 items
         );
 
-        return new RunStateDto(run.floor(), currentNode, choices, recentResults, inventory);
+        return new RunStateDto(
+                run.floor(),
+                run.status().name(),
+                run.resultPending(),
+                currentNode,
+                choices,
+                recentResults,
+                inventory
+        );
     }
 
     public static List<EventDto> toEventDtos(List<GameEvent> events) {

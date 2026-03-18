@@ -49,7 +49,7 @@ public record SelectNodeChoiceCommand(
     @Override
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         RunState.NodeChoice choice = state.runState().findChoice(choiceId);
-        state.runState().select(choice, state.seed());
+        state.runState().beginNode(choice);
 
         List<GameEvent> events = new ArrayList<>();
         events.add(new GameEvent.LogAppended("노드 선택: " + choice.name() + " (" + choice.typeLabel() + ")"));
@@ -58,6 +58,27 @@ public record SelectNodeChoiceCommand(
             events.add(new GameEvent.LogAppended("전투 노드를 선택했다. START_COMBAT 명령 대기 중."));
         } else {
             state.nodeState(NodeState.NON_COMBAT);
+            if (choice.phase() == RunState.NodePhase.JUDGEMENT) {
+                state.runState().resolveCurrentNode(
+                        "reward",
+                        "보상 획득",
+                        choice.name() + " 결과 확인",
+                        "판정을 통과해 200G와 열쇠 1개를 확보했다.",
+                        200,
+                        1,
+                        0
+                );
+            } else {
+                state.runState().resolveCurrentNode(
+                        "reward",
+                        "탐색 완료",
+                        choice.name() + " 결과 확인",
+                        "이벤트를 정리하고 120G와 상자 1개를 획득했다.",
+                        120,
+                        0,
+                        1
+                );
+            }
             events.add(new GameEvent.LogAppended("노드 결과가 recentResults에 기록되었다."));
         }
         return events;

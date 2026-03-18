@@ -11,6 +11,8 @@
   }
 
   $: resultCards = $combat.state?.run?.recentResults ?? []
+  $: runState = $combat.state?.run ?? null
+  $: currentNode = runState?.currentNode ?? null
   $: recentLogs = $logs.slice(0, 5)
   $: detailLogs = $combat.lastResolutionLogs.slice(0, 5)
 
@@ -28,6 +30,10 @@
   {:else if !resultCards.length}
     <div class="hint">최근 탐색 결과가 없어 기본 로그만 표시한다.</div>
   {:else}
+    <div class="card" style="margin-top:10px">
+      <div class="cardTitle">현재 정산 중인 노드</div>
+      <div class="hint">{currentNode ? `층 ${currentNode.floor} · ${currentNode.name} · ${currentNode.typeLabel}` : '정산 대상 노드 없음'}</div>
+    </div>
     <div class="table" style="margin-top:10px">
       {#each resultCards as card (card.id)}
         <article class="tr">

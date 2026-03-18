@@ -170,7 +170,17 @@ export function adaptSessionSnapshot(raw: any): SessionSnapshot {
     players,
     combat,
     cards: (raw?.cards ?? {}) as SessionSnapshot['cards'],
-    run: (raw?.run ?? null) as SessionSnapshot['run'],
+    run: raw?.run
+      ? {
+          floor: Number(raw.run.floor ?? 0),
+          status: String(raw.run.status ?? ''),
+          resultPending: Boolean(raw.run.resultPending),
+          currentNode: raw.run.currentNode ?? null,
+          availableChoices: Array.isArray(raw.run.availableChoices) ? raw.run.availableChoices : [],
+          recentResults: Array.isArray(raw.run.recentResults) ? raw.run.recentResults : [],
+          inventory: raw.run.inventory ?? { keys: 0, chests: 0, gold: 0, items: [] },
+        }
+      : null,
   }
 
   const enrichedPlayers = Object.fromEntries(
