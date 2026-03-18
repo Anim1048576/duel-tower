@@ -2,7 +2,8 @@
   import PageSkeleton from '../lib/PageSkeleton.svelte'
   import { navigate } from '../lib/router'
   import { info, warn } from '../stores/log'
-  import NodeChoiceCard, { type NodeChoice } from '../lib/components/node/NodeChoiceCard.svelte'
+  import NodeChoiceCard from '../lib/components/node/NodeChoiceCard.svelte'
+  import type { NodeChoice } from '../lib/components/node/types'
   import NodeConfirmModal from '../lib/components/node/NodeConfirmModal.svelte'
   import { combat, command } from '../stores/combat'
 

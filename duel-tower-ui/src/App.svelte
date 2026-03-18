@@ -40,7 +40,7 @@
   $: code = $session.code
   $: hasSession = Boolean(code)
   $: inCombat = Boolean($combat.state?.combat)
-  $: phase = !hasSession ? 'session' : inCombat ? 'combat' : 'lobby'
+  $: phase = (!hasSession ? 'session' : inCombat ? 'combat' : 'lobby') as Phase
 
   function isPathActive(path: string) {
     return cur === path || (path.includes(':id') && cur.startsWith('/character/'))

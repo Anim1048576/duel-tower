@@ -1,5 +1,6 @@
 <script lang="ts">
-  import DetailDrawer, { type DetailItem } from '../lib/components/DetailDrawer.svelte'
+  import DetailDrawer from '../lib/components/DetailDrawer.svelte'
+  import type { DetailItem } from '../lib/components/detail'
   import DetailPill from '../lib/components/DetailPill.svelte'
   import { combat } from '../stores/combat'
 

@@ -187,8 +187,8 @@
 
       <div class="searchGrid">
         {#each filtered as c (c.id)}
+          {@const skillIcon = iconForCard(c)}
           <div class="gcard" on:click={() => addToDeck(c.id)}>
-            {@const skillIcon = iconForCard(c)}
             <div class="row" style="justify-content:space-between; align-items:flex-start">
               <div class="gcardTitle">{c.name}</div>
               <span class="badge">{c.cost}</span>

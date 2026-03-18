@@ -47,7 +47,7 @@ export function navigate(path: string) {
 }
 
 export function isActive(path: string) {
-  let cur: string
+  let cur = initialPath
   route.subscribe((v) => (cur = v))()
   return cur === path
 }

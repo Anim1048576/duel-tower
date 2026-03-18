@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { NodeChoice } from './NodeChoiceCard.svelte'
+  import type { NodeChoice } from './types'
 
   export let open = false
   export let node: NodeChoice | null = null
