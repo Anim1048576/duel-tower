@@ -161,14 +161,16 @@ public final class StartCombatCommand implements GameCommand {
     }
 
     private static void ensureRunEncounterExists(GameState state, List<GameEvent> events) {
-        if (state.runState().currentNode() == null || state.runState().currentNode().phase() != RunState.NodePhase.COMBAT) {
-            return;
-        }
         if (!state.enemies().isEmpty()) {
             return;
         }
 
-        int floor = Math.max(1, state.runState().currentNode().floor());
+        int floor = 1;
+        if (state.runState().currentNode() != null && state.runState().currentNode().phase() == RunState.NodePhase.COMBAT) {
+            floor = Math.max(1, state.runState().currentNode().floor());
+        } else {
+            floor = Math.max(1, state.runState().floor());
+        }
         EnemyState enemy = new EnemyState(new Ids.EnemyId(DEFAULT_ENCOUNTER_ENEMY_ID), 18 + (floor * 4));
         enemy.attackPower(4 + floor);
         enemy.healPower(Math.max(0, floor - 1));

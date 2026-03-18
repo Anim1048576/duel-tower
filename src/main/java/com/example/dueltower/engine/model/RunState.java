@@ -168,16 +168,18 @@ public final class RunState {
         if (choice == null) {
             return;
         }
+        int nodeFloor = floor;
         this.currentNode = new CurrentNode(
                 choice.id(),
                 choice.name(),
                 choice.typeLabel(),
                 choice.phase(),
                 choice.danger(),
-                floor
+                nodeFloor
         );
         this.resultPending = false;
         availableChoices.clear();
+        floor = nodeFloor + 1;
     }
 
     public void resolveCurrentNode(String type,
@@ -187,16 +189,13 @@ public final class RunState {
                                    int goldDelta,
                                    int keyDelta,
                                    int chestDelta) {
-        if (currentNode == null) {
-            return;
-        }
         appendResult(new RecentResult(
                 "result-" + UUID.randomUUID(),
                 type,
                 title,
                 summary,
                 detail,
-                currentNode.name(),
+                currentNode == null ? "" : currentNode.name(),
                 Instant.now().toString()
         ));
         inventory.gold(inventory.gold() + goldDelta);
@@ -210,7 +209,6 @@ public final class RunState {
         if (resultPending) {
             currentNode = null;
             resultPending = false;
-            floor += 1;
         }
     }
 
