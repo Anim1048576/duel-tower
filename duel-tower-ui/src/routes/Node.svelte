@@ -6,6 +6,7 @@
   import type { NodeChoice } from '../lib/components/node/types'
   import NodeConfirmModal from '../lib/components/node/NodeConfirmModal.svelte'
   import { combat, command } from '../stores/combat'
+  import { session } from '../stores/session'
 
   let selectedNode: NodeChoice | null = null
   let confirmOpen = false
@@ -37,6 +38,7 @@
   $: runState = $combat.state?.run ?? null
   $: resultPending = Boolean(runState?.resultPending)
   $: currentNode = runState?.currentNode ?? null
+  $: canStartCombat = Boolean($session.gmToken)
 
   async function selectNode(node: NodeChoice) {
     if (resultPending) {
@@ -58,6 +60,12 @@
     if (!res?.accepted) return
 
     if (node.phase === 'combat') {
+      if (!canStartCombat) {
+        warn('GM 시작 대기', `${node.name} 선택 완료 · GM이 전투를 시작해야 합니다.`)
+        navigate('/lobby')
+        return
+      }
+
       const started = await command({ type: 'START_COMBAT' })
       if (started?.accepted) {
         info('노드 확정', `${node.name} 진입 · 전투 페이즈 이동`)
