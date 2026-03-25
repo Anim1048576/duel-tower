@@ -62,4 +62,54 @@ class StartCombatCommandRunLoopTest {
         assertNotNull(state.combat());
         assertTrue(state.enemies().containsKey(enemyId), "pre-seeded enemies must survive combat start");
     }
+
+    @Test
+    void victoryAfterCombatSetsResultPendingAndClearingResultsReturnsToNodeSelection() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 789L);
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        state.players().put(playerId, new PlayerState(playerId));
+
+        RunState.NodeChoice combatChoice = state.runState().availableChoices().stream()
+                .filter(choice -> !choice.disabled())
+                .filter(choice -> choice.phase() == RunState.NodePhase.COMBAT)
+                .findFirst()
+                .orElseThrow();
+
+        state.runState().beginNode(combatChoice);
+        state.nodeState(NodeState.COMBAT);
+
+        GameEngine engine = new GameEngine();
+        EngineResult startCombat = engine.process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new StartCombatCommand(UUID.randomUUID(), state.version(), playerId)
+        );
+
+        assertTrue(startCombat.accepted());
+        assertFalse(state.runState().resultPending(), "combat start should keep run in resolve state");
+        assertFalse(state.enemies().isEmpty());
+
+        state.enemies().values().forEach(enemy -> enemy.hp(0));
+
+        EngineResult endTurn = engine.process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new EndTurnCommand(UUID.randomUUID(), state.version(), playerId)
+        );
+
+        assertTrue(endTurn.accepted());
+        assertTrue(state.runState().resultPending(), "combat victory should set resultPending");
+        assertFalse(state.runState().recentResults().isEmpty(), "combat victory should append recent result");
+
+        EngineResult clearResults = engine.process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new ClearRecentResultsCommand(UUID.randomUUID(), state.version(), playerId)
+        );
+
+        assertTrue(clearResults.accepted());
+        assertFalse(state.runState().resultPending());
+        assertNull(state.runState().currentNode());
+        assertFalse(state.runState().availableChoices().isEmpty(), "after clear, next node choices should be prepared");
+    }
 }
