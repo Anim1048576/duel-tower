@@ -35,7 +35,6 @@
     trait1: null,
     trait2: null,
     ownedCards: '[]',
-    currentSkillDeck: null,
     exCard: '{}',
   }
 
@@ -84,8 +83,6 @@
       trait1: p.trait1,
       trait2: p.trait2,
       ownedCards: p.ownedCards,
-      // CharacterSheet는 덱 편집 화면이 아니므로 저장 시 currentSkillDeck을 항상 비웁니다.
-      currentSkillDeck: null,
       exCard: p.exCard,
     }
   }
@@ -163,8 +160,6 @@
       trait1: selectedTraits[0] ?? null,
       trait2: selectedTraits[1] ?? null,
       ownedCards: JSON.stringify(ownedCardCountMapToArray(selectedOwnedCardCounts)),
-      // CharacterSheet 저장으로 오래된 ownedCardId 기반 덱이 다시 살아나지 않도록 차단
-      currentSkillDeck: null,
       exCard: selectedExCardId ? JSON.stringify({ id: selectedExCardId }) : '{}',
     }
   }
@@ -203,15 +198,21 @@
     syncUiFromForm()
   }
 
+  function toCharacterSheetSavePayload(req: CharacterProfileRequest): CharacterProfileRequest {
+    const { currentSkillDeck: _ignored, ...payload } = req
+    return payload
+  }
+
   async function saveProfile() {
     saving = true
     error = ''
     syncFormFromUi()
+    const payload = toCharacterSheetSavePayload(form)
     try {
       if (selectedId) {
-        await updateCharacterProfile(selectedId, form)
+        await updateCharacterProfile(selectedId, payload)
       } else {
-        const created = await createCharacterProfile(form)
+        const created = await createCharacterProfile(payload)
         selectedId = created.id
       }
       await refresh()
