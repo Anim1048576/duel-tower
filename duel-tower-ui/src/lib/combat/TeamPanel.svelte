@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
   import type { CombatTarget } from '../model'
-  import type { TeamPlayer, TeamSide, TeamSummon } from './types'
+  import type { TeamEnemy, TeamPlayer, TeamSide, TeamSummon } from './types'
   import CharacterPanel from '../components/CharacterPanel.svelte'
   import StatusBadge from '../components/StatusBadge.svelte'
 
@@ -10,6 +10,7 @@
   export let side: TeamSide = 'ally'
   export let title = ''
   export let players: TeamPlayer[] = []
+  export let enemies: TeamEnemy[] = []
   export let summons: TeamSummon[] = []
   export let validTargets: CombatTarget[] = []
   export let selectedTarget: string | null = null
@@ -31,14 +32,29 @@
 <section class="panel zone">
   <div class="panelTitle">{heading}</div>
   <div class="spacer"></div>
-  {#if !players.length}
-    <div class="hint">표시할 플레이어 없음</div>
-  {:else}
+  {#if players.length}
     <div class="stack">
       {#each players as p (p.playerId)}
         {@const target = { type: 'player', playerId: p.playerId } as CombatTarget}
         <button class="unit" class:isTargetable={canTarget(target)} class:isSelected={selectedTarget === targetKey(target)} disabled={!canTarget(target)} on:click={() => dispatch('selectTarget', target)}>
           <CharacterPanel player={p} />
+        </button>
+      {/each}
+    </div>
+  {/if}
+
+  {#if enemies.length}
+    <div class="spacer"></div>
+    <div class="hint">적 유닛</div>
+    <div class="stack">
+      {#each enemies as enemy (enemy.enemyId)}
+        {@const target = { type: 'enemy', enemyId: enemy.enemyId } as CombatTarget}
+        <button class="unit" class:isTargetable={canTarget(target)} class:isSelected={selectedTarget === targetKey(target)} disabled={!canTarget(target)} on:click={() => dispatch('selectTarget', target)}>
+          <div class="rowLine">
+            <b>{enemy.enemyId}</b>
+            <StatusBadge label={`AP ${enemy.ap}`} />
+          </div>
+          <div class="hint">HP {enemy.hp}/{enemy.maxHp} · ATK {enemy.attackPower} · HEAL {enemy.healPower}</div>
         </button>
       {/each}
     </div>
@@ -59,6 +75,10 @@
         </button>
       {/each}
     </div>
+  {/if}
+
+  {#if !players.length && !enemies.length && !summons.length}
+    <div class="hint">표시할 유닛 없음</div>
   {/if}
 </section>
 
