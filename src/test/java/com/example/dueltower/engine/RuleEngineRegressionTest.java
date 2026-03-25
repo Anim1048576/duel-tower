@@ -478,6 +478,71 @@ class RuleEngineRegressionTest {
         assertEquals("전투 패배", result.summary());
     }
 
+    @Test
+    void combatVictoryRunLoopSetsResultPendingAndAllowsNextNodeSelectionAfterClear() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId strike = fx.addHandCard(fx.player, "NORMAL_STRIKE");
+        fx.enemy.hp(5);
+
+        RunState.NodeChoice combatChoice = fx.state.runState().availableChoices().stream()
+                .filter(choice -> !choice.disabled())
+                .filter(choice -> choice.phase() == RunState.NodePhase.COMBAT)
+                .findFirst()
+                .orElseThrow();
+
+        EngineResult selectNode = fx.process(new SelectNodeChoiceCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                combatChoice.id()
+        ));
+        assertTrue(selectNode.accepted());
+        assertEquals(NodeState.COMBAT, fx.state.nodeState());
+
+        EngineResult startCombat = fx.process(new StartCombatCommand(UUID.randomUUID(), fx.state.version(), fx.playerId));
+        assertTrue(startCombat.accepted());
+        assertNotNull(fx.state.combat());
+
+        fx.forceMainTurnForPlayer();
+        int hpBefore = fx.enemy.hp();
+        EngineResult play = fx.process(new PlayCardCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                strike,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+
+        assertTrue(play.accepted());
+        assertEquals(hpBefore - 5, fx.enemy.hp(), "card target selection should reduce enemy HP");
+        assertNull(fx.state.combat(), "combat context should end on victory");
+        assertEquals(NodeState.NON_COMBAT, fx.state.nodeState(), "node state should return to NON_COMBAT after combat ends");
+        assertTrue(fx.state.runState().resultPending(), "combat victory should set resultPending");
+        assertFalse(fx.state.runState().recentResults().isEmpty(), "combat victory should create run recentResults");
+
+        EngineResult clearResults = fx.process(new ClearRecentResultsCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId
+        ));
+        assertTrue(clearResults.accepted());
+        assertFalse(fx.state.runState().resultPending());
+        assertNull(fx.state.runState().currentNode());
+        assertFalse(fx.state.runState().availableChoices().isEmpty(), "next node choices should open after clearing results");
+
+        RunState.NodeChoice nextChoice = fx.state.runState().availableChoices().stream()
+                .filter(choice -> !choice.disabled())
+                .findFirst()
+                .orElseThrow();
+        EngineResult nextSelect = fx.process(new SelectNodeChoiceCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                nextChoice.id()
+        ));
+        assertTrue(nextSelect.accepted(), "node selection should be possible after result clear");
+    }
+
 
     @Test
     void hpZeroBattleIncapacitationPersistsAcrossCombatRestart() {
