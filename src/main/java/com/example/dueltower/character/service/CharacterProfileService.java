@@ -83,7 +83,9 @@ public class CharacterProfileService {
         profile.setTrait1(normalizeOptionalText(req.trait1()));
         profile.setTrait2(normalizeOptionalText(req.trait2()));
         profile.setOwnedCards(req.ownedCards().trim());
-        profile.setCurrentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()));
+        if (req.currentSkillDeck() != null) {
+            profile.setCurrentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()));
+        }
         profile.setExCard(req.exCard().trim());
         return toResponse(profile);
     }
