@@ -58,7 +58,7 @@
   }
 
   $: allyPlayers = players.filter((p) => p.playerId === (me?.playerId ?? '')).map((p) => ({ ...p, side: 'ally' as const }))
-  $: enemyPlayers = players.filter((p) => p.playerId !== (me?.playerId ?? '')).map((p) => ({ ...p, side: 'enemy' as const }))
+  $: enemyUnits = combatState?.enemies ?? []
 
   $: summons = combatState?.summons ?? []
   $: allySummons = summons.filter((s) => s.owner === me?.playerId)
@@ -384,11 +384,11 @@
   {/if}
 
   <div class="layoutTop">
-    <TeamPanel side="enemy" title="TeamPanel enemy" players={enemyPlayers} summons={enemySummons} {validTargets} selectedTarget={selectedTargetKey} on:selectTarget={(e) => onSelectTarget(e.detail)} />
+    <TeamPanel side="enemy" title="TeamPanel enemy" players={[]} enemies={enemyUnits} summons={enemySummons} {validTargets} selectedTarget={selectedTargetKey} on:selectTarget={(e) => onSelectTarget(e.detail)} />
 
     <ActionCenter {stage} action={pendingAction} {busy} on:cancel={cancelAction} on:confirm={confirmAction} />
 
-    <TeamPanel side="ally" title="TeamPanel ally" players={allyPlayers} summons={allySummons} {validTargets} selectedTarget={selectedTargetKey} on:selectTarget={(e) => onSelectTarget(e.detail)} />
+    <TeamPanel side="ally" title="TeamPanel ally" players={allyPlayers} enemies={[]} summons={allySummons} {validTargets} selectedTarget={selectedTargetKey} on:selectTarget={(e) => onSelectTarget(e.detail)} />
   </div>
 
   <div class="spacer"></div>

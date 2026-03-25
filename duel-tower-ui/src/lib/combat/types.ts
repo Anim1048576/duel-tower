@@ -1,4 +1,4 @@
-import type { ActionDescriptor, CharacterView, CombatTarget, SummonState } from '../model'
+import type { ActionDescriptor, CharacterView, CombatTarget, EnemyState, SummonState } from '../model'
 
 export type PendingAction = ActionDescriptor & {
   target?: CombatTarget
@@ -13,3 +13,5 @@ export type TeamPlayer = CharacterView & {
 }
 
 export type TeamSummon = SummonState
+
+export type TeamEnemy = EnemyState
