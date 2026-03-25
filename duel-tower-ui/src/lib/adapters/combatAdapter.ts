@@ -56,7 +56,9 @@ function asOwnedCards(input: unknown): PlayerOwnedCard[] {
 }
 
 function targetKey(target: CombatTarget) {
-  return target.type === 'player' ? `player:${target.playerId}` : `summon:${target.playerId}:${target.summonId}`
+  if (target.type === 'player') return `player:${target.playerId}`
+  if (target.type === 'summon') return `summon:${target.playerId}:${target.summonId}`
+  return `enemy:${target.enemyId}`
 }
 
 function collectValidTargets(state: SessionSnapshot, sourcePlayerId: string): CombatTarget[] {
@@ -67,10 +69,14 @@ function collectValidTargets(state: SessionSnapshot, sourcePlayerId: string): Co
     playerId: s.owner,
     summonId: s.summonId,
   }))
+  const enemyTargets: CombatTarget[] = (state.combat?.enemies ?? []).map((enemy) => ({
+    type: 'enemy',
+    enemyId: enemy.enemyId,
+  }))
 
   const unique = new Map<string, CombatTarget>()
-  for (const t of [...playerTargets, ...summonTargets]) unique.set(targetKey(t), t)
-  return [...unique.values()].filter((t) => t.playerId !== sourcePlayerId || t.type === 'summon')
+  for (const t of [...playerTargets, ...summonTargets, ...enemyTargets]) unique.set(targetKey(t), t)
+  return [...unique.values()].filter((t) => t.type !== 'player' || t.playerId !== sourcePlayerId)
 }
 
 function buildActionDescriptors(state: SessionSnapshot, player: CharacterView): ActionDescriptor[] {
@@ -161,7 +167,30 @@ export function adaptSessionSnapshot(raw: any): SessionSnapshot {
     }),
   ) as Record<string, CharacterView>
 
-  const combat = raw?.combat ? ({ ...(raw.combat as CombatSnapshot) } as CombatSnapshot) : null
+  const combat = raw?.combat
+    ? ({
+        ...(raw.combat as CombatSnapshot),
+        summons: Array.isArray(raw.combat.summons) ? raw.combat.summons : [],
+        enemies: Array.isArray(raw.combat.enemies)
+          ? raw.combat.enemies.map((enemy: any) => ({
+              enemyId: String(enemy?.enemyId ?? ''),
+              hp: Number(enemy?.hp ?? 0),
+              maxHp: Number(enemy?.maxHp ?? 0),
+              ap: Number(enemy?.ap ?? 0),
+              attackPower: Number(enemy?.attackPower ?? 0),
+              healPower: Number(enemy?.healPower ?? 0),
+              exCardId: enemy?.exCardId == null ? null : String(enemy.exCardId),
+              exActivatable: Boolean(enemy?.exActivatable),
+              exOnCooldown: Boolean(enemy?.exOnCooldown),
+              statuses: enemy?.statuses && typeof enemy.statuses === 'object'
+                ? Object.fromEntries(
+                    Object.entries(enemy.statuses as Record<string, unknown>).map(([key, value]) => [key, Number(value ?? 0)]),
+                  )
+                : {},
+            })).filter((enemy: any) => enemy.enemyId.length > 0)
+          : [],
+      } as CombatSnapshot)
+    : null
   const snapshot: SessionSnapshot = {
     sessionCode: String(raw?.sessionCode ?? ''),
     sessionId: String(raw?.sessionId ?? ''),
@@ -209,7 +238,8 @@ export function adaptSessionSnapshot(raw: any): SessionSnapshot {
 
 export function toTargetRef(target: CombatTarget): TargetRef {
   if (target.type === 'player') return { playerId: target.playerId }
-  return { summonOwnerPlayerId: target.playerId, summonInstanceId: target.summonId }
+  if (target.type === 'summon') return { summonOwnerPlayerId: target.playerId, summonInstanceId: target.summonId }
+  return { enemyId: target.enemyId }
 }
 
 export function toResolutionLogs(raw: RawApiResponse): ResolutionLog[] {

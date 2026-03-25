@@ -160,7 +160,9 @@
   }
 
   function targetKey(target: NonNullable<PendingAction['target']>) {
-    return target.type === 'player' ? `player:${target.playerId}` : `summon:${target.playerId}:${target.summonId}`
+    if (target.type === 'player') return `player:${target.playerId}`
+    if (target.type === 'summon') return `summon:${target.playerId}:${target.summonId}`
+    return `enemy:${target.enemyId}`
   }
 
   function toggleDiscardSelection(cardId: string) {

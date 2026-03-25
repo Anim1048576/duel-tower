@@ -18,7 +18,9 @@
   $: validTargetKeys = new Set(validTargets.map((t) => targetKey(t)))
 
   function targetKey(target: CombatTarget) {
-    return target.type === 'player' ? `player:${target.playerId}` : `summon:${target.playerId}:${target.summonId}`
+    if (target.type === 'player') return `player:${target.playerId}`
+    if (target.type === 'summon') return `summon:${target.playerId}:${target.summonId}`
+    return `enemy:${target.enemyId}`
   }
 
   function canTarget(target: CombatTarget) {

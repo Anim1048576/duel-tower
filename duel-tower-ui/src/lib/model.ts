@@ -91,11 +91,33 @@ export type SummonState = {
   actionAvailable: boolean
 }
 
-export type CombatTarget = {
-  type: 'player' | 'summon'
-  playerId: string
-  summonId?: string
+export type EnemyState = {
+  enemyId: string
+  hp: number
+  maxHp: number
+  ap: number
+  attackPower: number
+  healPower: number
+  exCardId: string | null
+  exActivatable: boolean
+  exOnCooldown: boolean
+  statuses: Record<string, number>
 }
+
+export type CombatTarget =
+  | {
+      type: 'player'
+      playerId: string
+    }
+  | {
+      type: 'summon'
+      playerId: string
+      summonId: string
+    }
+  | {
+      type: 'enemy'
+      enemyId: string
+    }
 
 export type ActionDescriptor = {
   id: string
@@ -133,6 +155,7 @@ export type CombatState = {
   currentTurnPlayer: string
   phase?: string
   summons?: SummonState[]
+  enemies?: EnemyState[]
 }
 
 
