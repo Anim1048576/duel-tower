@@ -12,25 +12,17 @@
 
 ### 표준 빌드
 ```bash
-./gradlew --offline --no-daemon assemble
-```
-
-### 최초 1회 캐시 준비
-오프라인 검증 전에 Gradle 테스트 의존성을 1회 캐시에 채운다.
-이 단계는 setup/prebuild 또는 네트워크가 허용된 초기 환경에서만 수행한다.
-
-```bash
-./gradlew --no-daemon test --refresh-dependencies || true
+./gradlew assemble
 ```
 
 ### 표준 테스트
 ```bash
-./gradlew --offline --no-daemon test
+./gradlew test
 ```
 
 ### 표준 실행
 ```bash
-./gradlew --offline --no-daemon bootRun
+./gradlew bootRun
 ```
 
 기본 포트는 `9009`다. 로컬 `.env` 파일을 쓰려면 프로젝트 루트에 아래 값만 채운다.
@@ -39,6 +31,13 @@
 DB_URL=jdbc:mariadb://localhost:3306/duel_tower
 DB_USERNAME=duelTowerUser
 DB_PASSWORD=change-me
+```
+
+처음 실행하는 환경에서는 Gradle이 테스트 및 실행에 필요한 의존성을 다운로드할 수 있다.  
+의존성 재해결이 필요하면 아래 명령을 사용할 수 있다.
+
+```bash
+./gradlew test --refresh-dependencies
 ```
 
 ## 3. 프론트엔드(Svelte / Vite)
@@ -71,23 +70,23 @@ npm run check
 
 `npm test` 스크립트는 현재 없다. 프론트엔드의 표준 검증 명령은 `npm run check`다.
 
-## 4. 현재 확인된 실행 결과
-- `./gradlew --offline --no-daemon assemble`: 성공
-- `./gradlew --offline --no-daemon test`: 실패
-  - 오프라인 캐시에 `org.springframework.boot:spring-boot-starter-test:4.0.3` 등 테스트 의존성이 없다.
-  - 첫 차단 지점은 `repo.maven.apache.org`(Maven Central)에서 받아야 하는 Gradle 테스트 의존성 캐시 부재다.
-- `./gradlew --offline --no-daemon bootRun`: 애플리케이션 초기화 실패
-  - 기본값 `jdbc:mariadb://localhost:3306/duel_tower` 로 접속을 시도하며, 로컬 MariaDB가 없으면 `Connection refused`가 발생한다.
+## 4. 현재 확인된 상태
+- 백엔드 빌드 기준 명령은 `./gradlew assemble` 이다.
+- 백엔드 테스트 기준 명령은 `./gradlew test` 이다.
+    - 처음 실행하는 환경에서는 Gradle 테스트 의존성 다운로드가 발생할 수 있다.
+    - 네트워크가 제한된 환경에서는 의존성 다운로드 단계에서 실패할 수 있다.
+- 백엔드 실행 기준 명령은 `./gradlew bootRun` 이다.
+    - 기본값 `jdbc:mariadb://localhost:3306/duel_tower` 로 접속을 시도하므로, 로컬 MariaDB가 없으면 `Connection refused` 가 발생할 수 있다.
 - `cd duel-tower-ui && npm ci`: 성공
 - `cd duel-tower-ui && npm run build`: 성공
 - `cd duel-tower-ui && npm run check`: 성공(경고만 남음)
 - `cd duel-tower-ui && npm run dev -- --host 127.0.0.1`: Vite 개발 서버 기동 확인
 
 ## 5. 다음 작업자가 바로 알면 좋은 점
-- 백엔드 테스트는 **코드 문제보다 캐시 문제** 때문에 현재 오프라인에서 막혀 있다.
-- 백엔드 실행은 **DB 미기동** 상태에서는 실패한다.
-- 프론트엔드는 로컬 기준으로 설치/개발/빌드/타입체크 경로가 모두 정리되어 있다.
-
+- 백엔드의 표준 검증 명령은 `./gradlew test` 다.
+- 네트워크가 제한된 환경에서는 백엔드 테스트 실행 전에 Gradle 의존성 다운로드 가능 여부를 먼저 확인하는 편이 좋다.
+- 백엔드 실행은 DB 미기동 상태에서는 실패한다.
+- 프론트엔드는 로컬 기준으로 설치, 개발, 빌드, 타입체크 경로가 정리되어 있다.
 
 ## API error schema
 

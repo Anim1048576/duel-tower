@@ -4,10 +4,10 @@
 백엔드 테스트를 동일한 전제조건과 절차로 재현 가능하게 한다.
 
 ## 2. 표준 실행 명령
-* 표준 검증 명령: `./gradlew --offline --no-daemon test`
-* Windows PowerShell/CMD 대응: `.\gradlew.bat --offline --no-daemon test`
+* 표준 검증 명령: `./gradlew test`
+* Windows PowerShell/CMD 대응: `.\gradlew.bat test`
 
-## 2.1 사전 캐시 준비 명령
+## 2.1 사전 캐시 준비 명령 (네트워크 제한환경용)
 * 목적: 오프라인 테스트에 필요한 Gradle 의존성을 최초 1회 캐시에 채운다.
 * 실행 위치: Codex/CI의 setup 또는 prebuild 단계
 * 권장 명령:
@@ -36,22 +36,22 @@
     * `--offline` 옵션 사용 시 필요한 Gradle 의존성이 로컬 캐시에 이미 존재해야 한다.
     * 최초 1회 이상 온라인 환경에서 의존성 다운로드가 완료된 상태여야 한다.
 * OS/쉘 주의사항:
-    * 현재 표준 명령은 `./gradlew --offline --no-daemon test`
-    * Windows PowerShell/CMD에서는 `.\gradlew.bat --offline --no-daemon test` 사용 가능
+    * 현재 표준 명령은 `./gradlew test`
+    * Windows PowerShell/CMD에서는 `.\gradlew.bat test` 사용 가능
 
 ## 4. 실행 절차
 1. 프로젝트 루트로 이동한다.
 2. Java 버전을 확인한다.
 3. Gradle Wrapper 파일 존재 여부를 확인한다.
 4. Codex/CI 환경에서 setup 또는 prebuild 단계가 있다면, 먼저 의존성 캐시를 준비한다.
-5. 표준 검증 명령 `./gradlew --offline --no-daemon test` 를 실행한다.
+5. 표준 검증 명령 `./gradlew test` 를 실행한다.
 6. 결과 로그를 저장한다.
 
 ## 5. 로그 저장 예시
 * Git Bash:
-    * `./gradlew --offline --no-daemon test | tee test-run.log`
+    * `./gradlew test | tee test-run.log`
 * PowerShell:
-    * `.\gradlew.bat --offline --no-daemon test *>&1 | Tee-Object test-run.log`
+    * `.\gradlew.bat test *>&1 | Tee-Object test-run.log`
 
 ## 6. 실패 원인 분류
 * Toolchain: JDK, Gradle, Wrapper 문제
