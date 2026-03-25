@@ -7,6 +7,13 @@
   export let stage: ActionStage = 'idle'
   export let action: PendingAction | null = null
   export let busy = false
+
+  function describeTarget() {
+    if (!action?.target) return '미선택'
+    if (action.target.type === 'player') return `player · ${action.target.playerId}`
+    if (action.target.type === 'summon') return `summon · ${action.target.playerId}/${action.target.summonId}`
+    return `enemy · ${action.target.enemyId}`
+  }
 </script>
 
 <section class="board">
@@ -27,7 +34,7 @@
       <div class="logHead">선택된 행동</div>
       <div class="logBody">{action.label}</div>
       {#if action.requiresTarget}
-        <div class="hint">대상: {action.target ? `${action.target.type} · ${action.target.playerId}${action.target.summonId ? `/${action.target.summonId}` : ''}` : '미선택'}</div>
+        <div class="hint">대상: {describeTarget()}</div>
       {/if}
       {#if action.disabledReason}
         <div class="hint" style="color: var(--danger)">{action.disabledReason}</div>
