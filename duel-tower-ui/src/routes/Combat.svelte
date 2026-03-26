@@ -15,6 +15,7 @@
   import ExZone from '../lib/combat/ExZone.svelte'
   import FieldZone from '../lib/combat/FieldZone.svelte'
   import SummonZone from '../lib/combat/SummonZone.svelte'
+  import { enemyIdFromActorKey, isEnemyActorTurn } from '../lib/combat/actorKey'
   import CardDetailDrawer from '../lib/components/CardDetailDrawer.svelte'
   import CardSummaryTile from '../lib/components/CardSummaryTile.svelte'
   import type { ActionStage, PendingAction } from '../lib/combat/types'
@@ -98,7 +99,7 @@
 
   $: if (
     combatState &&
-    combatState.currentTurnPlayer?.startsWith('E:') &&
+    isEnemyActorTurn(combatState.currentTurnPlayer) &&
     $session.gmToken &&
     !autoEnemyBusy
   ) {
@@ -271,7 +272,7 @@
   }
 
   async function autoAdvanceEnemyTurn(actorKey: string) {
-    const enemyId = actorKey.replace(/^E:/, '')
+    const enemyId = enemyIdFromActorKey(actorKey)
     if (!enemyId) return
     autoEnemyBusy = true
     try {
