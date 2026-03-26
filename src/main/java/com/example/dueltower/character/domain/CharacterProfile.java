@@ -70,7 +70,7 @@ public class CharacterProfile {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String ownedCards;
 
-    /** 현재 스킬 덱 프리셋 ID 목록 */
+    /** 현재 스킬 덱 선택 목록(세션 runtime 에서는 ownedCardId 기준으로 정규화해서 사용) */
     @Convert(converter = ListStringJsonConverter.class)
     @Column(columnDefinition = "TEXT")
     private List<String> currentSkillDeck;
