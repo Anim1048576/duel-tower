@@ -12,6 +12,7 @@ import type {
   SessionSnapshot,
   TargetRef,
 } from '../model'
+import { isPlayerActorTurn } from '../combat/actorKey'
 
 type RawApiResponse = {
   accepted?: boolean
@@ -83,7 +84,7 @@ function buildActionDescriptors(state: SessionSnapshot, player: CharacterView): 
   const combat = state.combat
   if (!combat) return []
 
-  const isMyTurn = combat.currentTurnPlayer === player.playerId
+  const isMyTurn = isPlayerActorTurn(combat.currentTurnPlayer, player.playerId)
   const canAct = isMyTurn && !player.pendingDecision
   const validTargets = collectValidTargets(state, player.playerId)
   const disabledReason = canAct ? '' : player.pendingDecision ? '결정 처리 후 행동 가능' : '내 턴에만 행동 가능'
@@ -230,7 +231,7 @@ export function adaptSessionSnapshot(raw: any): SessionSnapshot {
           ...snapshot.combat,
           availableActions: Object.values(enrichedPlayers)
             .flatMap((p) => p.availableActions)
-            .filter((a) => a.sourcePlayerId === snapshot.combat?.currentTurnPlayer),
+            .filter((a) => isPlayerActorTurn(snapshot.combat?.currentTurnPlayer, a.sourcePlayerId)),
         }
       : null,
   }
