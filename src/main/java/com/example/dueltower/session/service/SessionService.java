@@ -572,7 +572,7 @@ public class SessionService {
         if (profile.getTrait2() != null && !profile.getTrait2().isBlank()) passiveIds.add(profile.getTrait2().trim());
 
         List<OwnedCardDto> ownedCards = parseOwnedCardsJson(profile.getOwnedCards());
-        List<String> currentSkillDeck = profile.getCurrentSkillDeck();
+        List<String> currentSkillDeck = SessionNormalizationSupport.normalizeStoredCurrentSkillDeck(profile.getCurrentSkillDeck());
         String exCardId = parseExCardId(profile.getExCard());
 
         return new CharacterJoinTemplate(

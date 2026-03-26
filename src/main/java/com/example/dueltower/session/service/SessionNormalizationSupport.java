@@ -12,12 +12,21 @@ import java.util.*;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
-final class SessionNormalizationSupport {
+/**
+ * 세션/덱 관련 정규화 허브.
+ * <p>
+ * Canonical runtime rules:
+ * - ownedCards: {@link OwnedCard#ownedCardId()} 를 가진 사본 단위 목록
+ * - currentSkillDeck: ownedCardId 선택 목록
+ * <p>
+ * persisted/legacy payload(예: cardId 배열)는 이 클래스를 통해 runtime canonical 형태로 변환한다.
+ */
+public final class SessionNormalizationSupport {
 
     private SessionNormalizationSupport() {
     }
 
-    static List<OwnedCard> normalizeOwnedCards(List<OwnedCardDto> ownedCardsRaw) {
+    public static List<OwnedCard> normalizeOwnedCards(List<OwnedCardDto> ownedCardsRaw) {
         List<OwnedCard> out = new ArrayList<>(ownedCardsRaw.size());
         for (OwnedCardDto dto : ownedCardsRaw) {
             if (dto == null || dto.cardId() == null || dto.cardId().isBlank()) {
@@ -32,7 +41,7 @@ final class SessionNormalizationSupport {
         return List.copyOf(out);
     }
 
-    static List<OwnedCardModifier> normalizeOwnedCardModifiers(OwnedCardDto dto) {
+    public static List<OwnedCardModifier> normalizeOwnedCardModifiers(OwnedCardDto dto) {
         List<OwnedCardModifier> out = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         if (dto.modifiers() != null) {
@@ -66,7 +75,11 @@ final class SessionNormalizationSupport {
         return List.copyOf(out);
     }
 
-    static List<String> normalizeStoredOrRequestedDeckToOwnedCardIds(List<String> storedDeckEntries, List<OwnedCard> ownedCards) {
+    /**
+     * Join/DeckEdit 경로에서 deck 입력을 runtime canonical 형식(ownedCardId 배열)으로 정규화한다.
+     * 이미 ownedCardId 목록이면 trim 후 반환하고, legacy cardId 목록이면 ownedCardId로 해석한다.
+     */
+    public static List<String> normalizeStoredOrRequestedDeckToOwnedCardIds(List<String> storedDeckEntries, List<OwnedCard> ownedCards) {
         if (storedDeckEntries == null) {
             return null;
         }
@@ -94,9 +107,9 @@ final class SessionNormalizationSupport {
         return DeckListFormat.CANONICAL_OWNED_CARD_IDS;
     }
 
-    static List<String> resolveCardIdsToOwnedCardIds(List<String> cardIdsRaw,
-                                                     List<OwnedCard> ownedCards,
-                                                     String blankValueMessage) {
+    public static List<String> resolveCardIdsToOwnedCardIds(List<String> cardIdsRaw,
+                                                             List<OwnedCard> ownedCards,
+                                                             String blankValueMessage) {
         List<String> normalizedCardIds = new ArrayList<>();
         for (String cardId : cardIdsRaw) {
             if (cardId == null || cardId.isBlank()) {
@@ -138,5 +151,29 @@ final class SessionNormalizationSupport {
     enum DeckListFormat {
         CANONICAL_OWNED_CARD_IDS,
         LEGACY_CARD_IDS
+    }
+
+    /**
+     * CharacterProfile 저장 시 currentSkillDeck 입력을 정리한다.
+     *
+     * <p>주의: 여기서는 포맷(ownedCardId vs legacy cardId)을 강제하지 않고 공백/빈 값만 제거한다.
+     * canonical ownedCardId 해석은 세션 join/deck edit 시
+     * {@link #normalizeStoredOrRequestedDeckToOwnedCardIds(List, List)} 경로에서 단일하게 수행한다.
+     */
+    public static List<String> normalizeStoredCurrentSkillDeck(List<String> deckEntries) {
+        if (deckEntries == null) {
+            return null;
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String value : deckEntries) {
+            if (value == null) {
+                continue;
+            }
+            String trimmed = value.trim();
+            if (!trimmed.isEmpty()) {
+                normalized.add(trimmed);
+            }
+        }
+        return List.copyOf(normalized);
     }
 }
