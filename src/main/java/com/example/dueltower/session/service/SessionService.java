@@ -29,6 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.security.SecureRandom;
@@ -552,10 +554,30 @@ public class SessionService {
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId));
 
         List<String> deckCardIds = currentDeckCardIdsFromOwnedCardIds(deckOwnedCardIds, ownedCards);
+        profile.setOwnedCards(toCanonicalOwnedCardsJson(ownedCards));
         profile.setCurrentSkillDeck(List.copyOf(deckOwnedCardIds));
         characterProfileRepository.save(profile);
 
         deckService.upsertCharacterCurrentSkillDeck(characterId, deckCardIds);
+    }
+
+    private String toCanonicalOwnedCardsJson(List<OwnedCard> ownedCards) {
+        ArrayNode out = JSON.createArrayNode();
+        for (OwnedCard ownedCard : ownedCards) {
+            ObjectNode node = out.addObject();
+            node.put("ownedCardId", ownedCard.ownedCardId());
+            node.put("cardId", ownedCard.cardId());
+            node.put("strengthened", ownedCard.strengthened());
+            node.put("weakened", ownedCard.weakened());
+            node.put("lockedInDeck", ownedCard.lockedInDeck());
+            ArrayNode modifiers = node.putArray("modifiers");
+            for (OwnedCardModifier modifier : ownedCard.modifiers()) {
+                ObjectNode modifierNode = modifiers.addObject();
+                modifierNode.put("modifierId", modifier.modifierId());
+                modifierNode.put("value", modifier.value());
+            }
+        }
+        return out.toString();
     }
 
     private CharacterProfile loadCharacterProfile(Long characterIdRaw) {

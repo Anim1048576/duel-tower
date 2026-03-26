@@ -313,6 +313,35 @@ class SessionDeckRuleIntegrationTest {
         var savedProfile = characterProfileRepository.findById(Long.parseLong(characterIdValue)).orElseThrow();
 
         assertEquals(updatedDeckOwnedCardIds, savedProfile.getCurrentSkillDeck());
+        JsonNode savedOwnedCards = JSON.readTree(savedProfile.getOwnedCards());
+        assertTrue(savedOwnedCards.isArray());
+        assertTrue(savedOwnedCards.get(0).hasNonNull("ownedCardId"));
+        assertTrue(savedOwnedCards.get(0).hasNonNull("cardId"));
+
+        Map<String, String> savedOwnedCardIdToCardId = new LinkedHashMap<>();
+        for (JsonNode savedOwnedCard : savedOwnedCards) {
+            savedOwnedCardIdToCardId.put(
+                    savedOwnedCard.path("ownedCardId").asText(),
+                    savedOwnedCard.path("cardId").asText()
+            );
+        }
+        for (String deckOwnedCardId : updatedDeckOwnedCardIds) {
+            assertTrue(savedOwnedCardIdToCardId.containsKey(deckOwnedCardId));
+        }
+
+        String rejoinCode = createSession(session);
+        mockMvc.perform(post("/api/sessions/{code}/join", rejoinCode)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "playerPersist",
+                                  "characterId": %s
+                                }
+                                """.formatted(characterIdValue)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state.players.playerPersist.deckOwnedCardIds").isArray())
+                .andExpect(jsonPath("$.state.players.playerPersist.deckOwnedCardIds[0]").value(updatedDeckOwnedCardIds.get(0)));
 
         String decksJson = mockMvc.perform(get("/api/content/decks")
                         .session(session))
