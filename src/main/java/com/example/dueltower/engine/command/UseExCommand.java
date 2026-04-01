@@ -122,7 +122,7 @@ public final class UseExCommand implements GameCommand {
         int costPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costBase, events, "USE_EX_COST");
         int costStatus = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costPassive, events, "USE_EX_COST");
         int costCard = CardEffectOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), exId, ci, def, costStatus, events, "USE_EX_COST");
-        int cost = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), exId, ci, def, costCard, events, "PLAY_CARD_COST");
+        int cost = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), exId, ci, def, costCard, events, "USE_EX_COST");
         if (ps.ap() < cost) {
             throw new IllegalStateException("not enough ap during handle (need=" + cost + ", have=" + ps.ap() + ")");
         }
