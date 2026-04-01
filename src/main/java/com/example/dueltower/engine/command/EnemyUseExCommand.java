@@ -3,6 +3,7 @@ package com.example.dueltower.engine.command;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
+import com.example.dueltower.engine.core.effect.card.CardEffectOps;
 import com.example.dueltower.engine.core.effect.keyword.EnemyExOps;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
@@ -68,7 +69,8 @@ public final class EnemyUseExCommand implements GameCommand {
         List<GameEvent> dummyOut = new ArrayList<>();
         int needBase = def.cost();
         int needPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofEnemy(enemyId), ci, def, needBase, dummyOut, "VALIDATE");
-        int need = StatusOps.modifiedCost(state, ctx, TargetRef.ofEnemy(enemyId), ci, def, needPassive, dummyOut, "VALIDATE");
+        int needStatus = StatusOps.modifiedCost(state, ctx, TargetRef.ofEnemy(enemyId), ci, def, needPassive, dummyOut, "VALIDATE");
+        int need = CardEffectOps.modifiedCost(state, ctx, TargetRef.ofEnemy(enemyId), exId, ci, def, needStatus, dummyOut, "VALIDATE");
         int have = es.ap();
         if (have < need) errors.add("not enough ap (need=" + need + ", have=" + have + ")");
 
@@ -99,7 +101,8 @@ public final class EnemyUseExCommand implements GameCommand {
 
         int costBase = def.cost();
         int costPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofEnemy(enemyId), ci, def, costBase, events, "USE_EX_COST");
-        int cost = StatusOps.modifiedCost(state, ctx, TargetRef.ofEnemy(enemyId), ci, def, costPassive, events, "USE_EX_COST");
+        int costStatus = StatusOps.modifiedCost(state, ctx, TargetRef.ofEnemy(enemyId), ci, def, costPassive, events, "USE_EX_COST");
+        int cost = CardEffectOps.modifiedCost(state, ctx, TargetRef.ofEnemy(enemyId), exId, ci, def, costStatus, events, "USE_EX_COST");
         if (es.ap() < cost) {
             throw new IllegalStateException("not enough ap during handle (need=" + cost + ", have=" + es.ap() + ")");
         }

@@ -3,13 +3,14 @@ package com.example.dueltower.engine.command;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.SummonOps;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.effect.EffectContext;
+import com.example.dueltower.engine.core.effect.card.CardEffect;
+import com.example.dueltower.engine.core.effect.card.CardEffectOps;
 import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierOps;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
+import com.example.dueltower.engine.core.effect.keyword.MoveReason;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
-import com.example.dueltower.engine.core.effect.keyword.MoveReason;
-import com.example.dueltower.engine.core.effect.card.CardEffect;
-import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -67,7 +68,8 @@ public final class PlayCardCommand implements GameCommand {
         int needBase = def.cost();
         int needPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, dummyOut, "VALIDATE");
         int needStatus = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needPassive, dummyOut, "VALIDATE");
-        int need = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), cardId, ci, def, needStatus, dummyOut, "VALIDATE");
+        int needCard = CardEffectOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), cardId, ci, def, needStatus, dummyOut, "VALIDATE");
+        int need = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), cardId, ci, def, needCard, dummyOut, "VALIDATE");
         int have = ps.ap();
 
         // 키워드에 의한 코스트 규칙(집념 등)
@@ -110,7 +112,8 @@ public final class PlayCardCommand implements GameCommand {
         int costBase = def.cost();
         int costPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costBase, events, "PLAY_CARD_COST");
         int costStatus = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costPassive, events, "PLAY_CARD_COST");
-        int cost = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), cardId, ci, def, costStatus, events, "PLAY_CARD_COST");
+        int costCard = CardEffectOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), cardId, ci, def, costStatus, events, "PLAY_CARD_COST");
+        int cost = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), cardId, ci, def, costCard, events, "PLAY_CARD_COST");
 
         int have = ps.ap();
         int debt = 0;

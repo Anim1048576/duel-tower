@@ -12,6 +12,10 @@ public interface CardEffect extends PersistentFieldEffect {
         return List.of();
     }
 
+    default int onCost(CardCostCtx cc, int currentCost) {
+        return currentCost;
+    }
+
     void resolve(EffectContext ec);
 
     @Override

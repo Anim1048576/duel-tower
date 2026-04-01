@@ -4,6 +4,7 @@ import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
+import com.example.dueltower.engine.core.effect.card.CardEffectOps;
 import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierOps;
 import com.example.dueltower.engine.core.effect.keyword.ExActivationReason;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
@@ -85,7 +86,8 @@ public final class UseExCommand implements GameCommand {
         int needBase = def.cost();
         int needPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needBase, dummyOut, "VALIDATE");
         int needStatus = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, needPassive, dummyOut, "VALIDATE");
-        int need = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), exId, ci, def, needStatus, dummyOut, "VALIDATE");
+        int needCard = CardEffectOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), exId, ci, def, needStatus, dummyOut, "VALIDATE");
+        int need = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), exId, ci, def, needCard, dummyOut, "VALIDATE");
         int have = ps.ap();
         if (have < need) errors.add("not enough ap (need=" + need + ", have=" + have + ")");
 
@@ -119,7 +121,8 @@ public final class UseExCommand implements GameCommand {
         int costBase = def.cost();
         int costPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costBase, events, "USE_EX_COST");
         int costStatus = StatusOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), ci, def, costPassive, events, "USE_EX_COST");
-        int cost = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), exId, ci, def, costStatus, events, "USE_EX_COST");
+        int costCard = CardEffectOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), exId, ci, def, costStatus, events, "USE_EX_COST");
+        int cost = CardModifierOps.modifiedCost(state, ctx, TargetRef.ofPlayer(playerId), exId, ci, def, costCard, events, "PLAY_CARD_COST");
         if (ps.ap() < cost) {
             throw new IllegalStateException("not enough ap during handle (need=" + cost + ", have=" + ps.ap() + ")");
         }
