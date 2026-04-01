@@ -109,4 +109,187 @@ class AuthControllerIntegrationTest {
                         .content(duplicateBody))
                 .andExpect(status().isConflict());
     }
+
+    @Test
+    void signupWithNullBodyShouldReturnBadRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void signupWithBlankUsernameShouldReturnBadRequest() throws Exception {
+        String signupBody = """
+                {
+                  "username": "   ",
+                  "password": "password123"
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void signupWithBlankPasswordShouldReturnBadRequest() throws Exception {
+        String signupBody = """
+                {
+                  "username": "tester",
+                  "password": "   "
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginWithNullBodyShouldReturnBadRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginWithBlankUsernameShouldReturnBadRequest() throws Exception {
+        String loginBody = """
+                {
+                  "username": "   ",
+                  "password": "password123"
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginWithBlankPasswordShouldReturnBadRequest() throws Exception {
+        String loginBody = """
+                {
+                  "username": "tester",
+                  "password": "   "
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginWithWrongPasswordShouldReturnUnauthorized() throws Exception {
+        String signupBody = """
+                {
+                  "username": "tester",
+                  "password": "password123"
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupBody))
+                .andExpect(status().isOk());
+
+        String loginBody = """
+                {
+                  "username": "tester",
+                  "password": "wrong-password"
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logoutShouldInvalidateSession() throws Exception {
+        String signupBody = """
+                {
+                  "username": "tester",
+                  "password": "password123"
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupBody))
+                .andExpect(status().isOk());
+
+        String loginBody = """
+                {
+                  "username": "tester",
+                  "password": "password123"
+                }
+                """;
+
+        MockHttpSession session = (MockHttpSession) mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getRequest()
+                .getSession(false);
+
+        assertNotNull(session);
+
+        mockMvc.perform(post("/api/auth/logout").session(session))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/auth/me").session(session))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void signupShouldTrimUsername() throws Exception {
+        String signupBody = """
+                {
+                  "username": "  tester  ",
+                  "password": "password123"
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("tester"));
+    }
+
+    @Test
+    void loginShouldTrimUsername() throws Exception {
+        String signupBody = """
+                {
+                  "username": "tester",
+                  "password": "password123"
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupBody))
+                .andExpect(status().isOk());
+
+        String loginBody = """
+                {
+                  "username": "  tester  ",
+                  "password": "password123"
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("tester"));
+    }
 }
