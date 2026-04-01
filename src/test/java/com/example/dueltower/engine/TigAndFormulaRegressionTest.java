@@ -58,6 +58,36 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    void tig005CostReductionAppliesDuringValidationAndPayment() {
+        TigFixture fx = new TigFixture();
+        fx.player.statusSet(Tig201_Status.ID, 3);
+        fx.player.ap(1);
+
+        CardInstId tig005 = fx.addToHand("Tig005_Card");
+        fx.addToHand("C001");
+
+        EngineResult result = fx.play(tig005, List.of());
+
+        assertTrue(result.accepted(), "overcome 3+ should reduce Tig005 cost from 2 to 1");
+        assertEquals(0, fx.player.ap(), "actual payment should consume 1 AP");
+    }
+
+    @Test
+    void tig005StillFailsAtZeroApEvenWithOvercome3Plus() {
+        TigFixture fx = new TigFixture();
+        fx.player.statusSet(Tig201_Status.ID, 3);
+        fx.player.ap(0);
+
+        CardInstId tig005 = fx.addToHand("Tig005_Card");
+        fx.addToHand("C001");
+
+        EngineResult result = fx.play(tig005, List.of());
+
+        assertFalse(result.accepted());
+        assertTrue(result.errors().stream().anyMatch(e -> e.contains("not enough ap")));
+    }
+
+    @Test
     void tig901ExWithOneTargetDealsTwoHitsAndAddsBonusHitAtOvercome3Plus() {
         TigFixture base = new TigFixture();
         CardInstId exBase = base.addToEx("Tig901_EX");
