@@ -230,7 +230,6 @@ export type SessionSnapshot = {
 }
 
 // Backward-compat alias while migrating views.
-export type SessionState = SessionSnapshot
 
 export type EngineEvent = {
   type: string
