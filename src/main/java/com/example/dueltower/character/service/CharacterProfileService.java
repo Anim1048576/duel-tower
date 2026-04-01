@@ -5,6 +5,7 @@ import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.dto.CombatStatsDto;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.session.service.SessionNormalizationSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -83,7 +84,9 @@ public class CharacterProfileService {
         profile.setTrait1(normalizeOptionalText(req.trait1()));
         profile.setTrait2(normalizeOptionalText(req.trait2()));
         profile.setOwnedCards(req.ownedCards().trim());
-        profile.setCurrentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()));
+        if (req.currentSkillDeck() != null) {
+            profile.setCurrentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()));
+        }
         profile.setExCard(req.exCard().trim());
         return toResponse(profile);
     }
@@ -181,14 +184,7 @@ public class CharacterProfileService {
 
 
     private static List<String> normalizeCurrentSkillDeck(List<String> deckPresetIds) {
-        if (deckPresetIds == null) {
-            return null;
-        }
-
-        return deckPresetIds.stream()
-                .map(value -> value == null ? "" : value.trim())
-                .filter(value -> !value.isEmpty())
-                .toList();
+        return SessionNormalizationSupport.normalizeStoredCurrentSkillDeck(deckPresetIds);
     }
 
     private static String normalizeOptionalText(String value) {
