@@ -1,0 +1,297 @@
+package com.example.dueltower.character.service;
+
+import com.example.dueltower.character.domain.CharacterGender;
+import com.example.dueltower.character.domain.CharacterProfile;
+import com.example.dueltower.character.dto.CharacterProfileRequest;
+import com.example.dueltower.character.repository.CharacterProfileRepository;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.mockito.ArgumentCaptor;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
+
+@ExtendWith(MockitoExtension.class)
+class CharacterProfileServiceTest {
+
+    @Mock
+    private CharacterProfileRepository repository;
+
+    @Mock
+    private CharacterCombatStatCalculator combatStatCalculator;
+
+    @InjectMocks
+    private CharacterProfileService service;
+
+    @Test
+    @DisplayName("create: null 요청 본문이면 BAD_REQUEST를 던진다")
+    void createRejectsNullRequestBody() {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.create(null));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: disposition 유효 조합(질서/선, 중립/중용, 혼돈/악)을 허용한다")
+    void dispositionAcceptsValidValues() {
+        when(repository.save(any(CharacterProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
+                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+
+        service.create(validRequestWithDisposition("질서/선"));
+        service.create(validRequestWithDisposition("중립/중용"));
+        service.create(validRequestWithDisposition("혼돈/악"));
+
+        verify(repository, times(3)).save(any(CharacterProfile.class));
+    }
+
+    @Test
+    @DisplayName("create: disposition에 슬래시가 없으면 BAD_REQUEST를 던진다")
+    void dispositionRejectsInvalidFormatWithoutSlash() {
+        CharacterProfileRequest req = validRequestWithDisposition("질서선");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.create(req));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: disposition 축 값이 유효하지 않으면 BAD_REQUEST를 던진다")
+    void dispositionRejectsInvalidAxisValues() {
+        CharacterProfileRequest req = validRequestWithDisposition("선/질서");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.create(req));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: trait1이 비어있을 때 trait2를 설정하면 BAD_REQUEST를 던진다")
+    void trait2CannotBeSetWhenTrait1IsEmpty() {
+        CharacterProfileRequest req = validRequestWithTraits("   ", "부지런함");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.create(req));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: trait1/trait2 공백 문자열은 null로 정규화한다")
+    void optionalTextNormalizationBlankTraitsBecomeNull() {
+        when(repository.save(any(CharacterProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
+                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        CharacterProfileRequest req = validRequestWithTraits("   ", "   ");
+
+        service.create(req);
+
+        ArgumentCaptor<CharacterProfile> captor = ArgumentCaptor.forClass(CharacterProfile.class);
+        verify(repository).save(captor.capture());
+
+        CharacterProfile saved = captor.getValue();
+        assertNull(saved.getTrait1());
+        assertNull(saved.getTrait2());
+    }
+
+    @Test
+    @DisplayName("create: 필수 텍스트 필드는 trim 후 저장한다")
+    void createTrimsRequiredTextFields() {
+        when(repository.save(any(CharacterProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
+                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        CharacterProfileRequest req = validRequest(
+                "  이름  ",
+                "  소원  ",
+                "  한줄소개  ",
+                "  이야기  ",
+                "  질서/선  ",
+                "  [\"card-1\"]  ",
+                "  {\"id\":\"ex-1\"}  ",
+                List.of("  deck-1  ")
+        );
+
+        service.create(req);
+
+        ArgumentCaptor<CharacterProfile> captor = ArgumentCaptor.forClass(CharacterProfile.class);
+        verify(repository).save(captor.capture());
+
+        CharacterProfile saved = captor.getValue();
+        assertEquals("이름", saved.getName());
+        assertEquals("소원", saved.getWish());
+        assertEquals("한줄소개", saved.getOneLiner());
+        assertEquals("이야기", saved.getStory());
+        assertEquals("질서/선", saved.getDisposition());
+        assertEquals("[\"card-1\"]", saved.getOwnedCards());
+        assertEquals("{\"id\":\"ex-1\"}", saved.getExCard());
+    }
+
+    @Test
+    @DisplayName("update: req.currentSkillDeck가 null이면 기존 currentSkillDeck를 유지한다")
+    void updateKeepsExistingCurrentSkillDeckWhenRequestDeckIsNull() {
+        CharacterProfile existing = existingProfile();
+        existing.setCurrentSkillDeck(List.of("old-1", "old-2"));
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
+                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+
+        service.update(1L, validRequestWithCurrentSkillDeck(null));
+
+        assertIterableEquals(List.of("old-1", "old-2"), existing.getCurrentSkillDeck());
+    }
+
+    @Test
+    @DisplayName("update: 새 currentSkillDeck 제공 시 trim/빈값 제거로 정규화한다")
+    void updateNormalizesCurrentSkillDeckWhenProvided() {
+        CharacterProfile existing = existingProfile();
+        existing.setCurrentSkillDeck(List.of("old"));
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
+                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+
+        service.update(1L, validRequestWithCurrentSkillDeck(Arrays.asList("  new-1  ", " ", null, "new-2")));
+
+        assertIterableEquals(List.of("new-1", "new-2"), existing.getCurrentSkillDeck());
+    }
+
+    @Test
+    @DisplayName("delete: 없는 캐릭터를 삭제하면 NOT_FOUND를 던진다")
+    void deleteNonexistentCharacterReturnsNotFound() {
+        when(repository.existsById(999L)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.delete(999L));
+
+        assertEquals(NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("get: 없는 캐릭터를 조회하면 NOT_FOUND를 던진다")
+    void getNonexistentCharacterReturnsNotFound() {
+        when(repository.findById(999L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.get(999L));
+
+        assertEquals(NOT_FOUND, ex.getStatusCode());
+    }
+
+    private static CharacterProfileRequest validRequestWithDisposition(String disposition) {
+        return validRequest(
+                "name",
+                "wish",
+                "oneLiner",
+                "story",
+                disposition,
+                "[]",
+                "{}",
+                List.of("deck-1")
+        );
+    }
+
+    private static CharacterProfileRequest validRequestWithTraits(String trait1, String trait2) {
+        return new CharacterProfileRequest(
+                "name",
+                CharacterGender.MALE,
+                20,
+                "wish",
+                "질서/선",
+                "oneLiner",
+                "story",
+                5,
+                5,
+                5,
+                5,
+                trait1,
+                trait2,
+                "[]",
+                List.of("deck-1"),
+                "{}"
+        );
+    }
+
+    private static CharacterProfileRequest validRequestWithCurrentSkillDeck(List<String> currentSkillDeck) {
+        return validRequest(
+                "name",
+                "wish",
+                "oneLiner",
+                "story",
+                "질서/선",
+                "[]",
+                "{}",
+                currentSkillDeck
+        );
+    }
+
+    private static CharacterProfileRequest validRequest(
+            String name,
+            String wish,
+            String oneLiner,
+            String story,
+            String disposition,
+            String ownedCards,
+            String exCard,
+            List<String> currentSkillDeck
+    ) {
+        return new CharacterProfileRequest(
+                name,
+                CharacterGender.MALE,
+                20,
+                wish,
+                disposition,
+                oneLiner,
+                story,
+                5,
+                5,
+                5,
+                5,
+                "trait1",
+                "trait2",
+                ownedCards,
+                currentSkillDeck,
+                exCard
+        );
+    }
+
+    private static CharacterProfile existingProfile() {
+        return CharacterProfile.builder()
+                .id(1L)
+                .name("name")
+                .gender(CharacterGender.MALE)
+                .age(20)
+                .wish("wish")
+                .disposition("질서/선")
+                .oneLiner("oneLiner")
+                .story("story")
+                .physical(5)
+                .technique(5)
+                .sense(5)
+                .willpower(5)
+                .trait1("trait1")
+                .trait2("trait2")
+                .ownedCards("[]")
+                .currentSkillDeck(List.of("deck-1"))
+                .exCard("{}")
+                .build();
+    }
+}
