@@ -6,6 +6,7 @@ import com.example.dueltower.content.deck.domain.DeckCard;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.dto.*;
 import com.example.dueltower.content.deck.repository.DeckRepository;
+import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.Ids;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +35,8 @@ public class DeckService {
         DeckType type = (req == null || req.type() == null) ? DeckType.PLAYER : req.type();
         String name = normalizeName(req == null ? null : req.name(), type);
 
-        Map<String, Integer> cards = normalizeAndValidateCards(type, req == null ? null : req.cards());
+        Map<String, Integer> cards = normalizeAndValidateSpecs(req == null ? null : req.cards(), false);
+        applyPlayerDeckRulesOrThrow(type, cards, true);
 
         Deck deck = Deck.create(name, type);
         deck.syncCards(cards);
@@ -61,7 +63,8 @@ public class DeckService {
         DeckType newType = (req == null || req.type() == null) ? deck.getType() : req.type();
         String newName = normalizeName(req == null ? null : req.name(), newType);
 
-        Map<String, Integer> cards = normalizeAndValidateCards(newType, req == null ? null : req.cards());
+        Map<String, Integer> cards = normalizeAndValidateSpecs(req == null ? null : req.cards(), false);
+        applyPlayerDeckRulesOrThrow(newType, cards, true);
 
         deck.changeType(newType);
         deck.rename(newName);
@@ -78,10 +81,7 @@ public class DeckService {
     @Transactional
     public DeckResponse addCards(long id, AddDeckCardsRequest req) {
         Deck deck = getDeckOrThrow(id);
-
-        // 요청 normalize + validate
-        List<DeckCardSpec> specs = (req == null) ? null : req.cards();
-        Map<String, Integer> toAdd = normalizeAndValidateAddSpecs(specs);
+        Map<String, Integer> toAdd = normalizeAndValidateSpecs(req == null ? null : req.cards(), false);
 
         // add on current aggregate state
         for (var e : toAdd.entrySet()) {
@@ -97,15 +97,35 @@ public class DeckService {
     }
 
     @Transactional
+    public DeckResponse replaceCards(long id, ReplaceDeckCardsRequest req) {
+        Deck deck = getDeckOrThrow(id);
+        Map<String, Integer> cards = normalizeAndValidateSpecs(requiredCards(req), true);
+        applyPlayerDeckRulesOrThrow(deck.getType(), cards, true);
+        deck.syncCards(cards);
+        return toResponse(deck);
+    }
+
+    @Transactional(readOnly = true)
+    public DeckValidationResponse validateDeck(long id, ReplaceDeckCardsRequest req) {
+        Deck deck = getDeckOrThrow(id);
+        Map<String, Integer> cards = (req != null && req.cards() != null)
+                ? normalizeAndMergeSpecs(req.cards())
+                : toCountMap(deck);
+
+        List<DeckValidationIssue> issues = collectDeckValidationIssues(deck.getType(), cards, true);
+        int totalCards = cards.values().stream().mapToInt(Integer::intValue).sum();
+        return new DeckValidationResponse(issues.isEmpty(), List.copyOf(issues), totalCards);
+    }
+
+    @Transactional
     public void upsertCharacterCurrentSkillDeck(long characterId, List<String> deckCardIds) {
         if (characterId <= 0) {
-            throw new ResponseStatusException(BAD_REQUEST, "characterId must be positive");
+            throw badRequest("characterId must be positive");
         }
 
         String deckName = characterCurrentDeckName(characterId);
         Map<String, Integer> merged = normalizeAndMergeCardIds(deckCardIds);
-        validateCardIdsExist(merged.keySet());
-        deckLimitPolicy.validatePlayerDeckExact(merged);
+        applyPlayerDeckRulesOrThrow(DeckType.PLAYER, merged, true);
 
         Deck deck = deckRepository.findFirstByTypeAndName(DeckType.PLAYER, deckName)
                 .orElseGet(() -> Deck.create(deckName, DeckType.PLAYER));
@@ -119,7 +139,7 @@ public class DeckService {
     @Transactional
     public void delete(long id) {
         if (!deckRepository.existsById(id)) {
-            throw new ResponseStatusException(NOT_FOUND, "deck not found: " + id);
+            throw notFound("deck not found: " + id);
         }
         deckRepository.deleteById(id);
     }
@@ -132,7 +152,7 @@ public class DeckService {
 
     private Deck getDeckOrThrow(long id) {
         return deckRepository.findWithCardsById(id)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "deck not found: " + id));
+                .orElseThrow(() -> notFound("deck not found: " + id));
     }
 
     /**
@@ -145,12 +165,12 @@ public class DeckService {
         for (DeckCardSpec s : specs) {
             if (s == null) continue;
             if (s.cardId() == null || s.cardId().isBlank()) {
-                throw new ResponseStatusException(BAD_REQUEST, "cardId is required");
+                throw badRequest("cardId is required");
             }
             String cardId = s.cardId().trim();
             int count = (s.count() == null) ? 1 : s.count();
             if (count <= 0) {
-                throw new ResponseStatusException(BAD_REQUEST, "count must be >= 1: " + cardId);
+                throw badRequest("count must be >= 1: " + cardId);
             }
             merged.merge(cardId, count, Integer::sum);
         }
@@ -159,13 +179,13 @@ public class DeckService {
 
     private Map<String, Integer> normalizeAndMergeCardIds(List<String> cardIds) {
         if (cardIds == null) {
-            throw new ResponseStatusException(BAD_REQUEST, "deckCardIds is required");
+            throw badRequest("deckCardIds is required");
         }
 
         Map<String, Integer> merged = new LinkedHashMap<>();
         for (String rawCardId : cardIds) {
             if (rawCardId == null || rawCardId.isBlank()) {
-                throw new ResponseStatusException(BAD_REQUEST, "deckCardIds must not contain blank values");
+                throw badRequest("deckCardIds must not contain blank values");
             }
             String cardId = rawCardId.trim();
             merged.merge(cardId, 1, Integer::sum);
@@ -182,35 +202,111 @@ public class DeckService {
         for (String cardId : cardIds) {
             Ids.CardDefId id = new Ids.CardDefId(cardId);
             if (!cardMap.containsKey(id)) {
-                throw new ResponseStatusException(BAD_REQUEST, "unknown cardId: " + cardId);
+                throw badRequest("unknown cardId: " + cardId);
             }
         }
     }
 
-    /**
-     * cards 요청을 Map(cardId -> count)로 정규화 + 카드ID 존재 검증 + (플레이어 덱만) 제약 검증
-     */
-    private Map<String, Integer> normalizeAndValidateCards(DeckType type, List<DeckCardSpec> specs) {
-        Map<String, Integer> merged = normalizeAndMergeSpecs(specs);
-
-        // validate cardId exists in content
-        validateCardIdsExist(merged.keySet());
-
-        // 3) constraints (PLAYER only)
-        if (type == DeckType.PLAYER) {
-            deckLimitPolicy.validatePlayerDeckExact(merged);
+    private List<DeckValidationIssue> validateExRules(Map<String, Integer> merged) {
+        List<DeckValidationIssue> issues = new ArrayList<>();
+        var cardMap = cardService.asMap();
+        int exCount = 0;
+        for (var e : merged.entrySet()) {
+            var def = cardMap.get(new Ids.CardDefId(e.getKey()));
+            if (def == null) {
+                continue;
+            }
+            if (def.type() == CardType.EX) {
+                exCount += e.getValue();
+            }
+            if (def.type() == CardType.TOKEN) {
+                issues.add(issue("TOKEN_NOT_ALLOWED", "TOKEN card is not allowed in deck: " + e.getKey(), "cards"));
+            }
         }
+        if (exCount > 0) {
+            issues.add(issue("EX_NOT_ALLOWED", "EX card is not allowed in deck", "cards"));
+        }
+        return issues;
+    }
 
+    /**
+     * add/replace/remove(validate candidate)에서 공통 재사용할 카드 입력 정규화.
+     * 다음 단계(remove endpoint, preset/session validation 재사용)의 공통 진입점으로 사용한다.
+     */
+    private Map<String, Integer> normalizeAndValidateSpecs(List<DeckCardSpec> specs, boolean requireCards) {
+        if (requireCards && specs == null) {
+            throw badRequest("cards is required");
+        }
+        Map<String, Integer> merged = normalizeAndMergeSpecs(specs);
+        validateCardIdsExist(merged.keySet());
         return merged;
     }
 
     /**
-     * add 전용: Map(cardId -> count)로 정규화 + 카드ID 존재 검증
+     * PLAYER 덱 규칙을 모아 검증한다.
+     * - validate endpoint: collectDeckValidationIssues 호출
+     * - mutation(create/update/replace/upsert): applyPlayerDeckRulesOrThrow 호출
      */
-    private Map<String, Integer> normalizeAndValidateAddSpecs(List<DeckCardSpec> specs) {
-        Map<String, Integer> merged = normalizeAndMergeSpecs(specs);
-        validateCardIdsExist(merged.keySet());
-        return merged;
+    private List<DeckValidationIssue> collectDeckValidationIssues(DeckType type, Map<String, Integer> cards, boolean requireExactTotal) {
+        List<DeckValidationIssue> issues = new ArrayList<>();
+
+        try {
+            validateCardIdsExist(cards.keySet());
+        } catch (ResponseStatusException e) {
+            issues.add(issue("UNKNOWN_CARD_ID", safeReason(e), "cards"));
+        }
+
+        if (type != DeckType.PLAYER) {
+            return issues;
+        }
+
+        issues.addAll(validateExRules(cards));
+
+        try {
+            if (requireExactTotal) {
+                deckLimitPolicy.validatePlayerDeckExact(cards);
+            } else {
+                deckLimitPolicy.validatePlayerDeckUpTo(cards);
+            }
+        } catch (ResponseStatusException e) {
+            String reason = safeReason(e);
+            String code = reason.contains("copies per card")
+                    ? "COPY_LIMIT_EXCEEDED"
+                    : "TOTAL_CARDS_INVALID";
+            issues.add(issue(code, reason, "cards"));
+        }
+
+        return issues;
+    }
+
+    private void applyPlayerDeckRulesOrThrow(DeckType type, Map<String, Integer> cards, boolean requireExactTotal) {
+        List<DeckValidationIssue> issues = collectDeckValidationIssues(type, cards, requireExactTotal);
+        if (!issues.isEmpty()) {
+            throw badRequest(issues.get(0).message());
+        }
+    }
+
+    private List<DeckCardSpec> requiredCards(ReplaceDeckCardsRequest req) {
+        if (req == null || req.cards() == null) {
+            throw badRequest("cards is required");
+        }
+        return req.cards();
+    }
+
+    private DeckValidationIssue issue(String code, String message, String field) {
+        return new DeckValidationIssue(code, message, field);
+    }
+
+    private String safeReason(ResponseStatusException e) {
+        return (e.getReason() == null || e.getReason().isBlank()) ? "invalid deck request" : e.getReason();
+    }
+
+    private ResponseStatusException badRequest(String message) {
+        return new ResponseStatusException(BAD_REQUEST, message);
+    }
+
+    private ResponseStatusException notFound(String message) {
+        return new ResponseStatusException(NOT_FOUND, message);
     }
 
     private Map<String, Integer> toCountMap(Deck deck) {
