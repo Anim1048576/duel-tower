@@ -3,7 +3,9 @@ package com.example.dueltower.content.deck.api;
 import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.content.deck.dto.AddDeckCardsRequest;
 import com.example.dueltower.content.deck.dto.CreateDeckRequest;
+import com.example.dueltower.content.deck.dto.DeckValidationResponse;
 import com.example.dueltower.content.deck.dto.DeckResponse;
+import com.example.dueltower.content.deck.dto.ReplaceDeckCardsRequest;
 import com.example.dueltower.content.deck.dto.UpdateDeckRequest;
 import org.springframework.web.bind.annotation.*;
 
@@ -50,5 +52,21 @@ public class DeckController {
             @RequestBody(required = false) AddDeckCardsRequest req
     ) {
         return deckService.addCards(id, req);
+    }
+
+    @PutMapping("/{id}/cards")
+    public DeckResponse replaceCards(
+            @PathVariable long id,
+            @RequestBody(required = false) ReplaceDeckCardsRequest req
+    ) {
+        return deckService.replaceCards(id, req);
+    }
+
+    @PostMapping("/{id}/validate")
+    public DeckValidationResponse validate(
+            @PathVariable long id,
+            @RequestBody(required = false) ReplaceDeckCardsRequest req
+    ) {
+        return deckService.validateDeck(id, req);
     }
 }

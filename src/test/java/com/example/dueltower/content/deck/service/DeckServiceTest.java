@@ -6,10 +6,13 @@ import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.dto.AddDeckCardsRequest;
 import com.example.dueltower.content.deck.dto.CreateDeckRequest;
 import com.example.dueltower.content.deck.dto.DeckCardSpec;
+import com.example.dueltower.content.deck.dto.DeckValidationResponse;
 import com.example.dueltower.content.deck.dto.DeckResponse;
+import com.example.dueltower.content.deck.dto.ReplaceDeckCardsRequest;
 import com.example.dueltower.content.deck.dto.UpdateDeckRequest;
 import com.example.dueltower.content.deck.repository.DeckRepository;
 import com.example.dueltower.engine.model.CardDefinition;
+import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.Ids;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +29,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -203,6 +208,67 @@ class DeckServiceTest {
         assertEquals(BAD_REQUEST, ex.getStatusCode());
     }
 
+    @Test
+    @DisplayName("replaceCards: 기존 덱 구성을 전체 교체한다")
+    void replaceCardsReplacesWholeDeck() {
+        when(cardService.asMap()).thenReturn(cardMap("card-a", "card-b"));
+        Deck deck = Deck.create("deck", DeckType.ENEMY);
+        deck.syncCards(Map.of("card-a", 2));
+        when(deckRepository.findWithCardsById(1L)).thenReturn(Optional.of(deck));
+
+        DeckResponse response = service.replaceCards(1L, new ReplaceDeckCardsRequest(List.of(new DeckCardSpec("card-b", 3))));
+
+        assertEquals(3, response.totalCards());
+        assertEquals(1, response.cards().size());
+        assertEquals("card-b", response.cards().get(0).cardId());
+    }
+
+    @Test
+    @DisplayName("replaceCards: cards가 없으면 BAD_REQUEST")
+    void replaceCardsRequiresCards() {
+        Deck deck = Deck.create("deck", DeckType.ENEMY);
+        when(deckRepository.findWithCardsById(1L)).thenReturn(Optional.of(deck));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.replaceCards(1L, null));
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("validateDeck: 요청 카드 후보가 유효하면 valid=true")
+    void validateDeckCandidateValid() {
+        when(cardService.asMap()).thenReturn(cardMap("card-a", "card-b"));
+        Deck deck = Deck.create("deck", DeckType.PLAYER);
+        when(deckRepository.findWithCardsById(1L)).thenReturn(Optional.of(deck));
+
+        DeckValidationResponse response = service.validateDeck(1L, new ReplaceDeckCardsRequest(List.of(
+                new DeckCardSpec("card-a", 6),
+                new DeckCardSpec("card-b", 6)
+        )));
+
+        assertTrue(response.valid());
+        assertTrue(response.issues().isEmpty());
+        assertEquals(12, response.normalizedTotalCards());
+    }
+
+    @Test
+    @DisplayName("validateDeck: 룰 위반이면 이유 목록을 반환한다")
+    void validateDeckInvalidReturnsReasons() {
+        when(cardService.asMap()).thenReturn(cardMapWithType(
+                new CardStub("skill-a", CardType.SKILL),
+                new CardStub("ex-a", CardType.EX)
+        ));
+        Deck deck = Deck.create("deck", DeckType.PLAYER);
+        when(deckRepository.findWithCardsById(1L)).thenReturn(Optional.of(deck));
+
+        DeckValidationResponse response = service.validateDeck(1L, new ReplaceDeckCardsRequest(List.of(
+                new DeckCardSpec("skill-a", 1),
+                new DeckCardSpec("ex-a", 1)
+        )));
+
+        assertFalse(response.valid());
+        assertTrue(response.issues().stream().anyMatch(it -> it.message().contains("EX card is not allowed")));
+    }
+
     private static List<DeckCardSpec> cards12() {
         return List.of(
                 new DeckCardSpec("card-1", 3),
@@ -219,4 +285,23 @@ class DeckServiceTest {
         }
         return map;
     }
+
+    private static Map<Ids.CardDefId, CardDefinition> cardMapWithType(CardStub... cards) {
+        Map<Ids.CardDefId, CardDefinition> map = new HashMap<>();
+        for (CardStub card : cards) {
+            map.put(new Ids.CardDefId(card.id()), new CardDefinition(
+                    new Ids.CardDefId(card.id()),
+                    card.id(),
+                    card.type(),
+                    1,
+                    Map.of(),
+                    null,
+                    false,
+                    ""
+            ));
+        }
+        return map;
+    }
+
+    private record CardStub(String id, CardType type) {}
 }
