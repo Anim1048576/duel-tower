@@ -5,6 +5,7 @@ import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.NodeState;
+import com.example.dueltower.engine.model.PendingDecision;
 import com.example.dueltower.engine.model.RunState;
 
 import java.util.ArrayList;
@@ -56,30 +57,16 @@ public record SelectNodeChoiceCommand(
         if (choice.phase() == RunState.NodePhase.COMBAT) {
             state.nodeState(NodeState.COMBAT);
             events.add(new GameEvent.LogAppended("전투 노드를 선택했다. START_COMBAT 명령 대기 중."));
+        } else if (choice.phase() == RunState.NodePhase.JUDGEMENT) {
+            state.nodeState(NodeState.NON_COMBAT);
+            state.player(playerId).pendingDecision(new PendingDecision.JudgementChoice(
+                    "판정 결과를 선택하세요",
+                    List.of("SUCCESS", "FAIL")
+            ));
+            events.add(new GameEvent.LogAppended("판정 노드 진입: RESOLVE_JUDGEMENT 명령 대기 중."));
         } else {
             state.nodeState(NodeState.NON_COMBAT);
-            if (choice.phase() == RunState.NodePhase.JUDGEMENT) {
-                state.runState().resolveCurrentNode(
-                        "reward",
-                        "보상 획득",
-                        choice.name() + " 결과 확인",
-                        "판정을 통과해 200G와 열쇠 1개를 확보했다.",
-                        200,
-                        1,
-                        0
-                );
-            } else {
-                state.runState().resolveCurrentNode(
-                        "reward",
-                        "탐색 완료",
-                        choice.name() + " 결과 확인",
-                        "이벤트를 정리하고 120G와 상자 1개를 획득했다.",
-                        120,
-                        0,
-                        1
-                );
-            }
-            events.add(new GameEvent.LogAppended("노드 결과가 recentResults에 기록되었다."));
+            events.add(new GameEvent.LogAppended("이벤트 노드 진입: BUY_SHOP_ITEM 명령 대기 중."));
         }
         return events;
     }

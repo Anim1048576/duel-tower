@@ -6,13 +6,13 @@ import java.util.List;
  * Public command payload for {@code POST /api/sessions/{code}/command}.
  * <p>
  * Allowed {@code type} values:
- * START_COMBAT, DRAW, END_TURN, HAND_SWAP, PLAY_CARD, USE_EX, USE_SUMMON_ACTION, USE_ITEM, SURRENDER_COMBAT, DISCARD_TO_HAND_LIMIT, RESOLVE_INITIATIVE_TIE, SEARCH_PICK/RESOLVE_SEARCH_PICK, SELECT_NODE_CHOICE, CLEAR_RECENT_RESULTS, ENEMY_PLAY_CARD, ENEMY_USE_EX, ENEMY_END_TURN.
+ * START_COMBAT, DRAW, END_TURN, HAND_SWAP, PLAY_CARD, USE_EX, USE_SUMMON_ACTION, USE_ITEM, BUY_SHOP_ITEM, OPEN_CHEST, RESOLVE_JUDGEMENT, SURRENDER_COMBAT, DISCARD_TO_HAND_LIMIT, RESOLVE_INITIATIVE_TIE, SEARCH_PICK/RESOLVE_SEARCH_PICK, SELECT_NODE_CHOICE, CLEAR_RECENT_RESULTS, ENEMY_PLAY_CARD, ENEMY_USE_EX, ENEMY_END_TURN.
  * <p>
  * DRAW and HAND_SWAP are product rule commands (not admin/debug commands):
  * they are validated with normal main-turn constraints (phase/actor/pending-decision).
  *
  * Player-auth required types (must pass X-Player-Token -> playerId verification):
- * DRAW, PLAY_CARD, HAND_SWAP, END_TURN, USE_EX, USE_SUMMON_ACTION, USE_ITEM, SURRENDER_COMBAT, DISCARD_TO_HAND_LIMIT, RESOLVE_INITIATIVE_TIE, SEARCH_PICK/RESOLVE_SEARCH_PICK, SELECT_NODE_CHOICE, CLEAR_RECENT_RESULTS.
+ * DRAW, PLAY_CARD, HAND_SWAP, END_TURN, USE_EX, USE_SUMMON_ACTION, USE_ITEM, BUY_SHOP_ITEM, OPEN_CHEST, RESOLVE_JUDGEMENT, SURRENDER_COMBAT, DISCARD_TO_HAND_LIMIT, RESOLVE_INITIATIVE_TIE, SEARCH_PICK/RESOLVE_SEARCH_PICK, SELECT_NODE_CHOICE, CLEAR_RECENT_RESULTS.
  *
  * expectedVersion is required and must be provided by clients for optimistic concurrency.
  *
@@ -20,6 +20,9 @@ import java.util.List;
  * - BUY_SHOP_ITEM 후보 필드: offerId
  * - OPEN_CHEST 후보 필드: count
  * - RESOLVE_JUDGEMENT 후보 필드: choiceId/selectedIds
+ * - CLAIM_RECENT_RESULT 후보 필드: resultId/resultIndex
+ * - SELL_INVENTORY_ITEM 후보 필드: itemId/count
+ * - RETREAT_COMBAT 후보 필드: reason
  *
  * Target serialization rules:
  * - Prefer `targets` over legacy targetPlayerIds/targetEnemyIds.
@@ -49,6 +52,8 @@ public record CommandRequest(
         List<String> orderedActorKeys,
         List<String> selectedIds,
         String choiceId,
+        String resultId,
+        Integer resultIndex,
         String reason
 ) {
     public String normalizedType() {
@@ -81,6 +86,10 @@ public record CommandRequest(
 
     public String trimmedChoiceId() {
         return trimToNull(choiceId);
+    }
+
+    public String trimmedResultId() {
+        return trimToNull(resultId);
     }
 
     public String trimmedReason() {

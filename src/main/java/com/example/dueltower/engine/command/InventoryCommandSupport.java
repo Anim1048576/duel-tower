@@ -46,4 +46,42 @@ final class InventoryCommandSupport {
         }
         state.runState().inventory().replaceItems(nextItems);
     }
+
+    static void addInventoryItemCount(GameState state, RunState.InventoryItem gainedItem, int gainedCount) {
+        if (gainedItem == null || gainedCount <= 0) {
+            return;
+        }
+        boolean merged = false;
+        List<RunState.InventoryItem> nextItems = new ArrayList<>();
+        for (RunState.InventoryItem item : state.runState().inventory().items()) {
+            if (!item.id().equals(gainedItem.id())) {
+                nextItems.add(item);
+                continue;
+            }
+            nextItems.add(new RunState.InventoryItem(
+                    item.id(),
+                    item.name(),
+                    item.count() + gainedCount,
+                    item.bound(),
+                    item.battleUsable(),
+                    item.summary(),
+                    item.description(),
+                    item.tags()
+            ));
+            merged = true;
+        }
+        if (!merged) {
+            nextItems.add(new RunState.InventoryItem(
+                    gainedItem.id(),
+                    gainedItem.name(),
+                    gainedCount,
+                    gainedItem.bound(),
+                    gainedItem.battleUsable(),
+                    gainedItem.summary(),
+                    gainedItem.description(),
+                    gainedItem.tags()
+            ));
+        }
+        state.runState().inventory().replaceItems(nextItems);
+    }
 }

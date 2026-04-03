@@ -40,6 +40,9 @@ public class SessionController {
             "USE_EX",
             "USE_SUMMON_ACTION",
             "USE_ITEM",
+            "BUY_SHOP_ITEM",
+            "OPEN_CHEST",
+            "RESOLVE_JUDGEMENT",
             "SURRENDER_COMBAT",
             "DISCARD_TO_HAND_LIMIT",
             "RESOLVE_INITIATIVE_TIE",
@@ -444,33 +447,33 @@ public class SessionController {
         String type = req.normalizedType();
         switch (type) {
             case "START_COMBAT" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 return new StartCombatCommand(commandId, expectedVersion, playerId);
             }
             case "DRAW" -> {
                 // DRAW is a public product-rule command (validated by main-turn constraints in DrawCommand).
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 int count = req.countOrDefault(1);
                 return new DrawCommand(commandId, expectedVersion, playerId, count);
             }
             case "END_TURN" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 return new EndTurnCommand(commandId, expectedVersion, playerId);
             }
             case "HAND_SWAP" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 CardInstId id = parseSingleCardInstId(req.discardIds(), "discardIds");
                 return new HandSwapCommand(commandId, expectedVersion, playerId, id);
             }
             case "PLAY_CARD" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 CardInstId id = parseCardInstId(requireText(req.trimmedCardId(), "cardId"), "cardId");
                 TargetSelection sel = parseTargetSelection(req);
 
                 return new PlayCardCommand(commandId, expectedVersion, playerId, id, sel);
             }
             case "USE_EX" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 TargetSelection sel = parseTargetSelection(req);
 
                 return new UseExCommand(commandId, expectedVersion, playerId, sel);
@@ -492,30 +495,46 @@ public class SessionController {
                 return new EnemyEndTurnCommand(commandId, expectedVersion, enemyId);
             }
             case "USE_SUMMON_ACTION" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 Ids.SummonInstId summonId = parseSummonInstId(requireText(req.trimmedSummonId(), "summonId"), "summonId");
                 TargetSelection sel = parseTargetSelection(req);
                 return new UseSummonActionCommand(commandId, expectedVersion, playerId, summonId, sel);
             }
             case "USE_ITEM" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 String itemId = requireText(req.trimmedItemId(), "itemId");
-                int count = req.countOrDefault(1);
+                int count = countOrDefault(req, 1);
                 TargetSelection sel = parseTargetSelection(req);
                 return new UseItemCommand(commandId, expectedVersion, playerId, itemId, count, sel);
             }
+            case "BUY_SHOP_ITEM" -> {
+                PlayerId playerId = commandPlayerId(req);
+                String offerId = requireText(req.trimmedOfferId(), "offerId");
+                int count = countOrDefault(req, 1);
+                return new BuyShopItemCommand(commandId, expectedVersion, playerId, offerId, count);
+            }
+            case "OPEN_CHEST" -> {
+                PlayerId playerId = commandPlayerId(req);
+                int count = countOrDefault(req, 1);
+                return new OpenChestCommand(commandId, expectedVersion, playerId, count);
+            }
+            case "RESOLVE_JUDGEMENT" -> {
+                PlayerId playerId = commandPlayerId(req);
+                String choiceId = requireText(req.trimmedChoiceId(), "choiceId");
+                return new ResolveJudgementCommand(commandId, expectedVersion, playerId, choiceId);
+            }
             case "SURRENDER_COMBAT" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 String reason = req.trimmedReason();
                 return new SurrenderCombatCommand(commandId, expectedVersion, playerId, reason);
             }
             case "DISCARD_TO_HAND_LIMIT" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 List<CardInstId> ids = parseCardInstIds(req.discardIds(), "discardIds");
                 return new DiscardToHandLimitCommand(commandId, expectedVersion, playerId, ids);
             }
             case "RESOLVE_INITIATIVE_TIE" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 if (req.tieGroupIndex() == null) {
                     throw new ResponseStatusException(BAD_REQUEST, "tieGroupIndex is required");
                 }
@@ -531,26 +550,32 @@ public class SessionController {
                 );
             }
             case "SEARCH_PICK", "RESOLVE_SEARCH_PICK" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 List<CardInstId> ids = parseCardInstIds(req.selectedIds(), "selectedIds");
                 return new ResolveSearchPickCommand(commandId, expectedVersion, playerId, ids);
             }
             case "SELECT_NODE_CHOICE" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 return new SelectNodeChoiceCommand(commandId, expectedVersion, playerId, requireText(req.trimmedChoiceId(), "choiceId"));
             }
             case "CLEAR_RECENT_RESULTS" -> {
-                PlayerId playerId = parsePlayerId(req.playerId());
+                PlayerId playerId = commandPlayerId(req);
                 return new ClearRecentResultsCommand(commandId, expectedVersion, playerId);
             }
-            // 다음 라운드 확장 포인트(미구현):
-            // - BUY_SHOP_ITEM: offerId(+ playerId, expectedVersion)
-            // - OPEN_CHEST: count(+ playerId, expectedVersion)
-            // - RESOLVE_JUDGEMENT: choiceId/selectedIds(+ playerId, expectedVersion)
-            case "BUY_SHOP_ITEM", "OPEN_CHEST", "RESOLVE_JUDGEMENT" ->
-                    throw new ResponseStatusException(BAD_REQUEST, "command type not implemented yet: " + type);
+            // 다음 라운드 run-loop 확장 포인트:
+            // - CLAIM_RECENT_RESULT: resultId/resultIndex
+            // - SELL_INVENTORY_ITEM: itemId/count
+            // - RETREAT_COMBAT: reason
             default -> throw new ResponseStatusException(BAD_REQUEST, "unknown command type: " + req.type());
         }
+    }
+
+    private static PlayerId commandPlayerId(CommandRequest req) {
+        return parsePlayerId(requireText(req.trimmedPlayerId(), "playerId"));
+    }
+
+    private static int countOrDefault(CommandRequest req, int fallback) {
+        return req.countOrDefault(fallback);
     }
 
     private static String requireText(String value, String fieldName) {

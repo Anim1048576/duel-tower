@@ -109,6 +109,8 @@ public final class StateMapper {
             );
         } else if (ps.pendingDecision() instanceof PendingDecision.InitiativeTieOrder it) {
             pending = new PendingDecisionDto("INITIATIVE_TIE_ORDER", it.reason(), null, null, null, null, null, it.groupIndex(), List.copyOf(it.actorKeys()));
+        } else if (ps.pendingDecision() instanceof PendingDecision.JudgementChoice jc) {
+            pending = new PendingDecisionDto("JUDGEMENT", jc.reason(), null, null, List.copyOf(jc.choiceIds()), null, null, null, null);
         }
 
         return new PlayerStateDto(

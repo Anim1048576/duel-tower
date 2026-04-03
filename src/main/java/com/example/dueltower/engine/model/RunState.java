@@ -72,6 +72,12 @@ public final class RunState {
             List<String> tags
     ) {}
 
+    public record ShopOffer(
+            String id,
+            int priceGold,
+            InventoryItem item
+    ) {}
+
     public static final class Inventory {
         private int keys;
         private int chests;
@@ -103,6 +109,19 @@ public final class RunState {
             new NodeChoice("N-3", "폐허 저장고", "이벤트", "보상 카드 1장 획득", NodePhase.EVENT, Danger.LOW, false, null),
             new NodeChoice("N-4", "봉인된 균열", "전투", "열쇠 미보유 시 입장 불가", NodePhase.COMBAT, Danger.HIGH, true, "균열 열쇠가 없어 진입할 수 없음"),
             new NodeChoice("N-5", "안식처", "이벤트", "체력과 행동력을 정비한다", NodePhase.EVENT, Danger.LOW, false, null)
+    );
+
+    private static final List<ShopOffer> DEFAULT_SHOP_OFFERS = List.of(
+            new ShopOffer(
+                    "O-1",
+                    180,
+                    new InventoryItem("I-1", "소형 회복 물약", 1, false, true, "전투 중 사용 가능 · 체력 20 회복", "즉시 체력을 20 회복합니다. 턴 소모 없이 사용됩니다.", List.of("소모품", "회복"))
+            ),
+            new ShopOffer(
+                    "O-2",
+                    320,
+                    new InventoryItem("I-4", "긴급 연막탄", 1, true, true, "전투 중 사용 가능 · 회피 상승", "현재 턴 동안 회피율이 크게 상승합니다.", List.of("전투 아이템"))
+            )
     );
 
     private int floor = 1;
@@ -218,6 +237,18 @@ public final class RunState {
         if (status() == LoopStatus.CHOOSE_NODE && availableChoices.isEmpty()) {
             availableChoices.addAll(generateChoices(floor, seed, inventory));
         }
+    }
+
+    public ShopOffer findShopOffer(String offerId) {
+        if (offerId == null || offerId.isBlank()) {
+            return null;
+        }
+        for (ShopOffer offer : DEFAULT_SHOP_OFFERS) {
+            if (offer.id().equals(offerId.trim())) {
+                return offer;
+            }
+        }
+        return null;
     }
 
     private void appendResult(RecentResult result) {
