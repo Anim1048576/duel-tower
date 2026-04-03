@@ -180,6 +180,22 @@ public class SessionController {
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
 
+    @PostMapping("/{code}/players/{playerId}/loadout/from-preset")
+    public SessionStateDto applyPresetToLoadout(@PathVariable String code,
+                                                @PathVariable String playerId,
+                                                @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                                @RequestBody(required = false) ApplyPresetToSessionRequest req) {
+        if (req == null || req.presetId() == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "presetId is required");
+        }
+        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
+        if (!playerId.equals(actorPlayerId)) {
+            throw new ResponseStatusException(FORBIDDEN, "players may only edit their own loadout");
+        }
+        sessionService.applyPresetToLoadout(code, actorPlayerId, playerId, req.presetId());
+        return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+    }
+
     @PostMapping("/{code}/leave")
     public SessionStateDto leave(@PathVariable String code,
                                  @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader) {

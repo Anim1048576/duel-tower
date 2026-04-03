@@ -82,6 +82,12 @@ public class PresetService {
         presetRepository.delete(preset);
     }
 
+    @Transactional(readOnly = true)
+    public PresetLoadout getOwnedLoadout(String ownerUsername, long presetId) {
+        Preset preset = getOwnedPreset(ownerUsername, presetId);
+        return toLoadout(preset);
+    }
+
     /**
      * owner scope 강제 조회 helper.
      * - 다음 단계 clone/apply에서도 동일하게 사용한다.
@@ -226,12 +232,29 @@ public class PresetService {
         );
     }
 
+    private PresetLoadout toLoadout(Preset preset) {
+        return new PresetLoadout(
+                preset.getCharacterId(),
+                preset.getPassiveIds(),
+                preset.getDeckCardIds(),
+                preset.getExCardId()
+        );
+    }
+
     private record PresetPayload(
             String name,
             Long characterId,
             List<String> deckCardIds,
             String exCardId,
             List<String> passiveIds
+    ) {
+    }
+
+    public record PresetLoadout(
+            Long characterId,
+            List<String> passiveIds,
+            List<String> deckCardIds,
+            String exCardId
     ) {
     }
 }

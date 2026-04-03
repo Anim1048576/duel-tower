@@ -51,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/sessions/*/players/*/kick").permitAll()
                         .requestMatchers("/api/sessions/*/players/*/deck").permitAll()
                         .requestMatchers("/api/sessions/*/players/*/loadout").permitAll()
+                        .requestMatchers("/api/sessions/*/players/*/loadout/from-preset").permitAll()
                         .requestMatchers("/api/sessions/*/players/*/forget").permitAll()
                         .requestMatchers("/api/**").authenticated()
 
