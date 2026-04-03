@@ -75,6 +75,24 @@ public final class SessionRuntime {
         return characterIdByPlayerId.get(playerId);
     }
 
+    public void removePlayerBindings(String playerId) {
+        if (playerId == null || playerId.isBlank()) {
+            return;
+        }
+        String normalized = playerId.trim();
+        String token = playerTokensByPlayerId.remove(normalized);
+        if (token != null) {
+            playerIdByToken.remove(token);
+        }
+        characterIdByPlayerId.remove(normalized);
+    }
+
+    public void clearPlayerBindings() {
+        playerTokensByPlayerId.clear();
+        playerIdByToken.clear();
+        characterIdByPlayerId.clear();
+    }
+
     public GameState state() { return state; }
     public EngineContext ctx() { return ctx; }
     public Instant createdAt() { return createdAt; }

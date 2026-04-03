@@ -224,6 +224,41 @@ public class SessionService {
         return rt.withLock(() -> rt.findPlayerIdByToken(token));
     }
 
+    public GameState leaveSession(String code, String actorPlayerIdRaw) {
+        if (actorPlayerIdRaw == null || actorPlayerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "actorPlayerId is required");
+        }
+        PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
+        SessionRuntime rt = get(code);
+        return rt.withLock(() -> removePlayerFromSession(rt, actor, "player not found"));
+    }
+
+    public GameState kickPlayer(String code, String targetPlayerIdRaw) {
+        if (targetPlayerIdRaw == null || targetPlayerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
+        }
+        PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
+        SessionRuntime rt = get(code);
+        return rt.withLock(() -> removePlayerFromSession(rt, target, "player not found"));
+    }
+
+    public GameState resetSession(String code, boolean keepPlayers, boolean keepLoadouts, Long newSeed) {
+        SessionRuntime rt = get(code);
+        return rt.withLock(() -> {
+            GameState state = rt.state();
+            long resetSeed = (newSeed == null) ? state.seed() : newSeed;
+            resetSessionState(rt, state, keepPlayers, keepLoadouts, resetSeed);
+            return state;
+        });
+    }
+
+    public void deleteSession(String code) {
+        SessionRuntime rt = sessions.remove(code);
+        if (rt == null) {
+            throw new ResponseStatusException(NOT_FOUND, "session not found");
+        }
+    }
+
     public GameState updateDeck(String code,
                                 String actorPlayerIdRaw,
                                 String targetPlayerIdRaw,
@@ -258,6 +293,45 @@ public class SessionService {
             loadDeck(state, ps, deckOwnedCardIds);
             shuffleDeck(state, ps);
             persistCharacterDeck(rt, target, deckOwnedCardIds, ps.ownedCards());
+            return state;
+        });
+    }
+
+    public GameState updateLoadout(String code,
+                                   String actorPlayerIdRaw,
+                                   String targetPlayerIdRaw,
+                                   Long characterIdRaw,
+                                   List<String> passiveIdsRaw,
+                                   List<String> deckOwnedCardIdsRaw,
+                                   String exCardIdRaw) {
+        if (targetPlayerIdRaw == null || targetPlayerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
+        }
+        if (actorPlayerIdRaw == null || actorPlayerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "actorPlayerId is required");
+        }
+
+        PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
+        PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
+        SessionRuntime rt = get(code);
+        return rt.withLock(() -> {
+            GameState state = rt.state();
+            if (!actor.equals(target)) {
+                throw new ResponseStatusException(FORBIDDEN, "players may only edit their own loadout");
+            }
+
+            PlayerState ps = state.player(target);
+            if (ps == null) {
+                throw new ResponseStatusException(NOT_FOUND, "player not found");
+            }
+
+            validateDeckEditableState(state.nodeState(), ps);
+            CharacterJoinTemplate characterTemplate = (characterIdRaw == null)
+                    ? null
+                    : toCharacterJoinTemplate(loadCharacterProfile(characterIdRaw));
+
+            applyLoadout(rt, state, ps, characterTemplate, characterIdRaw, passiveIdsRaw, deckOwnedCardIdsRaw, exCardIdRaw);
+            persistCharacterDeck(rt, target, ps.deckOwnedCardIds(), ps.ownedCards());
             return state;
         });
     }
@@ -758,6 +832,222 @@ public class SessionService {
         return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(storedDeckEntries, ownedCards);
     }
 
+    private void applyLoadout(SessionRuntime rt,
+                              GameState state,
+                              PlayerState ps,
+                              CharacterJoinTemplate characterTemplate,
+                              Long characterIdRaw,
+                              List<String> passiveIdsRaw,
+                              List<String> deckOwnedCardIdsRaw,
+                              String exCardIdRaw) {
+        List<String> previousDeckOwnedCardIds = currentDeckOwnedCardIds(ps);
+        List<OwnedCard> effectiveOwnedCards = resolveLoadoutOwnedCards(ps, characterTemplate);
+        List<String> effectivePassiveIds = resolveLoadoutPassiveIds(ps, characterTemplate, passiveIdsRaw);
+        List<String> effectiveDeckOwnedCardIds = resolveLoadoutDeckOwnedCardIds(ps, effectiveOwnedCards, characterTemplate, deckOwnedCardIdsRaw);
+        String effectiveExCardId = resolveLoadoutExCardId(state, ps, characterTemplate, exCardIdRaw);
+
+        List<String> currentDeckForValidation = (characterTemplate == null) ? previousDeckOwnedCardIds : null;
+        boolean allowEmptyCharacterDeck = characterTemplate != null && effectiveDeckOwnedCardIds.isEmpty();
+        if (!allowEmptyCharacterDeck) {
+            validateDeckBuild(effectiveDeckOwnedCardIds, effectiveOwnedCards, currentDeckForValidation);
+        }
+        validateExCardId(effectiveExCardId);
+
+        if (characterTemplate != null && characterIdRaw != null) {
+            rt.bindCharacterId(ps.playerId().value(), characterIdRaw);
+        }
+
+        ps.ownedCards(effectiveOwnedCards);
+        ps.passiveIds(effectivePassiveIds);
+        ps.deckOwnedCardIds(effectiveDeckOwnedCardIds);
+        loadDeck(state, ps, effectiveDeckOwnedCardIds);
+        addCardToEx(state, ps, new CardDefId(normalizeExCardId(effectiveExCardId)));
+        shuffleDeck(state, ps);
+    }
+
+    private List<OwnedCard> resolveLoadoutOwnedCards(PlayerState ps, CharacterJoinTemplate characterTemplate) {
+        if (characterTemplate == null) {
+            return List.copyOf(ps.ownedCards());
+        }
+        return parseOwnedCards(characterTemplate.ownedCards());
+    }
+
+    private List<String> resolveLoadoutPassiveIds(PlayerState ps,
+                                                  CharacterJoinTemplate characterTemplate,
+                                                  List<String> passiveIdsRaw) {
+        if (passiveIdsRaw != null) {
+            return parsePassiveIds(passiveIdsRaw);
+        }
+        if (characterTemplate != null) {
+            return parsePassiveIds(characterTemplate.passiveIds());
+        }
+        return List.copyOf(ps.passiveIds());
+    }
+
+    private List<String> resolveLoadoutDeckOwnedCardIds(PlayerState ps,
+                                                        List<OwnedCard> effectiveOwnedCards,
+                                                        CharacterJoinTemplate characterTemplate,
+                                                        List<String> deckOwnedCardIdsRaw) {
+        if (deckOwnedCardIdsRaw != null) {
+            return resolveRequestedDeckOwnedCardIds(deckOwnedCardIdsRaw, effectiveOwnedCards);
+        }
+        if (characterTemplate != null) {
+            List<String> currentSkillDeck = characterTemplate.currentSkillDeck();
+            if (currentSkillDeck == null || currentSkillDeck.isEmpty()) {
+                return List.of();
+            }
+            return resolveStoredDeckToOwnedCardIds(currentSkillDeck, effectiveOwnedCards);
+        }
+        return List.copyOf(ps.deckOwnedCardIds());
+    }
+
+    private String resolveLoadoutExCardId(GameState state,
+                                          PlayerState ps,
+                                          CharacterJoinTemplate characterTemplate,
+                                          String exCardIdRaw) {
+        if (exCardIdRaw != null) {
+            return normalizeExCardId(exCardIdRaw);
+        }
+        if (characterTemplate != null) {
+            return normalizeExCardId(characterTemplate.exCardId());
+        }
+        return normalizeExCardId(resolveCurrentExCardId(state, ps));
+    }
+
+    private void validateExCardId(String exCardIdRaw) {
+        String exCardId = normalizeExCardId(exCardIdRaw);
+        if (!cardService.asMap().containsKey(new CardDefId(exCardId))) {
+            throw new ResponseStatusException(BAD_REQUEST, "invalid exCardId: " + exCardId);
+        }
+    }
+
+    private GameState removePlayerFromSession(SessionRuntime rt, PlayerId target, String notFoundMessage) {
+        GameState state = rt.state();
+        if (state.nodeState() == NodeState.COMBAT) {
+            throw new ResponseStatusException(FORBIDDEN, "player management is unavailable during combat");
+        }
+
+        PlayerState ps = state.player(target);
+        if (ps == null) {
+            throw new ResponseStatusException(NOT_FOUND, notFoundMessage);
+        }
+
+        removePlayerRuntimeState(state, ps);
+        state.players().remove(target);
+        rt.removePlayerBindings(target.value());
+        return state;
+    }
+
+    private void resetSessionState(SessionRuntime rt,
+                                   GameState state,
+                                   boolean keepPlayers,
+                                   boolean keepLoadouts,
+                                   long resetSeed) {
+        Map<PlayerId, String> exCardByPlayerId = new LinkedHashMap<>();
+        if (keepPlayers && keepLoadouts) {
+            for (Map.Entry<PlayerId, PlayerState> entry : state.players().entrySet()) {
+                exCardByPlayerId.put(entry.getKey(), resolveCurrentExCardId(state, entry.getValue()));
+            }
+        }
+
+        state.enemies().clear();
+        state.summons().clear();
+        state.cardInstances().clear();
+        state.combat(null);
+        state.nodeState(NodeState.NON_COMBAT);
+
+        if (!keepPlayers) {
+            state.players().clear();
+            rt.clearPlayerBindings();
+            state.runState().initialize(resetSeed);
+            return;
+        }
+
+        for (PlayerState ps : state.players().values()) {
+            String exCardId = exCardByPlayerId.getOrDefault(ps.playerId(), "EX901");
+            resetPlayerState(state, ps, keepLoadouts, resetSeed, exCardId);
+        }
+        state.runState().initialize(resetSeed);
+    }
+
+    private void resetPlayerState(GameState state,
+                                  PlayerState ps,
+                                  boolean keepLoadouts,
+                                  long resetSeed,
+                                  String preservedExCardId) {
+        ps.deck().clear();
+        ps.hand().clear();
+        ps.grave().clear();
+        ps.field().clear();
+        ps.excluded().clear();
+        ps.activeSummons().clear();
+        ps.summonByCard().clear();
+        ps.statusValues().clear();
+        ps.pendingDecision(null);
+        ps.swappedThisTurn(false);
+        ps.cardsPlayedThisTurn(0);
+        ps.usedExThisTurn(false);
+        ps.usedTenacityThisTurn(false);
+        ps.tenacityDebtThisTurn(0);
+        ps.exCooldownUntilRound(0);
+        ps.exActivatable(true);
+        ps.refillToMax();
+        ps.exCard(null);
+
+        if (!keepLoadouts) {
+            List<OwnedCard> defaultOwnedCards = defaultOwnedCards();
+            ps.ownedCards(defaultOwnedCards);
+            List<String> defaultDeckOwnedCardIds = resolveCardIdsToOwnedCardIds(
+                    defaultPresetDeckCardIds(),
+                    defaultOwnedCards,
+                    "deckCardIds must not contain blank values"
+            );
+            ps.deckOwnedCardIds(defaultDeckOwnedCardIds);
+            loadDeck(state, ps, defaultDeckOwnedCardIds);
+            addCardToEx(state, ps, new CardDefId("EX901"));
+            shuffleDeck(state, ps, resetSeed);
+            return;
+        }
+
+        List<String> deckOwnedCardIds = currentDeckOwnedCardIds(ps);
+        if (deckOwnedCardIds != null && !deckOwnedCardIds.isEmpty()) {
+            loadDeck(state, ps, deckOwnedCardIds);
+            shuffleDeck(state, ps, resetSeed);
+        }
+        addCardToEx(state, ps, new CardDefId((preservedExCardId == null || preservedExCardId.isBlank()) ? "EX901" : preservedExCardId.trim()));
+    }
+
+    private void removePlayerRuntimeState(GameState state, PlayerState ps) {
+        Set<CardInstId> toDelete = new LinkedHashSet<>();
+        toDelete.addAll(ps.deck());
+        toDelete.addAll(ps.hand());
+        toDelete.addAll(ps.grave());
+        toDelete.addAll(ps.field());
+        toDelete.addAll(ps.excluded());
+        if (ps.exCard() != null) {
+            toDelete.add(ps.exCard());
+        }
+        for (CardInstId id : toDelete) {
+            state.cardInstances().remove(id);
+        }
+
+        List<Ids.SummonInstId> summonIds = new ArrayList<>(ps.activeSummons());
+        for (Ids.SummonInstId summonId : summonIds) {
+            state.summons().remove(summonId);
+        }
+    }
+
+    private String resolveCurrentExCardId(GameState state, PlayerState ps) {
+        if (ps.exCard() == null) {
+            return "EX901";
+        }
+        CardInstance exInst = state.card(ps.exCard());
+        if (exInst == null || exInst.defId() == null || exInst.defId().value() == null || exInst.defId().value().isBlank()) {
+            return "EX901";
+        }
+        return exInst.defId().value().trim();
+    }
+
     private List<String> resolveCardIdsToOwnedCardIds(List<String> cardIdsRaw,
                                                   List<OwnedCard> ownedCards,
                                                   String blankValueMessage) {
@@ -817,9 +1107,13 @@ public class SessionService {
     }
 
     private void shuffleDeck(GameState state, PlayerState ps) {
+        shuffleDeck(state, ps, state.seed());
+    }
+
+    private void shuffleDeck(GameState state, PlayerState ps, long seed) {
         List<CardInstId> list = new ArrayList<>(ps.deck());
         ps.deck().clear();
-        Collections.shuffle(list, new Random(state.seed() ^ ps.playerId().value().hashCode()));
+        Collections.shuffle(list, new Random(seed ^ ps.playerId().value().hashCode()));
         for (CardInstId id : list) ps.deck().addLast(id);
     }
 

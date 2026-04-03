@@ -44,7 +44,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/sessions", "/api/sessions/*/join").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/sessions/*").permitAll()
                         .requestMatchers("/api/sessions/*/command").permitAll()
+                        .requestMatchers("/api/sessions/*/leave").permitAll()
+                        .requestMatchers("/api/sessions/*/reset").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/sessions/*").permitAll()
+                        .requestMatchers("/api/sessions/*/players/*/kick").permitAll()
                         .requestMatchers("/api/sessions/*/players/*/deck").permitAll()
+                        .requestMatchers("/api/sessions/*/players/*/loadout").permitAll()
                         .requestMatchers("/api/sessions/*/players/*/forget").permitAll()
                         .requestMatchers("/api/**").authenticated()
 
