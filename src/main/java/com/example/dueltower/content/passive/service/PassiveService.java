@@ -1,11 +1,13 @@
 package com.example.dueltower.content.passive.service;
 
 import com.example.dueltower.content.passive.model.PassiveBlueprint;
+import com.example.dueltower.content.support.ContentLookupSupport;
 import com.example.dueltower.engine.core.effect.passive.PassiveEffect;
 import com.example.dueltower.engine.model.PassiveDefinition;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+
 
 @Service
 public class PassiveService {
@@ -43,6 +45,10 @@ public class PassiveService {
     }
 
     public List<PassiveDefinition> list() { return all; }
+
+    public PassiveDefinition get(String id) {
+        return ContentLookupSupport.requireById(defsById, id, value -> value, "passive");
+    }
     public Map<String, PassiveDefinition> defsMap() { return defsById; }
     public Map<String, PassiveEffect> effectsMap() { return effectsById; }
 }

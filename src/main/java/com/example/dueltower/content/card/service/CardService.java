@@ -1,12 +1,14 @@
 package com.example.dueltower.content.card.service;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.support.ContentLookupSupport;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+
 
 @Service
 public class CardService {
@@ -66,8 +68,28 @@ public class CardService {
 
     /** API 용: 타입별 목록 */
     public List<CardDefinition> list(CardType type) {
+        return listFiltered(type, null, null);
+    }
+
+
+    /** API 용: 카드 상세 */
+    public CardDefinition get(String id) {
+        return ContentLookupSupport.requireById(byId, id, CardDefId::new, "card");
+    }
+
+    /**
+     * 다음 Step 확장 포인트: 카드 검색형 GET은 이 필터를 확장해서 붙인다.
+     */
+    public List<CardDefinition> listFiltered(CardType type, String q, String keywordId) {
+        String query = ContentLookupSupport.normalizeId(q).toLowerCase(Locale.ROOT);
+        String normalizedKeywordId = ContentLookupSupport.normalizeId(keywordId);
+
         return all.stream()
-                .filter(card -> card.type() == type)
+                .filter(card -> type == null || card.type() == type)
+                .filter(card -> query.isEmpty() || card.name().toLowerCase(Locale.ROOT).contains(query)
+                        || card.description().toLowerCase(Locale.ROOT).contains(query)
+                        || card.id().value().toLowerCase(Locale.ROOT).contains(query))
+                .filter(card -> normalizedKeywordId.isEmpty() || card.keywords().containsKey(normalizedKeywordId))
                 .toList();
     }
 

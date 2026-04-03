@@ -3,6 +3,7 @@ package com.example.dueltower.content.passive.api;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.engine.model.PassiveDefinition;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,5 +21,10 @@ public class PassiveController {
     @GetMapping
     public List<PassiveDefinition> list() {
         return service.list();
+    }
+
+    @GetMapping("/{id}")
+    public PassiveDefinition get(@PathVariable String id) {
+        return service.get(id);
     }
 }

@@ -28,10 +28,36 @@ class ContentApiSmokeIntegrationTest {
     }
 
     @Test
+    void cardDetailEndpointShouldReturnOkForKnownId() throws Exception {
+        mockMvc.perform(get("/api/content/cards/C001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id.value").value("C001"));
+    }
+
+    @Test
+    void cardDetailEndpointShouldReturnNotFoundForUnknownId() throws Exception {
+        mockMvc.perform(get("/api/content/cards/C999"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void keywordsEndpointShouldReturnOkAndNonEmptyPayload() throws Exception {
         mockMvc.perform(get("/api/content/keywords"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(greaterThan(0)));
+    }
+
+    @Test
+    void keywordDetailEndpointShouldReturnOkForKnownId() throws Exception {
+        mockMvc.perform(get("/api/content/keywords/설치"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("설치"));
+    }
+
+    @Test
+    void keywordDetailEndpointShouldReturnNotFoundForUnknownId() throws Exception {
+        mockMvc.perform(get("/api/content/keywords/K999"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -42,10 +68,36 @@ class ContentApiSmokeIntegrationTest {
     }
 
     @Test
+    void passiveDetailEndpointShouldReturnOkForKnownId() throws Exception {
+        mockMvc.perform(get("/api/content/passives/P001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("P001"));
+    }
+
+    @Test
+    void passiveDetailEndpointShouldReturnNotFoundForUnknownId() throws Exception {
+        mockMvc.perform(get("/api/content/passives/P999"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void statusesEndpointShouldReturnOkAndNonEmptyPayload() throws Exception {
         mockMvc.perform(get("/api/content/statuses"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(greaterThan(0)));
+    }
+
+    @Test
+    void statusDetailEndpointShouldReturnOkForKnownId() throws Exception {
+        mockMvc.perform(get("/api/content/statuses/SHIELD"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("SHIELD"));
+    }
+
+    @Test
+    void statusDetailEndpointShouldReturnNotFoundForUnknownId() throws Exception {
+        mockMvc.perform(get("/api/content/statuses/S999"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
