@@ -350,6 +350,552 @@ class SessionCommandExtensionIntegrationTest {
         assertTrue(response.has("state"));
     }
 
+    @Test
+    void buyShopItemSucceedsOnEventNodeAndConsumesGold() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode initialState = snapshotState(fx);
+        String eventChoiceId = findChoiceIdByPhase(initialState, "EVENT");
+
+        JsonNode selected = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "SELECT_NODE_CHOICE",
+                  "playerId": "player1",
+                  "choiceId": "%s",
+                  "expectedVersion": %d
+                }
+                """.formatted(eventChoiceId, initialState.get("version").asLong())
+        );
+        assertTrue(selected.get("accepted").asBoolean());
+
+        long expectedVersion = selected.get("state").get("version").asLong();
+        int beforeGold = selected.get("state").path("run").path("inventory").path("gold").asInt();
+        int beforeSmokeBomb = findItemCount(selected.get("state"), "I-4");
+
+        JsonNode bought = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-2",
+                  "expectedVersion": %d
+                }
+                """.formatted(expectedVersion)
+        );
+
+        assertTrue(bought.get("accepted").asBoolean());
+        assertEquals(beforeGold - 320, bought.get("state").path("run").path("inventory").path("gold").asInt());
+        assertEquals(beforeSmokeBomb + 1, findItemCount(bought.get("state"), "I-4"));
+        assertTrue(bought.get("state").path("run").path("resultPending").asBoolean());
+    }
+
+    @Test
+    void buyShopItemFailsWithoutPlayerToken() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode initialState = snapshotState(fx);
+        String eventChoiceId = findChoiceIdByPhase(initialState, "EVENT");
+
+        JsonNode selected = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "SELECT_NODE_CHOICE",
+                  "playerId": "player1",
+                  "choiceId": "%s",
+                  "expectedVersion": %d
+                }
+                """.formatted(eventChoiceId, initialState.get("version").asLong())
+        );
+        long expectedVersion = selected.path("state").path("version").asLong();
+
+        mockMvc.perform(post("/api/sessions/{code}/command", fx.code)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "BUY_SHOP_ITEM",
+                                  "playerId": "player1",
+                                  "offerId": "O-1",
+                                  "expectedVersion": %d
+                                }
+                                """.formatted(expectedVersion)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void buyShopItemFailsWhenTokenPlayerMismatch() throws Exception {
+        Fixture fx = createFixtureWithSecondPlayer();
+        JsonNode initialState = snapshotState(fx);
+        String eventChoiceId = findChoiceIdByPhase(initialState, "EVENT");
+
+        JsonNode selected = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "SELECT_NODE_CHOICE",
+                  "playerId": "player1",
+                  "choiceId": "%s",
+                  "expectedVersion": %d
+                }
+                """.formatted(eventChoiceId, initialState.get("version").asLong())
+        );
+        long expectedVersion = selected.path("state").path("version").asLong();
+
+        mockMvc.perform(post("/api/sessions/{code}/command", fx.code)
+                        .header("X-Player-Token", fx.otherPlayerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "BUY_SHOP_ITEM",
+                                  "playerId": "player1",
+                                  "offerId": "O-1",
+                                  "expectedVersion": %d
+                                }
+                                """.formatted(expectedVersion)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void buyShopItemFailsWhenOfferIdMissing() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode initialState = snapshotState(fx);
+        String eventChoiceId = findChoiceIdByPhase(initialState, "EVENT");
+
+        JsonNode selected = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "SELECT_NODE_CHOICE",
+                  "playerId": "player1",
+                  "choiceId": "%s",
+                  "expectedVersion": %d
+                }
+                """.formatted(eventChoiceId, initialState.get("version").asLong())
+        );
+
+        mockMvc.perform(post("/api/sessions/{code}/command", fx.code)
+                        .header("X-Player-Token", fx.playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "BUY_SHOP_ITEM",
+                                  "playerId": "player1",
+                                  "expectedVersion": %d
+                                }
+                                """.formatted(selected.path("state").path("version").asLong())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void buyShopItemRejectsWhenOfferIdUnknown() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectEventNode(fx);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-999",
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.path("state").path("version").asLong())
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "offer not found"));
+    }
+
+    @Test
+    void buyShopItemRejectsWhenGoldInsufficient() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectEventNode(fx);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-2",
+                  "count": 999,
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.path("state").path("version").asLong())
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "not enough gold"));
+    }
+
+    @Test
+    void buyShopItemRejectsWhenShopNotAvailable() throws Exception {
+        Fixture fx = createFixture();
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-1",
+                  "expectedVersion": 0
+                }
+                """
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "shop is not available now"));
+    }
+
+    @Test
+    void buyShopItemRejectsWhenExpectedVersionMismatched() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectEventNode(fx);
+        long staleVersion = Math.max(0, selected.path("state").path("version").asLong() - 1);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-1",
+                  "expectedVersion": %d
+                }
+                """.formatted(staleVersion)
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "version mismatch"));
+    }
+
+    @Test
+    void openChestConsumesChestAndAddsRewards() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode initialState = snapshotState(fx);
+        long expectedVersion = initialState.get("version").asLong();
+        int beforeChests = initialState.path("run").path("inventory").path("chests").asInt();
+        int beforeGold = initialState.path("run").path("inventory").path("gold").asInt();
+        int beforePotion = findItemCount(initialState, "I-1");
+
+        JsonNode opened = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "OPEN_CHEST",
+                  "playerId": "player1",
+                  "expectedVersion": %d
+                }
+                """.formatted(expectedVersion)
+        );
+
+        assertTrue(opened.get("accepted").asBoolean());
+        assertEquals(beforeChests - 1, opened.get("state").path("run").path("inventory").path("chests").asInt());
+        assertEquals(beforeGold + 150, opened.get("state").path("run").path("inventory").path("gold").asInt());
+        assertEquals(beforePotion + 1, findItemCount(opened.get("state"), "I-1"));
+    }
+
+    @Test
+    void openChestFailsWithoutPlayerToken() throws Exception {
+        Fixture fx = createFixture();
+
+        mockMvc.perform(post("/api/sessions/{code}/command", fx.code)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "OPEN_CHEST",
+                                  "playerId": "player1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void openChestFailsWhenTokenPlayerMismatch() throws Exception {
+        Fixture fx = createFixtureWithSecondPlayer();
+
+        mockMvc.perform(post("/api/sessions/{code}/command", fx.code)
+                        .header("X-Player-Token", fx.otherPlayerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "OPEN_CHEST",
+                                  "playerId": "player1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void openChestRejectsWhenChestInsufficient() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode initial = snapshotState(fx);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "OPEN_CHEST",
+                  "playerId": "player1",
+                  "count": 99,
+                  "expectedVersion": %d
+                }
+                """.formatted(initial.path("version").asLong())
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "not enough chests"));
+    }
+
+    @Test
+    void openChestRejectsWhenNodeResolving() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectJudgementNode(fx);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "OPEN_CHEST",
+                  "playerId": "player1",
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.path("state").path("version").asLong())
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "cannot open chest while resolving node"));
+    }
+
+    @Test
+    void openChestRejectsWhenExpectedVersionMismatched() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode bumped = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "CLEAR_RECENT_RESULTS",
+                  "playerId": "player1",
+                  "expectedVersion": 0
+                }
+                """
+        );
+        assertTrue(bumped.path("accepted").asBoolean());
+        long staleVersion = Math.max(0, bumped.path("state").path("version").asLong() - 1);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "OPEN_CHEST",
+                  "playerId": "player1",
+                  "expectedVersion": %d
+                }
+                """.formatted(staleVersion)
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "version mismatch"));
+    }
+
+    @Test
+    void resolveJudgementRequiresPendingAndResolvesNodeResult() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode initialState = snapshotState(fx);
+        String judgementChoiceId = findChoiceIdByPhase(initialState, "JUDGEMENT");
+
+        JsonNode selected = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "SELECT_NODE_CHOICE",
+                  "playerId": "player1",
+                  "choiceId": "%s",
+                  "expectedVersion": %d
+                }
+                """.formatted(judgementChoiceId, initialState.get("version").asLong())
+        );
+        assertTrue(selected.get("accepted").asBoolean());
+        assertEquals("JUDGEMENT", selected.path("state").path("players").path("player1").path("pendingDecision").path("type").asText());
+
+        long expectedVersion = selected.get("state").get("version").asLong();
+        JsonNode resolved = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "RESOLVE_JUDGEMENT",
+                  "playerId": "player1",
+                  "choiceId": "SUCCESS",
+                  "expectedVersion": %d
+                }
+                """.formatted(expectedVersion)
+        );
+
+        assertTrue(resolved.get("accepted").asBoolean());
+        assertTrue(resolved.get("state").path("run").path("resultPending").asBoolean());
+        assertTrue(resolved.path("state").path("players").path("player1").path("pendingDecision").isNull());
+    }
+
+    @Test
+    void resolveJudgementFailsWithoutPlayerToken() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectJudgementNode(fx);
+
+        mockMvc.perform(post("/api/sessions/{code}/command", fx.code)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "RESOLVE_JUDGEMENT",
+                                  "playerId": "player1",
+                                  "choiceId": "SUCCESS",
+                                  "expectedVersion": %d
+                                }
+                                """.formatted(selected.path("state").path("version").asLong())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void resolveJudgementFailsWhenTokenPlayerMismatch() throws Exception {
+        Fixture fx = createFixtureWithSecondPlayer();
+        JsonNode selected = selectJudgementNode(fx);
+
+        mockMvc.perform(post("/api/sessions/{code}/command", fx.code)
+                        .header("X-Player-Token", fx.otherPlayerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "RESOLVE_JUDGEMENT",
+                                  "playerId": "player1",
+                                  "choiceId": "SUCCESS",
+                                  "expectedVersion": %d
+                                }
+                                """.formatted(selected.path("state").path("version").asLong())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void resolveJudgementRejectsWhenNoPendingDecision() throws Exception {
+        Fixture fx = createFixture();
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "RESOLVE_JUDGEMENT",
+                  "playerId": "player1",
+                  "choiceId": "SUCCESS",
+                  "expectedVersion": 0
+                }
+                """
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "judgement is not pending"));
+    }
+
+    @Test
+    void resolveJudgementRejectsWhenChoiceInvalid() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectJudgementNode(fx);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "RESOLVE_JUDGEMENT",
+                  "playerId": "player1",
+                  "choiceId": "NOPE",
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.path("state").path("version").asLong())
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "invalid judgement choice"));
+    }
+
+    @Test
+    void resolveJudgementRejectsWhenExpectedVersionMismatched() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectJudgementNode(fx);
+        long staleVersion = Math.max(0, selected.path("state").path("version").asLong() - 1);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "RESOLVE_JUDGEMENT",
+                  "playerId": "player1",
+                  "choiceId": "SUCCESS",
+                  "expectedVersion": %d
+                }
+                """.formatted(staleVersion)
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "version mismatch"));
+    }
+
+    @Test
+    void playCardAndEndTurnRailsRemainStableAsRejectedNotHttpError() throws Exception {
+        Fixture fx = createFixture();
+
+        JsonNode playCardResponse = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "PLAY_CARD",
+                  "playerId": "player1",
+                  "cardId": "%s",
+                  "expectedVersion": 0
+                }
+                """.formatted(UUID.randomUUID())
+        );
+        assertFalse(playCardResponse.path("accepted").asBoolean());
+        assertTrue(playCardResponse.path("errors").isArray());
+        assertTrue(playCardResponse.path("errors").size() > 0);
+
+        JsonNode endTurnResponse = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "END_TURN",
+                  "playerId": "player1",
+                  "expectedVersion": 0
+                }
+                """
+        );
+        assertFalse(endTurnResponse.path("accepted").asBoolean());
+        assertTrue(endTurnResponse.path("errors").isArray());
+        assertTrue(endTurnResponse.path("errors").size() > 0);
+    }
+
     private JsonNode startCombatAndReachPlayerMainTurn(Fixture fx) throws Exception {
         JsonNode start = commandAsGm(
                 fx.code,
@@ -425,6 +971,71 @@ class SessionCommandExtensionIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         return JSON.readTree(result.getResponse().getContentAsString());
+    }
+
+    private JsonNode snapshotState(Fixture fx) throws Exception {
+        JsonNode probe = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "SEARCH_PICK",
+                  "playerId": "player1",
+                  "selectedIds": [],
+                  "expectedVersion": 0
+                }
+                """
+        );
+        return probe.get("state");
+    }
+
+    private String findChoiceIdByPhase(JsonNode stateNode, String phase) {
+        JsonNode choices = stateNode.path("run").path("availableChoices");
+        for (JsonNode choice : choices) {
+            if (phase.equals(choice.path("phase").asText()) && !choice.path("disabled").asBoolean()) {
+                return choice.path("id").asText();
+            }
+        }
+        fail("choice with phase not found: " + phase);
+        return null;
+    }
+
+    private JsonNode selectEventNode(Fixture fx) throws Exception {
+        JsonNode initialState = snapshotState(fx);
+        String eventChoiceId = findChoiceIdByPhase(initialState, "EVENT");
+        JsonNode selected = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "SELECT_NODE_CHOICE",
+                  "playerId": "player1",
+                  "choiceId": "%s",
+                  "expectedVersion": %d
+                }
+                """.formatted(eventChoiceId, initialState.get("version").asLong())
+        );
+        assertTrue(selected.path("accepted").asBoolean());
+        return selected;
+    }
+
+    private JsonNode selectJudgementNode(Fixture fx) throws Exception {
+        JsonNode initialState = snapshotState(fx);
+        String judgementChoiceId = findChoiceIdByPhase(initialState, "JUDGEMENT");
+        JsonNode selected = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "SELECT_NODE_CHOICE",
+                  "playerId": "player1",
+                  "choiceId": "%s",
+                  "expectedVersion": %d
+                }
+                """.formatted(judgementChoiceId, initialState.get("version").asLong())
+        );
+        assertTrue(selected.path("accepted").asBoolean());
+        return selected;
     }
 
     private JsonNode commandAsGm(String code, String gmToken, String body) throws Exception {

@@ -3,7 +3,7 @@ package com.example.dueltower.engine.model;
 import java.util.Objects;
 import java.util.UUID;
 
-public sealed interface PendingDecision permits PendingDecision.DiscardToHandLimit, PendingDecision.SearchPick, PendingDecision.InitiativeTieOrder {
+public sealed interface PendingDecision permits PendingDecision.DiscardToHandLimit, PendingDecision.SearchPick, PendingDecision.InitiativeTieOrder, PendingDecision.JudgementChoice {
     record DiscardToHandLimit(String reason, int limit) implements PendingDecision {
         public DiscardToHandLimit {
             Objects.requireNonNull(reason);
@@ -39,6 +39,20 @@ public sealed interface PendingDecision permits PendingDecision.DiscardToHandLim
         public InitiativeTieOrder {
             Objects.requireNonNull(reason);
             Objects.requireNonNull(actorKeys);
+        }
+    }
+
+    record JudgementChoice(String reason, java.util.List<String> choiceIds) implements PendingDecision {
+        public JudgementChoice {
+            Objects.requireNonNull(reason);
+            Objects.requireNonNull(choiceIds);
+            choiceIds = java.util.List.copyOf(choiceIds);
+            if (choiceIds.isEmpty()) {
+                throw new IllegalArgumentException("choiceIds must not be empty");
+            }
+            if (choiceIds.stream().anyMatch(id -> id == null || id.isBlank())) {
+                throw new IllegalArgumentException("choiceIds must not contain blank");
+            }
         }
     }
 
