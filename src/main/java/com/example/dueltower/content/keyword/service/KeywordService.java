@@ -1,11 +1,13 @@
 package com.example.dueltower.content.keyword.service;
 
 import com.example.dueltower.content.keyword.model.KeywordBlueprint;
+import com.example.dueltower.content.support.ContentLookupSupport;
 import com.example.dueltower.engine.core.effect.keyword.KeywordEffect;
 import com.example.dueltower.engine.model.KeywordDefinition;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+
 
 @Service
 public class KeywordService {
@@ -43,6 +45,10 @@ public class KeywordService {
     }
 
     public List<KeywordDefinition> list() { return all; }
+
+    public KeywordDefinition get(String id) {
+        return ContentLookupSupport.requireById(defsById, id, value -> value, "keyword");
+    }
     public Map<String, KeywordDefinition> defsMap() { return defsById; }
     public Map<String, KeywordEffect> effectsMap() { return effectsById; }
 }

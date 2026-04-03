@@ -3,6 +3,7 @@ package com.example.dueltower.content.keyword.api;
 import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.engine.model.KeywordDefinition;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,5 +21,10 @@ public class KeywordController {
     @GetMapping
     public List<KeywordDefinition> list() {
         return service.list();
+    }
+
+    @GetMapping("/{id}")
+    public KeywordDefinition get(@PathVariable String id) {
+        return service.get(id);
     }
 }

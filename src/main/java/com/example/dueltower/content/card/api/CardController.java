@@ -4,6 +4,7 @@ import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,5 +26,10 @@ public class CardController {
             return service.list();
         }
         return service.list(type);
+    }
+
+    @GetMapping("/{id}")
+    public CardDefinition get(@PathVariable String id) {
+        return service.get(id);
     }
 }

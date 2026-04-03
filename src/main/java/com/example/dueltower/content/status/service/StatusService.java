@@ -1,11 +1,13 @@
 package com.example.dueltower.content.status.service;
 
 import com.example.dueltower.content.status.model.StatusBlueprint;
+import com.example.dueltower.content.support.ContentLookupSupport;
 import com.example.dueltower.engine.core.effect.status.StatusEffect;
 import com.example.dueltower.engine.model.StatusDefinition;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+
 
 @Service
 public class StatusService {
@@ -43,6 +45,10 @@ public class StatusService {
     }
 
     public List<StatusDefinition> list() { return all; }
+
+    public StatusDefinition get(String id) {
+        return ContentLookupSupport.requireById(defsById, id, value -> value, "status");
+    }
     public Map<String, StatusDefinition> defsMap() { return defsById; }
     public Map<String, StatusEffect> effectsMap() { return effectsById; }
 }
