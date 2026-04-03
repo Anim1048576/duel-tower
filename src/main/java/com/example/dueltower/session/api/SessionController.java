@@ -26,6 +26,7 @@ import java.util.UUID;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
+import static org.springframework.http.HttpStatus.NO_CONTENT;
 
 @RestController
 @RequestMapping("/api/sessions")
@@ -154,6 +155,70 @@ public class SessionController {
         sessionService.updateDeck(code, actorPlayerId, playerId, req.requestedDeckOwnedCardIds());
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
+
+    @PostMapping("/{code}/players/{playerId}/loadout")
+    public SessionStateDto updateLoadout(@PathVariable String code,
+                                         @PathVariable String playerId,
+                                         @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                         @RequestBody(required = false) UpdateSessionLoadoutRequest req) {
+        if (req == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "request body is required");
+        }
+        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
+        if (!playerId.equals(actorPlayerId)) {
+            throw new ResponseStatusException(FORBIDDEN, "players may only edit their own loadout");
+        }
+        sessionService.updateLoadout(
+                code,
+                actorPlayerId,
+                playerId,
+                req.characterId(),
+                req.passiveIds(),
+                req.deckOwnedCardIds(),
+                req.exCardId()
+        );
+        return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+    }
+
+    @PostMapping("/{code}/leave")
+    public SessionStateDto leave(@PathVariable String code,
+                                 @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader) {
+        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
+        sessionService.leaveSession(code, actorPlayerId);
+        return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+    }
+
+    @PostMapping("/{code}/players/{playerId}/kick")
+    public SessionStateDto kick(@PathVariable String code,
+                                @PathVariable String playerId,
+                                @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                @RequestBody(required = false) KickPlayerRequest req) {
+        SessionRuntime rt = requireGmSession(code, gmTokenHeader);
+        if (req != null && req.reason() != null && !req.reason().isBlank()) {
+            log.info("session kick code={} playerId={} reason={}", code, playerId, req.reason().trim());
+        }
+        sessionService.kickPlayer(rt.code(), playerId);
+        return sessionService.withSessionLock(code, lockedRt -> StateMapper.toDto(lockedRt.code(), lockedRt.state()));
+    }
+
+    @PostMapping("/{code}/reset")
+    public SessionStateDto reset(@PathVariable String code,
+                                 @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                 @RequestBody(required = false) ResetSessionRequest req) {
+        SessionRuntime rt = requireGmSession(code, gmTokenHeader);
+        ResetSessionRequest resetReq = (req == null) ? new ResetSessionRequest(null, null, null) : req;
+        sessionService.resetSession(rt.code(), resetReq.keepPlayersOrDefault(), resetReq.keepLoadoutsOrDefault(), resetReq.newSeed());
+        return sessionService.withSessionLock(code, lockedRt -> StateMapper.toDto(lockedRt.code(), lockedRt.state()));
+    }
+
+    @DeleteMapping("/{code}")
+    @ResponseStatus(NO_CONTENT)
+    public void delete(@PathVariable String code,
+                       @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader) {
+        requireGmSession(code, gmTokenHeader);
+        sessionService.deleteSession(code);
+    }
+
     @PostMapping("/{code}/command")
     public EngineResponseDto command(@PathVariable String code,
                                      @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
@@ -255,6 +320,12 @@ public class SessionController {
 
         log.warn("START_COMBAT unauthorized: invalid GM token for code={}", rt.code());
         throw new ResponseStatusException(UNAUTHORIZED, "gm authorization required");
+    }
+
+    private SessionRuntime requireGmSession(String code, String gmTokenHeader) {
+        SessionRuntime rt = sessionService.get(code);
+        validateStartCombatAuthority(rt, gmTokenHeader);
+        return rt;
     }
 
     private static UUID parseOrNewUuid(String v) {
