@@ -4,6 +4,8 @@ import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.member.MemberRepository;
+import com.example.dueltower.preset.domain.Preset;
+import com.example.dueltower.preset.repository.PresetRepository;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,12 +43,16 @@ class SessionManagementIntegrationTest {
     @Autowired
     private CharacterProfileRepository characterProfileRepository;
 
+    @Autowired
+    private PresetRepository presetRepository;
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
         memberRepository.deleteAll();
         characterProfileRepository.deleteAll();
+        presetRepository.deleteAll();
     }
 
     @Test
@@ -273,6 +279,131 @@ class SessionManagementIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void applyPresetToLoadoutAllowsSelfApplyWithPlayerToken() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, info.code(), "player1");
+
+        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
+                .name("프리셋 캐릭터")
+                .gender(CharacterGender.OTHER)
+                .age(20)
+                .wish("테스트")
+                .disposition("중립")
+                .oneLiner("프리셋")
+                .story("preset apply")
+                .physical(10)
+                .technique(10)
+                .sense(10)
+                .willpower(10)
+                .trait1("P001")
+                .trait2("P002")
+                .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
+                .currentSkillDeck(List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"))
+                .exCard("{\"id\":\"EX901\"}")
+                .build());
+        Preset preset = presetRepository.save(Preset.create(
+                "player1",
+                "세션 적용 프리셋",
+                profile.getId(),
+                List.of(
+                        "C001", "C001", "C001",
+                        "C002", "C002", "C002",
+                        "C003", "C003", "C003",
+                        "C004", "C004", "C004"
+                ),
+                "EX901",
+                List.of("P001", "P002")
+        ));
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/from-preset", info.code(), "player1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "presetId": %d
+                                }
+                                """.formatted(preset.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.player1.passiveIds[0]").value("P001"))
+                .andExpect(jsonPath("$.players.player1.passiveIds[1]").value("P002"))
+                .andExpect(jsonPath("$.players.player1.deckOwnedCardIds.length()").value(12));
+    }
+
+    @Test
+    void applyPresetToLoadoutRejectsOtherPlayersPreset() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "gm");
+        MockHttpSession player1Session = signUpAndLogin("player1", "player1@example.com", "password123");
+        MockHttpSession player2Session = signUpAndLogin("player2", "player2@example.com", "password123");
+        String player1Token = joinAsPlayer(player1Session, info.code(), "player1");
+        joinAsPlayer(player2Session, info.code(), "player2");
+
+        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
+                .name("타인 프리셋")
+                .gender(CharacterGender.OTHER)
+                .age(20)
+                .wish("테스트")
+                .disposition("중립")
+                .oneLiner("타인")
+                .story("owner scope")
+                .physical(10)
+                .technique(10)
+                .sense(10)
+                .willpower(10)
+                .trait1("P001")
+                .trait2(null)
+                .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
+                .currentSkillDeck(List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"))
+                .exCard("{\"id\":\"EX901\"}")
+                .build());
+        Preset foreignPreset = presetRepository.save(Preset.create(
+                "player2",
+                "player2 preset",
+                profile.getId(),
+                List.of(
+                        "C001", "C001", "C001",
+                        "C002", "C002", "C002",
+                        "C003", "C003", "C003",
+                        "C004", "C004", "C004"
+                ),
+                "EX901",
+                List.of("P001")
+        ));
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/from-preset", info.code(), "player1")
+                        .header("X-Player-Token", player1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "presetId": %d
+                                }
+                                """.formatted(foreignPreset.getId())))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void applyPresetToLoadoutRejectsDifferentPathPlayerId() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "gm");
+        MockHttpSession player1Session = signUpAndLogin("player1", "player1@example.com", "password123");
+        MockHttpSession player2Session = signUpAndLogin("player2", "player2@example.com", "password123");
+        String player1Token = joinAsPlayer(player1Session, info.code(), "player1");
+        joinAsPlayer(player2Session, info.code(), "player2");
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/from-preset", info.code(), "player2")
+                        .header("X-Player-Token", player1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "presetId": 1
+                                }
+                                """))
+                .andExpect(status().isForbidden());
     }
 
     private SessionInfo createSession(MockHttpSession session, String gmId) throws Exception {

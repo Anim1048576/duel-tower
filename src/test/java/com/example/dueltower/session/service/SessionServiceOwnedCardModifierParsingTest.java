@@ -152,7 +152,7 @@ class SessionServiceOwnedCardModifierParsingTest {
     }
 
     private static SessionService newSessionService() {
-        return new SessionService(null, null, null, null, null, null, null, Duration.ofMinutes(30), Duration.ofMinutes(5));
+        return new SessionService(null, null, null, null, null, null, null, null, Duration.ofMinutes(30), Duration.ofMinutes(5));
     }
 
     @SuppressWarnings("unchecked")

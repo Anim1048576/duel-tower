@@ -22,6 +22,7 @@ import com.example.dueltower.common.api.ApiErrorResolver;
 import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.dto.OwnedCardModifierDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
+import com.example.dueltower.preset.service.PresetService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -60,6 +61,7 @@ public class SessionService {
     private final KeywordService keywordService;
     private final PassiveService passiveService;
     private final CardModifierService cardModifierService;
+    private final PresetService presetService;
     private final Duration sessionTtl;
     private final Duration cleanupInterval;
 
@@ -76,6 +78,7 @@ public class SessionService {
                           KeywordService keywordService,
                           PassiveService passiveService,
                           CardModifierService cardModifierService,
+                          PresetService presetService,
                           @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.characterProfileRepository = characterProfileRepository;
@@ -85,6 +88,7 @@ public class SessionService {
         this.keywordService = keywordService;
         this.passiveService = passiveService;
         this.cardModifierService = cardModifierService;
+        this.presetService = presetService;
         this.sessionTtl = sessionTtl;
         this.cleanupInterval = cleanupInterval;
     }
@@ -304,36 +308,29 @@ public class SessionService {
                                    List<String> passiveIdsRaw,
                                    List<String> deckOwnedCardIdsRaw,
                                    String exCardIdRaw) {
-        if (targetPlayerIdRaw == null || targetPlayerIdRaw.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
+        return applyLoadoutToPlayer(
+                code,
+                actorPlayerIdRaw,
+                targetPlayerIdRaw,
+                LoadoutApplySpec.direct(characterIdRaw, passiveIdsRaw, deckOwnedCardIdsRaw, exCardIdRaw)
+        );
+    }
+
+    public GameState applyPresetToLoadout(String code,
+                                          String actorPlayerIdRaw,
+                                          String targetPlayerIdRaw,
+                                          Long presetIdRaw) {
+        if (presetIdRaw == null || presetIdRaw <= 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "presetId must be positive");
         }
-        if (actorPlayerIdRaw == null || actorPlayerIdRaw.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, "actorPlayerId is required");
-        }
-
-        PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
-        PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
-        SessionRuntime rt = get(code);
-        return rt.withLock(() -> {
-            GameState state = rt.state();
-            if (!actor.equals(target)) {
-                throw new ResponseStatusException(FORBIDDEN, "players may only edit their own loadout");
-            }
-
-            PlayerState ps = state.player(target);
-            if (ps == null) {
-                throw new ResponseStatusException(NOT_FOUND, "player not found");
-            }
-
-            validateDeckEditableState(state.nodeState(), ps);
-            CharacterJoinTemplate characterTemplate = (characterIdRaw == null)
-                    ? null
-                    : toCharacterJoinTemplate(loadCharacterProfile(characterIdRaw));
-
-            applyLoadout(rt, state, ps, characterTemplate, characterIdRaw, passiveIdsRaw, deckOwnedCardIdsRaw, exCardIdRaw);
-            persistCharacterDeck(rt, target, ps.deckOwnedCardIds(), ps.ownedCards());
-            return state;
-        });
+        String ownerUsername = requirePlayerText(actorPlayerIdRaw, "actorPlayerId is required");
+        PresetService.PresetLoadout presetLoadout = presetService.getOwnedLoadout(ownerUsername, presetIdRaw);
+        return applyLoadoutToPlayer(
+                code,
+                actorPlayerIdRaw,
+                targetPlayerIdRaw,
+                LoadoutApplySpec.fromPreset(presetLoadout)
+        );
     }
 
 
@@ -747,6 +744,29 @@ public class SessionService {
             List<OwnedCardDto> ownedCards
     ) {}
 
+    private record LoadoutApplySpec(
+            Long characterId,
+            List<String> passiveIds,
+            List<String> deckCardIds,
+            String exCardId
+    ) {
+        private static LoadoutApplySpec direct(Long characterId,
+                                               List<String> passiveIds,
+                                               List<String> deckCardIds,
+                                               String exCardId) {
+            return new LoadoutApplySpec(characterId, passiveIds, deckCardIds, exCardId);
+        }
+
+        private static LoadoutApplySpec fromPreset(PresetService.PresetLoadout presetLoadout) {
+            return new LoadoutApplySpec(
+                    presetLoadout.characterId(),
+                    presetLoadout.passiveIds(),
+                    presetLoadout.deckCardIds(),
+                    presetLoadout.exCardId()
+            );
+        }
+    }
+
     private List<String> parsePassiveIds(List<String> passiveIdsRaw) {
         if (passiveIdsRaw == null) return List.of();
         if (passiveIdsRaw.size() > PlayerState.MAX_PASSIVES) {
@@ -863,6 +883,59 @@ public class SessionService {
         loadDeck(state, ps, effectiveDeckOwnedCardIds);
         addCardToEx(state, ps, new CardDefId(normalizeExCardId(effectiveExCardId)));
         shuffleDeck(state, ps);
+    }
+
+    /**
+     * loadout 반영 단일 경로.
+     * - 일반 업데이트 / preset 적용 모두 동일한 검증/반영 흐름으로 처리한다.
+     * - 다음 단계에서 clone preset 등 확장 시 LoadoutApplySpec 변환만 추가하면 된다.
+     */
+    private GameState applyLoadoutToPlayer(String code,
+                                           String actorPlayerIdRaw,
+                                           String targetPlayerIdRaw,
+                                           LoadoutApplySpec spec) {
+        String actorPlayerId = requirePlayerText(actorPlayerIdRaw, "actorPlayerId is required");
+        String targetPlayerId = requirePlayerText(targetPlayerIdRaw, "playerId is required");
+
+        PlayerId actor = new PlayerId(actorPlayerId);
+        PlayerId target = new PlayerId(targetPlayerId);
+        SessionRuntime rt = get(code);
+        return rt.withLock(() -> {
+            GameState state = rt.state();
+            if (!actor.equals(target)) {
+                throw new ResponseStatusException(FORBIDDEN, "players may only edit their own loadout");
+            }
+
+            PlayerState ps = state.player(target);
+            if (ps == null) {
+                throw new ResponseStatusException(NOT_FOUND, "player not found");
+            }
+
+            validateDeckEditableState(state.nodeState(), ps);
+            CharacterJoinTemplate characterTemplate = (spec.characterId() == null)
+                    ? null
+                    : toCharacterJoinTemplate(loadCharacterProfile(spec.characterId()));
+
+            applyLoadout(
+                    rt,
+                    state,
+                    ps,
+                    characterTemplate,
+                    spec.characterId(),
+                    spec.passiveIds(),
+                    spec.deckCardIds(),
+                    spec.exCardId()
+            );
+            persistCharacterDeck(rt, target, ps.deckOwnedCardIds(), ps.ownedCards());
+            return state;
+        });
+    }
+
+    private String requirePlayerText(String raw, String message) {
+        if (raw == null || raw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, message);
+        }
+        return raw.trim();
     }
 
     private List<OwnedCard> resolveLoadoutOwnedCards(PlayerState ps, CharacterJoinTemplate characterTemplate) {
