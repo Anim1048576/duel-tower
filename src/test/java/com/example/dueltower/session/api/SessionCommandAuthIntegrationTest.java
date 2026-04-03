@@ -81,6 +81,27 @@ class SessionCommandAuthIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+
+    @Test
+    void useItemWithoutPlayerTokenReturns401() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        String code = createSession(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
+        joinAsPlayer(playerSession, code, "player1");
+
+        mockMvc.perform(post("/api/sessions/{code}/command", code)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "USE_ITEM",
+                                  "playerId": "player1",
+                                  "itemId": "I-1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
     @Test
     void startCombatWithoutValidGmTokenReturns401() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
