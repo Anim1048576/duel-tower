@@ -19,7 +19,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -40,6 +39,8 @@ public class SessionController {
             "END_TURN",
             "USE_EX",
             "USE_SUMMON_ACTION",
+            "USE_ITEM",
+            "SURRENDER_COMBAT",
             "DISCARD_TO_HAND_LIMIT",
             "RESOLVE_INITIATIVE_TIE",
             "SEARCH_PICK",
@@ -242,7 +243,7 @@ public class SessionController {
                                      @RequestBody CommandRequest req) {
         long startNs = System.nanoTime();
 
-        if (req == null || req.type() == null || req.type().isBlank()) {
+        if (req == null || req.normalizedType().isEmpty()) {
             throw new ResponseStatusException(BAD_REQUEST, "type is required");
         }
         if (req.expectedVersion() == null) {
@@ -250,19 +251,13 @@ public class SessionController {
         }
         SessionRuntime rt = sessionService.get(code);
 
-        String t = req.type().trim().toUpperCase(Locale.ROOT);
+        String t = req.normalizedType();
         if ("START_COMBAT".equals(t)) {
-            requirePlayer(req.playerId());
+            requirePlayer(req.trimmedPlayerId());
             validateStartCombatAuthority(rt, gmTokenHeader);
         }
 
-        if (PLAYER_AUTH_REQUIRED_TYPES.contains(t)) {
-            requirePlayer(req.playerId());
-            String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
-            if (!req.playerId().trim().equals(actorPlayerId)) {
-                throw new ResponseStatusException(FORBIDDEN, "playerId mismatch");
-            }
-        }
+        validatePlayerAuthorityIfRequired(code, playerTokenHeader, req, t);
 
         if (GM_AUTH_REQUIRED_TYPES.contains(t)) {
             validateStartCombatAuthority(rt, gmTokenHeader);
@@ -270,15 +265,17 @@ public class SessionController {
 
         UUID commandId = parseOrNewUuid(req.commandId());
 
-        log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} summonId={} count={} discardIds={} targetPlayers={} targetEnemies={} targets={}",
+        log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} summonId={} itemId={} count={} reason={} discardIds={} targetPlayers={} targetEnemies={} targets={}",
                 code,
-                req.type(),
-                (req.playerId() == null) ? null : req.playerId().trim(),
+                t,
+                req.trimmedPlayerId(),
                 req.expectedVersion(),
                 commandId,
-                (req.cardId() == null) ? null : req.cardId().trim(),
-                (req.summonId() == null) ? null : req.summonId().trim(),
+                req.trimmedCardId(),
+                req.trimmedSummonId(),
+                req.trimmedItemId(),
                 req.count(),
+                req.trimmedReason(),
                 (req.discardIds() == null) ? 0 : req.discardIds().size(),
                 (req.targetPlayerIds() == null) ? 0 : req.targetPlayerIds().size(),
                 (req.targetEnemyIds() == null) ? 0 : req.targetEnemyIds().size(),
@@ -444,7 +441,7 @@ public class SessionController {
     }
 
     private static GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
-        String type = req.type().trim().toUpperCase(Locale.ROOT);
+        String type = req.normalizedType();
         switch (type) {
             case "START_COMBAT" -> {
                 PlayerId playerId = parsePlayerId(req.playerId());
@@ -453,7 +450,7 @@ public class SessionController {
             case "DRAW" -> {
                 // DRAW is a public product-rule command (validated by main-turn constraints in DrawCommand).
                 PlayerId playerId = parsePlayerId(req.playerId());
-                int count = (req.count() == null) ? 1 : req.count();
+                int count = req.countOrDefault(1);
                 return new DrawCommand(commandId, expectedVersion, playerId, count);
             }
             case "END_TURN" -> {
@@ -467,11 +464,7 @@ public class SessionController {
             }
             case "PLAY_CARD" -> {
                 PlayerId playerId = parsePlayerId(req.playerId());
-                if (req.cardId() == null || req.cardId().isBlank()) {
-                    throw new ResponseStatusException(BAD_REQUEST, "cardId is required");
-                }
-
-                CardInstId id = parseCardInstId(req.cardId(), "cardId");
+                CardInstId id = parseCardInstId(requireText(req.trimmedCardId(), "cardId"), "cardId");
                 TargetSelection sel = parseTargetSelection(req);
 
                 return new PlayCardCommand(commandId, expectedVersion, playerId, id, sel);
@@ -484,11 +477,7 @@ public class SessionController {
             }
             case "ENEMY_PLAY_CARD" -> {
                 Ids.EnemyId enemyId = parseEnemyId(req.enemyId());
-                if (req.cardId() == null || req.cardId().isBlank()) {
-                    throw new ResponseStatusException(BAD_REQUEST, "cardId is required");
-                }
-
-                CardInstId id = parseCardInstId(req.cardId(), "cardId");
+                CardInstId id = parseCardInstId(requireText(req.trimmedCardId(), "cardId"), "cardId");
                 TargetSelection sel = parseTargetSelection(req);
 
                 return new EnemyPlayCardCommand(commandId, expectedVersion, enemyId, id, sel);
@@ -504,12 +493,21 @@ public class SessionController {
             }
             case "USE_SUMMON_ACTION" -> {
                 PlayerId playerId = parsePlayerId(req.playerId());
-                if (req.summonId() == null || req.summonId().isBlank()) {
-                    throw new ResponseStatusException(BAD_REQUEST, "summonId is required");
-                }
-                Ids.SummonInstId summonId = parseSummonInstId(req.summonId(), "summonId");
+                Ids.SummonInstId summonId = parseSummonInstId(requireText(req.trimmedSummonId(), "summonId"), "summonId");
                 TargetSelection sel = parseTargetSelection(req);
                 return new UseSummonActionCommand(commandId, expectedVersion, playerId, summonId, sel);
+            }
+            case "USE_ITEM" -> {
+                PlayerId playerId = parsePlayerId(req.playerId());
+                String itemId = requireText(req.trimmedItemId(), "itemId");
+                int count = req.countOrDefault(1);
+                TargetSelection sel = parseTargetSelection(req);
+                return new UseItemCommand(commandId, expectedVersion, playerId, itemId, count, sel);
+            }
+            case "SURRENDER_COMBAT" -> {
+                PlayerId playerId = parsePlayerId(req.playerId());
+                String reason = req.trimmedReason();
+                return new SurrenderCombatCommand(commandId, expectedVersion, playerId, reason);
             }
             case "DISCARD_TO_HAND_LIMIT" -> {
                 PlayerId playerId = parsePlayerId(req.playerId());
@@ -539,22 +537,41 @@ public class SessionController {
             }
             case "SELECT_NODE_CHOICE" -> {
                 PlayerId playerId = parsePlayerId(req.playerId());
-                if (req.choiceId() == null || req.choiceId().isBlank()) {
-                    throw new ResponseStatusException(BAD_REQUEST, "choiceId is required");
-                }
-                return new SelectNodeChoiceCommand(commandId, expectedVersion, playerId, req.choiceId().trim());
+                return new SelectNodeChoiceCommand(commandId, expectedVersion, playerId, requireText(req.trimmedChoiceId(), "choiceId"));
             }
             case "CLEAR_RECENT_RESULTS" -> {
                 PlayerId playerId = parsePlayerId(req.playerId());
                 return new ClearRecentResultsCommand(commandId, expectedVersion, playerId);
             }
+            // 다음 라운드 확장 포인트(미구현):
+            // - BUY_SHOP_ITEM: offerId(+ playerId, expectedVersion)
+            // - OPEN_CHEST: count(+ playerId, expectedVersion)
+            // - RESOLVE_JUDGEMENT: choiceId/selectedIds(+ playerId, expectedVersion)
+            case "BUY_SHOP_ITEM", "OPEN_CHEST", "RESOLVE_JUDGEMENT" ->
+                    throw new ResponseStatusException(BAD_REQUEST, "command type not implemented yet: " + type);
             default -> throw new ResponseStatusException(BAD_REQUEST, "unknown command type: " + req.type());
         }
     }
 
-    private static void requirePlayer(String playerId) {
-        if (playerId == null || playerId.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
+    private static String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, fieldName + " is required");
         }
+        return value.trim();
+    }
+
+    private void validatePlayerAuthorityIfRequired(String code, String playerTokenHeader, CommandRequest req, String type) {
+        if (!PLAYER_AUTH_REQUIRED_TYPES.contains(type)) {
+            return;
+        }
+        String requestPlayerId = requireText(req.trimmedPlayerId(), "playerId");
+        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
+        if (!requestPlayerId.equals(actorPlayerId)) {
+            throw new ResponseStatusException(FORBIDDEN, "playerId mismatch");
+        }
+    }
+
+    private static void requirePlayer(String playerId) {
+        requireText(playerId, "playerId");
     }
 }
