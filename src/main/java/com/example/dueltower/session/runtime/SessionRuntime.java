@@ -4,9 +4,12 @@ import com.example.dueltower.engine.command.GameCommand;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
+import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,6 +22,8 @@ import java.util.function.Supplier;
  */
 public final class SessionRuntime {
 
+    public record StoredEvent(long cursor, long version, GameEvent event, Instant occurredAt) {}
+
     private final String code;
     private final String gmId;
     private final String gmToken;
@@ -29,10 +34,12 @@ public final class SessionRuntime {
     private final GameState state;
     private final EngineContext ctx;
     private final GameEngine engine;
+    private final List<StoredEvent> eventHistory = new ArrayList<>();
 
     private final Object lock = new Object();
     private final Instant createdAt;
     private volatile Instant lastAccessedAt;
+    private long nextEventCursor = 1L;
 
     public SessionRuntime(String code, String gmId, String gmToken, GameState state, EngineContext ctx) {
         this.code = code;
@@ -110,7 +117,22 @@ public final class SessionRuntime {
     public EngineResult apply(GameCommand cmd) {
         synchronized (lock) {
             touchAccess();
-            return engine.process(state, ctx, cmd);
+            EngineResult result = engine.process(state, ctx, cmd);
+            if (result.accepted() && !result.events().isEmpty()) {
+                long version = state.version();
+                Instant occurredAt = Instant.now();
+                for (GameEvent event : result.events()) {
+                    eventHistory.add(new StoredEvent(nextEventCursor++, version, event, occurredAt));
+                }
+            }
+            return result;
+        }
+    }
+
+    public List<StoredEvent> eventHistorySnapshot() {
+        synchronized (lock) {
+            touchAccess();
+            return List.copyOf(eventHistory);
         }
     }
 }

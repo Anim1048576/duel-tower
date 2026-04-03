@@ -266,7 +266,7 @@ public final class StateMapper {
         return out;
     }
 
-    private static EventDto toEventDto(GameEvent ev) {
+    public static EventDto toEventDto(GameEvent ev) {
         if (ev instanceof GameEvent.LogAppended e) {
             return new EventDto("LOG_APPENDED", Map.of("line", e.line()));
         }
