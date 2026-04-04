@@ -82,6 +82,13 @@ public final class SessionRuntime {
         return characterIdByPlayerId.get(playerId);
     }
 
+    public void clearCharacterBinding(String playerId) {
+        if (playerId == null || playerId.isBlank()) {
+            return;
+        }
+        characterIdByPlayerId.remove(playerId.trim());
+    }
+
     public void removePlayerBindings(String playerId) {
         if (playerId == null || playerId.isBlank()) {
             return;

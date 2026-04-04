@@ -101,6 +101,17 @@ class SessionLogControllerIntegrationTest {
     }
 
     @Test
+    void eventsCanBeReadByAuthenticatedGmWithoutTokenHeader() throws Exception {
+        SessionFixture fixture = createFixture("gm", "player1");
+        commandClearRecentResults(fixture.code(), fixture.playerToken(), 0);
+
+        mockMvc.perform(get("/api/sessions/{code}/events", fixture.code())
+                        .session(fixture.gmSession()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray());
+    }
+
+    @Test
     void logsCanBeReadByParticipantWithDefaultQuery() throws Exception {
         SessionFixture fixture = createFixture("gm", "player1");
         commandClearRecentResults(fixture.code(), fixture.playerToken(), 0);
@@ -156,6 +167,17 @@ class SessionLogControllerIntegrationTest {
 
         mockMvc.perform(get("/api/sessions/{code}/logs", fixture.code())
                         .header("X-GM-Token", fixture.gmToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray());
+    }
+
+    @Test
+    void logsCanBeReadByAuthenticatedParticipantWithoutTokenHeader() throws Exception {
+        SessionFixture fixture = createFixture("gm", "player1");
+        commandClearRecentResults(fixture.code(), fixture.playerToken(), 0);
+
+        mockMvc.perform(get("/api/sessions/{code}/logs", fixture.code())
+                        .session(fixture.playerSession()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray());
     }
@@ -220,7 +242,7 @@ class SessionLogControllerIntegrationTest {
         MockHttpSession playerSession = signUpAndLogin(playerUsername, playerUsername + "@example.com", "password123");
         String playerToken = joinAsPlayer(playerSession, create.code(), playerUsername);
 
-        return new SessionFixture(create.code(), create.gmToken(), playerToken);
+        return new SessionFixture(create.code(), create.gmToken(), playerToken, gmSession, playerSession);
     }
 
     private void commandClearRecentResults(String code, String playerToken, long expectedVersion) throws Exception {
@@ -315,7 +337,11 @@ class SessionLogControllerIntegrationTest {
         return json.get("playerToken").asText();
     }
 
-    private record SessionFixture(String code, String gmToken, String playerToken) {}
+    private record SessionFixture(String code,
+                                  String gmToken,
+                                  String playerToken,
+                                  MockHttpSession gmSession,
+                                  MockHttpSession playerSession) {}
 
     private record CreateSessionResult(String code, String gmToken) {}
 }
