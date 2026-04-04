@@ -51,16 +51,7 @@ public record OpenChestCommand(
 
         InventoryCommandSupport.addInventoryItemCount(
                 state,
-                new RunState.InventoryItem(
-                        "I-1",
-                        "소형 회복 물약",
-                        1,
-                        false,
-                        true,
-                        "전투 중 사용 가능 · 체력 20 회복",
-                        "즉시 체력을 20 회복합니다. 턴 소모 없이 사용됩니다.",
-                        List.of("소모품", "회복")
-                ),
+                new RunState.InventoryItem("I-1", 1, false),
                 gainedPotion
         );
 

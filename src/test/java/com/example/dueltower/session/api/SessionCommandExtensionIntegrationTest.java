@@ -163,6 +163,52 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    void useItemRejectsAntidoteWhenTargetMissing() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "USE_ITEM",
+                  "playerId": "player1",
+                  "itemId": "I-2",
+                  "count": 1,
+                  "expectedVersion": %d
+                }
+                """.formatted(stateAfterStart.get("version").asLong())
+        );
+
+        assertFalse(response.get("accepted").asBoolean());
+        assertTrue(hasError(response, "player target required"));
+    }
+
+    @Test
+    void useItemAntidoteSucceedsWhenTargetProvided() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "USE_ITEM",
+                  "playerId": "player1",
+                  "itemId": "I-2",
+                  "count": 1,
+                  "targetPlayerIds": ["player1"],
+                  "expectedVersion": %d
+                }
+                """.formatted(stateAfterStart.get("version").asLong())
+        );
+
+        assertTrue(response.get("accepted").asBoolean());
+    }
+
+    @Test
     void useItemRejectsWhenCombatNotStarted() throws Exception {
         Fixture fx = createFixture();
 
@@ -181,6 +227,31 @@ class SessionCommandExtensionIntegrationTest {
 
         assertFalse(response.get("accepted").asBoolean());
         assertTrue(hasError(response, "combat not started"));
+    }
+
+    @Test
+    void useItemSmokeBombSucceedsAndConsumesInventory() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
+        long expectedVersion = stateAfterStart.get("version").asLong();
+        int beforeCount = findItemCountOrZero(stateAfterStart, "I-4");
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "USE_ITEM",
+                  "playerId": "player1",
+                  "itemId": "I-4",
+                  "count": 1,
+                  "expectedVersion": %d
+                }
+                """.formatted(expectedVersion)
+        );
+
+        assertTrue(response.get("accepted").asBoolean());
+        assertEquals(beforeCount - 1, findItemCountOrZero(response.get("state"), "I-4"));
     }
 
     @Test
@@ -476,7 +547,7 @@ class SessionCommandExtensionIntegrationTest {
         );
 
         assertTrue(bought.get("accepted").asBoolean());
-        assertEquals(beforeGold - 320, bought.get("state").path("run").path("inventory").path("gold").asInt());
+        assertEquals(beforeGold - 60, bought.get("state").path("run").path("inventory").path("gold").asInt());
         assertEquals(beforeSmokeBomb + 1, findItemCount(bought.get("state"), "I-4"));
         assertTrue(bought.get("state").path("run").path("resultPending").asBoolean());
     }
@@ -1049,6 +1120,16 @@ class SessionCommandExtensionIntegrationTest {
             }
         }
         throw new IllegalStateException("item not found: " + itemId);
+    }
+
+    private int findItemCountOrZero(JsonNode stateNode, String itemId) {
+        JsonNode items = stateNode.path("run").path("inventory").path("items");
+        for (JsonNode item : items) {
+            if (itemId.equals(item.path("id").asText())) {
+                return item.path("count").asInt();
+            }
+        }
+        return 0;
     }
 
     private JsonNode commandAsPlayer(String code, String playerToken, String body) throws Exception {

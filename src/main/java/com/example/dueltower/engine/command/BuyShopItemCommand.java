@@ -52,7 +52,7 @@ public record BuyShopItemCommand(
             return errors;
         }
 
-        long totalCost = (long) offer.priceGold() * count;
+        long totalCost = (long) offer.price() * count;
         if (totalCost > state.runState().inventory().gold()) {
             errors.add("not enough gold");
         }
@@ -66,19 +66,23 @@ public record BuyShopItemCommand(
             return List.of();
         }
 
-        InventoryCommandSupport.addInventoryItemCount(state, offer.item(), count);
-        int totalCost = offer.priceGold() * count;
+        InventoryCommandSupport.addInventoryItemCount(
+                state,
+                new RunState.InventoryItem(offer.itemId(), 1, offer.bound()),
+                count
+        );
+        int totalCost = offer.price() * count;
 
         state.runState().resolveCurrentNode(
                 "reward",
                 "상점 구매 완료",
-                offer.item().name() + " x" + count + " 구매",
-                "상점에서 " + offer.item().name() + "을(를) 구매했다. 총 " + totalCost + "G 지불.",
+                offer.itemId() + " x" + count + " 구매",
+                "상점에서 " + offer.itemId() + "을(를) 구매했다. 총 " + totalCost + "G 지불.",
                 -totalCost,
                 0,
                 0
         );
 
-        return List.of(new GameEvent.LogAppended(playerId.value() + " 상점 구매: " + offer.id() + " x" + count));
+        return List.of(new GameEvent.LogAppended(playerId.value() + " 상점 구매: " + offer.offerId() + " x" + count));
     }
 }

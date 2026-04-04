@@ -1,10 +1,12 @@
 package com.example.dueltower.content;
 
 import com.example.dueltower.content.card.service.CardService;
+import com.example.dueltower.content.item.service.ItemService;
 import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
 import com.example.dueltower.engine.model.CardDefinition;
+import com.example.dueltower.engine.model.ItemDefinition;
 import com.example.dueltower.engine.model.KeywordDefinition;
 import com.example.dueltower.engine.model.PassiveDefinition;
 import com.example.dueltower.engine.model.StatusDefinition;
@@ -15,8 +17,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.emptyOrNullString;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -40,6 +44,9 @@ class ContentDetailApiIntegrationTest {
 
     @Autowired
     private KeywordService keywordService;
+
+    @Autowired
+    private ItemService itemService;
 
     @Test
     void cardDetailShouldBeAccessibleWithoutLoginAndContainCoreFields() throws Exception {
@@ -154,11 +161,50 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    void itemDetailShouldReturnOkForKnownId() throws Exception {
+        ItemDefinition knownItem = itemService.list().stream().findFirst().orElseThrow();
+
+        mockMvc.perform(get("/api/content/items/{id}", knownItem.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(knownItem.id()))
+                .andExpect(jsonPath("$.name", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.summary", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.description", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.battleUsable").isBoolean())
+                .andExpect(jsonPath("$.tags").isArray());
+    }
+
+    @Test
+    void itemDetailShouldAllowTrimmedIdLookup() throws Exception {
+        ItemDefinition knownItem = itemService.list().stream().findFirst().orElseThrow();
+
+        mockMvc.perform(get("/api/content/items/{id}", " " + knownItem.id() + " "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(knownItem.id()));
+    }
+
+    @Test
+    void itemDetailShouldReturnNotFoundForUnknownId() throws Exception {
+        mockMvc.perform(get("/api/content/items/{id}", "__UNKNOWN_ITEM__"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void itemListShouldReturnRegisteredItems() throws Exception {
+        mockMvc.perform(get("/api/content/items"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(greaterThanOrEqualTo(5)))
+                .andExpect(jsonPath("$[*].id", hasItems("I-1", "I-2", "I-3", "I-4", "I-5")));
+    }
+
+    @Test
     void contentDetailEndpointsAndCardListShouldRemainPublic() throws Exception {
         CardDefinition knownCard = cardService.list().stream().findFirst().orElseThrow();
         PassiveDefinition knownPassive = passiveService.list().stream().findFirst().orElseThrow();
         StatusDefinition knownStatus = statusService.list().stream().findFirst().orElseThrow();
         KeywordDefinition knownKeyword = keywordService.list().stream().findFirst().orElseThrow();
+        ItemDefinition knownItem = itemService.list().stream().findFirst().orElseThrow();
 
         mockMvc.perform(get("/api/content/cards"))
                 .andExpect(status().isOk());
@@ -170,6 +216,10 @@ class ContentDetailApiIntegrationTest {
         mockMvc.perform(get("/api/content/statuses/{id}", knownStatus.id()))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/content/keywords/{id}", knownKeyword.id()))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/content/items"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/content/items/{id}", knownItem.id()))
                 .andExpect(status().isOk());
     }
 }

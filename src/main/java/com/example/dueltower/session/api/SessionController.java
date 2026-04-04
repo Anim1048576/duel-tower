@@ -8,6 +8,7 @@ import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.TargetRef;
 import com.example.dueltower.engine.model.TargetSelection;
+import com.example.dueltower.content.item.service.ItemService;
 import com.example.dueltower.session.service.SessionService;
 import com.example.dueltower.session.dto.*;
 import com.example.dueltower.session.runtime.SessionRuntime;
@@ -62,8 +63,9 @@ public class SessionController {
 
     private final SessionService sessionService;
 
-    public SessionController(SessionService sessionService) {
+    public SessionController(SessionService sessionService, ItemService itemService) {
         this.sessionService = sessionService;
+        StateMapper.configureItemService(itemService);
     }
 
     @PostMapping

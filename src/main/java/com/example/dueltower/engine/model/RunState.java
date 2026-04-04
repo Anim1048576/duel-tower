@@ -62,20 +62,17 @@ public final class RunState {
     ) {}
 
     public record InventoryItem(
-            String id,
-            String name,
+            String itemId,
             int count,
-            boolean bound,
-            boolean battleUsable,
-            String summary,
-            String description,
-            List<String> tags
+            boolean bound
     ) {}
 
     public record ShopOffer(
-            String id,
-            int priceGold,
-            InventoryItem item
+            String offerId,
+            String itemId,
+            int price,
+            int stock,
+            boolean bound
     ) {}
 
     public static final class Inventory {
@@ -112,16 +109,8 @@ public final class RunState {
     );
 
     private static final List<ShopOffer> DEFAULT_SHOP_OFFERS = List.of(
-            new ShopOffer(
-                    "O-1",
-                    180,
-                    new InventoryItem("I-1", "소형 회복 물약", 1, false, true, "전투 중 사용 가능 · 체력 20 회복", "즉시 체력을 20 회복합니다. 턴 소모 없이 사용됩니다.", List.of("소모품", "회복"))
-            ),
-            new ShopOffer(
-                    "O-2",
-                    320,
-                    new InventoryItem("I-4", "긴급 연막탄", 1, true, true, "전투 중 사용 가능 · 회피 상승", "현재 턴 동안 회피율이 크게 상승합니다.", List.of("전투 아이템"))
-            )
+            new ShopOffer("O-1", "I-1", 25, 5, false),
+            new ShopOffer("O-2", "I-4", 60, 2, true)
     );
 
     private int floor = 1;
@@ -244,7 +233,7 @@ public final class RunState {
             return null;
         }
         for (ShopOffer offer : DEFAULT_SHOP_OFFERS) {
-            if (offer.id().equals(offerId.trim())) {
+            if (offer.offerId().equals(offerId.trim())) {
                 return offer;
             }
         }
@@ -310,11 +299,11 @@ public final class RunState {
 
     private static List<InventoryItem> defaultInventoryItems() {
         return List.of(
-                new InventoryItem("I-1", "소형 회복 물약", 8, false, true, "전투 중 사용 가능 · 체력 20 회복", "즉시 체력을 20 회복합니다. 턴 소모 없이 사용됩니다.", List.of("소모품", "회복")),
-                new InventoryItem("I-2", "해독제", 3, true, true, "전투 중 사용 가능 · 디버프 해제", "출혈/중독 등 해로운 상태효과 1개를 제거합니다.", List.of("소모품", "정화")),
-                new InventoryItem("I-3", "단단한 가죽끈", 12, false, false, "제작 재료", "장비 제작에 사용되는 기본 재료입니다.", List.of("재료")),
-                new InventoryItem("I-4", "긴급 연막탄", 2, true, true, "전투 중 사용 가능 · 회피 상승", "현재 턴 동안 회피율이 크게 상승합니다.", List.of("전투 아이템")),
-                new InventoryItem("I-5", "강화석 파편", 16, false, false, "강화 재료", "장비 강화 수치에 따라 다량으로 요구됩니다.", List.of("재료"))
+                new InventoryItem("I-1", 3, false),
+                new InventoryItem("I-2", 1, false),
+                new InventoryItem("I-3", 2, false),
+                new InventoryItem("I-4", 1, true),
+                new InventoryItem("I-5", 8, false)
         );
     }
 }
