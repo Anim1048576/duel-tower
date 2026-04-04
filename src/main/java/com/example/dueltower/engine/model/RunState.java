@@ -251,6 +251,22 @@ public final class RunState {
         return null;
     }
 
+    public void appendRecentResult(String type,
+                                   String title,
+                                   String summary,
+                                   String detail,
+                                   String source) {
+        appendResult(new RecentResult(
+                "result-" + UUID.randomUUID(),
+                type,
+                title,
+                summary,
+                detail,
+                (source == null) ? "" : source,
+                Instant.now().toString()
+        ));
+    }
+
     private void appendResult(RecentResult result) {
         recentResults.add(0, result);
         if (recentResults.size() > 20) {

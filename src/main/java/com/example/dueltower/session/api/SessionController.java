@@ -44,6 +44,8 @@ public class SessionController {
             "OPEN_CHEST",
             "RESOLVE_JUDGEMENT",
             "SURRENDER_COMBAT",
+            "SELL_INVENTORY_ITEM",
+            "RETREAT_COMBAT",
             "DISCARD_TO_HAND_LIMIT",
             "RESOLVE_INITIATIVE_TIE",
             "SEARCH_PICK",
@@ -99,12 +101,65 @@ public class SessionController {
                                                @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                                Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        validateRecentResultsReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        validateSessionReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
         return rt.withLock(() -> new RecentResultsResponse(
                 rt.state().version(),
                 rt.state().runState().resultPending(),
                 StateMapper.toCurrentNodeDto(rt.state().runState()),
                 StateMapper.toRecentResultDtos(rt.state().runState())
+        ));
+    }
+
+    @GetMapping("/{code}/run")
+    public RunStateDto run(@PathVariable String code,
+                           @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                           @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                           Authentication authentication) {
+        SessionRuntime rt = sessionService.get(code);
+        validateSessionReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        return rt.withLock(() -> StateMapper.toRunDto(rt.state().runState()));
+    }
+
+    @GetMapping("/{code}/inventory")
+    public SessionRunInventoryResponse inventory(@PathVariable String code,
+                                                 @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                                 @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                                 Authentication authentication) {
+        SessionRuntime rt = sessionService.get(code);
+        validateSessionReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        return rt.withLock(() -> new SessionRunInventoryResponse(
+                rt.state().version(),
+                StateMapper.toInventoryDto(rt.state().runState())
+        ));
+    }
+
+    @GetMapping("/{code}/results")
+    public RecentResultsResponse results(@PathVariable String code,
+                                         @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                         @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                         Authentication authentication) {
+        SessionRuntime rt = sessionService.get(code);
+        validateSessionReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        return rt.withLock(() -> new RecentResultsResponse(
+                rt.state().version(),
+                rt.state().runState().resultPending(),
+                StateMapper.toCurrentNodeDto(rt.state().runState()),
+                StateMapper.toRecentResultDtos(rt.state().runState())
+        ));
+    }
+
+    @GetMapping("/{code}/choices")
+    public SessionRunChoicesResponse choices(@PathVariable String code,
+                                             @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                             @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                             Authentication authentication) {
+        SessionRuntime rt = sessionService.get(code);
+        validateSessionReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        return rt.withLock(() -> new SessionRunChoicesResponse(
+                rt.state().version(),
+                rt.state().runState().resultPending(),
+                StateMapper.toCurrentNodeDto(rt.state().runState()),
+                StateMapper.toNodeChoiceDtos(rt.state().runState())
         ));
     }
 
@@ -369,10 +424,10 @@ public class SessionController {
         throw new ResponseStatusException(UNAUTHORIZED, "gm authorization required");
     }
 
-    private void validateRecentResultsReadAccess(SessionRuntime rt,
-                                                 String gmTokenHeader,
-                                                 String playerTokenHeader,
-                                                 Authentication authentication) {
+    private void validateSessionReadAccess(SessionRuntime rt,
+                                           String gmTokenHeader,
+                                           String playerTokenHeader,
+                                           Authentication authentication) {
         String gmToken = (gmTokenHeader == null) ? "" : gmTokenHeader.trim();
         if (!gmToken.isEmpty() && rt.gmToken().equals(gmToken)) {
             return;
@@ -592,6 +647,17 @@ public class SessionController {
                 String reason = req.trimmedReason();
                 return new SurrenderCombatCommand(commandId, expectedVersion, playerId, reason);
             }
+            case "SELL_INVENTORY_ITEM" -> {
+                PlayerId playerId = commandPlayerId(req);
+                String itemId = requireText(req.trimmedItemId(), "itemId");
+                int count = countOrDefault(req, 1);
+                return new SellInventoryItemCommand(commandId, expectedVersion, playerId, itemId, count);
+            }
+            case "RETREAT_COMBAT" -> {
+                PlayerId playerId = commandPlayerId(req);
+                String reason = req.trimmedReason();
+                return new RetreatCombatCommand(commandId, expectedVersion, playerId, reason);
+            }
             case "DISCARD_TO_HAND_LIMIT" -> {
                 PlayerId playerId = commandPlayerId(req);
                 List<CardInstId> ids = parseCardInstIds(req.discardIds(), "discardIds");
@@ -628,8 +694,6 @@ public class SessionController {
             }
             // 다음 라운드 run-loop 확장 포인트:
             // - CLAIM_RECENT_RESULT: resultId/resultIndex
-            // - SELL_INVENTORY_ITEM: itemId/count
-            // - RETREAT_COMBAT: reason
             default -> throw new ResponseStatusException(BAD_REQUEST, "unknown command type: " + req.type());
         }
     }

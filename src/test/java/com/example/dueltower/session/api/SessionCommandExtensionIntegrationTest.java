@@ -308,6 +308,94 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    void sellInventoryItemMutatesInventoryGoldAndRecentResults() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode state = snapshotState(fx);
+        long expectedVersion = state.path("version").asLong();
+        int beforeGold = state.path("run").path("inventory").path("gold").asInt();
+        int beforeCount = findItemCount(state, "I-1");
+        int beforeRecentResults = state.path("run").path("recentResults").size();
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "SELL_INVENTORY_ITEM",
+                  "playerId": "player1",
+                  "itemId": "I-1",
+                  "count": 1,
+                  "expectedVersion": %d
+                }
+                """.formatted(expectedVersion)
+        );
+
+        assertTrue(response.path("accepted").asBoolean());
+        assertEquals(beforeCount - 1, findItemCount(response.path("state"), "I-1"));
+        assertTrue(response.path("state").path("run").path("inventory").path("gold").asInt() > beforeGold);
+        assertEquals(beforeRecentResults + 1, response.path("state").path("run").path("recentResults").size());
+    }
+
+    @Test
+    void sellInventoryItemFailsWithoutPlayerToken() throws Exception {
+        Fixture fx = createFixture();
+        mockMvc.perform(post("/api/sessions/{code}/command", fx.code)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "SELL_INVENTORY_ITEM",
+                                  "playerId": "player1",
+                                  "itemId": "I-1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void retreatCombatSucceedsDuringCombatAndClosesCombat() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "RETREAT_COMBAT",
+                  "playerId": "player1",
+                  "reason": "too dangerous",
+                  "expectedVersion": %d
+                }
+                """.formatted(stateAfterStart.get("version").asLong())
+        );
+
+        assertTrue(response.path("accepted").asBoolean());
+        assertTrue(response.path("state").path("combat").isNull());
+        assertTrue(response.path("state").path("run").path("resultPending").asBoolean());
+    }
+
+    @Test
+    void retreatCombatRejectedWhenNotInCombat() throws Exception {
+        Fixture fx = createFixture();
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "RETREAT_COMBAT",
+                  "playerId": "player1",
+                  "expectedVersion": 0
+                }
+                """
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "retreat is only available during combat"));
+    }
+
+    @Test
     void drawRailStillWorksAsPlayerAuthCommand() throws Exception {
         Fixture fx = createFixture();
 

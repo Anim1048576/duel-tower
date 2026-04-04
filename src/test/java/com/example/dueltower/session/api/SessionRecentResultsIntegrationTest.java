@@ -67,6 +67,49 @@ class SessionRecentResultsIntegrationTest {
     }
 
     @Test
+    void runAliasEndpointsRequireParticipantOrGmAuth() throws Exception {
+        SessionFixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/sessions/{code}/run", fixture.code))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/sessions/{code}/inventory", fixture.code))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/sessions/{code}/results", fixture.code))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/sessions/{code}/choices", fixture.code))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void runAliasEndpointsReturnPartialRunSlices() throws Exception {
+        SessionFixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/sessions/{code}/run", fixture.code)
+                        .header("X-Player-Token", fixture.playerToken))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.inventory").exists())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.floor").exists());
+
+        mockMvc.perform(get("/api/sessions/{code}/inventory", fixture.code)
+                        .header("X-Player-Token", fixture.playerToken))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.version").exists())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.inventory.items").isArray());
+
+        mockMvc.perform(get("/api/sessions/{code}/results", fixture.code)
+                        .header("X-Player-Token", fixture.playerToken))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.recentResults").isArray())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.availableChoices").doesNotExist());
+
+        mockMvc.perform(get("/api/sessions/{code}/choices", fixture.code)
+                        .header("X-Player-Token", fixture.playerToken))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.availableChoices").isArray())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.inventory").doesNotExist());
+    }
+
+    @Test
     void clearRecentResultsWithPlayerTokenResetsResultPendingAndRecentResults() throws Exception {
         SessionFixture fixture = createFixture();
         startCombat(fixture);

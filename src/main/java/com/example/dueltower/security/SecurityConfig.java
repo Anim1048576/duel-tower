@@ -43,7 +43,17 @@ public class SecurityConfig {
                         .requestMatchers("/api/me/presets/**").authenticated()
 
                         .requestMatchers(HttpMethod.POST, "/api/sessions", "/api/sessions/*/join").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/sessions/*", "/api/sessions/*/events", "/api/sessions/*/logs", "/api/sessions/*/recent-results").permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/sessions/*",
+                                "/api/sessions/*/events",
+                                "/api/sessions/*/logs",
+                                "/api/sessions/*/recent-results",
+                                "/api/sessions/*/run",
+                                "/api/sessions/*/inventory",
+                                "/api/sessions/*/results",
+                                "/api/sessions/*/choices"
+                        ).permitAll()
                         .requestMatchers("/api/sessions/*/command").permitAll()
                         .requestMatchers("/api/sessions/*/leave").permitAll()
                         .requestMatchers("/api/sessions/*/reset").permitAll()
