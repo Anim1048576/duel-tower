@@ -46,6 +46,11 @@ public class PresetController {
         return presetService.update(requireAuthenticatedUsername(authentication), presetId, req);
     }
 
+    @PostMapping("/{presetId}/clone")
+    public PresetResponse clonePreset(@PathVariable long presetId, Authentication authentication) {
+        return presetService.cloneMine(requireAuthenticatedUsername(authentication), presetId);
+    }
+
     @DeleteMapping("/{presetId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable long presetId, Authentication authentication) {

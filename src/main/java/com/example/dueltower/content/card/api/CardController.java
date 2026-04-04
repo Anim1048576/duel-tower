@@ -21,11 +21,10 @@ public class CardController {
     }
 
     @GetMapping
-    public List<CardDefinition> list(@RequestParam(required = false) CardType type) {
-        if (type == null) {
-            return service.list();
-        }
-        return service.list(type);
+    public List<CardDefinition> list(@RequestParam(required = false) CardType type,
+                                     @RequestParam(required = false) String q,
+                                     @RequestParam(required = false) String keywordId) {
+        return service.listFiltered(type, q, keywordId);
     }
 
     @GetMapping("/{id}")

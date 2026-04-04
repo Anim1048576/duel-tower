@@ -4,6 +4,7 @@ import java.util.List;
 
 public record PlayerStateDto(
         String playerId,
+        boolean ready,
         List<String> passiveIds,
         List<OwnedCardDto> ownedCards,
         List<String> deck,

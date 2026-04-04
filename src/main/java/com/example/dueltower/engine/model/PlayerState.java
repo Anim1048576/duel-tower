@@ -63,6 +63,7 @@ public final class PlayerState {
     private final List<String> passiveIds = new ArrayList<>();
     private final List<OwnedCard> ownedCards = new ArrayList<>();
     private final List<String> deckOwnedCardIds = new ArrayList<>();
+    private boolean ready;
 
     public PlayerState(PlayerId playerId) {
         this.playerId = playerId;
@@ -224,6 +225,9 @@ public final class PlayerState {
     public List<OwnedCard> ownedCards() { return Collections.unmodifiableList(ownedCards); }
 
     public List<String> deckOwnedCardIds() { return Collections.unmodifiableList(deckOwnedCardIds); }
+
+    public boolean ready() { return ready; }
+    public void ready(boolean value) { this.ready = value; }
 
     public void deckOwnedCardIds(Collection<String> value) {
         Objects.requireNonNull(value, "deckOwnedCardIds is required");

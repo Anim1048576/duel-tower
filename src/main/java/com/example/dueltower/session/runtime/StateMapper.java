@@ -115,6 +115,7 @@ public final class StateMapper {
 
         return new PlayerStateDto(
                 ps.playerId().value(),
+                ps.ready(),
                 ps.passiveIds(),
                 mapOwnedCards(ps, state),
                 ps.deck().stream().map(id -> id.value().toString()).toList(),

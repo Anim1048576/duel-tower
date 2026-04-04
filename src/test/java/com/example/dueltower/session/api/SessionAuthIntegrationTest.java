@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -217,6 +218,96 @@ class SessionAuthIntegrationTest {
                         .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.players.tester.deck.length()").value(0));
+    }
+
+    @Test
+    void readyEndpointRequiresPlayerTokenAndOnlyAllowsSelfUpdate() throws Exception {
+        MockHttpSession alice = signUpAndLogin("alice", "alice@example.com", "password123");
+        MockHttpSession bob = signUpAndLogin("bob", "bob@example.com", "password123");
+        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
+                .name("레디 테스트 캐릭터")
+                .gender(CharacterGender.OTHER)
+                .age(20)
+                .wish("테스트")
+                .disposition("질서/선")
+                .oneLiner("안녕하세요")
+                .story("ready 테스트")
+                .physical(10)
+                .technique(10)
+                .sense(10)
+                .willpower(10)
+                .trait1("P001")
+                .trait2(null)
+                .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
+                .currentSkillDeck(List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"))
+                .exCard("{\"id\":\"EX901\"}")
+                .build());
+
+        MvcResult createResult = mockMvc.perform(post("/api/sessions")
+                        .session(alice)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"gmId\":\"alice\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String code = extractJsonStringValue(createResult.getResponse().getContentAsString(), "code");
+
+        String aliceToken = extractJsonStringValue(mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(alice)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "alice",
+                                  "characterId": %d
+                                }
+                                """.formatted(profile.getId())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "playerToken");
+
+        String bobToken = extractJsonStringValue(mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(bob)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "bob",
+                                  "characterId": %d
+                                }
+                                """.formatted(profile.getId())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "playerToken");
+
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, "alice")
+                        .session(alice)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, "alice")
+                        .session(alice)
+                        .header("X-Player-Token", bobToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, "alice")
+                        .session(alice)
+                        .header("X-Player-Token", aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.alice.ready").value(true))
+                .andExpect(jsonPath("$.players.bob.ready").value(false));
     }
 
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {
