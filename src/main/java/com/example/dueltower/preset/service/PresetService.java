@@ -143,7 +143,10 @@ public class PresetService {
     }
 
     private List<String> validateAndNormalizeDeckCardIds(List<String> deckCardIds) {
-        List<String> ids = (deckCardIds == null) ? List.of() : deckCardIds;
+        if (deckCardIds == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "deckCardIds is required");
+        }
+        List<String> ids = deckCardIds;
         List<String> normalized = new ArrayList<>(ids.size());
         for (String rawCardId : ids) {
             String cardId = requireText(rawCardId, "deckCardIds must not contain blank values");
@@ -156,7 +159,10 @@ public class PresetService {
     }
 
     private List<String> validateAndNormalizePassiveIds(List<String> passiveIds) {
-        List<String> ids = (passiveIds == null) ? List.of() : passiveIds;
+        if (passiveIds == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "passiveIds is required");
+        }
+        List<String> ids = passiveIds;
         Set<String> knownPassives = passiveService.defsMap().keySet();
         List<String> normalized = new ArrayList<>(ids.size());
         for (String rawPassiveId : ids) {

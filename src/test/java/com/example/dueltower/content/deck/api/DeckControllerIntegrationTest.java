@@ -370,6 +370,44 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    void validateWithoutRequestBodyShouldUseCurrentDeckComposition() throws Exception {
+        MockHttpSession session = signUpAndLogin("deckValidateCurrent");
+        Deck deck = createDeck("deck-validate-current", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
+
+        mockMvc.perform(post("/api/content/decks/{id}/validate", deck.getId())
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.issues.length()").value(0))
+                .andExpect(jsonPath("$.normalizedTotalCards").value(12));
+    }
+
+    @Test
+    void validateShouldApplyDuplicateCardIdMergePolicyConsistently() throws Exception {
+        MockHttpSession session = signUpAndLogin("deckValidateDupMerge");
+        Deck deck = createDeck("deck-validate-dup-merge", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
+
+        mockMvc.perform(post("/api/content/decks/{id}/validate", deck.getId())
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cards": [
+                                    {"cardId":"C001","count":2},
+                                    {"cardId":"C001","count":2},
+                                    {"cardId":"C002","count":3},
+                                    {"cardId":"C003","count":3},
+                                    {"cardId":"C004","count":2}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(false))
+                .andExpect(jsonPath("$.issues[0].code").value("COPY_LIMIT_EXCEEDED"))
+                .andExpect(jsonPath("$.normalizedTotalCards").value(12));
+    }
+
+    @Test
     void publicGetDeckEndpointsShouldRemainAccessible() throws Exception {
         Deck deck = createDeck("deck-public", DeckType.ENEMY, Map.of("C001", 1));
 

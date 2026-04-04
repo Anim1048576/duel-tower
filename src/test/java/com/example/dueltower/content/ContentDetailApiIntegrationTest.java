@@ -81,6 +81,17 @@ class ContentDetailApiIntegrationTest {
 
         mockMvc.perform(get("/api/content/passives/{id}", knownPassive.id()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(knownPassive.id()))
+                .andExpect(jsonPath("$.name", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.description", not(emptyOrNullString())));
+    }
+
+    @Test
+    void passiveDetailShouldAllowTrimmedIdLookup() throws Exception {
+        PassiveDefinition knownPassive = passiveService.list().stream().findFirst().orElseThrow();
+
+        mockMvc.perform(get("/api/content/passives/{id}", " " + knownPassive.id() + " "))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(knownPassive.id()));
     }
 
@@ -96,6 +107,17 @@ class ContentDetailApiIntegrationTest {
 
         mockMvc.perform(get("/api/content/statuses/{id}", knownStatus.id()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(knownStatus.id()))
+                .andExpect(jsonPath("$.name", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.description", not(emptyOrNullString())));
+    }
+
+    @Test
+    void statusDetailShouldAllowTrimmedIdLookup() throws Exception {
+        StatusDefinition knownStatus = statusService.list().stream().findFirst().orElseThrow();
+
+        mockMvc.perform(get("/api/content/statuses/{id}", " " + knownStatus.id() + " "))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(knownStatus.id()));
     }
 
@@ -110,6 +132,17 @@ class ContentDetailApiIntegrationTest {
         KeywordDefinition knownKeyword = keywordService.list().stream().findFirst().orElseThrow();
 
         mockMvc.perform(get("/api/content/keywords/{id}", knownKeyword.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(knownKeyword.id()))
+                .andExpect(jsonPath("$.name", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.description", not(emptyOrNullString())));
+    }
+
+    @Test
+    void keywordDetailShouldAllowTrimmedIdLookup() throws Exception {
+        KeywordDefinition knownKeyword = keywordService.list().stream().findFirst().orElseThrow();
+
+        mockMvc.perform(get("/api/content/keywords/{id}", " " + knownKeyword.id() + " "))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(knownKeyword.id()));
     }

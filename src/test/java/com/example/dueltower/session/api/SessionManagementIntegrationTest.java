@@ -151,6 +151,40 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    void resetWithKeepLoadoutsFalseResetsDeckExAndPassives() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, info.code(), "player1");
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout", info.code(), "player1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "passiveIds": ["P001", "P002"],
+                                  "exCardId": "EX901"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.player1.passiveIds.length()").value(2));
+
+        mockMvc.perform(post("/api/sessions/{code}/reset", info.code())
+                        .header("X-GM-Token", info.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "keepPlayers": true,
+                                  "keepLoadouts": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.player1.passiveIds").isEmpty())
+                .andExpect(jsonPath("$.players.player1.deckOwnedCardIds.length()").value(12))
+                .andExpect(jsonPath("$.players.player1.exCard").exists());
+    }
+
+    @Test
     void deleteFailsWithoutGmToken() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -404,6 +438,37 @@ class SessionManagementIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void applyPresetToLoadoutRequiresPlayerToken() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
+        joinAsPlayer(playerSession, info.code(), "player1");
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/from-preset", info.code(), "player1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "presetId": 1
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void applyPresetToLoadoutRequiresPresetId() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, info.code(), "player1");
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/from-preset", info.code(), "player1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
     }
 
     private SessionInfo createSession(MockHttpSession session, String gmId) throws Exception {

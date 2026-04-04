@@ -5,7 +5,7 @@ import java.util.List;
 
 public record PresetResponse(
         Long id,
-        String ownerUsername,
+        String owner,
         String name,
         Long characterId,
         List<String> deckCardIds,

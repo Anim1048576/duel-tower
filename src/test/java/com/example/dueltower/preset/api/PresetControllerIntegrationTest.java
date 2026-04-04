@@ -76,7 +76,7 @@ class PresetControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(ownerPresetId))
-                .andExpect(jsonPath("$[0].ownerUsername").value("owner"));
+                .andExpect(jsonPath("$[0].owner").value("owner"));
     }
 
     @Test
@@ -176,7 +176,7 @@ class PresetControllerIntegrationTest {
                                 }
                                 """.formatted(characterId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownerUsername").value("owner"))
+                .andExpect(jsonPath("$.owner").value("owner"))
                 .andExpect(jsonPath("$.name").value("starter"))
                 .andExpect(jsonPath("$.deckCardIds.length()").value(3));
     }
@@ -195,6 +195,38 @@ class PresetControllerIntegrationTest {
                                   "deckCardIds": ["C001"],
                                   "exCardId": "EX901",
                                   "passiveIds": ["P001"]
+                                }
+                                """.formatted(characterId)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createFailsWhenRequiredLoadoutFieldsMissing() throws Exception {
+        MockHttpSession session = signUpAndLogin("owner", "owner@example.com", "password123");
+        long characterId = createCharacter();
+
+        mockMvc.perform(post("/api/me/presets")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "missing-deck",
+                                  "characterId": %d,
+                                  "exCardId": "EX901",
+                                  "passiveIds": ["P001"]
+                                }
+                                """.formatted(characterId)))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/me/presets")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "missing-passives",
+                                  "characterId": %d,
+                                  "deckCardIds": ["C001"],
+                                  "exCardId": "EX901"
                                 }
                                 """.formatted(characterId)))
                 .andExpect(status().isBadRequest());

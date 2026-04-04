@@ -1038,12 +1038,13 @@ public class SessionService {
 
         for (PlayerState ps : state.players().values()) {
             String exCardId = exCardByPlayerId.getOrDefault(ps.playerId(), "EX901");
-            resetPlayerState(state, ps, keepLoadouts, resetSeed, exCardId);
+            resetPlayerState(rt, state, ps, keepLoadouts, resetSeed, exCardId);
         }
         state.runState().initialize(resetSeed);
     }
 
-    private void resetPlayerState(GameState state,
+    private void resetPlayerState(SessionRuntime rt,
+                                  GameState state,
                                   PlayerState ps,
                                   boolean keepLoadouts,
                                   long resetSeed,
@@ -1069,6 +1070,7 @@ public class SessionService {
 
         if (!keepLoadouts) {
             List<OwnedCard> defaultOwnedCards = defaultOwnedCards();
+            ps.passiveIds(List.of());
             ps.ownedCards(defaultOwnedCards);
             List<String> defaultDeckOwnedCardIds = resolveCardIdsToOwnedCardIds(
                     defaultPresetDeckCardIds(),
@@ -1078,6 +1080,7 @@ public class SessionService {
             ps.deckOwnedCardIds(defaultDeckOwnedCardIds);
             loadDeck(state, ps, defaultDeckOwnedCardIds);
             addCardToEx(state, ps, new CardDefId("EX901"));
+            rt.clearCharacterBinding(ps.playerId().value());
             shuffleDeck(state, ps, resetSeed);
             return;
         }
