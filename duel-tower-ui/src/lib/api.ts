@@ -7,6 +7,7 @@ import type {
   JoinSessionResponse,
   OwnedCard,
   PassiveDefinition,
+  RecentResultsResponse,
   SessionSnapshot,
 } from './model'
 
@@ -270,6 +271,23 @@ export async function createSession(gmId: string): Promise<CreateSessionResponse
 export async function getSessionState(code: string): Promise<SessionSnapshot> {
   const raw = await request<any>(`/api/sessions/${encodeURIComponent(code)}`)
   return adaptSessionSnapshot(raw)
+}
+
+export async function getRecentResults(
+  code: string,
+  gmToken?: string,
+  playerToken?: string,
+): Promise<RecentResultsResponse> {
+  return await request<RecentResultsResponse>(
+    `/api/sessions/${encodeURIComponent(code)}/recent-results`,
+    undefined,
+    {
+      gmToken,
+      playerToken,
+      includeGmToken: true,
+      includePlayerToken: true,
+    },
+  )
 }
 
 export async function joinSession(

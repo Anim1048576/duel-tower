@@ -218,6 +218,13 @@ export type RunSnapshot = {
   inventory: RunInventory
 }
 
+export type RecentResultsResponse = {
+  version: number
+  resultPending: boolean
+  currentNode: RunCurrentNode | null
+  recentResults: RunResult[]
+}
+
 export type SessionSnapshot = {
   sessionCode: string
   sessionId: string
