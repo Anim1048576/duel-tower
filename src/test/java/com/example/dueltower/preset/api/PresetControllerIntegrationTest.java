@@ -332,6 +332,29 @@ class PresetControllerIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void ownerCanCloneOnlyOwnPreset() throws Exception {
+        MockHttpSession owner = signUpAndLogin("owner", "owner@example.com", "password123");
+        MockHttpSession other = signUpAndLogin("other", "other@example.com", "password123");
+        long characterId = createCharacter();
+        long presetId = createPreset(owner, characterId, "starter");
+
+        mockMvc.perform(post("/api/me/presets/{presetId}/clone", presetId)
+                        .session(other))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(post("/api/me/presets/{presetId}/clone", presetId)
+                        .session(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.owner").value("owner"))
+                .andExpect(jsonPath("$.name").value("starter (copy)"));
+
+        mockMvc.perform(get("/api/me/presets")
+                        .session(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
     private long createCharacter() {
         CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
                 .name("테스트 캐릭터")

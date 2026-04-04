@@ -41,6 +41,20 @@ class ContentApiSmokeIntegrationTest {
     }
 
     @Test
+    void cardsEndpointShouldSupportQTypeAndKeywordFilters() throws Exception {
+        mockMvc.perform(get("/api/content/cards")
+                        .param("q", "기본")
+                        .param("type", "SKILL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(greaterThan(0)));
+
+        mockMvc.perform(get("/api/content/cards")
+                        .param("keywordId", "__NO_SUCH_KEYWORD__"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     void keywordsEndpointShouldReturnOkAndNonEmptyPayload() throws Exception {
         mockMvc.perform(get("/api/content/keywords"))
                 .andExpect(status().isOk())

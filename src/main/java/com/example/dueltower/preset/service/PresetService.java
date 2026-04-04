@@ -77,6 +77,20 @@ public class PresetService {
     }
 
     @Transactional
+    public PresetResponse cloneMine(String ownerUsername, long presetId) {
+        Preset source = getOwnedPreset(ownerUsername, presetId);
+        Preset clone = Preset.create(
+                ownerUsername,
+                buildCloneName(source.getName()),
+                source.getCharacterId(),
+                source.getDeckCardIds(),
+                source.getExCardId(),
+                source.getPassiveIds()
+        );
+        return toResponse(presetRepository.save(clone));
+    }
+
+    @Transactional
     public void delete(String ownerUsername, long presetId) {
         Preset preset = getOwnedPreset(ownerUsername, presetId);
         presetRepository.delete(preset);
@@ -197,6 +211,19 @@ public class PresetService {
                 payload.exCardId(),
                 payload.passiveIds()
         );
+    }
+
+    private String buildCloneName(String sourceName) {
+        String suffix = " (copy)";
+        String candidate = sourceName + suffix;
+        if (candidate.length() <= 100) {
+            return candidate;
+        }
+        int baseLimit = 100 - suffix.length();
+        if (baseLimit <= 0) {
+            return suffix.substring(0, 100);
+        }
+        return sourceName.substring(0, Math.min(sourceName.length(), baseLimit)) + suffix;
     }
 
     /**

@@ -237,6 +237,31 @@ public class SessionService {
         return rt.withLock(() -> removePlayerFromSession(rt, actor, "player not found"));
     }
 
+    public GameState setPlayerReady(String code, String actorPlayerIdRaw, String targetPlayerIdRaw, boolean ready) {
+        if (actorPlayerIdRaw == null || actorPlayerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "actorPlayerId is required");
+        }
+        if (targetPlayerIdRaw == null || targetPlayerIdRaw.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
+        }
+
+        PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
+        PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
+        if (!actor.equals(target)) {
+            throw new ResponseStatusException(FORBIDDEN, "players may only update their own ready state");
+        }
+
+        SessionRuntime rt = get(code);
+        return rt.withLock(() -> {
+            PlayerState player = rt.state().players().get(target);
+            if (player == null) {
+                throw new ResponseStatusException(NOT_FOUND, "player not found");
+            }
+            player.ready(ready);
+            return rt.state();
+        });
+    }
+
     public GameState kickPlayer(String code, String targetPlayerIdRaw) {
         if (targetPlayerIdRaw == null || targetPlayerIdRaw.isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");

@@ -215,6 +215,22 @@ public class SessionController {
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
 
+    @PutMapping("/{code}/players/{playerId}/ready")
+    public SessionStateDto updateReady(@PathVariable String code,
+                                       @PathVariable String playerId,
+                                       @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                       @RequestBody(required = false) UpdatePlayerReadyRequest req) {
+        if (req == null || req.ready() == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "ready is required");
+        }
+        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
+        if (!playerId.equals(actorPlayerId)) {
+            throw new ResponseStatusException(FORBIDDEN, "players may only update their own ready state");
+        }
+        sessionService.setPlayerReady(code, actorPlayerId, playerId, req.ready());
+        return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+    }
+
     @PostMapping("/{code}/leave")
     public SessionStateDto leave(@PathVariable String code,
                                  @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader) {
