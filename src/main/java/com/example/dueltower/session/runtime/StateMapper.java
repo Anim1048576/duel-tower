@@ -1,6 +1,7 @@
 package com.example.dueltower.session.runtime;
 
 import com.example.dueltower.content.card.model.OwnedCardModifier;
+import com.example.dueltower.content.item.service.ItemService;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.session.dto.*;
@@ -9,7 +10,17 @@ import com.example.dueltower.session.service.OwnedCardForgetPolicy;
 import java.util.*;
 
 public final class StateMapper {
+    private static Map<String, ItemDefinition> itemDefsById = Map.of();
+
     private StateMapper() {}
+
+    public static void configureItemService(ItemService itemService) {
+        itemDefsById = (itemService == null) ? Map.of() : itemService.defsMap();
+    }
+
+    public static void configureItemDefsForTest(Map<String, ItemDefinition> defsById) {
+        itemDefsById = (defsById == null) ? Map.of() : Map.copyOf(defsById);
+    }
 
     public static SessionStateDto toDto(String sessionCode, GameState state) {
         int currentRound = (state.combat() == null) ? 0 : state.combat().round();
@@ -267,16 +278,22 @@ public final class StateMapper {
             return new RunStateDto.InventoryDto(0, 0, 0, List.of());
         }
         List<RunStateDto.InventoryItemDto> items = run.inventory().items().stream()
-                .map(item -> new RunStateDto.InventoryItemDto(
-                        item.id(),
-                        item.name(),
-                        item.count(),
-                        item.bound(),
-                        item.battleUsable(),
-                        item.summary(),
-                        item.description(),
-                        item.tags()
-                ))
+                .map(item -> {
+                    ItemDefinition def = itemDefsById.get(item.itemId());
+                    if (def == null) {
+                        throw new IllegalStateException("item definition not found: " + item.itemId());
+                    }
+                    return new RunStateDto.InventoryItemDto(
+                            def.id(),
+                            def.name(),
+                            item.count(),
+                            item.bound(),
+                            def.battleUsable(),
+                            def.summary(),
+                            def.description(),
+                            def.tags()
+                    );
+                })
                 .toList();
         return new RunStateDto.InventoryDto(
                 run.inventory().keys(),

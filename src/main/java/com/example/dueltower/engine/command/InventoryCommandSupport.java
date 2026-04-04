@@ -15,7 +15,7 @@ final class InventoryCommandSupport {
         }
         String normalized = rawItemId.trim();
         for (RunState.InventoryItem item : state.runState().inventory().items()) {
-            if (normalized.equals(item.id())) {
+            if (normalized.equals(item.itemId())) {
                 return item;
             }
         }
@@ -25,23 +25,14 @@ final class InventoryCommandSupport {
     static void consumeInventoryItem(GameState state, RunState.InventoryItem usedItem, int usedCount) {
         List<RunState.InventoryItem> nextItems = new ArrayList<>();
         for (RunState.InventoryItem item : state.runState().inventory().items()) {
-            if (!item.id().equals(usedItem.id())) {
+            if (!item.itemId().equals(usedItem.itemId()) || item.bound() != usedItem.bound()) {
                 nextItems.add(item);
                 continue;
             }
 
             int remain = Math.max(0, item.count() - usedCount);
             if (remain > 0) {
-                nextItems.add(new RunState.InventoryItem(
-                        item.id(),
-                        item.name(),
-                        remain,
-                        item.bound(),
-                        item.battleUsable(),
-                        item.summary(),
-                        item.description(),
-                        item.tags()
-                ));
+                nextItems.add(new RunState.InventoryItem(item.itemId(), remain, item.bound()));
             }
         }
         state.runState().inventory().replaceItems(nextItems);
@@ -54,33 +45,15 @@ final class InventoryCommandSupport {
         boolean merged = false;
         List<RunState.InventoryItem> nextItems = new ArrayList<>();
         for (RunState.InventoryItem item : state.runState().inventory().items()) {
-            if (!item.id().equals(gainedItem.id())) {
+            if (!item.itemId().equals(gainedItem.itemId()) || item.bound() != gainedItem.bound()) {
                 nextItems.add(item);
                 continue;
             }
-            nextItems.add(new RunState.InventoryItem(
-                    item.id(),
-                    item.name(),
-                    item.count() + gainedCount,
-                    item.bound(),
-                    item.battleUsable(),
-                    item.summary(),
-                    item.description(),
-                    item.tags()
-            ));
+            nextItems.add(new RunState.InventoryItem(item.itemId(), item.count() + gainedCount, item.bound()));
             merged = true;
         }
         if (!merged) {
-            nextItems.add(new RunState.InventoryItem(
-                    gainedItem.id(),
-                    gainedItem.name(),
-                    gainedCount,
-                    gainedItem.bound(),
-                    gainedItem.battleUsable(),
-                    gainedItem.summary(),
-                    gainedItem.description(),
-                    gainedItem.tags()
-            ));
+            nextItems.add(new RunState.InventoryItem(gainedItem.itemId(), gainedCount, gainedItem.bound()));
         }
         state.runState().inventory().replaceItems(nextItems);
     }

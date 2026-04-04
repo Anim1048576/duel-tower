@@ -9,6 +9,7 @@ import com.example.dueltower.engine.model.RunState;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public record SellInventoryItemCommand(
@@ -18,6 +19,8 @@ public record SellInventoryItemCommand(
         String itemId,
         int count
 ) implements GameCommand {
+
+    private static final Set<String> BATTLE_USABLE_IDS = Set.of("I-1", "I-2", "I-4");
 
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
@@ -67,19 +70,19 @@ public record SellInventoryItemCommand(
         state.runState().appendRecentResult(
                 "inventory",
                 "인벤토리 판매",
-                item.name() + " x" + count + " 판매",
+                item.itemId() + " x" + count + " 판매",
                 "인벤토리 아이템을 정리하여 " + gainedGold + "G를 획득했다.",
                 "inventory"
         );
 
-        return List.of(new GameEvent.LogAppended(playerId.value() + " 인벤토리 판매: " + item.id() + " x" + count + " (+" + gainedGold + "G)"));
+        return List.of(new GameEvent.LogAppended(playerId.value() + " 인벤토리 판매: " + item.itemId() + " x" + count + " (+" + gainedGold + "G)"));
     }
 
     private static int sellUnitPrice(RunState.InventoryItem item) {
         if (item.bound()) {
             return 40;
         }
-        if (item.battleUsable()) {
+        if (BATTLE_USABLE_IDS.contains(item.itemId())) {
             return 60;
         }
         return 50;
