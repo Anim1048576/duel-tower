@@ -199,6 +199,62 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    void removeCardsShouldSubtractRequestedCopies() throws Exception {
+        MockHttpSession session = signUpAndLogin("deckRemove1");
+        Deck deck = createDeck("deck-remove", DeckType.ENEMY, Map.of("C001", 3, "C002", 2));
+
+        mockMvc.perform(post("/api/content/decks/{id}/cards/remove", deck.getId())
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cards": [
+                                    {"cardId":"C001","count":2}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCards").value(3))
+                .andExpect(jsonPath("$.cards.length()").value(2));
+    }
+
+    @Test
+    void removeCardsShouldFailWhenCardMissingInDeck() throws Exception {
+        MockHttpSession session = signUpAndLogin("deckRemove2");
+        Deck deck = createDeck("deck-remove-missing", DeckType.ENEMY, Map.of("C001", 1));
+
+        mockMvc.perform(post("/api/content/decks/{id}/cards/remove", deck.getId())
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cards": [
+                                    {"cardId":"C002","count":1}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void removeCardsShouldFailWhenCountIsNotPositive() throws Exception {
+        MockHttpSession session = signUpAndLogin("deckRemove3");
+        Deck deck = createDeck("deck-remove-bad-count", DeckType.ENEMY, Map.of("C001", 1));
+
+        mockMvc.perform(post("/api/content/decks/{id}/cards/remove", deck.getId())
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cards": [
+                                    {"cardId":"C001","count":0}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void validateShouldReturnValidTrueForValidPlayerCandidate() throws Exception {
         MockHttpSession session = signUpAndLogin("deckValidate1");
         Deck deck = createDeck("deck-player", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));

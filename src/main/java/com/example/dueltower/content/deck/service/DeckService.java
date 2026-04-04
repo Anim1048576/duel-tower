@@ -105,6 +105,32 @@ public class DeckService {
         return toResponse(deck);
     }
 
+    @Transactional
+    public DeckResponse removeCards(long id, RemoveDeckCardsRequest req) {
+        Deck deck = getDeckOrThrow(id);
+        Map<String, Integer> toRemove = normalizeAndValidateSpecs(requiredCards(req), true);
+        Map<String, Integer> current = toCountMap(deck);
+
+        for (var e : toRemove.entrySet()) {
+            Integer existing = current.get(e.getKey());
+            if (existing == null || existing <= 0) {
+                throw badRequest("card not found in deck: " + e.getKey());
+            }
+            if (existing < e.getValue()) {
+                throw badRequest("remove count exceeds current count: " + e.getKey());
+            }
+            int remain = existing - e.getValue();
+            if (remain == 0) {
+                current.remove(e.getKey());
+            } else {
+                current.put(e.getKey(), remain);
+            }
+        }
+
+        deck.syncCards(current);
+        return toResponse(deck);
+    }
+
     @Transactional(readOnly = true)
     public DeckValidationResponse validateDeck(long id, ReplaceDeckCardsRequest req) {
         Deck deck = getDeckOrThrow(id);
@@ -287,6 +313,13 @@ public class DeckService {
     }
 
     private List<DeckCardSpec> requiredCards(ReplaceDeckCardsRequest req) {
+        if (req == null || req.cards() == null) {
+            throw badRequest("cards is required");
+        }
+        return req.cards();
+    }
+
+    private List<DeckCardSpec> requiredCards(RemoveDeckCardsRequest req) {
         if (req == null || req.cards() == null) {
             throw badRequest("cards is required");
         }

@@ -5,6 +5,7 @@ import com.example.dueltower.content.deck.dto.AddDeckCardsRequest;
 import com.example.dueltower.content.deck.dto.CreateDeckRequest;
 import com.example.dueltower.content.deck.dto.DeckValidationResponse;
 import com.example.dueltower.content.deck.dto.DeckResponse;
+import com.example.dueltower.content.deck.dto.RemoveDeckCardsRequest;
 import com.example.dueltower.content.deck.dto.ReplaceDeckCardsRequest;
 import com.example.dueltower.content.deck.dto.UpdateDeckRequest;
 import org.springframework.web.bind.annotation.*;
@@ -60,6 +61,14 @@ public class DeckController {
             @RequestBody(required = false) ReplaceDeckCardsRequest req
     ) {
         return deckService.replaceCards(id, req);
+    }
+
+    @PostMapping("/{id}/cards/remove")
+    public DeckResponse removeCards(
+            @PathVariable long id,
+            @RequestBody(required = false) RemoveDeckCardsRequest req
+    ) {
+        return deckService.removeCards(id, req);
     }
 
     @PostMapping("/{id}/validate")

@@ -194,10 +194,30 @@ public final class StateMapper {
     }
 
 
-    private static RunStateDto toRunDto(RunState run) {
+    public static RunStateDto toRunDto(RunState run) {
         RunStateDto.CurrentNodeDto currentNode = toCurrentNodeDto(run);
 
-        List<RunStateDto.NodeChoiceDto> choices = run.availableChoices().stream()
+        List<RunStateDto.NodeChoiceDto> choices = toNodeChoiceDtos(run);
+
+        List<RunStateDto.RecentResultDto> recentResults = toRecentResultDtos(run);
+        RunStateDto.InventoryDto inventory = toInventoryDto(run);
+
+        return new RunStateDto(
+                run.floor(),
+                run.status().name(),
+                run.resultPending(),
+                currentNode,
+                choices,
+                recentResults,
+                inventory
+        );
+    }
+
+    public static List<RunStateDto.NodeChoiceDto> toNodeChoiceDtos(RunState run) {
+        if (run == null) {
+            return List.of();
+        }
+        return run.availableChoices().stream()
                 .map(choice -> new RunStateDto.NodeChoiceDto(
                         choice.id(),
                         choice.name(),
@@ -209,38 +229,6 @@ public final class StateMapper {
                         choice.disabledReason()
                 ))
                 .toList();
-
-        List<RunStateDto.RecentResultDto> recentResults = toRecentResultDtos(run);
-
-        List<RunStateDto.InventoryItemDto> items = run.inventory().items().stream()
-                .map(item -> new RunStateDto.InventoryItemDto(
-                        item.id(),
-                        item.name(),
-                        item.count(),
-                        item.bound(),
-                        item.battleUsable(),
-                        item.summary(),
-                        item.description(),
-                        item.tags()
-                ))
-                .toList();
-
-        RunStateDto.InventoryDto inventory = new RunStateDto.InventoryDto(
-                run.inventory().keys(),
-                run.inventory().chests(),
-                run.inventory().gold(),
-                items
-        );
-
-        return new RunStateDto(
-                run.floor(),
-                run.status().name(),
-                run.resultPending(),
-                currentNode,
-                choices,
-                recentResults,
-                inventory
-        );
     }
 
     public static RunStateDto.CurrentNodeDto toCurrentNodeDto(RunState run) {
@@ -272,6 +260,30 @@ public final class StateMapper {
                         result.at()
                 ))
                 .toList();
+    }
+
+    public static RunStateDto.InventoryDto toInventoryDto(RunState run) {
+        if (run == null) {
+            return new RunStateDto.InventoryDto(0, 0, 0, List.of());
+        }
+        List<RunStateDto.InventoryItemDto> items = run.inventory().items().stream()
+                .map(item -> new RunStateDto.InventoryItemDto(
+                        item.id(),
+                        item.name(),
+                        item.count(),
+                        item.bound(),
+                        item.battleUsable(),
+                        item.summary(),
+                        item.description(),
+                        item.tags()
+                ))
+                .toList();
+        return new RunStateDto.InventoryDto(
+                run.inventory().keys(),
+                run.inventory().chests(),
+                run.inventory().gold(),
+                items
+        );
     }
 
     public static List<EventDto> toEventDtos(List<GameEvent> events) {
