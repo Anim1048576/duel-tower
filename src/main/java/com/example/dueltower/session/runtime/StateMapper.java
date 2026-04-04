@@ -194,17 +194,7 @@ public final class StateMapper {
 
 
     private static RunStateDto toRunDto(RunState run) {
-        RunStateDto.CurrentNodeDto currentNode = null;
-        if (run.currentNode() != null) {
-            currentNode = new RunStateDto.CurrentNodeDto(
-                    run.currentNode().id(),
-                    run.currentNode().name(),
-                    run.currentNode().typeLabel(),
-                    run.currentNode().phase().name(),
-                    run.currentNode().danger().name(),
-                    run.currentNode().floor()
-            );
-        }
+        RunStateDto.CurrentNodeDto currentNode = toCurrentNodeDto(run);
 
         List<RunStateDto.NodeChoiceDto> choices = run.availableChoices().stream()
                 .map(choice -> new RunStateDto.NodeChoiceDto(
@@ -219,17 +209,7 @@ public final class StateMapper {
                 ))
                 .toList();
 
-        List<RunStateDto.RecentResultDto> recentResults = run.recentResults().stream()
-                .map(result -> new RunStateDto.RecentResultDto(
-                        result.id(),
-                        result.type(),
-                        result.title(),
-                        result.summary(),
-                        result.detail(),
-                        result.source(),
-                        result.at()
-                ))
-                .toList();
+        List<RunStateDto.RecentResultDto> recentResults = toRecentResultDtos(run);
 
         List<RunStateDto.InventoryItemDto> items = run.inventory().items().stream()
                 .map(item -> new RunStateDto.InventoryItemDto(
@@ -260,6 +240,37 @@ public final class StateMapper {
                 recentResults,
                 inventory
         );
+    }
+
+    public static RunStateDto.CurrentNodeDto toCurrentNodeDto(RunState run) {
+        if (run == null || run.currentNode() == null) {
+            return null;
+        }
+        return new RunStateDto.CurrentNodeDto(
+                run.currentNode().id(),
+                run.currentNode().name(),
+                run.currentNode().typeLabel(),
+                run.currentNode().phase().name(),
+                run.currentNode().danger().name(),
+                run.currentNode().floor()
+        );
+    }
+
+    public static List<RunStateDto.RecentResultDto> toRecentResultDtos(RunState run) {
+        if (run == null) {
+            return List.of();
+        }
+        return run.recentResults().stream()
+                .map(result -> new RunStateDto.RecentResultDto(
+                        result.id(),
+                        result.type(),
+                        result.title(),
+                        result.summary(),
+                        result.detail(),
+                        result.source(),
+                        result.at()
+                ))
+                .toList();
     }
 
     public static List<EventDto> toEventDtos(List<GameEvent> events) {

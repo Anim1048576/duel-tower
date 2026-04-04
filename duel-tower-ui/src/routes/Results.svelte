@@ -1,8 +1,13 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
+  import { get } from 'svelte/store'
   import PageSkeleton from '../lib/PageSkeleton.svelte'
+  import { getRecentResults } from '../lib/api'
+  import type { RecentResultsResponse } from '../lib/model'
   import { navigate } from '../lib/router'
   import { combat, command } from '../stores/combat'
   import { logs } from '../stores/log'
+  import { session } from '../stores/session'
 
   function tone(type: string) {
     if (type === 'reward') return 'ok'
@@ -10,14 +15,30 @@
     return 'info'
   }
 
-  $: resultCards = $combat.state?.run?.recentResults ?? []
-  $: runState = $combat.state?.run ?? null
-  $: currentNode = runState?.currentNode ?? null
+  let recent: RecentResultsResponse | null = null
+  let loadError = ''
+
+  $: resultCards = recent?.recentResults ?? []
+  $: currentNode = recent?.currentNode ?? null
   $: recentLogs = $logs.slice(0, 5)
   $: detailLogs = $combat.lastResolutionLogs.slice(0, 5)
 
+  onMount(async () => {
+    const s = get(session)
+    const code = (s.code || '').trim()
+    if (!code) return
+    try {
+      recent = await getRecentResults(code, s.gmToken, s.playerToken)
+      loadError = ''
+    } catch (e) {
+      recent = null
+      loadError = e instanceof Error ? e.message : '결과 조회 실패'
+    }
+  })
+
   async function backToNode() {
-    await command({ type: 'CLEAR_RECENT_RESULTS' })
+    if (!recent) return
+    await command({ type: 'CLEAR_RECENT_RESULTS', expectedVersion: recent.version })
     navigate('/node')
   }
 </script>
@@ -25,8 +46,10 @@
 <PageSkeleton title="Results" summary="전투 종료/탐사 실패/보상 획득 공통 결과 카드">
   <button slot="actions" class="btn" on:click={backToNode}>노드로 복귀</button>
 
-  {#if !$combat.state}
-    <div class="hint">세션 상태를 불러오는 중...</div>
+  {#if loadError}
+    <div class="hint">{loadError}</div>
+  {:else if !recent}
+    <div class="hint">결과 정보를 불러오는 중...</div>
   {:else if !resultCards.length}
     <div class="hint">최근 탐색 결과가 없어 기본 로그만 표시한다.</div>
   {:else}

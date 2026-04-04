@@ -93,6 +93,21 @@ public class SessionController {
         });
     }
 
+    @GetMapping("/{code}/recent-results")
+    public RecentResultsResponse recentResults(@PathVariable String code,
+                                               @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                               @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                               Authentication authentication) {
+        SessionRuntime rt = sessionService.get(code);
+        validateRecentResultsReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        return rt.withLock(() -> new RecentResultsResponse(
+                rt.state().version(),
+                rt.state().runState().resultPending(),
+                StateMapper.toCurrentNodeDto(rt.state().runState()),
+                StateMapper.toRecentResultDtos(rt.state().runState())
+        ));
+    }
+
     @PostMapping("/{code}/join")
     public JoinSessionResponse join(@PathVariable String code,
                                     @RequestBody(required = false) JoinSessionRequest req,
@@ -336,6 +351,39 @@ public class SessionController {
 
         log.warn("START_COMBAT unauthorized: invalid GM token for code={}", rt.code());
         throw new ResponseStatusException(UNAUTHORIZED, "gm authorization required");
+    }
+
+    private void validateRecentResultsReadAccess(SessionRuntime rt,
+                                                 String gmTokenHeader,
+                                                 String playerTokenHeader,
+                                                 Authentication authentication) {
+        String gmToken = (gmTokenHeader == null) ? "" : gmTokenHeader.trim();
+        if (!gmToken.isEmpty() && rt.gmToken().equals(gmToken)) {
+            return;
+        }
+
+        String actorPlayerId = rt.withLock(() -> {
+            String token = (playerTokenHeader == null) ? "" : playerTokenHeader.trim();
+            if (token.isEmpty()) {
+                return null;
+            }
+            return rt.findPlayerIdByToken(token);
+        });
+        if (actorPlayerId != null) {
+            return;
+        }
+
+        if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())) {
+            String username = authentication.getName();
+            if (rt.gmId().equals(username)) {
+                return;
+            }
+            if (rt.state().players().containsKey(new PlayerId(username))) {
+                return;
+            }
+        }
+
+        throw new ResponseStatusException(UNAUTHORIZED, "participant or gm authorization required");
     }
 
     private SessionRuntime requireGmSession(String code, String gmTokenHeader) {
