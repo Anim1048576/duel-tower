@@ -1,18 +1,18 @@
 package com.example.dueltower.content.item.idb;
 
 import com.example.dueltower.content.item.model.ItemBlueprint;
+import com.example.dueltower.content.status.sdb.S301_Barrier;
 import com.example.dueltower.engine.core.effect.item.UseItemResolutionContext;
 import com.example.dueltower.engine.event.GameEvent;
-import com.example.dueltower.engine.model.Ids;
+import com.example.dueltower.engine.model.CombatState;
 import com.example.dueltower.engine.model.ItemDefinition;
-import com.example.dueltower.engine.model.PlayerState;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
 public class I004_EmergencySmokeBomb implements ItemBlueprint {
-    public static final String ID = ItemIds.EMERGENCY_SMOKE_BOMB;
+    public static final String ID = ItemIds.CHEAP_BARRIER_GENERATOR;
 
     @Override
     public String id() {
@@ -23,26 +23,24 @@ public class I004_EmergencySmokeBomb implements ItemBlueprint {
     public ItemDefinition definition() {
         return new ItemDefinition(
                 id(),
-                "긴급 연막탄",
+                "염가형 장벽 생성기",
                 true,
-                "전투 중 사용 가능 · 회피 상승",
-                "현재 턴 동안 회피율이 크게 상승합니다.",
-                List.of("전투 아이템")
+                "전투 중 사용 가능 · 아군 진영 [방벽] 8",
+                "아군 진영에 [방벽] 8을 적용합니다.",
+                List.of("소모품", "방어")
         );
     }
 
     @Override
     public void resolveUse(UseItemResolutionContext ctx) {
-        Ids.PlayerId targetPlayerId = (ctx.targetCharacterId() == null || ctx.targetCharacterId().isBlank())
-                ? ctx.actor().playerId()
-                : new Ids.PlayerId(ctx.targetCharacterId().trim());
-
-        PlayerState ps = ctx.state().player(targetPlayerId);
-        if (ps == null) {
+        if (ctx.combat() == null) {
             return;
         }
 
-        ps.statusAdd("S004", 2 * ctx.useCount());
-        ctx.out().add(new GameEvent.LogAppended("item:" + id() + " used on " + targetPlayerId.value() + " (+Evasion)"));
+        int added = 8 * ctx.useCount();
+        ctx.combat().factionStatusValues(CombatState.FactionId.PLAYERS)
+                .merge(S301_Barrier.ID, added, Integer::sum);
+
+        ctx.out().add(new GameEvent.LogAppended("item:" + id() + " used (+BARRIER " + added + ")"));
     }
 }

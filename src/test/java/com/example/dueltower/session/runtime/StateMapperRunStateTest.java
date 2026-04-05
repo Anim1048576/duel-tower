@@ -106,7 +106,7 @@ class StateMapperRunStateTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals("소형 회복 물약", item.name());
+        assertEquals("염가형 회복물약", item.name());
         assertEquals(3, item.count());
         assertFalse(item.bound());
         assertTrue(item.battleUsable());
@@ -119,7 +119,7 @@ class StateMapperRunStateTest {
                 .findFirst()
                 .orElseThrow();
         assertEquals(1, i4.count());
-        assertTrue(i4.bound());
+        assertFalse(i4.bound());
     }
 
     @Test
@@ -135,11 +135,13 @@ class StateMapperRunStateTest {
 
     private static Map<String, ItemDefinition> defaultItemDefs() {
         return Map.of(
-                "I-1", new ItemDefinition("I-1", "소형 회복 물약", true, "전투 중 사용 가능 · 체력 20 회복", "즉시 체력을 20 회복합니다. 턴 소모 없이 사용됩니다.", List.of("소모품", "회복")),
-                "I-2", new ItemDefinition("I-2", "해독제", true, "전투 중 사용 가능 · 디버프 해제", "출혈/중독 등 해로운 상태효과 1개를 제거합니다.", List.of("소모품", "정화")),
-                "I-3", new ItemDefinition("I-3", "단단한 가죽끈", false, "제작 재료", "장비 제작에 사용되는 기본 재료입니다.", List.of("재료")),
-                "I-4", new ItemDefinition("I-4", "긴급 연막탄", true, "전투 중 사용 가능 · 회피 상승", "현재 턴 동안 회피율이 크게 상승합니다.", List.of("전투 아이템")),
-                "I-5", new ItemDefinition("I-5", "강화석 파편", false, "강화 재료", "장비 강화 수치에 따라 다량으로 요구됩니다.", List.of("재료"))
+                "I-1", new ItemDefinition("I-1", "염가형 회복물약", true, "전투 중 사용 가능 · 아군 1명 체력 10 회복", "아군 1명의 체력을 10 회복합니다.", List.of("소모품", "회복")),
+                "I-2", new ItemDefinition("I-2", "회복물약", true, "전투 중 사용 가능 · 아군 1명 체력 30 회복", "아군 1명의 체력을 30 회복합니다.", List.of("소모품", "회복")),
+                "I-3", new ItemDefinition("I-3", "상급 회복물약", true, "전투 중 사용 가능 · 아군 1명 체력 50 회복", "아군 1명의 체력을 50 회복합니다.", List.of("소모품", "회복")),
+                "I-4", new ItemDefinition("I-4", "염가형 장벽 생성기", true, "전투 중 사용 가능 · 아군 진영 [방벽] 8", "아군 진영에 [방벽] 8을 적용합니다.", List.of("소모품", "방어")),
+                "I-5", new ItemDefinition("I-5", "장벽 생성기", true, "전투 중 사용 가능 · 아군 진영 [방벽] 20", "아군 진영에 [방벽] 20을 적용합니다.", List.of("소모품", "방어")),
+                "I-6", new ItemDefinition("I-6", "해독제", true, "전투 중 사용 가능 · 아군 1명 해로운 상태 1개 해제", "아군 1명의 무작위 [해로운 상태] 1개를 해제합니다.", List.of("소모품", "정화")),
+                "I-7", new ItemDefinition("I-7", "긴급 연막탄", true, "전투 중 사용 가능 · 사용자 [회피] 1", "사용자에게 [회피] 1을 부여합니다.", List.of("소모품", "회피"))
         );
     }
 }
