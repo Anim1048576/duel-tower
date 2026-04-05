@@ -1,15 +1,26 @@
 package com.example.dueltower.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
-import java.util.LinkedHashMap;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.Map;
 
+@Validated
 @ConfigurationProperties(prefix = "duel.balance")
 public class RewardTableProperties {
+    @Valid
     private final Chest chest = new Chest();
+
+    @Valid
     private final Judgement judgement = new Judgement();
-    private final Map<String, Integer> sellPrices = new LinkedHashMap<>(RewardTableConfig.defaults().sellPrices());
+
+    @NotEmpty
+    private Map<@NotBlank String, @NotNull @PositiveOrZero Integer> sellPrices;
 
     public Chest getChest() {
         return chest;
@@ -19,20 +30,31 @@ public class RewardTableProperties {
         return judgement;
     }
 
-    public Map<String, Integer> getSellPrices() {
+    public Map<@NotBlank String, @NotNull @PositiveOrZero Integer> getSellPrices() {
         return sellPrices;
     }
 
-    public static class Chest {
-        private int goldPerChest = 150;
-        private String itemId = "I-1";
-        private int itemCountPerChest = 1;
+    public void setSellPrices(Map<@NotBlank String, @NotNull @PositiveOrZero Integer> sellPrices) {
+        this.sellPrices = sellPrices;
+    }
 
-        public int getGoldPerChest() {
+    public static class Chest {
+        @NotNull
+        @PositiveOrZero
+        private Integer goldPerChest;
+
+        @NotBlank
+        private String itemId;
+
+        @NotNull
+        @PositiveOrZero
+        private Integer itemCountPerChest;
+
+        public Integer getGoldPerChest() {
             return goldPerChest;
         }
 
-        public void setGoldPerChest(int goldPerChest) {
+        public void setGoldPerChest(Integer goldPerChest) {
             this.goldPerChest = goldPerChest;
         }
 
@@ -44,41 +66,49 @@ public class RewardTableProperties {
             this.itemId = itemId;
         }
 
-        public int getItemCountPerChest() {
+        public Integer getItemCountPerChest() {
             return itemCountPerChest;
         }
 
-        public void setItemCountPerChest(int itemCountPerChest) {
+        public void setItemCountPerChest(Integer itemCountPerChest) {
             this.itemCountPerChest = itemCountPerChest;
         }
     }
 
     public static class Judgement {
-        private int successGold = 200;
-        private int successKeys = 1;
-        private int failureGold = 80;
+        @NotNull
+        @PositiveOrZero
+        private Integer successGold;
 
-        public int getSuccessGold() {
+        @NotNull
+        @PositiveOrZero
+        private Integer successKeys;
+
+        @NotNull
+        @PositiveOrZero
+        private Integer failureGold;
+
+        public Integer getSuccessGold() {
             return successGold;
         }
 
-        public void setSuccessGold(int successGold) {
+        public void setSuccessGold(Integer successGold) {
             this.successGold = successGold;
         }
 
-        public int getSuccessKeys() {
+        public Integer getSuccessKeys() {
             return successKeys;
         }
 
-        public void setSuccessKeys(int successKeys) {
+        public void setSuccessKeys(Integer successKeys) {
             this.successKeys = successKeys;
         }
 
-        public int getFailureGold() {
+        public Integer getFailureGold() {
             return failureGold;
         }
 
-        public void setFailureGold(int failureGold) {
+        public void setFailureGold(Integer failureGold) {
             this.failureGold = failureGold;
         }
     }

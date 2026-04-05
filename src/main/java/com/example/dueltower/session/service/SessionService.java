@@ -83,29 +83,6 @@ public class SessionService {
     private final SecureRandom rnd = new SecureRandom();
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
 
-    public SessionService(CharacterProfileRepository characterProfileRepository,
-                          CardService cardService,
-                          DeckService deckService,
-                          StatusService statusService,
-                          KeywordService keywordService,
-                          ItemService itemService,
-                          EquipService equipService,
-                          PassiveService passiveService,
-                          CardModifierService cardModifierService,
-                          PresetService presetService,
-                          Duration sessionTtl,
-                          Duration cleanupInterval) {
-        this(characterProfileRepository, cardService, deckService, statusService, keywordService, itemService, equipService,
-                passiveService, cardModifierService, presetService,
-                GameRules.defaults(),
-                RewardTableConfig.defaults(),
-                StarterLoadoutConfig.defaults(GameRules.defaults()),
-                RunConfigs.defaults(),
-                EncounterTables.defaults(),
-                sessionTtl,
-                cleanupInterval);
-    }
-
     @Autowired
     public SessionService(CharacterProfileRepository characterProfileRepository,
                           CardService cardService,
