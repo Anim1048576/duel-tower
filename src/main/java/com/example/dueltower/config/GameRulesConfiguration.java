@@ -1,38 +1,34 @@
 package com.example.dueltower.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@EnableConfigurationProperties(GameRulesProperties.class)
 public class GameRulesConfiguration {
 
     @Bean
-    public GameRules gameRules(
-            @Value("${duel.game.rules.deck-size:12}") int deckSize,
-            @Value("${duel.game.rules.max-deck-copies:3}") int maxDeckCopies,
-            @Value("${duel.game.rules.max-deck-edit-changes:2}") int maxDeckEditChanges,
-            @Value("${duel.game.rules.max-passives:2}") int maxPassives,
-            @Value("${duel.game.rules.max-owned-cards:20}") int maxOwnedCards,
-            @Value("${duel.game.rules.hand-limit:6}") int handLimit,
-            @Value("${duel.game.rules.field-limit:5}") int fieldLimit,
-            @Value("${duel.game.rules.combat-start-draw-count:4}") int combatStartDrawCount,
-            @Value("${duel.game.rules.turn-start-bonus-draw-hand-threshold:4}") int turnStartBonusDrawHandThreshold,
-            @Value("${duel.game.rules.turn-start-draw-below-threshold:2}") int turnStartDrawBelowThreshold,
-            @Value("${duel.game.rules.turn-start-draw-at-or-above-threshold:1}") int turnStartDrawAtOrAboveThreshold
-    ) {
+    public GameRules gameRules(GameRulesProperties properties) {
         return new GameRules(
-                deckSize,
-                maxDeckCopies,
-                maxDeckEditChanges,
-                maxPassives,
-                maxOwnedCards,
-                handLimit,
-                fieldLimit,
-                combatStartDrawCount,
-                turnStartBonusDrawHandThreshold,
-                turnStartDrawBelowThreshold,
-                turnStartDrawAtOrAboveThreshold
+                requireConfigured(properties.getDeckSize(), "duel.game.rules.deck-size"),
+                requireConfigured(properties.getMaxDeckCopies(), "duel.game.rules.max-deck-copies"),
+                requireConfigured(properties.getMaxDeckEditChanges(), "duel.game.rules.max-deck-edit-changes"),
+                requireConfigured(properties.getMaxPassives(), "duel.game.rules.max-passives"),
+                requireConfigured(properties.getMaxOwnedCards(), "duel.game.rules.max-owned-cards"),
+                requireConfigured(properties.getHandLimit(), "duel.game.rules.hand-limit"),
+                requireConfigured(properties.getFieldLimit(), "duel.game.rules.field-limit"),
+                requireConfigured(properties.getCombatStartDrawCount(), "duel.game.rules.combat-start-draw-count"),
+                requireConfigured(properties.getTurnStartBonusDrawHandThreshold(), "duel.game.rules.turn-start-bonus-draw-hand-threshold"),
+                requireConfigured(properties.getTurnStartDrawBelowThreshold(), "duel.game.rules.turn-start-draw-below-threshold"),
+                requireConfigured(properties.getTurnStartDrawAtOrAboveThreshold(), "duel.game.rules.turn-start-draw-at-or-above-threshold")
         );
+    }
+
+    private static int requireConfigured(Integer value, String key) {
+        if (value == null) {
+            throw new IllegalStateException("missing required game rule property: " + key);
+        }
+        return value;
     }
 }

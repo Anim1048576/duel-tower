@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.command;
 
 import com.example.dueltower.config.RewardTableConfig;
+import com.example.dueltower.config.GameRules;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
@@ -53,7 +54,7 @@ class ResolveJudgementCommandTest {
                         Map.of(), Map.of(),
                         Map.of(), Map.of(),
                         Map.of(),
-                        null,
+                        GameRules.defaults(),
                         rewardConfig
                 ),
                 new ResolveJudgementCommand(UUID.randomUUID(), state.version(), playerId, "SUCCESS"));

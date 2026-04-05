@@ -21,6 +21,7 @@ import com.example.dueltower.engine.model.PassiveDefinition;
 import com.example.dueltower.engine.model.StatusDefinition;
 
 import java.util.Map;
+import java.util.Objects;
 
 public final class EngineContext {
     private final Map<CardDefId, CardDefinition> definitions;
@@ -210,10 +211,10 @@ public final class EngineContext {
         this.itemDefs = Map.copyOf(itemDefs);
         this.itemEffects = Map.copyOf(itemEffects);
         this.equipDefs = Map.copyOf(equipDefs);
-        this.gameRules = gameRules == null ? GameRules.defaults() : gameRules;
-        this.rewardTableConfig = rewardTableConfig == null ? RewardTableConfig.defaults() : rewardTableConfig;
-        this.encounterTableConfig = encounterTableConfig == null ? EncounterTableConfig.defaults() : encounterTableConfig;
-        this.runConfig = runConfig == null ? RunConfigs.defaultConfig() : runConfig;
+        this.gameRules = Objects.requireNonNull(gameRules, "gameRules");
+        this.rewardTableConfig = Objects.requireNonNull(rewardTableConfig, "rewardTableConfig");
+        this.encounterTableConfig = Objects.requireNonNull(encounterTableConfig, "encounterTableConfig");
+        this.runConfig = Objects.requireNonNull(runConfig, "runConfig");
     }
 
     public EngineContext(

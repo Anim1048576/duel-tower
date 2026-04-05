@@ -3,6 +3,11 @@ package com.example.dueltower.session.service;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.model.OwnedCardModifier;
 import com.example.dueltower.content.cardmodifier.cmdb.CardModifierIds;
+import com.example.dueltower.config.GameRules;
+import com.example.dueltower.config.RewardTableConfig;
+import com.example.dueltower.engine.config.EncounterTables;
+import com.example.dueltower.engine.config.RunConfigs;
+import com.example.dueltower.session.config.StarterLoadoutConfig;
 import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.dto.OwnedCardModifierDto;
 import org.junit.jupiter.api.Test;
@@ -152,7 +157,17 @@ class SessionServiceOwnedCardModifierParsingTest {
     }
 
     private static SessionService newSessionService() {
-        return new SessionService(null, null, null, null, null, null, null, null, null, null, Duration.ofMinutes(30), Duration.ofMinutes(5));
+        GameRules gameRules = GameRules.defaults();
+        return new SessionService(
+                null, null, null, null, null, null, null, null, null, null,
+                gameRules,
+                RewardTableConfig.defaults(),
+                StarterLoadoutConfig.defaults(gameRules),
+                RunConfigs.defaults(),
+                EncounterTables.defaults(),
+                Duration.ofMinutes(30),
+                Duration.ofMinutes(5)
+        );
     }
 
     @SuppressWarnings("unchecked")
