@@ -100,7 +100,7 @@ class RunStateTest {
                         new RunConfig.RunNodeDefinition("CUSTOM-2", "맞춤 판정", "판정", "일반 판정", RunState.NodePhase.JUDGEMENT, RunState.Danger.LOW, false, null),
                         new RunConfig.RunNodeDefinition("CUSTOM-3", "맞춤 이벤트", "이벤트", "일반 이벤트", RunState.NodePhase.EVENT, RunState.Danger.LOW, false, null)
                 ),
-                List.of()
+                List.of(new RunState.ShopOffer("TEST-OFFER", new ItemRef("I-1"), 10, 1, false))
         );
         RunState run = new RunState(config);
 

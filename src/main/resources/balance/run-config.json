@@ -1,0 +1,75 @@
+{
+  "startingKeys": 2,
+  "startingChests": 1,
+  "startingGold": 12450,
+  "startingItems": [
+    { "itemId": "I-1", "count": 3, "bound": false },
+    { "itemId": "I-2", "count": 1, "bound": false },
+    { "itemId": "I-4", "count": 1, "bound": false },
+    { "itemId": "I-6", "count": 1, "bound": false }
+  ],
+  "nodePool": [
+    {
+      "id": "N-1",
+      "name": "회랑 정찰",
+      "typeLabel": "판정",
+      "rule": "판정 성공 시 안전한 지름길 발견",
+      "phase": "JUDGEMENT",
+      "danger": "MID",
+      "requiresKey": false,
+      "keyRequiredReason": null
+    },
+    {
+      "id": "N-2",
+      "name": "붕괴 전장",
+      "typeLabel": "전투",
+      "rule": "적 선공 확률 증가",
+      "phase": "COMBAT",
+      "danger": "HIGH",
+      "requiresKey": false,
+      "keyRequiredReason": null
+    },
+    {
+      "id": "N-3",
+      "name": "폐허 저장고",
+      "typeLabel": "이벤트",
+      "rule": "보상 카드 1장 획득",
+      "phase": "EVENT",
+      "danger": "LOW",
+      "requiresKey": false,
+      "keyRequiredReason": null
+    },
+    {
+      "id": "N-4",
+      "name": "봉인된 균열",
+      "typeLabel": "전투",
+      "rule": "열쇠 미보유 시 입장 불가",
+      "phase": "COMBAT",
+      "danger": "HIGH",
+      "requiresKey": true,
+      "keyRequiredReason": "균열 열쇠가 없어 진입할 수 없음"
+    },
+    {
+      "id": "N-5",
+      "name": "안식처",
+      "typeLabel": "이벤트",
+      "rule": "체력과 행동력을 정비한다",
+      "phase": "EVENT",
+      "danger": "LOW",
+      "requiresKey": false,
+      "keyRequiredReason": null
+    }
+  ],
+  "defaultShopOffers": [
+    { "offerId": "O-1", "refId": "I-1", "price": 50, "stock": 5, "bound": false },
+    { "offerId": "O-2", "refId": "I-2", "price": 200, "stock": 5, "bound": false },
+    { "offerId": "O-3", "refId": "I-3", "price": 500, "stock": 5, "bound": false },
+    { "offerId": "O-4", "refId": "I-4", "price": 50, "stock": 5, "bound": false },
+    { "offerId": "O-5", "refId": "I-5", "price": 200, "stock": 5, "bound": false },
+    { "offerId": "O-6", "refId": "I-6", "price": 250, "stock": 5, "bound": false },
+    { "offerId": "O-7", "refId": "I-7", "price": 500, "stock": 5, "bound": false },
+    { "offerId": "O-8", "refId": "E-1", "price": 200, "stock": 5, "bound": false },
+    { "offerId": "O-9", "refId": "E-2", "price": 250, "stock": 5, "bound": false },
+    { "offerId": "O-10", "refId": "I-8", "price": 25, "stock": 5, "bound": false }
+  ]
+}
