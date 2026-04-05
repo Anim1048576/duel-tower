@@ -7,6 +7,7 @@ import com.example.dueltower.engine.model.RunState;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -17,11 +18,36 @@ public record EncounterTableConfig(
 
     public EncounterTableConfig {
         encounters = List.copyOf(Objects.requireNonNull(encounters, "encounters"));
-        fallbackEncounterId = Objects.requireNonNull(fallbackEncounterId, "fallbackEncounterId");
+        if (encounters.isEmpty()) {
+            throw new IllegalStateException("encounters config must not be empty");
+        }
+
+        fallbackEncounterId = normalizeRequired(fallbackEncounterId, "fallbackEncounterId");
+        String normalizedFallbackEncounterId = fallbackEncounterId;
+        boolean hasFallback = encounters.stream().anyMatch(template -> template.encounterId().equals(normalizedFallbackEncounterId));
+        if (!hasFallback) {
+            throw new IllegalStateException("fallback encounterId is missing in encounters: " + fallbackEncounterId);
+        }
     }
 
     public static EncounterTableConfig defaults() {
         return EncounterTables.defaultConfig();
+    }
+
+    public static EncounterTableConfig fromRaw(EncounterTableRaw raw) {
+        if (raw == null) {
+            throw new IllegalStateException("encounter table config is missing");
+        }
+        if (raw.encounters() == null || raw.encounters().isEmpty()) {
+            throw new IllegalStateException("encounters config must not be empty");
+        }
+
+        List<EncounterTemplate> templates = new ArrayList<>(raw.encounters().size());
+        for (EncounterTemplateRaw encounterRaw : raw.encounters()) {
+            templates.add(toEncounterTemplate(encounterRaw));
+        }
+
+        return new EncounterTableConfig(templates, raw.fallbackEncounterId());
     }
 
     public EncounterTemplate selectEncounter(RunState runState) {
@@ -73,6 +99,69 @@ public record EncounterTableConfig(
             return Math.max(1, runState.currentNode().floor());
         }
         return Math.max(1, runState.floor());
+    }
+
+    private static EncounterTemplate toEncounterTemplate(EncounterTemplateRaw raw) {
+        if (raw == null) {
+            throw new IllegalStateException("encounter template config is missing");
+        }
+
+        List<EnemyTemplate> enemies = new ArrayList<>();
+        if (raw.enemies() != null) {
+            for (EnemyTemplateRaw enemyRaw : raw.enemies()) {
+                enemies.add(toEnemyTemplate(enemyRaw));
+            }
+        }
+
+        RunState.NodePhase requiredNodePhase = parseNodePhase(raw.requiredNodePhase());
+
+        return new EncounterTemplate(
+                normalizeRequired(raw.encounterId(), "encounterId"),
+                raw.minFloor(),
+                raw.maxFloor(),
+                requiredNodePhase,
+                enemies
+        );
+    }
+
+    private static EnemyTemplate toEnemyTemplate(EnemyTemplateRaw raw) {
+        if (raw == null) {
+            throw new IllegalStateException("enemy template config is missing");
+        }
+        return new EnemyTemplate(
+                normalizeRequired(raw.enemyId(), "enemyId"),
+                requireInt(raw.maxHp(), "maxHp"),
+                requireInt(raw.hpPerFloor(), "hpPerFloor"),
+                requireInt(raw.attackPower(), "attackPower"),
+                requireInt(raw.attackPowerPerFloor(), "attackPowerPerFloor"),
+                requireInt(raw.healingPower(), "healingPower"),
+                requireInt(raw.healingPowerPerFloor(), "healingPowerPerFloor")
+        );
+    }
+
+    private static RunState.NodePhase parseNodePhase(String rawPhase) {
+        if (rawPhase == null || rawPhase.isBlank()) {
+            return null;
+        }
+        try {
+            return RunState.NodePhase.valueOf(rawPhase.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalStateException("invalid requiredNodePhase: " + rawPhase, ex);
+        }
+    }
+
+    private static String normalizeRequired(String raw, String fieldName) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalStateException("encounter " + fieldName + " must not be blank");
+        }
+        return raw.trim();
+    }
+
+    private static int requireInt(Integer value, String fieldName) {
+        if (value == null) {
+            throw new IllegalStateException("encounter enemy " + fieldName + " is required");
+        }
+        return value;
     }
 
     public record EncounterTemplate(
@@ -141,4 +230,27 @@ public record EncounterTableConfig(
             return Math.max(0, baseHealPower + (healPowerPerFloor * floorDelta));
         }
     }
+
+    public record EncounterTableRaw(
+            List<EncounterTemplateRaw> encounters,
+            String fallbackEncounterId
+    ) {}
+
+    public record EncounterTemplateRaw(
+            String encounterId,
+            Integer minFloor,
+            Integer maxFloor,
+            String requiredNodePhase,
+            List<EnemyTemplateRaw> enemies
+    ) {}
+
+    public record EnemyTemplateRaw(
+            String enemyId,
+            Integer maxHp,
+            Integer hpPerFloor,
+            Integer attackPower,
+            Integer attackPowerPerFloor,
+            Integer healingPower,
+            Integer healingPowerPerFloor
+    ) {}
 }

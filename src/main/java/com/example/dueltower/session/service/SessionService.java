@@ -16,6 +16,7 @@ import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.config.EncounterTables;
 import com.example.dueltower.engine.config.RunConfigs;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
@@ -74,6 +75,7 @@ public class SessionService {
     private final RewardTableConfig rewardTableConfig;
     private final StarterLoadoutConfig starterLoadoutConfig;
     private final RunConfigs runConfigs;
+    private final EncounterTables encounterTables;
 
     // code -> runtime (in-memory)
     private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
@@ -99,6 +101,7 @@ public class SessionService {
                 RewardTableConfig.defaults(),
                 StarterLoadoutConfig.defaults(GameRules.defaults()),
                 RunConfigs.defaults(),
+                EncounterTables.defaults(),
                 sessionTtl,
                 cleanupInterval);
     }
@@ -118,6 +121,7 @@ public class SessionService {
                           RewardTableConfig rewardTableConfig,
                           StarterLoadoutConfig starterLoadoutConfig,
                           RunConfigs runConfigs,
+                          EncounterTables encounterTables,
                           @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.characterProfileRepository = characterProfileRepository;
@@ -136,6 +140,7 @@ public class SessionService {
         this.rewardTableConfig = rewardTableConfig;
         this.starterLoadoutConfig = starterLoadoutConfig;
         this.runConfigs = runConfigs;
+        this.encounterTables = encounterTables;
     }
 
     public SessionRuntime createSession(String gmId) {
@@ -159,7 +164,7 @@ public class SessionService {
                     equipService.defsMap(),
                     gameRules,
                     rewardTableConfig,
-                    null,
+                    encounterTables.encounterTableConfig(),
                     runConfigs.runConfig()
             );
             GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong(), runConfigs.runConfig());

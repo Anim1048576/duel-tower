@@ -3,7 +3,9 @@ package com.example.dueltower.engine.config;
 import com.example.dueltower.engine.model.EnemyState;
 import com.example.dueltower.engine.model.RunState;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ByteArrayResource;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,8 +40,8 @@ class EncounterTableConfigTest {
     }
 
     @Test
-    void throwsWhenNoEncounterMatchesAndFallbackMissing() {
-        EncounterTableConfig config = new EncounterTableConfig(
+    void throwsWhenFallbackEncounterIdDoesNotExist() {
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> new EncounterTableConfig(
                 List.of(
                         new EncounterTableConfig.EncounterTemplate(
                                 "HIGH-FLOOR",
@@ -50,11 +52,45 @@ class EncounterTableConfigTest {
                         )
                 ),
                 "MISSING-FALLBACK"
-        );
+        ));
+
+        assertEquals("fallback encounterId is missing in encounters: MISSING-FALLBACK", ex.getMessage());
+    }
+
+    @Test
+    void loadFromResourceParsesAndValidatesEncounterJson() {
+        String raw = """
+                {
+                  "fallbackEncounterId": "T-1",
+                  "encounters": [
+                    {
+                      "encounterId": "T-1",
+                      "minFloor": 1,
+                      "requiredNodePhase": "COMBAT",
+                      "enemies": [
+                        {
+                          "enemyId": "TE-1",
+                          "maxHp": 30,
+                          "hpPerFloor": 2,
+                          "attackPower": 6,
+                          "attackPowerPerFloor": 1,
+                          "healingPower": 0,
+                          "healingPowerPerFloor": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """;
+
+        EncounterTableConfig loaded = EncounterTables.load(new ByteArrayResource(raw.getBytes(StandardCharsets.UTF_8)));
 
         RunState runState = new RunState();
-        runState.initialize(99L);
+        runState.initialize(1L);
+        List<EnemyState> enemies = loaded.instantiateEncounterEnemies(runState);
 
-        assertThrows(IllegalStateException.class, () -> config.instantiateEncounterEnemies(runState));
+        assertEquals(1, enemies.size());
+        assertEquals("TE-1", enemies.get(0).enemyId().value());
+        assertEquals(30, enemies.get(0).hp());
     }
 }
