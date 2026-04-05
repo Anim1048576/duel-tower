@@ -14,8 +14,6 @@ import java.util.*;
 
 public final class StartCombatCommand implements GameCommand {
 
-    private static final String DEFAULT_ENCOUNTER_ENEMY_ID = "RUN-ENEMY-1";
-
     private final UUID commandId;
     private final long expectedVersion;
     private final Ids.PlayerId actorId; // GM(또는 시스템) 표시용
@@ -45,7 +43,7 @@ public final class StartCombatCommand implements GameCommand {
         List<GameEvent> events = new ArrayList<>();
 
         resetBeforeCombatStart(state, ctx, events);
-        ensureRunEncounterExists(state, events);
+        ensureRunEncounterExists(state, ctx, events);
         clearTransientBattleIncapacitation(state);
 
         // 1) 참가자 목록(플레이어 + 적)
@@ -161,22 +159,20 @@ public final class StartCombatCommand implements GameCommand {
         return events;
     }
 
-    private static void ensureRunEncounterExists(GameState state, List<GameEvent> events) {
+    private static void ensureRunEncounterExists(GameState state, EngineContext ctx, List<GameEvent> events) {
         if (!state.enemies().isEmpty()) {
             return;
         }
 
-        int floor = 1;
-        if (state.runState().currentNode() != null && state.runState().currentNode().phase() == RunState.NodePhase.COMBAT) {
-            floor = Math.max(1, state.runState().currentNode().floor());
-        } else {
-            floor = Math.max(1, state.runState().floor());
+        List<EnemyState> enemies = ctx.encounterTable().instantiateEncounterEnemies(state.runState());
+        if (enemies.isEmpty()) {
+            throw new IllegalStateException("encounter must contain at least one enemy");
         }
-        EnemyState enemy = new EnemyState(new Ids.EnemyId(DEFAULT_ENCOUNTER_ENEMY_ID), 18 + (floor * 4));
-        enemy.attackPower(4 + floor);
-        enemy.healPower(Math.max(0, floor - 1));
-        state.enemies().put(enemy.enemyId(), enemy);
-        events.add(new GameEvent.LogAppended("런 전투용 기본 적이 배치되었다: " + enemy.enemyId().value()));
+
+        for (EnemyState enemy : enemies) {
+            state.enemies().put(enemy.enemyId(), enemy);
+            events.add(new GameEvent.LogAppended("런 인카운터 적이 배치되었다: " + enemy.enemyId().value()));
+        }
     }
 
     /**
