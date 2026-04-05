@@ -113,7 +113,7 @@ public final class StartCombatCommand implements GameCommand {
 
         state.combat(cs);
 
-        // 2) 전투 시작 손패 4장 드로우(플레이어만)
+        // 2) 전투 시작 손패 규칙 장수 드로우(플레이어만)
         for (Ids.PlayerId pid : state.players().keySet()) {
             PlayerState ps = state.player(pid);
             if (ps == null || CombatStatuses.isPersistentlyBattleIncapacitated(ps)) continue;
@@ -124,11 +124,12 @@ public final class StartCombatCommand implements GameCommand {
             ps.usedTenacityThisTurn(false);
             ps.tenacityDebtThisTurn(0);
 
-            drawOpeningHand(state, ps, 4, events);
+            int openingDrawCount = ctx.gameRules().combatStartDrawCount();
+            drawOpeningHand(state, ps, openingDrawCount, events);
 
             HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, events, "hand limit exceeded");
 
-            events.add(new GameEvent.LogAppended(ps.playerId().value() + " draws 4 (combat start)"));
+            events.add(new GameEvent.LogAppended(ps.playerId().value() + " draws " + openingDrawCount + " (combat start)"));
         }
 
         // 2.5) 동률 결정을 먼저 처리하거나(있으면), 즉시 첫 턴을 시작한다.

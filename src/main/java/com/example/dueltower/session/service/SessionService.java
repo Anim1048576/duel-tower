@@ -1,6 +1,7 @@
 package com.example.dueltower.session.service;
 
 import com.example.dueltower.character.domain.CharacterProfile;
+import com.example.dueltower.config.GameRules;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.model.OwnedCardModifier;
@@ -26,6 +27,7 @@ import com.example.dueltower.session.dto.OwnedCardModifierDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import com.example.dueltower.preset.service.PresetService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -50,9 +52,6 @@ import static org.springframework.http.HttpStatus.*;
 @Slf4j
 public class SessionService {
 
-    private static final int DECK_SIZE = 12;
-    private static final int MAX_DECK_COPIES = 3;
-    private static final int MAX_DECK_EDIT_CHANGES = 2;
     private static final Pattern PASSIVE_ID_FORMAT = Pattern.compile("^P\\d{3}$");
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -68,6 +67,7 @@ public class SessionService {
     private final PresetService presetService;
     private final Duration sessionTtl;
     private final Duration cleanupInterval;
+    private final GameRules gameRules;
 
     // code -> runtime (in-memory)
     private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
@@ -85,6 +85,24 @@ public class SessionService {
                           PassiveService passiveService,
                           CardModifierService cardModifierService,
                           PresetService presetService,
+                          Duration sessionTtl,
+                          Duration cleanupInterval) {
+        this(characterProfileRepository, cardService, deckService, statusService, keywordService, itemService, equipService,
+                passiveService, cardModifierService, presetService, GameRules.defaults(), sessionTtl, cleanupInterval);
+    }
+
+    @Autowired
+    public SessionService(CharacterProfileRepository characterProfileRepository,
+                          CardService cardService,
+                          DeckService deckService,
+                          StatusService statusService,
+                          KeywordService keywordService,
+                          ItemService itemService,
+                          EquipService equipService,
+                          PassiveService passiveService,
+                          CardModifierService cardModifierService,
+                          PresetService presetService,
+                          GameRules gameRules,
                           @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.characterProfileRepository = characterProfileRepository;
@@ -99,6 +117,7 @@ public class SessionService {
         this.presetService = presetService;
         this.sessionTtl = sessionTtl;
         this.cleanupInterval = cleanupInterval;
+        this.gameRules = gameRules;
     }
 
     public SessionRuntime createSession(String gmId) {
@@ -119,7 +138,8 @@ public class SessionService {
                     cardModifierService.effectsMap(),
                     itemService.defsMap(),
                     itemService.effectsMap(),
-                    equipService.defsMap()
+                    equipService.defsMap(),
+                    gameRules
             );
             GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
             SessionRuntime rt = new SessionRuntime(code, gmId, generateGmToken(), state, ctx);
@@ -485,14 +505,14 @@ public class SessionService {
     }
 
     private void validateDeckBuild(List<String> deckOwnedCardIds, List<OwnedCard> ownedCards, List<String> currentDeckOwnedCardIds) {
-        if (deckOwnedCardIds.size() != DECK_SIZE) {
+        if (deckOwnedCardIds.size() != gameRules.deckSize()) {
             throw new ApiErrorException(
                     BAD_REQUEST,
                     "DECK_EDIT_INVALID",
                     "VALIDATION",
-                    "덱은 정확히 12장으로 맞춰야 합니다.",
-                    "deck must contain exactly 12 cards",
-                    ApiErrorResolver.details("requiredDeckSize", DECK_SIZE, "actualDeckSize", deckOwnedCardIds.size())
+                    "덱은 정확히 " + gameRules.deckSize() + "장으로 맞춰야 합니다.",
+                    "deck must contain exactly " + gameRules.deckSize() + " cards",
+                    ApiErrorResolver.details("requiredDeckSize", gameRules.deckSize(), "actualDeckSize", deckOwnedCardIds.size())
             );
         }
 
@@ -530,28 +550,28 @@ public class SessionService {
 
         Map<String, Integer> deckCounts = cardCounts(deckCardIds);
         for (var e : deckCounts.entrySet()) {
-            if (e.getValue() > MAX_DECK_COPIES) {
+            if (e.getValue() > gameRules.maxDeckCopies()) {
                 throw new ApiErrorException(
                         BAD_REQUEST,
                         "DECK_EDIT_INVALID",
                         "VALIDATION",
-                        "같은 카드는 덱에 최대 3장까지 넣을 수 있습니다.",
-                        "card copy limit exceeded: " + e.getKey() + " (max 3)",
-                        ApiErrorResolver.details("cardId", e.getKey(), "maxCopies", MAX_DECK_COPIES, "actualCopies", e.getValue())
+                        "같은 카드는 덱에 최대 " + gameRules.maxDeckCopies() + "장까지 넣을 수 있습니다.",
+                        "card copy limit exceeded: " + e.getKey() + " (max " + gameRules.maxDeckCopies() + ")",
+                        ApiErrorResolver.details("cardId", e.getKey(), "maxCopies", gameRules.maxDeckCopies(), "actualCopies", e.getValue())
                 );
             }
         }
 
         if (currentDeckOwnedCardIds != null) {
             int changedCards = calculateDeckChangedCards(currentDeckOwnedCardIds, deckOwnedCardIds);
-            if (changedCards > MAX_DECK_EDIT_CHANGES) {
+            if (changedCards > gameRules.maxDeckEditChanges()) {
                 throw new ApiErrorException(
                         BAD_REQUEST,
                         "DECK_EDIT_INVALID",
                         "RULE",
-                        "현재 덱에서는 최대 2장까지만 교체할 수 있습니다.",
-                        "deck edit invalid: at most 2 cards can be changed (requested " + changedCards + ")",
-                        ApiErrorResolver.details("maxChangedCards", MAX_DECK_EDIT_CHANGES, "actualChangedCards", changedCards)
+                        "현재 덱에서는 최대 " + gameRules.maxDeckEditChanges() + "장까지만 교체할 수 있습니다.",
+                        "deck edit invalid: at most " + gameRules.maxDeckEditChanges() + " cards can be changed (requested " + changedCards + ")",
+                        ApiErrorResolver.details("maxChangedCards", gameRules.maxDeckEditChanges(), "actualChangedCards", changedCards)
                 );
             }
 
@@ -805,8 +825,8 @@ public class SessionService {
 
     private List<String> parsePassiveIds(List<String> passiveIdsRaw) {
         if (passiveIdsRaw == null) return List.of();
-        if (passiveIdsRaw.size() > PlayerState.MAX_PASSIVES) {
-            throw new ResponseStatusException(BAD_REQUEST, "passiveIds allows 0 to " + PlayerState.MAX_PASSIVES + " items.");
+        if (passiveIdsRaw.size() > gameRules.maxPassives()) {
+            throw new ResponseStatusException(BAD_REQUEST, "passiveIds allows 0 to " + gameRules.maxPassives() + " items.");
         }
 
         LinkedHashSet<String> normalized = new LinkedHashSet<>();
