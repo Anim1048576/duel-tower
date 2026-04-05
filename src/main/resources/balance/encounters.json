@@ -1,0 +1,21 @@
+{
+  "fallbackEncounterId": "RUN-DEFAULT-COMBAT",
+  "encounters": [
+    {
+      "encounterId": "RUN-DEFAULT-COMBAT",
+      "minFloor": 1,
+      "requiredNodePhase": "COMBAT",
+      "enemies": [
+        {
+          "enemyId": "RUN-ENEMY-1",
+          "maxHp": 22,
+          "hpPerFloor": 4,
+          "attackPower": 5,
+          "attackPowerPerFloor": 1,
+          "healingPower": 0,
+          "healingPowerPerFloor": 1
+        }
+      ]
+    }
+  ]
+}

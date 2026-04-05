@@ -1,38 +1,57 @@
 package com.example.dueltower.engine.config;
 
-import com.example.dueltower.engine.model.RunState;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
-import java.util.List;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Objects;
 
+@Component
 public final class EncounterTables {
 
-    private static final EncounterTableConfig DEFAULT = new EncounterTableConfig(
-            List.of(
-                    new EncounterTableConfig.EncounterTemplate(
-                            "RUN-DEFAULT-COMBAT",
-                            1,
-                            null,
-                            RunState.NodePhase.COMBAT,
-                            List.of(
-                                    new EncounterTableConfig.EnemyTemplate(
-                                            "RUN-ENEMY-1",
-                                            22,
-                                            4,
-                                            5,
-                                            1,
-                                            0,
-                                            1
-                                    )
-                            )
-                    )
-            ),
-            "RUN-DEFAULT-COMBAT"
-    );
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String DEFAULT_RESOURCE_PATH = "balance/encounters.json";
+    private final EncounterTableConfig encounterTableConfig;
 
-    private EncounterTables() {
+    @Autowired
+    public EncounterTables(@Value("${duel.balance.encounters:classpath:balance/encounters.json}") Resource encounterResource) {
+        this(load(encounterResource));
+    }
+
+    EncounterTables(EncounterTableConfig encounterTableConfig) {
+        this.encounterTableConfig = Objects.requireNonNull(encounterTableConfig, "encounterTableConfig");
+    }
+
+    public static EncounterTables defaults() {
+        return new EncounterTables(defaultConfig());
+    }
+
+    public EncounterTableConfig encounterTableConfig() {
+        return encounterTableConfig;
     }
 
     public static EncounterTableConfig defaultConfig() {
-        return DEFAULT;
+        return DefaultHolder.DEFAULT;
+    }
+
+    public static EncounterTableConfig load(Resource resource) {
+        if (resource == null) {
+            throw new IllegalStateException("encounter resource is missing");
+        }
+        try (InputStream in = resource.getInputStream()) {
+            EncounterTableConfig.EncounterTableRaw raw = JSON.readValue(in, EncounterTableConfig.EncounterTableRaw.class);
+            return EncounterTableConfig.fromRaw(raw);
+        } catch (IOException e) {
+            throw new IllegalStateException("failed to load encounter config from " + resource.getDescription(), e);
+        }
+    }
+
+    private static final class DefaultHolder {
+        private static final EncounterTableConfig DEFAULT = load(new ClassPathResource(DEFAULT_RESOURCE_PATH));
     }
 }

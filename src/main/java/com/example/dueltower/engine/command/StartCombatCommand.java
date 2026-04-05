@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.command;
 
 import com.example.dueltower.common.util.DiceUtility;
+import com.example.dueltower.engine.config.EncounterTableConfig;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
 import com.example.dueltower.engine.core.ZoneOps;
@@ -164,11 +165,13 @@ public final class StartCombatCommand implements GameCommand {
             return;
         }
 
+        EncounterTableConfig.EncounterTemplate encounter = ctx.encounterTable().selectEncounter(state.runState());
         List<EnemyState> enemies = ctx.encounterTable().instantiateEncounterEnemies(state.runState());
         if (enemies.isEmpty()) {
-            throw new IllegalStateException("encounter must contain at least one enemy");
+            throw new IllegalStateException("encounter must contain at least one enemy: " + encounter.encounterId());
         }
 
+        events.add(new GameEvent.LogAppended("런 인카운터가 선택되었다: " + encounter.encounterId()));
         for (EnemyState enemy : enemies) {
             state.enemies().put(enemy.enemyId(), enemy);
             events.add(new GameEvent.LogAppended("런 인카운터 적이 배치되었다: " + enemy.enemyId().value()));
