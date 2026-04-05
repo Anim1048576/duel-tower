@@ -1,6 +1,9 @@
 package com.example.dueltower.engine.model;
 
+import com.example.dueltower.engine.config.RunConfig;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -83,5 +86,31 @@ class RunStateTest {
 
         assertTrue(run.recentResults().isEmpty());
         assertEquals(2, run.floor());
+    }
+
+    @Test
+    void requiredKeyRuleUsesNodeDefinitionInsteadOfSpecificNodeId() {
+        RunConfig config = new RunConfig(
+                0,
+                0,
+                0,
+                List.of(),
+                List.of(
+                        new RunConfig.RunNodeDefinition("CUSTOM-1", "맞춤 전투", "전투", "열쇠 필요", RunState.NodePhase.COMBAT, RunState.Danger.MID, true, "열쇠 필요"),
+                        new RunConfig.RunNodeDefinition("CUSTOM-2", "맞춤 판정", "판정", "일반 판정", RunState.NodePhase.JUDGEMENT, RunState.Danger.LOW, false, null),
+                        new RunConfig.RunNodeDefinition("CUSTOM-3", "맞춤 이벤트", "이벤트", "일반 이벤트", RunState.NodePhase.EVENT, RunState.Danger.LOW, false, null)
+                ),
+                List.of()
+        );
+        RunState run = new RunState(config);
+
+        run.initialize(7L);
+
+        RunState.NodeChoice customCombat = run.availableChoices().stream()
+                .filter(choice -> "CUSTOM-1".equals(choice.id()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(customCombat.disabled());
+        assertEquals("열쇠 필요", customCombat.disabledReason());
     }
 }
