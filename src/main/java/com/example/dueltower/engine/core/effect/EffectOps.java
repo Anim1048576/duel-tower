@@ -443,6 +443,6 @@ public final class EffectOps {
 
     private int actorAttackPower() {
         PlayerState actor = actor();
-        return actor.attackPower() + EquipmentCombatOps.attackPowerBonus(actor);
+        return actor.attackPower() + EquipmentCombatOps.attackPowerBonus(actor, ec.ctx());
     }
 }

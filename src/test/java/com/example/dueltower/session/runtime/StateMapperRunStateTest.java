@@ -153,8 +153,8 @@ class StateMapperRunStateTest {
 
     private static Map<String, EquipDefinition> defaultEquipDefs() {
         return Map.of(
-                "E-1", new EquipDefinition("E-1", "튼튼한 죽창", EquipSlot.WEAPON, "장착 가능한 근접 무기", "장착 가능한 근접 무기", List.of("장비", "근접", "무기"), null),
-                "E-2", new EquipDefinition("E-2", "휴대용 권총", EquipSlot.WEAPON, "장착 가능한 원거리 무기", "장착 가능한 원거리 무기", List.of("장비", "원거리", "무기"), null)
+                "E-1", new EquipDefinition("E-1", "튼튼한 죽창", EquipSlot.WEAPON, "장착 가능한 근접 무기", "장착 가능한 근접 무기", List.of("장비", "근접", "무기"), null, null, null, null),
+                "E-2", new EquipDefinition("E-2", "휴대용 권총", EquipSlot.WEAPON, "장착 가능한 원거리 무기", "장착 가능한 원거리 무기", List.of("장비", "원거리", "무기"), new EquipAmmoPolicy(6, 6), null, null, null)
         );
     }
 

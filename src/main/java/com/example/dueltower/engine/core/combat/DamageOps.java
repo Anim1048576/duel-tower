@@ -67,7 +67,7 @@ public final class DamageOps {
         // 1) '받는 피해' 변형 순서: passive -> status(대상 상태 + 대상 진영 상태)
         remaining = PassiveOps.onIncomingDamage(state, ctx, out, sourceRef, target, remaining, source);
         remaining = applyIncoming(state, ctx, rt, sourceRef, target, remaining, f);
-        remaining = Math.max(0, remaining + EquipmentCombatOps.incomingDamageBonus(state, target));
+        remaining = Math.max(0, remaining + EquipmentCombatOps.incomingDamageBonus(state, target, ctx));
         if (remaining <= 0) return;
 
         // 2) HP 적용

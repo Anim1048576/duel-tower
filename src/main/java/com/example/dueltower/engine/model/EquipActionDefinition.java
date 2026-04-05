@@ -8,6 +8,7 @@ public record EquipActionDefinition(
         Target target,
         int apCost,
         boolean requiresLoadedAmmo,
-        int loadedAmmoCost
+        int loadedAmmoCost,
+        int fixedDamage
 ) {
 }
