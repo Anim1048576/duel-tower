@@ -3,6 +3,8 @@ package com.example.dueltower.engine.core;
 import com.example.dueltower.config.GameRules;
 import com.example.dueltower.config.RewardTableConfig;
 import com.example.dueltower.engine.config.EncounterTableConfig;
+import com.example.dueltower.engine.config.RunConfig;
+import com.example.dueltower.engine.config.RunConfigs;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierEffect;
 import com.example.dueltower.engine.core.effect.item.ItemEffect;
@@ -42,6 +44,7 @@ public final class EngineContext {
     private final GameRules gameRules;
     private final RewardTableConfig rewardTableConfig;
     private final EncounterTableConfig encounterTableConfig;
+    private final RunConfig runConfig;
 
     public EngineContext(Map<CardDefId, CardDefinition> definitions, Map<CardDefId, CardEffect> effects) {
         this(definitions, effects, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), GameRules.defaults(), RewardTableConfig.defaults(), EncounterTableConfig.defaults());
@@ -170,6 +173,30 @@ public final class EngineContext {
             RewardTableConfig rewardTableConfig,
             EncounterTableConfig encounterTableConfig
     ) {
+        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, passiveDefs, passiveEffects,
+                cardModifierDefs, cardModifierEffects, itemDefs, itemEffects, equipDefs, gameRules, rewardTableConfig,
+                encounterTableConfig, RunConfigs.defaultConfig());
+    }
+
+    public EngineContext(
+            Map<CardDefId, CardDefinition> definitions,
+            Map<CardDefId, CardEffect> effects,
+            Map<String, StatusDefinition> statusDefs,
+            Map<String, StatusEffect> statusEffects,
+            Map<String, KeywordDefinition> keywordDefs,
+            Map<String, KeywordEffect> keywordEffects,
+            Map<String, PassiveDefinition> passiveDefs,
+            Map<String, PassiveEffect> passiveEffects,
+            Map<String, CardModifierDefinition> cardModifierDefs,
+            Map<String, CardModifierEffect> cardModifierEffects,
+            Map<String, ItemDefinition> itemDefs,
+            Map<String, ItemEffect> itemEffects,
+            Map<String, EquipDefinition> equipDefs,
+            GameRules gameRules,
+            RewardTableConfig rewardTableConfig,
+            EncounterTableConfig encounterTableConfig,
+            RunConfig runConfig
+    ) {
         this.definitions = Map.copyOf(definitions);
         this.effects = Map.copyOf(effects);
         this.statusDefs = Map.copyOf(statusDefs);
@@ -186,6 +213,7 @@ public final class EngineContext {
         this.gameRules = gameRules == null ? GameRules.defaults() : gameRules;
         this.rewardTableConfig = rewardTableConfig == null ? RewardTableConfig.defaults() : rewardTableConfig;
         this.encounterTableConfig = encounterTableConfig == null ? EncounterTableConfig.defaults() : encounterTableConfig;
+        this.runConfig = runConfig == null ? RunConfigs.defaultConfig() : runConfig;
     }
 
     public EngineContext(
@@ -303,4 +331,5 @@ public final class EngineContext {
     public GameRules gameRules() { return gameRules; }
     public RewardTableConfig rewardTable() { return rewardTableConfig; }
     public EncounterTableConfig encounterTable() { return encounterTableConfig; }
+    public RunConfig runConfig() { return runConfig; }
 }

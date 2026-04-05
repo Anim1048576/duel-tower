@@ -16,6 +16,7 @@ import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.config.RunConfigs;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -72,6 +73,7 @@ public class SessionService {
     private final GameRules gameRules;
     private final RewardTableConfig rewardTableConfig;
     private final StarterLoadoutConfig starterLoadoutConfig;
+    private final RunConfigs runConfigs;
 
     // code -> runtime (in-memory)
     private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
@@ -96,6 +98,7 @@ public class SessionService {
                 GameRules.defaults(),
                 RewardTableConfig.defaults(),
                 StarterLoadoutConfig.defaults(GameRules.defaults()),
+                RunConfigs.defaults(),
                 sessionTtl,
                 cleanupInterval);
     }
@@ -114,6 +117,7 @@ public class SessionService {
                           GameRules gameRules,
                           RewardTableConfig rewardTableConfig,
                           StarterLoadoutConfig starterLoadoutConfig,
+                          RunConfigs runConfigs,
                           @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.characterProfileRepository = characterProfileRepository;
@@ -131,6 +135,7 @@ public class SessionService {
         this.gameRules = gameRules;
         this.rewardTableConfig = rewardTableConfig;
         this.starterLoadoutConfig = starterLoadoutConfig;
+        this.runConfigs = runConfigs;
     }
 
     public SessionRuntime createSession(String gmId) {
@@ -153,9 +158,11 @@ public class SessionService {
                     itemService.effectsMap(),
                     equipService.defsMap(),
                     gameRules,
-                    rewardTableConfig
+                    rewardTableConfig,
+                    null,
+                    runConfigs.runConfig()
             );
-            GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
+            GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong(), runConfigs.runConfig());
             SessionRuntime rt = new SessionRuntime(code, gmId, generateGmToken(), state, ctx);
 
             if (sessions.putIfAbsent(code, rt) == null) {

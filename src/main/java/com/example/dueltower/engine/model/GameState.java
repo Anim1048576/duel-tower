@@ -1,5 +1,7 @@
 package com.example.dueltower.engine.model;
 
+import com.example.dueltower.engine.config.RunConfig;
+import com.example.dueltower.engine.config.RunConfigs;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SessionId;
@@ -21,11 +23,16 @@ public final class GameState {
 
     private CombatState combat;
     private NodeState nodeState = NodeState.NON_COMBAT;
-    private final RunState runState = new RunState();
+    private final RunState runState;
 
     public GameState(SessionId sessionId, long seed) {
+        this(sessionId, seed, RunConfigs.defaultConfig());
+    }
+
+    public GameState(SessionId sessionId, long seed, RunConfig runConfig) {
         this.sessionId = sessionId;
         this.seed = seed;
+        this.runState = new RunState(runConfig);
         this.runState.initialize(seed);
     }
 
