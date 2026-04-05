@@ -44,21 +44,23 @@ public record OpenChestCommand(
 
     @Override
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
-        int gainedGold = 150 * count;
-        int gainedPotion = count;
+        int gainedGold = ctx.rewardTable().chest().goldPerChest() * count;
+        String rewardItemId = ctx.rewardTable().chest().itemId();
+        int gainedItemCount = ctx.rewardTable().chest().itemCountPerChest() * count;
+        String rewardItemLabel = "I-1".equals(rewardItemId) ? "소형 회복 물약" : rewardItemId;
 
         InventoryCommandSupport.addInventoryEntryCount(
                 state,
-                new ItemRef("I-1"),
+                new ItemRef(rewardItemId),
                 false,
-                gainedPotion
+                gainedItemCount
         );
 
         state.runState().resolveCurrentNode(
                 "reward",
                 "상자 개봉",
                 "상자 " + count + "개 개봉",
-                "상자에서 " + gainedGold + "G와 소형 회복 물약 " + gainedPotion + "개를 획득했다.",
+                "상자에서 " + gainedGold + "G와 " + rewardItemLabel + " " + gainedItemCount + "개를 획득했다.",
                 gainedGold,
                 0,
                 -count

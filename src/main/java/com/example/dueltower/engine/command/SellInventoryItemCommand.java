@@ -7,7 +7,6 @@ import com.example.dueltower.engine.model.Ids.PlayerId;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 public record SellInventoryItemCommand(
@@ -18,19 +17,6 @@ public record SellInventoryItemCommand(
         String inventoryEquipId,
         int count
 ) implements GameCommand {
-
-    private static final Map<String, Integer> SELL_UNIT_PRICES = Map.of(
-            "I-1", 25,
-            "I-2", 100,
-            "I-3", 250,
-            "I-4", 25,
-            "I-5", 100,
-            "I-6", 125,
-            "I-7", 250,
-            "I-8", 12,
-            "E-1", 100,
-            "E-2", 125
-    );
 
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
@@ -97,7 +83,7 @@ public record SellInventoryItemCommand(
             InventoryCommandSupport.consumeInventoryEntry(state, equip, 1);
             soldEntryId = ((EquipRef) equip.ref()).equipId();
             soldCount = 1;
-            gainedGold = sellUnitPrice(soldEntryId);
+            gainedGold = sellUnitPrice(ctx, soldEntryId);
         } else {
             RunState.InventoryEntry item = InventoryCommandSupport.findItemEntry(state, itemId);
             if (item == null) {
@@ -106,7 +92,7 @@ public record SellInventoryItemCommand(
             InventoryCommandSupport.consumeInventoryEntry(state, item, count);
             soldEntryId = ((ItemRef) item.ref()).itemId();
             soldCount = count;
-            gainedGold = sellUnitPrice(soldEntryId) * count;
+            gainedGold = sellUnitPrice(ctx, soldEntryId) * count;
         }
         state.runState().inventory().gold(state.runState().inventory().gold() + gainedGold);
         state.runState().appendRecentResult(
@@ -120,7 +106,7 @@ public record SellInventoryItemCommand(
         return List.of(new GameEvent.LogAppended(playerId.value() + " 인벤토리 판매: " + soldEntryId + " x" + soldCount + " (+" + gainedGold + "G)"));
     }
 
-    private static int sellUnitPrice(String itemId) {
-        return SELL_UNIT_PRICES.getOrDefault(itemId, 0);
+    private static int sellUnitPrice(EngineContext ctx, String itemId) {
+        return ctx.rewardTable().sellUnitPrice(itemId);
     }
 }

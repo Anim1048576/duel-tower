@@ -57,6 +57,9 @@ public record ResolveJudgementCommand(
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         String normalizedChoice = choiceId.trim();
         state.player(playerId).pendingDecision(null);
+        int successGold = ctx.rewardTable().judgement().successGold();
+        int successKeys = ctx.rewardTable().judgement().successKeys();
+        int failureGold = ctx.rewardTable().judgement().failureGold();
 
         boolean success = "SUCCESS".equalsIgnoreCase(normalizedChoice);
         if (success) {
@@ -64,9 +67,9 @@ public record ResolveJudgementCommand(
                     "reward",
                     "판정 성공",
                     "위험 구역 돌파 성공",
-                    "판정을 통과해 200G와 열쇠 1개를 확보했다.",
-                    200,
-                    1,
+                    "판정을 통과해 " + successGold + "G와 열쇠 " + successKeys + "개를 확보했다.",
+                    successGold,
+                    successKeys,
                     0
             );
         } else {
@@ -74,8 +77,8 @@ public record ResolveJudgementCommand(
                     "reward",
                     "판정 실패",
                     "위험 구역 돌파 실패",
-                    "시간을 소모했지만 80G를 건졌다.",
-                    80,
+                    "시간을 소모했지만 " + failureGold + "G를 건졌다.",
+                    failureGold,
                     0,
                     0
             );
