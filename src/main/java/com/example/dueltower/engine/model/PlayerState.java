@@ -1,5 +1,6 @@
 package com.example.dueltower.engine.model;
 
+import com.example.dueltower.config.GameRules;
 import com.example.dueltower.content.card.model.OwnedCard;
 
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -9,8 +10,7 @@ import com.example.dueltower.engine.model.Ids.SummonInstId;
 import java.util.*;
 
 public final class PlayerState {
-    public static final int MAX_PASSIVES = 2;
-    public static final int MAX_OWNED_CARDS = 20;
+    private static final GameRules DEFAULT_GAME_RULES = GameRules.defaults();
 
     private final PlayerId playerId;
 
@@ -208,8 +208,8 @@ public final class PlayerState {
         if (normalized.size() != value.size()) {
             throw new IllegalArgumentException("duplicate passiveIds are not allowed");
         }
-        if (normalized.size() > MAX_PASSIVES) {
-            throw new IllegalArgumentException("passiveIds supports up to " + MAX_PASSIVES);
+        if (normalized.size() > DEFAULT_GAME_RULES.maxPassives()) {
+            throw new IllegalArgumentException("passiveIds supports up to " + DEFAULT_GAME_RULES.maxPassives());
         }
 
         passiveIds.clear();
@@ -224,8 +224,8 @@ public final class PlayerState {
         if (passiveIds.contains(normalized)) {
             throw new IllegalArgumentException("duplicate passiveIds are not allowed");
         }
-        if (passiveIds.size() >= MAX_PASSIVES) {
-            throw new IllegalArgumentException("passiveIds supports up to " + MAX_PASSIVES);
+        if (passiveIds.size() >= DEFAULT_GAME_RULES.maxPassives()) {
+            throw new IllegalArgumentException("passiveIds supports up to " + DEFAULT_GAME_RULES.maxPassives());
         }
         passiveIds.add(normalized);
     }
@@ -273,11 +273,11 @@ public final class PlayerState {
     }
 
     public int maxOwnedCardCount() {
-        return MAX_OWNED_CARDS;
+        return DEFAULT_GAME_RULES.maxOwnedCards();
     }
 
     public boolean forgettingRequired() {
-        return ownedCardCount() > MAX_OWNED_CARDS;
+        return ownedCardCount() > DEFAULT_GAME_RULES.maxOwnedCards();
     }
 
     public int status(String key) {
@@ -296,8 +296,8 @@ public final class PlayerState {
     }
 
     // ===== 제한 =====
-    public int handLimit() { return 6; }
-    public int fieldLimit() { return 5; }
+    public int handLimit() { return DEFAULT_GAME_RULES.handLimit(); }
+    public int fieldLimit() { return DEFAULT_GAME_RULES.fieldLimit(); }
 
     // ===== 내부 유틸 =====
     private void clampVitals() {

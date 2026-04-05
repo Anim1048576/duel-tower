@@ -26,8 +26,8 @@ public final class TurnPhases {
      * 턴 시작 처리
      * - 상태 효과(turnStart)
      * - (플레이어만) 패 교환 플래그 초기화
-     * - (플레이어만) 드로우: 손패 < 4면 2장, 아니면 1장
-     * - (플레이어만) 손패 제한(6) 초과 시 discard-to-limit 결정 생성
+     * - (플레이어만) 드로우: 규칙 기준으로 계산한 장수
+     * - (플레이어만) 손패 제한 초과 시 discard-to-limit 결정 생성
      */
     public static void turnStart(GameState state, EngineContext ctx, TargetRef actor, List<GameEvent> out, String source) {
         // 턴 시작 훅 순서: passive -> status
@@ -61,7 +61,7 @@ public final class TurnPhases {
                 }
             }
 
-            int draw = (ps.hand().size() < 4) ? 2 : 1;
+            int draw = ctx.gameRules().turnStartDrawCount(ps.hand().size());
             // 턴 시작 드로우는 deck+grave 고갈로 즉시 [전투 불능] 처리하지 않는다.
             ZoneOps.drawWithRefill(state, ctx, ps, draw, out, false);
 
