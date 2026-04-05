@@ -1,6 +1,7 @@
 package com.example.dueltower.character.service;
 
 import com.example.dueltower.character.domain.CharacterProfile;
+import com.example.dueltower.character.domain.CharacterDisposition;
 import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.dto.CombatStatsDto;
@@ -159,16 +160,10 @@ public class CharacterProfileService {
 
     private static void validateDisposition(String disposition) {
         requireText(disposition, "disposition is required");
-        String[] parts = disposition.trim().split("/");
-        if (parts.length != 2) {
+        if (!CharacterDisposition.hasAxisFormat(disposition)) {
             throw new ResponseStatusException(BAD_REQUEST, "disposition must be in the format axis1/axis2 (e.g. 질서/선)");
         }
-
-        String lawChaos = parts[0].trim();
-        String goodEvil = parts[1].trim();
-
-        if (!(lawChaos.equals("질서") || lawChaos.equals("중립") || lawChaos.equals("혼돈"))
-                || !(goodEvil.equals("선") || goodEvil.equals("중용") || goodEvil.equals("악"))) {
+        if (!CharacterDisposition.isValid(disposition)) {
             throw new ResponseStatusException(BAD_REQUEST, "disposition must combine one of [질서, 중립, 혼돈] and one of [선, 중용, 악]");
         }
     }

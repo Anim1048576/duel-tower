@@ -47,7 +47,9 @@ public record OpenChestCommand(
         int gainedGold = ctx.rewardTable().chest().goldPerChest() * count;
         String rewardItemId = ctx.rewardTable().chest().itemId();
         int gainedItemCount = ctx.rewardTable().chest().itemCountPerChest() * count;
-        String rewardItemLabel = "I-1".equals(rewardItemId) ? "소형 회복 물약" : rewardItemId;
+        String rewardItemLabel = ctx.hasItemDef(rewardItemId)
+                ? ctx.itemDef(rewardItemId).name()
+                : rewardItemId;
 
         InventoryCommandSupport.addInventoryEntryCount(
                 state,

@@ -2,7 +2,6 @@ package com.example.dueltower.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -31,39 +30,28 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(SecurityPaths.PUBLIC_WEB).permitAll()
+
+                        .requestMatchers(SecurityPaths.CONTENT_READ_METHOD, SecurityPaths.API_CONTENT).permitAll()
+
+                        .requestMatchers(SecurityPaths.AUTH_PUBLIC).permitAll()
+                        .requestMatchers(SecurityPaths.AUTH_REQUIRED).authenticated()
+
+                        .requestMatchers(SecurityPaths.SESSION_JOIN_METHOD, SecurityPaths.SESSION_AUTH_REQUIRED).authenticated()
                         .requestMatchers(
-                                "/", "/favicon.ico",
-                                "/ui/**"
+                                SecurityPaths.SESSION_READ_METHOD,
+                                SecurityPaths.SESSION_READ_PUBLIC
                         ).permitAll()
-
-                        .requestMatchers(HttpMethod.GET, "/api/content/**").permitAll()
-
-                        .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
-                        .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
-                        .requestMatchers("/api/me/presets/**").authenticated()
-
-                        .requestMatchers(HttpMethod.POST, "/api/sessions", "/api/sessions/*/join").authenticated()
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/sessions/*",
-                                "/api/sessions/*/events",
-                                "/api/sessions/*/logs",
-                                "/api/sessions/*/recent-results",
-                                "/api/sessions/*/run",
-                                "/api/sessions/*/inventory",
-                                "/api/sessions/*/results",
-                                "/api/sessions/*/choices"
-                        ).permitAll()
-                        .requestMatchers("/api/sessions/*/command").permitAll()
-                        .requestMatchers("/api/sessions/*/leave").permitAll()
-                        .requestMatchers("/api/sessions/*/reset").permitAll()
-                        .requestMatchers(HttpMethod.DELETE, "/api/sessions/*").permitAll()
-                        .requestMatchers("/api/sessions/*/players/*/kick").permitAll()
-                        .requestMatchers("/api/sessions/*/players/*/deck").permitAll()
-                        .requestMatchers("/api/sessions/*/players/*/loadout").permitAll()
-                        .requestMatchers("/api/sessions/*/players/*/loadout/from-preset").permitAll()
-                        .requestMatchers("/api/sessions/*/players/*/forget").permitAll()
-                        .requestMatchers("/api/**").authenticated()
+                        .requestMatchers(SecurityPaths.SESSION_COMMAND).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_LEAVE).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_RESET).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_DELETE_METHOD, SecurityPaths.SESSION_DELETE).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_KICK).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_DECK).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_LOADOUT).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_LOADOUT_PRESET).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_FORGET).permitAll()
+                        .requestMatchers(SecurityPaths.API_ALL).authenticated()
 
                         .anyRequest().permitAll()
                 );

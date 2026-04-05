@@ -3,11 +3,7 @@ package com.example.dueltower.session.api;
 import com.example.dueltower.common.api.ApiErrorResolver;
 import com.example.dueltower.engine.command.*;
 import com.example.dueltower.engine.core.EngineResult;
-import com.example.dueltower.engine.model.Ids;
-import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
-import com.example.dueltower.engine.model.TargetRef;
-import com.example.dueltower.engine.model.TargetSelection;
 import com.example.dueltower.content.equip.service.EquipService;
 import com.example.dueltower.content.item.service.ItemService;
 import com.example.dueltower.session.service.SessionService;
@@ -19,9 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
@@ -33,38 +27,6 @@ import static org.springframework.http.HttpStatus.NO_CONTENT;
 @RequestMapping("/api/sessions")
 @Slf4j
 public class SessionController {
-
-    private static final Set<String> PLAYER_AUTH_REQUIRED_TYPES = Set.of(
-            "DRAW",
-            "PLAY_CARD",
-            "HAND_SWAP",
-            "END_TURN",
-            "USE_EX",
-            "USE_SUMMON_ACTION",
-            "USE_EQUIP_ACTION",
-            "RELOAD_EQUIPMENT",
-            "USE_ITEM",
-            "BUY_SHOP_ITEM",
-            "EQUIP_EQUIPMENT",
-            "UNEQUIP_EQUIPMENT",
-            "OPEN_CHEST",
-            "RESOLVE_JUDGEMENT",
-            "SURRENDER_COMBAT",
-            "SELL_INVENTORY_ITEM",
-            "RETREAT_COMBAT",
-            "DISCARD_TO_HAND_LIMIT",
-            "RESOLVE_INITIATIVE_TIE",
-            "SEARCH_PICK",
-            "RESOLVE_SEARCH_PICK",
-            "SELECT_NODE_CHOICE",
-            "CLEAR_RECENT_RESULTS"
-    );
-
-    private static final Set<String> GM_AUTH_REQUIRED_TYPES = Set.of(
-            "ENEMY_PLAY_CARD",
-            "ENEMY_USE_EX",
-            "ENEMY_END_TURN"
-    );
 
     private final SessionService sessionService;
 
@@ -346,24 +308,23 @@ public class SessionController {
             throw new ResponseStatusException(BAD_REQUEST, "expectedVersion is required");
         }
         SessionRuntime rt = sessionService.get(code);
+        UUID commandId = parseOrNewUuid(req.commandId());
+        SessionCommandType commandType = SessionCommandType.from(req.type());
 
-        String t = req.normalizedType();
-        if ("START_COMBAT".equals(t)) {
+        if (commandType.requiresPlayerId()) {
             requirePlayer(req.trimmedPlayerId());
             validateStartCombatAuthority(rt, gmTokenHeader);
         }
 
-        validatePlayerAuthorityIfRequired(code, playerTokenHeader, req, t);
+        validatePlayerAuthorityIfRequired(code, playerTokenHeader, req, commandType);
 
-        if (GM_AUTH_REQUIRED_TYPES.contains(t)) {
+        if (commandType.requiresGmAuthorization()) {
             validateStartCombatAuthority(rt, gmTokenHeader);
         }
 
-        UUID commandId = parseOrNewUuid(req.commandId());
-
         log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} summonId={} itemId={} count={} reason={} discardIds={} targetPlayers={} targetEnemies={} targets={}",
                 code,
-                t,
+                commandType.requestType(),
                 req.trimmedPlayerId(),
                 req.expectedVersion(),
                 commandId,
@@ -379,7 +340,7 @@ public class SessionController {
         );
 
         final EngineResult res = rt.withLock(() -> {
-            GameCommand cmd = toCommand(req, commandId, req.expectedVersion());
+            GameCommand cmd = commandType.toCommand(req, commandId, req.expectedVersion());
             return rt.apply(cmd);
         });
 
@@ -484,255 +445,6 @@ public class SessionController {
         return new PlayerId(playerId.trim());
     }
 
-    private static Ids.EnemyId parseEnemyId(String enemyId) {
-        if (enemyId == null || enemyId.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, "enemyId is required");
-        }
-        return new Ids.EnemyId(enemyId.trim());
-    }
-
-    private static CardInstId parseCardInstId(String raw, String fieldName) {
-        if (raw == null || raw.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, fieldName + " is blank");
-        }
-        try {
-            return new CardInstId(UUID.fromString(raw.trim()));
-        } catch (Exception e) {
-            throw new ResponseStatusException(BAD_REQUEST, "invalid " + fieldName + " uuid: " + raw);
-        }
-    }
-
-    private static Ids.SummonInstId parseSummonInstId(String raw, String fieldName) {
-        if (raw == null || raw.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, fieldName + " is blank");
-        }
-        try {
-            return new Ids.SummonInstId(UUID.fromString(raw.trim()));
-        } catch (Exception e) {
-            throw new ResponseStatusException(BAD_REQUEST, "invalid " + fieldName + " uuid: " + raw);
-        }
-    }
-
-    private static CardInstId parseSingleCardInstId(List<String> raw, String fieldName) {
-        List<String> list = (raw == null) ? List.of() : raw;
-        if (list.size() != 1) {
-            throw new ResponseStatusException(BAD_REQUEST, fieldName + " must have exactly 1 id");
-        }
-        return parseCardInstId(list.get(0), fieldName + "[0]");
-    }
-
-    private static List<CardInstId> parseCardInstIds(List<String> raw, String fieldName) {
-        List<String> list = (raw == null) ? List.of() : raw;
-        List<CardInstId> ids = new ArrayList<>(list.size());
-        for (String s : list) {
-            ids.add(parseCardInstId(s, fieldName));
-        }
-        return ids;
-    }
-
-    private static TargetSelection parseTargetSelection(CommandRequest req) {
-        List<TargetRef> targets = new ArrayList<>();
-
-        if (req.targets() != null) {
-            for (TargetRefDto dto : req.targets()) {
-                if (dto == null) continue;
-                if (dto.playerId() != null && !dto.playerId().isBlank()) {
-                    targets.add(TargetRef.ofPlayer(new PlayerId(dto.playerId().trim())));
-                    continue;
-                }
-                if (dto.enemyId() != null && !dto.enemyId().isBlank()) {
-                    targets.add(TargetRef.ofEnemy(new Ids.EnemyId(dto.enemyId().trim())));
-                    continue;
-                }
-                if (dto.summonOwnerPlayerId() != null && !dto.summonOwnerPlayerId().isBlank()
-                        && dto.summonInstanceId() != null && !dto.summonInstanceId().isBlank()) {
-                    targets.add(TargetRef.ofSummon(
-                            new PlayerId(dto.summonOwnerPlayerId().trim()),
-                            parseSummonInstId(dto.summonInstanceId(), "targets.summonInstanceId")
-                    ));
-                }
-            }
-        }
-
-        if (req.targetPlayerIds() != null) {
-            for (String s : req.targetPlayerIds()) {
-                if (s == null || s.isBlank()) continue;
-                targets.add(TargetRef.ofPlayer(new PlayerId(s.trim())));
-            }
-        }
-        if (req.targetEnemyIds() != null) {
-            for (String s : req.targetEnemyIds()) {
-                if (s == null || s.isBlank()) continue;
-                targets.add(TargetRef.ofEnemy(new Ids.EnemyId(s.trim())));
-            }
-        }
-        return targets.isEmpty() ? TargetSelection.empty() : new TargetSelection(List.copyOf(targets));
-    }
-
-    private static GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
-        String type = req.normalizedType();
-        switch (type) {
-            case "START_COMBAT" -> {
-                PlayerId playerId = commandPlayerId(req);
-                return new StartCombatCommand(commandId, expectedVersion, playerId);
-            }
-            case "DRAW" -> {
-                // DRAW is a public product-rule command (validated by main-turn constraints in DrawCommand).
-                PlayerId playerId = commandPlayerId(req);
-                int count = req.countOrDefault(1);
-                return new DrawCommand(commandId, expectedVersion, playerId, count);
-            }
-            case "END_TURN" -> {
-                PlayerId playerId = commandPlayerId(req);
-                return new EndTurnCommand(commandId, expectedVersion, playerId);
-            }
-            case "HAND_SWAP" -> {
-                PlayerId playerId = commandPlayerId(req);
-                CardInstId id = parseSingleCardInstId(req.discardIds(), "discardIds");
-                return new HandSwapCommand(commandId, expectedVersion, playerId, id);
-            }
-            case "PLAY_CARD" -> {
-                PlayerId playerId = commandPlayerId(req);
-                CardInstId id = parseCardInstId(requireText(req.trimmedCardId(), "cardId"), "cardId");
-                TargetSelection sel = parseTargetSelection(req);
-
-                return new PlayCardCommand(commandId, expectedVersion, playerId, id, sel);
-            }
-            case "USE_EX" -> {
-                PlayerId playerId = commandPlayerId(req);
-                TargetSelection sel = parseTargetSelection(req);
-
-                return new UseExCommand(commandId, expectedVersion, playerId, sel);
-            }
-            case "ENEMY_PLAY_CARD" -> {
-                Ids.EnemyId enemyId = parseEnemyId(req.enemyId());
-                CardInstId id = parseCardInstId(requireText(req.trimmedCardId(), "cardId"), "cardId");
-                TargetSelection sel = parseTargetSelection(req);
-
-                return new EnemyPlayCardCommand(commandId, expectedVersion, enemyId, id, sel);
-            }
-            case "ENEMY_USE_EX" -> {
-                Ids.EnemyId enemyId = parseEnemyId(req.enemyId());
-                TargetSelection sel = parseTargetSelection(req);
-                return new EnemyUseExCommand(commandId, expectedVersion, enemyId, sel);
-            }
-            case "ENEMY_END_TURN" -> {
-                Ids.EnemyId enemyId = parseEnemyId(req.enemyId());
-                return new EnemyEndTurnCommand(commandId, expectedVersion, enemyId);
-            }
-            case "USE_SUMMON_ACTION" -> {
-                PlayerId playerId = commandPlayerId(req);
-                Ids.SummonInstId summonId = parseSummonInstId(requireText(req.trimmedSummonId(), "summonId"), "summonId");
-                TargetSelection sel = parseTargetSelection(req);
-                return new UseSummonActionCommand(commandId, expectedVersion, playerId, summonId, sel);
-            }
-            case "USE_EQUIP_ACTION" -> {
-                PlayerId playerId = commandPlayerId(req);
-                String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
-                TargetSelection sel = parseTargetSelection(req);
-                return new UseEquipActionCommand(commandId, expectedVersion, playerId, inventoryEquipId, sel);
-            }
-            case "RELOAD_EQUIPMENT" -> {
-                PlayerId playerId = commandPlayerId(req);
-                String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
-                return new ReloadEquipmentCommand(commandId, expectedVersion, playerId, inventoryEquipId);
-            }
-            case "USE_ITEM" -> {
-                PlayerId playerId = commandPlayerId(req);
-                String itemId = requireText(req.trimmedItemId(), "itemId");
-                int count = countOrDefault(req, 1);
-                TargetSelection sel = parseTargetSelection(req);
-                return new UseItemCommand(commandId, expectedVersion, playerId, itemId, count, sel);
-            }
-            case "BUY_SHOP_ITEM" -> {
-                PlayerId playerId = commandPlayerId(req);
-                String offerId = requireText(req.trimmedOfferId(), "offerId");
-                int count = countOrDefault(req, 1);
-                return new BuyShopItemCommand(commandId, expectedVersion, playerId, offerId, count);
-            }
-            case "EQUIP_EQUIPMENT" -> {
-                PlayerId playerId = commandPlayerId(req);
-                String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
-                return new EquipEquipmentCommand(commandId, expectedVersion, playerId, inventoryEquipId);
-            }
-            case "UNEQUIP_EQUIPMENT" -> {
-                PlayerId playerId = commandPlayerId(req);
-                String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
-                return new UnequipEquipmentCommand(commandId, expectedVersion, playerId, inventoryEquipId);
-            }
-            case "OPEN_CHEST" -> {
-                PlayerId playerId = commandPlayerId(req);
-                int count = countOrDefault(req, 1);
-                return new OpenChestCommand(commandId, expectedVersion, playerId, count);
-            }
-            case "RESOLVE_JUDGEMENT" -> {
-                PlayerId playerId = commandPlayerId(req);
-                String choiceId = requireText(req.trimmedChoiceId(), "choiceId");
-                return new ResolveJudgementCommand(commandId, expectedVersion, playerId, choiceId);
-            }
-            case "SURRENDER_COMBAT" -> {
-                PlayerId playerId = commandPlayerId(req);
-                String reason = req.trimmedReason();
-                return new SurrenderCombatCommand(commandId, expectedVersion, playerId, reason);
-            }
-            case "SELL_INVENTORY_ITEM" -> {
-                PlayerId playerId = commandPlayerId(req);
-                int count = countOrDefault(req, 1);
-                return new SellInventoryItemCommand(commandId, expectedVersion, playerId, req.trimmedItemId(), req.trimmedInventoryEquipId(), count);
-            }
-            case "RETREAT_COMBAT" -> {
-                PlayerId playerId = commandPlayerId(req);
-                String reason = req.trimmedReason();
-                return new RetreatCombatCommand(commandId, expectedVersion, playerId, reason);
-            }
-            case "DISCARD_TO_HAND_LIMIT" -> {
-                PlayerId playerId = commandPlayerId(req);
-                List<CardInstId> ids = parseCardInstIds(req.discardIds(), "discardIds");
-                return new DiscardToHandLimitCommand(commandId, expectedVersion, playerId, ids);
-            }
-            case "RESOLVE_INITIATIVE_TIE" -> {
-                PlayerId playerId = commandPlayerId(req);
-                if (req.tieGroupIndex() == null) {
-                    throw new ResponseStatusException(BAD_REQUEST, "tieGroupIndex is required");
-                }
-                if (req.orderedActorKeys() == null || req.orderedActorKeys().isEmpty()) {
-                    throw new ResponseStatusException(BAD_REQUEST, "orderedActorKeys is required");
-                }
-                return new ResolveInitiativeTieCommand(
-                        commandId,
-                        expectedVersion,
-                        playerId,
-                        req.tieGroupIndex(),
-                        req.orderedActorKeys()
-                );
-            }
-            case "SEARCH_PICK", "RESOLVE_SEARCH_PICK" -> {
-                PlayerId playerId = commandPlayerId(req);
-                List<CardInstId> ids = parseCardInstIds(req.selectedIds(), "selectedIds");
-                return new ResolveSearchPickCommand(commandId, expectedVersion, playerId, ids);
-            }
-            case "SELECT_NODE_CHOICE" -> {
-                PlayerId playerId = commandPlayerId(req);
-                return new SelectNodeChoiceCommand(commandId, expectedVersion, playerId, requireText(req.trimmedChoiceId(), "choiceId"));
-            }
-            case "CLEAR_RECENT_RESULTS" -> {
-                PlayerId playerId = commandPlayerId(req);
-                return new ClearRecentResultsCommand(commandId, expectedVersion, playerId);
-            }
-            // 다음 라운드 run-loop 확장 포인트:
-            // - CLAIM_RECENT_RESULT: resultId/resultIndex
-            default -> throw new ResponseStatusException(BAD_REQUEST, "unknown command type: " + req.type());
-        }
-    }
-
-    private static PlayerId commandPlayerId(CommandRequest req) {
-        return parsePlayerId(requireText(req.trimmedPlayerId(), "playerId"));
-    }
-
-    private static int countOrDefault(CommandRequest req, int fallback) {
-        return req.countOrDefault(fallback);
-    }
-
     private static String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, fieldName + " is required");
@@ -740,8 +452,8 @@ public class SessionController {
         return value.trim();
     }
 
-    private void validatePlayerAuthorityIfRequired(String code, String playerTokenHeader, CommandRequest req, String type) {
-        if (!PLAYER_AUTH_REQUIRED_TYPES.contains(type)) {
+    private void validatePlayerAuthorityIfRequired(String code, String playerTokenHeader, CommandRequest req, SessionCommandType commandType) {
+        if (!commandType.requiresPlayerAuthorization()) {
             return;
         }
         String requestPlayerId = requireText(req.trimmedPlayerId(), "playerId");
