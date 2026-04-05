@@ -151,7 +151,18 @@ public final class StateMapper {
                 ps.maxOwnedCardCount(),
                 ps.forgettingRequired(),
                 ps.equippedItems().entrySet().stream()
-                        .map(e -> new PlayerStateDto.EquippedItemDto(e.getKey().name(), e.getValue().equipId(), e.getValue().bound()))
+                        .map(e -> {
+                            EquipDefinition def = equipDefsById.get(e.getValue().equipId());
+                            return new PlayerStateDto.EquippedItemDto(
+                                    e.getKey().name(),
+                                    e.getValue().inventoryEquipId(),
+                                    e.getValue().equipId(),
+                                    e.getValue().bound(),
+                                    e.getValue().loadedAmmo(),
+                                    e.getValue().maxLoadedAmmo(),
+                                    def != null && def.action() != null
+                            );
+                        })
                         .toList()
         );
     }
@@ -294,10 +305,13 @@ public final class StateMapper {
                         return new RunStateDto.InventoryItemDto(
                                 "ITEM",
                                 def.id(),
+                                null,
                                 def.name(),
                                 item.count(),
                                 item.bound(),
                                 def.battleUsable(),
+                                null,
+                                null,
                                 def.summary(),
                                 def.description(),
                                 def.tags()
@@ -311,10 +325,13 @@ public final class StateMapper {
                         return new RunStateDto.InventoryItemDto(
                                 "EQUIP",
                                 def.id(),
+                                item.inventoryEquipId(),
                                 def.name(),
                                 item.count(),
                                 item.bound(),
                                 false,
+                                item.loadedAmmo(),
+                                item.maxLoadedAmmo(),
                                 def.summary(),
                                 def.description(),
                                 def.tags()

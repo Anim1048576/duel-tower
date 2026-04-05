@@ -41,6 +41,8 @@ public class SessionController {
             "END_TURN",
             "USE_EX",
             "USE_SUMMON_ACTION",
+            "USE_EQUIP_ACTION",
+            "RELOAD_EQUIPMENT",
             "USE_ITEM",
             "BUY_SHOP_ITEM",
             "EQUIP_EQUIPMENT",
@@ -624,6 +626,17 @@ public class SessionController {
                 TargetSelection sel = parseTargetSelection(req);
                 return new UseSummonActionCommand(commandId, expectedVersion, playerId, summonId, sel);
             }
+            case "USE_EQUIP_ACTION" -> {
+                PlayerId playerId = commandPlayerId(req);
+                String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
+                TargetSelection sel = parseTargetSelection(req);
+                return new UseEquipActionCommand(commandId, expectedVersion, playerId, inventoryEquipId, sel);
+            }
+            case "RELOAD_EQUIPMENT" -> {
+                PlayerId playerId = commandPlayerId(req);
+                String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
+                return new ReloadEquipmentCommand(commandId, expectedVersion, playerId, inventoryEquipId);
+            }
             case "USE_ITEM" -> {
                 PlayerId playerId = commandPlayerId(req);
                 String itemId = requireText(req.trimmedItemId(), "itemId");
@@ -639,13 +652,13 @@ public class SessionController {
             }
             case "EQUIP_EQUIPMENT" -> {
                 PlayerId playerId = commandPlayerId(req);
-                String equipId = requireText(req.trimmedEquipId(), "equipId");
-                return new EquipEquipmentCommand(commandId, expectedVersion, playerId, equipId);
+                String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
+                return new EquipEquipmentCommand(commandId, expectedVersion, playerId, inventoryEquipId);
             }
             case "UNEQUIP_EQUIPMENT" -> {
                 PlayerId playerId = commandPlayerId(req);
-                String equipId = requireText(req.trimmedEquipId(), "equipId");
-                return new UnequipEquipmentCommand(commandId, expectedVersion, playerId, equipId);
+                String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
+                return new UnequipEquipmentCommand(commandId, expectedVersion, playerId, inventoryEquipId);
             }
             case "OPEN_CHEST" -> {
                 PlayerId playerId = commandPlayerId(req);
@@ -664,9 +677,8 @@ public class SessionController {
             }
             case "SELL_INVENTORY_ITEM" -> {
                 PlayerId playerId = commandPlayerId(req);
-                String itemId = requireText(req.trimmedItemId(), "itemId");
                 int count = countOrDefault(req, 1);
-                return new SellInventoryItemCommand(commandId, expectedVersion, playerId, itemId, count);
+                return new SellInventoryItemCommand(commandId, expectedVersion, playerId, req.trimmedItemId(), req.trimmedInventoryEquipId(), count);
             }
             case "RETREAT_COMBAT" -> {
                 PlayerId playerId = commandPlayerId(req);

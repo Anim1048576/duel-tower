@@ -22,9 +22,10 @@ public class E001_SturdySpear implements EquipBlueprint {
                 id(),
                 "튼튼한 죽창",
                 EquipSlot.WEAPON,
-                "장착 가능한 근접 무기",
-                "장착하면 WEAPON 슬롯을 점유합니다. 현재는 장착 상태만 관리합니다.",
-                List.of("장비", "근접", "무기")
+                "[장비] 공격력 +2, 받는 피해 +1",
+                "장착 시 전반적인 공격력이 증가하지만, 받는 피해가 1 증가합니다.",
+                List.of("장비", "근접", "무기"),
+                null
         );
     }
 }

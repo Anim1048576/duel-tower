@@ -124,7 +124,7 @@ class StateMapperRunStateTest {
     void toDtoMapsEquipInventoryEntryWithEntryType() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1234L);
         var next = new java.util.ArrayList<>(state.runState().inventory().items());
-        next.add(new RunState.InventoryEntry(new EquipRef("E-1"), 1, false));
+        next.add(RunState.InventoryEntry.equip(UUID.randomUUID().toString(), new EquipRef("E-1"), false, null, null));
         state.runState().inventory().replaceItems(next);
 
         SessionStateDto dto = StateMapper.toDto("ABCD1234", state);
@@ -137,6 +137,7 @@ class StateMapperRunStateTest {
         assertEquals("EQUIP", equip.entryType());
         assertEquals("튼튼한 죽창", equip.name());
         assertFalse(equip.battleUsable());
+        assertNotNull(equip.inventoryEquipId());
     }
 
     @Test
@@ -152,8 +153,8 @@ class StateMapperRunStateTest {
 
     private static Map<String, EquipDefinition> defaultEquipDefs() {
         return Map.of(
-                "E-1", new EquipDefinition("E-1", "튼튼한 죽창", EquipSlot.WEAPON, "장착 가능한 근접 무기", "장착 가능한 근접 무기", List.of("장비", "근접", "무기")),
-                "E-2", new EquipDefinition("E-2", "휴대용 권총", EquipSlot.WEAPON, "장착 가능한 원거리 무기", "장착 가능한 원거리 무기", List.of("장비", "원거리", "무기"))
+                "E-1", new EquipDefinition("E-1", "튼튼한 죽창", EquipSlot.WEAPON, "장착 가능한 근접 무기", "장착 가능한 근접 무기", List.of("장비", "근접", "무기"), null),
+                "E-2", new EquipDefinition("E-2", "휴대용 권총", EquipSlot.WEAPON, "장착 가능한 원거리 무기", "장착 가능한 원거리 무기", List.of("장비", "원거리", "무기"), null)
         );
     }
 

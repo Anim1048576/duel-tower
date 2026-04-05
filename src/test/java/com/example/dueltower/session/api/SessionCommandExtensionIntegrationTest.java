@@ -1075,6 +1075,7 @@ class SessionCommandExtensionIntegrationTest {
         );
         assertTrue(bought.path("accepted").asBoolean());
         assertTrue(hasInventoryEntryType(bought.path("state"), "E-1", "EQUIP"));
+        String inventoryEquipId = findInventoryEquipId(bought.path("state"), "E-1");
 
         JsonNode equipped = commandAsPlayer(
                 fx.code,
@@ -1083,14 +1084,14 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "EQUIP_EQUIPMENT",
                   "playerId": "player1",
-                  "equipId": "E-1",
+                  "inventoryEquipId": "%s",
                   "expectedVersion": %d
                 }
-                """.formatted(bought.path("state").get("version").asLong())
+                """.formatted(inventoryEquipId, bought.path("state").get("version").asLong())
         );
 
         assertTrue(equipped.path("accepted").asBoolean());
-        assertEquals(0, findItemCountOrZero(equipped.path("state"), "E-1"));
+        assertEquals(0, countInventoryEntries(equipped.path("state"), "E-1", "EQUIP"));
         assertTrue(hasEquippedItem(equipped.path("state"), "player1", "WEAPON", "E-1"));
 
         JsonNode unequipped = commandAsPlayer(
@@ -1100,14 +1101,14 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "UNEQUIP_EQUIPMENT",
                   "playerId": "player1",
-                  "equipId": "E-1",
+                  "inventoryEquipId": "%s",
                   "expectedVersion": %d
                 }
-                """.formatted(equipped.path("state").get("version").asLong())
+                """.formatted(inventoryEquipId, equipped.path("state").get("version").asLong())
         );
 
         assertTrue(unequipped.path("accepted").asBoolean());
-        assertEquals(1, findItemCount(unequipped.path("state"), "E-1"));
+        assertEquals(1, countInventoryEntries(unequipped.path("state"), "E-1", "EQUIP"));
         assertFalse(hasEquippedItem(unequipped.path("state"), "player1", "WEAPON", "E-1"));
     }
 
@@ -1245,6 +1246,28 @@ class SessionCommandExtensionIntegrationTest {
             }
         }
         return false;
+    }
+
+    private String findInventoryEquipId(JsonNode stateNode, String equipId) {
+        JsonNode items = stateNode.path("run").path("inventory").path("items");
+        for (JsonNode item : items) {
+            if (equipId.equals(item.path("id").asText()) && "EQUIP".equals(item.path("entryType").asText())) {
+                return item.path("inventoryEquipId").asText();
+            }
+        }
+        fail("inventoryEquipId not found for equip: " + equipId);
+        return null;
+    }
+
+    private int countInventoryEntries(JsonNode stateNode, String id, String entryType) {
+        int count = 0;
+        JsonNode items = stateNode.path("run").path("inventory").path("items");
+        for (JsonNode item : items) {
+            if (id.equals(item.path("id").asText()) && entryType.equals(item.path("entryType").asText())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private JsonNode commandAsPlayer(String code, String playerToken, String body) throws Exception {

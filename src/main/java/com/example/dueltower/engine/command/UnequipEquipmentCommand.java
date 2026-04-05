@@ -13,7 +13,7 @@ public record UnequipEquipmentCommand(
         UUID commandId,
         long expectedVersion,
         PlayerId playerId,
-        String equipId
+        String inventoryEquipId
 ) implements GameCommand {
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
@@ -27,8 +27,8 @@ public record UnequipEquipmentCommand(
             errors.add("player not found");
             return errors;
         }
-        if (equipId == null || equipId.isBlank()) {
-            errors.add("equipId is required");
+        if (inventoryEquipId == null || inventoryEquipId.isBlank()) {
+            errors.add("inventoryEquipId is required");
             return errors;
         }
         if (state.combat() != null || state.nodeState() == NodeState.COMBAT) {
@@ -36,16 +36,11 @@ public record UnequipEquipmentCommand(
             return errors;
         }
 
-        EquipDefinition def;
-        try {
-            def = ctx.equipDef(equipId.trim());
-        } catch (IllegalArgumentException ex) {
-            errors.add("equipment definition not found: " + equipId.trim());
-            return errors;
-        }
-
-        EquippedItem equipped = player.equippedItem(def.slot());
-        if (equipped == null || !def.id().equals(equipped.equipId())) {
+        EquippedItem equipped = player.equippedItems().values().stream()
+                .filter(item -> inventoryEquipId.trim().equals(item.inventoryEquipId()))
+                .findFirst()
+                .orElse(null);
+        if (equipped == null) {
             errors.add("equipment is not equipped");
         }
         return errors;
@@ -57,15 +52,25 @@ public record UnequipEquipmentCommand(
         if (player == null) {
             return List.of();
         }
-        EquipDefinition def = ctx.equipDef(equipId.trim());
-        EquippedItem equipped = player.equippedItem(def.slot());
-        if (equipped == null || !def.id().equals(equipped.equipId())) {
+        EquippedItem equipped = player.equippedItems().values().stream()
+                .filter(item -> inventoryEquipId.trim().equals(item.inventoryEquipId()))
+                .findFirst()
+                .orElse(null);
+        if (equipped == null) {
             return List.of();
         }
 
+        EquipDefinition def = ctx.equipDef(equipped.equipId());
         player.unequipItem(def.slot());
-        InventoryCommandSupport.addInventoryEntryCount(state, new EquipRef(def.id()), equipped.bound(), 1);
+        InventoryCommandSupport.addEquipInventoryEntry(
+                state,
+                equipped.inventoryEquipId(),
+                def.id(),
+                equipped.bound(),
+                equipped.loadedAmmo(),
+                equipped.maxLoadedAmmo()
+        );
 
-        return List.of(new GameEvent.LogAppended(playerId.value() + " 해제: " + def.id() + " [" + def.slot().name() + "]"));
+        return List.of(new GameEvent.LogAppended(playerId.value() + " 해제: " + def.id() + " [" + def.slot().name() + "] #" + equipped.inventoryEquipId()));
     }
 }
