@@ -1,5 +1,8 @@
 package com.example.dueltower.engine.model;
 
+import com.example.dueltower.engine.config.RunConfig;
+import com.example.dueltower.engine.config.RunConfigs;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -125,33 +128,21 @@ public final class RunState {
         }
     }
 
-    private static final List<NodeChoice> NODE_POOL = List.of(
-            new NodeChoice("N-1", "회랑 정찰", "판정", "판정 성공 시 안전한 지름길 발견", NodePhase.JUDGEMENT, Danger.MID, false, null),
-            new NodeChoice("N-2", "붕괴 전장", "전투", "적 선공 확률 증가", NodePhase.COMBAT, Danger.HIGH, false, null),
-            new NodeChoice("N-3", "폐허 저장고", "이벤트", "보상 카드 1장 획득", NodePhase.EVENT, Danger.LOW, false, null),
-            new NodeChoice("N-4", "봉인된 균열", "전투", "열쇠 미보유 시 입장 불가", NodePhase.COMBAT, Danger.HIGH, true, "균열 열쇠가 없어 진입할 수 없음"),
-            new NodeChoice("N-5", "안식처", "이벤트", "체력과 행동력을 정비한다", NodePhase.EVENT, Danger.LOW, false, null)
-    );
-
-    private static final List<ShopOffer> DEFAULT_SHOP_OFFERS = List.of(
-            new ShopOffer("O-1", new ItemRef("I-1"), 50, 5, false),
-            new ShopOffer("O-2", new ItemRef("I-2"), 200, 5, false),
-            new ShopOffer("O-3", new ItemRef("I-3"), 500, 5, false),
-            new ShopOffer("O-4", new ItemRef("I-4"), 50, 5, false),
-            new ShopOffer("O-5", new ItemRef("I-5"), 200, 5, false),
-            new ShopOffer("O-6", new ItemRef("I-6"), 250, 5, false),
-            new ShopOffer("O-7", new ItemRef("I-7"), 500, 5, false),
-            new ShopOffer("O-8", new EquipRef("E-1"), 200, 5, false),
-            new ShopOffer("O-9", new EquipRef("E-2"), 250, 5, false),
-            new ShopOffer("O-10", new ItemRef("I-8"), 25, 5, false)
-    );
-
+    private final RunConfig runConfig;
     private int floor = 1;
     private CurrentNode currentNode;
     private boolean resultPending;
     private final List<NodeChoice> availableChoices = new ArrayList<>();
     private final List<RecentResult> recentResults = new ArrayList<>();
     private final Inventory inventory = new Inventory();
+
+    public RunState() {
+        this(RunConfigs.defaultConfig());
+    }
+
+    public RunState(RunConfig runConfig) {
+        this.runConfig = Objects.requireNonNull(runConfig, "runConfig");
+    }
 
     public int floor() { return floor; }
 
@@ -185,12 +176,12 @@ public final class RunState {
         floor = 1;
         currentNode = null;
         resultPending = false;
-        inventory.keys(2);
-        inventory.chests(1);
-        inventory.gold(12450);
-        inventory.replaceItems(defaultInventoryItems());
+        inventory.keys(runConfig.startingKeys());
+        inventory.chests(runConfig.startingChests());
+        inventory.gold(runConfig.startingGold());
+        inventory.replaceItems(runConfig.startingItems());
         availableChoices.clear();
-        availableChoices.addAll(generateChoices(floor, seed, inventory));
+        availableChoices.addAll(generateChoices(floor, seed, inventory, runConfig.nodePool()));
     }
 
     public NodeChoice findChoice(String choiceId) {
@@ -257,7 +248,7 @@ public final class RunState {
         }
         clearRecentResults();
         if (status() == LoopStatus.CHOOSE_NODE && availableChoices.isEmpty()) {
-            availableChoices.addAll(generateChoices(floor, seed, inventory));
+            availableChoices.addAll(generateChoices(floor, seed, inventory, runConfig.nodePool()));
         }
     }
 
@@ -265,7 +256,7 @@ public final class RunState {
         if (offerId == null || offerId.isBlank()) {
             return null;
         }
-        for (ShopOffer offer : DEFAULT_SHOP_OFFERS) {
+        for (ShopOffer offer : runConfig.defaultShopOffers()) {
             if (offer.offerId().equals(offerId.trim())) {
                 return offer;
             }
@@ -296,10 +287,13 @@ public final class RunState {
         }
     }
 
-    private static List<NodeChoice> generateChoices(int floor, long seed, Inventory inventory) {
+    private static List<NodeChoice> generateChoices(int floor,
+                                                    long seed,
+                                                    Inventory inventory,
+                                                    List<RunConfig.RunNodeDefinition> nodePool) {
         Random random = new Random(seed ^ ((long) floor * 9973L));
         List<Integer> order = new ArrayList<>();
-        for (int i = 0; i < NODE_POOL.size(); i++) {
+        for (int i = 0; i < nodePool.size(); i++) {
             order.add(i);
         }
         order.sort(Comparator.comparingInt(i -> random.nextInt()));
@@ -307,35 +301,26 @@ public final class RunState {
         Set<String> usedTypes = new LinkedHashSet<>();
         List<NodeChoice> selected = new ArrayList<>();
         for (Integer index : order) {
-            NodeChoice base = NODE_POOL.get(index);
-            if (usedTypes.contains(base.typeLabel())) {
+            RunConfig.RunNodeDefinition node = nodePool.get(index);
+            if (usedTypes.contains(node.typeLabel())) {
                 continue;
             }
-            boolean disabled = base.id().equals("N-4") && inventory.keys() <= 0;
+            boolean disabled = node.requiresKey() && inventory.keys() <= 0;
             selected.add(new NodeChoice(
-                    base.id(),
-                    base.name(),
-                    base.typeLabel(),
-                    base.rule(),
-                    base.phase(),
-                    base.danger(),
+                    node.id(),
+                    node.name(),
+                    node.typeLabel(),
+                    node.rule(),
+                    node.phase(),
+                    node.danger(),
                     disabled,
-                    disabled ? "균열 열쇠가 없어 진입할 수 없음" : null
+                    disabled ? node.keyRequiredReason() : null
             ));
-            usedTypes.add(base.typeLabel());
+            usedTypes.add(node.typeLabel());
             if (selected.size() >= 3) {
                 break;
             }
         }
         return selected;
-    }
-
-    private static List<InventoryEntry> defaultInventoryItems() {
-        return List.of(
-                InventoryEntry.item(new ItemRef("I-1"), 3, false),
-                InventoryEntry.item(new ItemRef("I-2"), 1, false),
-                InventoryEntry.item(new ItemRef("I-4"), 1, false),
-                InventoryEntry.item(new ItemRef("I-6"), 1, false)
-        );
     }
 }
