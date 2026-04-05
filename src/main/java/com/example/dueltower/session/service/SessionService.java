@@ -22,6 +22,7 @@ import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SessionId;
 import com.example.dueltower.common.api.ApiErrorException;
 import com.example.dueltower.common.api.ApiErrorResolver;
+import com.example.dueltower.session.config.StarterLoadoutConfig;
 import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.dto.OwnedCardModifierDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
@@ -68,6 +69,7 @@ public class SessionService {
     private final Duration sessionTtl;
     private final Duration cleanupInterval;
     private final GameRules gameRules;
+    private final StarterLoadoutConfig starterLoadoutConfig;
 
     // code -> runtime (in-memory)
     private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
@@ -88,7 +90,11 @@ public class SessionService {
                           Duration sessionTtl,
                           Duration cleanupInterval) {
         this(characterProfileRepository, cardService, deckService, statusService, keywordService, itemService, equipService,
-                passiveService, cardModifierService, presetService, GameRules.defaults(), sessionTtl, cleanupInterval);
+                passiveService, cardModifierService, presetService,
+                GameRules.defaults(),
+                StarterLoadoutConfig.defaults(GameRules.defaults()),
+                sessionTtl,
+                cleanupInterval);
     }
 
     @Autowired
@@ -103,6 +109,7 @@ public class SessionService {
                           CardModifierService cardModifierService,
                           PresetService presetService,
                           GameRules gameRules,
+                          StarterLoadoutConfig starterLoadoutConfig,
                           @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.characterProfileRepository = characterProfileRepository;
@@ -118,6 +125,7 @@ public class SessionService {
         this.sessionTtl = sessionTtl;
         this.cleanupInterval = cleanupInterval;
         this.gameRules = gameRules;
+        this.starterLoadoutConfig = starterLoadoutConfig;
     }
 
     public SessionRuntime createSession(String gmId) {
@@ -851,7 +859,7 @@ public class SessionService {
 
     private List<OwnedCard> parseOwnedCards(List<OwnedCardDto> ownedCardsRaw) {
         if (ownedCardsRaw == null || ownedCardsRaw.isEmpty()) {
-            return defaultOwnedCards();
+            return starterLoadoutConfig.defaultOwnedCards();
         }
         return SessionNormalizationSupport.normalizeOwnedCards(ownedCardsRaw);
     }
@@ -1093,7 +1101,7 @@ public class SessionService {
         }
 
         for (PlayerState ps : state.players().values()) {
-            String exCardId = exCardByPlayerId.getOrDefault(ps.playerId(), "EX901");
+            String exCardId = exCardByPlayerId.getOrDefault(ps.playerId(), starterLoadoutConfig.defaultExCardId());
             resetPlayerState(rt, state, ps, keepLoadouts, resetSeed, exCardId);
         }
         state.runState().initialize(resetSeed);
@@ -1125,17 +1133,17 @@ public class SessionService {
         ps.exCard(null);
 
         if (!keepLoadouts) {
-            List<OwnedCard> defaultOwnedCards = defaultOwnedCards();
+            List<OwnedCard> defaultOwnedCards = starterLoadoutConfig.defaultOwnedCards();
             ps.passiveIds(List.of());
             ps.ownedCards(defaultOwnedCards);
             List<String> defaultDeckOwnedCardIds = resolveCardIdsToOwnedCardIds(
-                    defaultPresetDeckCardIds(),
+                    starterLoadoutConfig.defaultPresetDeckCardIds(),
                     defaultOwnedCards,
                     "deckCardIds must not contain blank values"
             );
             ps.deckOwnedCardIds(defaultDeckOwnedCardIds);
             loadDeck(state, ps, defaultDeckOwnedCardIds);
-            addCardToEx(state, ps, new CardDefId("EX901"));
+            addCardToEx(state, ps, new CardDefId(starterLoadoutConfig.defaultExCardId()));
             rt.clearCharacterBinding(ps.playerId().value());
             shuffleDeck(state, ps, resetSeed);
             return;
@@ -1146,7 +1154,9 @@ public class SessionService {
             loadDeck(state, ps, deckOwnedCardIds);
             shuffleDeck(state, ps, resetSeed);
         }
-        addCardToEx(state, ps, new CardDefId((preservedExCardId == null || preservedExCardId.isBlank()) ? "EX901" : preservedExCardId.trim()));
+        addCardToEx(state, ps, new CardDefId((preservedExCardId == null || preservedExCardId.isBlank())
+                ? starterLoadoutConfig.defaultExCardId()
+                : preservedExCardId.trim()));
     }
 
     private void removePlayerRuntimeState(GameState state, PlayerState ps) {
@@ -1171,11 +1181,11 @@ public class SessionService {
 
     private String resolveCurrentExCardId(GameState state, PlayerState ps) {
         if (ps.exCard() == null) {
-            return "EX901";
+            return starterLoadoutConfig.defaultExCardId();
         }
         CardInstance exInst = state.card(ps.exCard());
         if (exInst == null || exInst.defId() == null || exInst.defId().value() == null || exInst.defId().value().isBlank()) {
-            return "EX901";
+            return starterLoadoutConfig.defaultExCardId();
         }
         return exInst.defId().value().trim();
     }
@@ -1195,25 +1205,7 @@ public class SessionService {
     }
 
     private String normalizeExCardId(String raw) {
-        return (raw == null || raw.isBlank()) ? "EX901" : raw.trim();
-    }
-
-    private List<OwnedCard> defaultOwnedCards() {
-        List<OwnedCard> owned = new ArrayList<>(20);
-        for (int i = 0; i < 5; i++) owned.add(OwnedCard.fromLegacy("C001", false, false, false));
-        for (int i = 0; i < 5; i++) owned.add(OwnedCard.fromLegacy("C002", false, false, false));
-        for (int i = 0; i < 5; i++) owned.add(OwnedCard.fromLegacy("C003", false, false, false));
-        for (int i = 0; i < 5; i++) owned.add(OwnedCard.fromLegacy("C004", false, false, false));
-        return List.copyOf(owned);
-    }
-
-    private List<String> defaultPresetDeckCardIds() {
-        return List.of(
-                "C001", "C001", "C001",
-                "C002", "C002", "C002",
-                "C003", "C003", "C003",
-                "C004", "C004", "C004"
-        );
+        return (raw == null || raw.isBlank()) ? starterLoadoutConfig.defaultExCardId() : raw.trim();
     }
 
     private void addCardToDeck(GameState state, PlayerState ps, CardDefId defId) {
