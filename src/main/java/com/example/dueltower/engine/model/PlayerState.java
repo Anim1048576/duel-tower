@@ -47,6 +47,8 @@ public final class PlayerState {
 
     private PendingDecision pendingDecision;
 
+    private final Map<EquipSlot, EquippedItem> equippedItems = new EnumMap<>(EquipSlot.class);
+
     // ===== 생활 스탯(기본) =====
     private int body;   // 신체
     private int skill;  // 기술
@@ -116,6 +118,16 @@ public final class PlayerState {
 
     public PendingDecision pendingDecision() { return pendingDecision; }
     public void pendingDecision(PendingDecision d) { this.pendingDecision = d; }
+
+    public Map<EquipSlot, EquippedItem> equippedItems() { return Collections.unmodifiableMap(equippedItems); }
+    public EquippedItem equippedItem(EquipSlot slot) { return equippedItems.get(slot); }
+    public void equipItem(EquipSlot slot, EquippedItem item) {
+        if (slot == null || item == null) {
+            throw new IllegalArgumentException("slot and item are required");
+        }
+        equippedItems.put(slot, item);
+    }
+    public EquippedItem unequipItem(EquipSlot slot) { return equippedItems.remove(slot); }
 
     // ===== 생활 스탯 =====
     public int body() { return body; }

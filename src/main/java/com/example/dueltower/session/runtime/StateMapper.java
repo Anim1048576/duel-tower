@@ -1,6 +1,7 @@
 package com.example.dueltower.session.runtime;
 
 import com.example.dueltower.content.card.model.OwnedCardModifier;
+import com.example.dueltower.content.equip.service.EquipService;
 import com.example.dueltower.content.item.service.ItemService;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
@@ -11,15 +12,18 @@ import java.util.*;
 
 public final class StateMapper {
     private static Map<String, ItemDefinition> itemDefsById = Map.of();
+    private static Map<String, EquipDefinition> equipDefsById = Map.of();
 
     private StateMapper() {}
 
-    public static void configureItemService(ItemService itemService) {
+    public static void configureContentServices(ItemService itemService, EquipService equipService) {
         itemDefsById = (itemService == null) ? Map.of() : itemService.defsMap();
+        equipDefsById = (equipService == null) ? Map.of() : equipService.defsMap();
     }
 
-    public static void configureItemDefsForTest(Map<String, ItemDefinition> defsById) {
-        itemDefsById = (defsById == null) ? Map.of() : Map.copyOf(defsById);
+    public static void configureDefsForTest(Map<String, ItemDefinition> itemDefs, Map<String, EquipDefinition> equipDefs) {
+        itemDefsById = (itemDefs == null) ? Map.of() : Map.copyOf(itemDefs);
+        equipDefsById = (equipDefs == null) ? Map.of() : Map.copyOf(equipDefs);
     }
 
     public static SessionStateDto toDto(String sessionCode, GameState state) {
@@ -145,7 +149,10 @@ public final class StateMapper {
                 ps.fieldLimit(),
                 ps.ownedCardCount(),
                 ps.maxOwnedCardCount(),
-                ps.forgettingRequired()
+                ps.forgettingRequired(),
+                ps.equippedItems().entrySet().stream()
+                        .map(e -> new PlayerStateDto.EquippedItemDto(e.getKey().name(), e.getValue().equipId(), e.getValue().bound()))
+                        .toList()
         );
     }
 
@@ -279,20 +286,41 @@ public final class StateMapper {
         }
         List<RunStateDto.InventoryItemDto> items = run.inventory().items().stream()
                 .map(item -> {
-                    ItemDefinition def = itemDefsById.get(item.itemId());
-                    if (def == null) {
-                        throw new IllegalStateException("item definition not found: " + item.itemId());
+                    if (item.ref() instanceof ItemRef itemRef) {
+                        ItemDefinition def = itemDefsById.get(itemRef.itemId());
+                        if (def == null) {
+                            throw new IllegalStateException("item definition not found: " + itemRef.itemId());
+                        }
+                        return new RunStateDto.InventoryItemDto(
+                                "ITEM",
+                                def.id(),
+                                def.name(),
+                                item.count(),
+                                item.bound(),
+                                def.battleUsable(),
+                                def.summary(),
+                                def.description(),
+                                def.tags()
+                        );
                     }
-                    return new RunStateDto.InventoryItemDto(
-                            def.id(),
-                            def.name(),
-                            item.count(),
-                            item.bound(),
-                            def.battleUsable(),
-                            def.summary(),
-                            def.description(),
-                            def.tags()
-                    );
+                    if (item.ref() instanceof EquipRef equipRef) {
+                        EquipDefinition def = equipDefsById.get(equipRef.equipId());
+                        if (def == null) {
+                            throw new IllegalStateException("equip definition not found: " + equipRef.equipId());
+                        }
+                        return new RunStateDto.InventoryItemDto(
+                                "EQUIP",
+                                def.id(),
+                                def.name(),
+                                item.count(),
+                                item.bound(),
+                                false,
+                                def.summary(),
+                                def.description(),
+                                def.tags()
+                        );
+                    }
+                    throw new IllegalStateException("unsupported inventory entry ref");
                 })
                 .toList();
         return new RunStateDto.InventoryDto(

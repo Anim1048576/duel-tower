@@ -2,10 +2,8 @@ package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.event.GameEvent;
-import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.PlayerId;
-import com.example.dueltower.engine.model.NodeState;
-import com.example.dueltower.engine.model.RunState;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +52,7 @@ public record SellInventoryItemCommand(
             return errors;
         }
 
-        RunState.InventoryItem item = InventoryCommandSupport.findInventoryItem(state, itemId);
+        RunState.InventoryEntry item = InventoryCommandSupport.findItemEntry(state, itemId);
         if (item == null) {
             errors.add("item not found");
             return errors;
@@ -67,23 +65,24 @@ public record SellInventoryItemCommand(
 
     @Override
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
-        RunState.InventoryItem item = InventoryCommandSupport.findInventoryItem(state, itemId);
+        RunState.InventoryEntry item = InventoryCommandSupport.findItemEntry(state, itemId);
         if (item == null) {
             return List.of();
         }
-        InventoryCommandSupport.consumeInventoryItem(state, item, count);
+        InventoryCommandSupport.consumeInventoryEntry(state, item, count);
 
-        int gainedGold = sellUnitPrice(item.itemId()) * count;
+        String soldItemId = ((ItemRef) item.ref()).itemId();
+        int gainedGold = sellUnitPrice(soldItemId) * count;
         state.runState().inventory().gold(state.runState().inventory().gold() + gainedGold);
         state.runState().appendRecentResult(
                 "inventory",
                 "인벤토리 판매",
-                item.itemId() + " x" + count + " 판매",
+                soldItemId + " x" + count + " 판매",
                 "인벤토리 아이템을 정리하여 " + gainedGold + "G를 획득했다.",
                 "inventory"
         );
 
-        return List.of(new GameEvent.LogAppended(playerId.value() + " 인벤토리 판매: " + item.itemId() + " x" + count + " (+" + gainedGold + "G)"));
+        return List.of(new GameEvent.LogAppended(playerId.value() + " 인벤토리 판매: " + soldItemId + " x" + count + " (+" + gainedGold + "G)"));
     }
 
     private static int sellUnitPrice(String itemId) {

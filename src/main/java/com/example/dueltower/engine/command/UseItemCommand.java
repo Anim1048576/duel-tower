@@ -38,7 +38,7 @@ public record UseItemCommand(
             errors.add("count must be >= 1");
         }
 
-        RunState.InventoryItem item = InventoryCommandSupport.findInventoryItem(state, itemId);
+        RunState.InventoryEntry item = InventoryCommandSupport.findItemEntry(state, itemId);
         if (item == null) {
             errors.add("item not found");
             return errors;
@@ -46,9 +46,9 @@ public record UseItemCommand(
 
         ItemDefinition definition;
         try {
-            definition = ctx.itemDef(item.itemId());
+            definition = ctx.itemDef(((ItemRef) item.ref()).itemId());
         } catch (IllegalArgumentException ex) {
-            errors.add("item definition not found: " + item.itemId());
+            errors.add("item definition not found: " + ((ItemRef) item.ref()).itemId());
             return errors;
         }
 
@@ -61,9 +61,9 @@ public record UseItemCommand(
 
         ItemEffect effect;
         try {
-            effect = ctx.itemEffect(item.itemId());
+            effect = ctx.itemEffect(((ItemRef) item.ref()).itemId());
         } catch (IllegalArgumentException ex) {
-            errors.add("item effect not found: " + item.itemId());
+            errors.add("item effect not found: " + ((ItemRef) item.ref()).itemId());
             return errors;
         }
 
@@ -95,14 +95,14 @@ public record UseItemCommand(
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         List<GameEvent> events = new ArrayList<>();
 
-        RunState.InventoryItem item = InventoryCommandSupport.findInventoryItem(state, itemId);
+        RunState.InventoryEntry item = InventoryCommandSupport.findItemEntry(state, itemId);
         if (item == null) {
             return events;
         }
 
-        ItemEffect effect = ctx.itemEffect(item.itemId());
+        ItemEffect effect = ctx.itemEffect(((ItemRef) item.ref()).itemId());
 
-        InventoryCommandSupport.consumeInventoryItem(state, item, count);
+        InventoryCommandSupport.consumeInventoryEntry(state, item, count);
 
         PlayerState actor = state.player(playerId);
         if (actor == null) {

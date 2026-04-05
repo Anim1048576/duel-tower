@@ -7,6 +7,7 @@ import com.example.dueltower.content.card.model.OwnedCardModifier;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.content.cardmodifier.service.CardModifierService;
+import com.example.dueltower.content.equip.service.EquipService;
 import com.example.dueltower.content.item.service.ItemService;
 import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.content.passive.service.PassiveService;
@@ -61,6 +62,7 @@ public class SessionService {
     private final StatusService statusService;
     private final KeywordService keywordService;
     private final ItemService itemService;
+    private final EquipService equipService;
     private final PassiveService passiveService;
     private final CardModifierService cardModifierService;
     private final PresetService presetService;
@@ -79,6 +81,7 @@ public class SessionService {
                           StatusService statusService,
                           KeywordService keywordService,
                           ItemService itemService,
+                          EquipService equipService,
                           PassiveService passiveService,
                           CardModifierService cardModifierService,
                           PresetService presetService,
@@ -90,6 +93,7 @@ public class SessionService {
         this.statusService = statusService;
         this.keywordService = keywordService;
         this.itemService = itemService;
+        this.equipService = equipService;
         this.passiveService = passiveService;
         this.cardModifierService = cardModifierService;
         this.presetService = presetService;
@@ -114,7 +118,8 @@ public class SessionService {
                     cardModifierService.defsMap(),
                     cardModifierService.effectsMap(),
                     itemService.defsMap(),
-                    itemService.effectsMap()
+                    itemService.effectsMap(),
+                    equipService.defsMap()
             );
             GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong());
             SessionRuntime rt = new SessionRuntime(code, gmId, generateGmToken(), state, ctx);

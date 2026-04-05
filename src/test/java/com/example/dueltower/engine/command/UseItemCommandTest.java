@@ -7,6 +7,7 @@ import com.example.dueltower.content.item.idb.I004_EmergencySmokeBomb;
 import com.example.dueltower.content.item.idb.I005_EnhancementShard;
 import com.example.dueltower.content.item.idb.I006_Antidote;
 import com.example.dueltower.content.item.idb.I007_EmergencySmokeBomb;
+import com.example.dueltower.content.item.idb.I008_BulletBundle;
 import com.example.dueltower.content.status.sdb.S004_Evasion;
 import com.example.dueltower.content.status.sdb.S101_Pain;
 import com.example.dueltower.content.status.sdb.S105_Weak;
@@ -245,6 +246,30 @@ class UseItemCommandTest {
         assertTrue(result.errors().contains("item effect not found: I-1"));
     }
 
+    @Test
+    void useItemRejectsWhenItemIsNotBattleUsable() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 132L);
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        state.players().put(playerId, new PlayerState(playerId));
+        seedCombatMainTurn(state, playerId);
+
+        addInventoryItem(state, "I-8", 1);
+
+        UseItemCommand command = new UseItemCommand(
+                UUID.randomUUID(),
+                state.version(),
+                playerId,
+                "I-8",
+                1,
+                TargetSelection.empty()
+        );
+
+        EngineResult result = new GameEngine().process(state, defaultItemCtx(), command);
+
+        assertFalse(result.accepted());
+        assertTrue(result.errors().contains("item is not battle usable"));
+    }
+
     private static void seedCombatMainTurn(GameState state, Ids.PlayerId playerId) {
         CombatState combat = new CombatState();
         combat.phase(CombatPhase.MAIN);
@@ -255,16 +280,16 @@ class UseItemCommandTest {
         state.nodeState(NodeState.COMBAT);
     }
 
-    private static RunState.InventoryItem findItem(GameState state, String itemId) {
+    private static RunState.InventoryEntry findItem(GameState state, String itemId) {
         return state.runState().inventory().items().stream()
-                .filter(item -> item.itemId().equals(itemId))
+                .filter(item -> item.ref() instanceof ItemRef ref && ref.itemId().equals(itemId))
                 .findFirst()
                 .orElseThrow();
     }
 
     private static void addInventoryItem(GameState state, String itemId, int count) {
         var next = new java.util.ArrayList<>(state.runState().inventory().items());
-        next.add(new RunState.InventoryItem(itemId, count, false));
+        next.add(new RunState.InventoryEntry(new ItemRef(itemId), count, false));
         state.runState().inventory().replaceItems(next);
     }
 
@@ -276,6 +301,7 @@ class UseItemCommandTest {
         I005_EnhancementShard i5 = new I005_EnhancementShard();
         I006_Antidote i6 = new I006_Antidote();
         I007_EmergencySmokeBomb i7 = new I007_EmergencySmokeBomb();
+        I008_BulletBundle i8 = new I008_BulletBundle();
 
         return new EngineContext(
                 Map.of(),
@@ -295,7 +321,8 @@ class UseItemCommandTest {
                         "I-4", i4.definition(),
                         "I-5", i5.definition(),
                         "I-6", i6.definition(),
-                        "I-7", i7.definition()
+                        "I-7", i7.definition(),
+                        "I-8", i8.definition()
                 ),
                 Map.of(
                         "I-1", i1,
@@ -317,6 +344,7 @@ class UseItemCommandTest {
         I005_EnhancementShard i5 = new I005_EnhancementShard();
         I006_Antidote i6 = new I006_Antidote();
         I007_EmergencySmokeBomb i7 = new I007_EmergencySmokeBomb();
+        I008_BulletBundle i8 = new I008_BulletBundle();
 
         return new EngineContext(
                 Map.of(),
@@ -336,7 +364,8 @@ class UseItemCommandTest {
                         "I-4", i4.definition(),
                         "I-5", i5.definition(),
                         "I-6", i6.definition(),
-                        "I-7", i7.definition()
+                        "I-7", i7.definition(),
+                        "I-8", i8.definition()
                 ),
                 Map.of(
                         "I-2", i2,

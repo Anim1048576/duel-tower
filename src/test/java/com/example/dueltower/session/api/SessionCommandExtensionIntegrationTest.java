@@ -1055,6 +1055,100 @@ class SessionCommandExtensionIntegrationTest {
         assertTrue(endTurnResponse.path("errors").size() > 0);
     }
 
+
+    @Test
+    void buyEquipOfferStoresEquipEntryTypeAndEquipUnequipFlowWorks() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectEventNode(fx);
+
+        JsonNode bought = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-8",
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.get("state").get("version").asLong())
+        );
+        assertTrue(bought.path("accepted").asBoolean());
+        assertTrue(hasInventoryEntryType(bought.path("state"), "E-1", "EQUIP"));
+
+        JsonNode equipped = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "EQUIP_EQUIPMENT",
+                  "playerId": "player1",
+                  "equipId": "E-1",
+                  "expectedVersion": %d
+                }
+                """.formatted(bought.path("state").get("version").asLong())
+        );
+
+        assertTrue(equipped.path("accepted").asBoolean());
+        assertEquals(0, findItemCountOrZero(equipped.path("state"), "E-1"));
+        assertTrue(hasEquippedItem(equipped.path("state"), "player1", "WEAPON", "E-1"));
+
+        JsonNode unequipped = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "UNEQUIP_EQUIPMENT",
+                  "playerId": "player1",
+                  "equipId": "E-1",
+                  "expectedVersion": %d
+                }
+                """.formatted(equipped.path("state").get("version").asLong())
+        );
+
+        assertTrue(unequipped.path("accepted").asBoolean());
+        assertEquals(1, findItemCount(unequipped.path("state"), "E-1"));
+        assertFalse(hasEquippedItem(unequipped.path("state"), "player1", "WEAPON", "E-1"));
+    }
+
+    @Test
+    void buyBulletBundleExposesItemTypeAndUseIsRejected() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectEventNode(fx);
+
+        JsonNode bought = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-10",
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.get("state").get("version").asLong())
+        );
+
+        assertTrue(bought.path("accepted").asBoolean());
+        assertTrue(hasInventoryEntryType(bought.path("state"), "I-8", "ITEM"));
+
+        JsonNode used = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "USE_ITEM",
+                  "playerId": "player1",
+                  "itemId": "I-8",
+                  "expectedVersion": %d
+                }
+                """.formatted(bought.path("state").get("version").asLong())
+        );
+
+        assertFalse(used.path("accepted").asBoolean());
+        assertTrue(hasError(used, "combat not started") || hasError(used, "item is not battle usable"));
+    }
+
     private JsonNode startCombatAndReachPlayerMainTurn(Fixture fx) throws Exception {
         JsonNode start = commandAsGm(
                 fx.code,
@@ -1130,6 +1224,27 @@ class SessionCommandExtensionIntegrationTest {
             }
         }
         return 0;
+    }
+
+
+    private boolean hasInventoryEntryType(JsonNode stateNode, String id, String type) {
+        JsonNode items = stateNode.path("run").path("inventory").path("items");
+        for (JsonNode item : items) {
+            if (id.equals(item.path("id").asText()) && type.equals(item.path("entryType").asText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasEquippedItem(JsonNode stateNode, String playerId, String slot, String equipId) {
+        JsonNode equippedItems = stateNode.path("players").path(playerId).path("equippedItems");
+        for (JsonNode equipped : equippedItems) {
+            if (slot.equals(equipped.path("slot").asText()) && equipId.equals(equipped.path("equipId").asText())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private JsonNode commandAsPlayer(String code, String playerToken, String body) throws Exception {

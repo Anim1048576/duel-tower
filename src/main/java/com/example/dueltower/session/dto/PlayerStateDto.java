@@ -23,5 +23,12 @@ public record PlayerStateDto(
         int fieldLimit,
         int ownedCardCount,
         int maxOwnedCardCount,
-        boolean forgettingRequired
-) {}
+        boolean forgettingRequired,
+        List<EquippedItemDto> equippedItems
+) {
+    public record EquippedItemDto(
+            String slot,
+            String equipId,
+            boolean bound
+    ) {}
+}
