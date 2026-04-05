@@ -51,24 +51,31 @@ class EquipEquipmentCommandTest {
 
         GameEngine engine = new GameEngine();
         EngineContext ctx = equipCtx();
+        String inventoryEquipId = state.runState().inventory().items().stream()
+                .filter(entry -> entry.ref() instanceof EquipRef ref && "E-1".equals(ref.equipId()))
+                .map(RunState.InventoryEntry::inventoryEquipId)
+                .findFirst()
+                .orElseThrow();
 
         EngineResult equip = engine.process(state, ctx,
-                new EquipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, "E-1"));
+                new EquipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, inventoryEquipId));
 
         assertTrue(equip.accepted());
         assertNull(InventoryCommandSupport.findEquipEntry(state, "E-1"));
         EquippedItem equipped = player.equippedItem(EquipSlot.WEAPON);
         assertNotNull(equipped);
         assertEquals("E-1", equipped.equipId());
+        assertEquals(inventoryEquipId, equipped.inventoryEquipId());
         assertTrue(equipped.bound());
 
         EngineResult unequip = engine.process(state, ctx,
-                new UnequipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, "E-1"));
+                new UnequipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, inventoryEquipId));
 
         assertTrue(unequip.accepted());
         assertNull(player.equippedItem(EquipSlot.WEAPON));
         RunState.InventoryEntry returned = InventoryCommandSupport.findEquipEntry(state, "E-1");
         assertNotNull(returned);
+        assertEquals(inventoryEquipId, returned.inventoryEquipId());
         assertTrue(returned.bound());
         assertEquals(1, returned.count());
     }
@@ -86,25 +93,59 @@ class EquipEquipmentCommandTest {
         GameEngine engine = new GameEngine();
         EngineContext ctx = equipCtx();
 
+        String spearInventoryId = state.runState().inventory().items().stream()
+                .filter(entry -> entry.ref() instanceof EquipRef ref && "E-1".equals(ref.equipId()))
+                .map(RunState.InventoryEntry::inventoryEquipId)
+                .findFirst()
+                .orElseThrow();
+        String pistolInventoryId = state.runState().inventory().items().stream()
+                .filter(entry -> entry.ref() instanceof EquipRef ref && "E-2".equals(ref.equipId()))
+                .map(RunState.InventoryEntry::inventoryEquipId)
+                .findFirst()
+                .orElseThrow();
+
         assertTrue(engine.process(state, ctx,
-                new EquipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, "E-1")).accepted());
+                new EquipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, spearInventoryId)).accepted());
 
         EngineResult slotConflict = engine.process(state, ctx,
-                new EquipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, "E-2"));
+                new EquipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, pistolInventoryId));
         assertFalse(slotConflict.accepted());
         assertTrue(slotConflict.errors().stream().anyMatch(e -> e.contains("slot already occupied")));
 
         seedCombatMainTurn(state, playerId);
 
         EngineResult equipInCombat = engine.process(state, ctx,
-                new EquipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, "E-2"));
+                new EquipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, pistolInventoryId));
         assertFalse(equipInCombat.accepted());
         assertTrue(equipInCombat.errors().contains("cannot equip equipment during combat"));
 
         EngineResult unequipInCombat = engine.process(state, ctx,
-                new UnequipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, "E-1"));
+                new UnequipEquipmentCommand(UUID.randomUUID(), state.version(), playerId, spearInventoryId));
         assertFalse(unequipInCombat.accepted());
         assertTrue(unequipInCombat.errors().contains("cannot unequip equipment during combat"));
+    }
+
+    @Test
+    void buyingSameEquipTwiceCreatesDistinctInventoryEntries() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 203L);
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        state.players().put(playerId, new PlayerState(playerId));
+        seedShopReady(state);
+
+        GameEngine engine = new GameEngine();
+        EngineContext ctx = equipCtx();
+        assertTrue(engine.process(state, ctx,
+                new BuyShopItemCommand(UUID.randomUUID(), state.version(), playerId, "O-9", 2)).accepted());
+
+        var pistols = state.runState().inventory().items().stream()
+                .filter(entry -> entry.ref() instanceof EquipRef ref && "E-2".equals(ref.equipId()))
+                .toList();
+        assertEquals(2, pistols.size());
+        assertNotEquals(pistols.get(0).inventoryEquipId(), pistols.get(1).inventoryEquipId());
+        assertEquals(1, pistols.get(0).count());
+        assertEquals(1, pistols.get(1).count());
+        assertEquals(6, pistols.get(0).loadedAmmo());
+        assertEquals(6, pistols.get(1).loadedAmmo());
     }
 
     private static EngineContext equipCtx() {
@@ -116,8 +157,8 @@ class EquipEquipmentCommandTest {
                 Map.of(), Map.of(),
                 Map.of(), Map.of(),
                 Map.of(
-                        "E-1", new EquipDefinition("E-1", "튼튼한 죽창", EquipSlot.WEAPON, "장착 가능한 근접 무기", "장착 가능한 근접 무기", java.util.List.of("장비")),
-                        "E-2", new EquipDefinition("E-2", "휴대용 권총", EquipSlot.WEAPON, "장착 가능한 원거리 무기", "장착 가능한 원거리 무기", java.util.List.of("장비"))
+                        "E-1", new EquipDefinition("E-1", "튼튼한 죽창", EquipSlot.WEAPON, "장착 가능한 근접 무기", "장착 가능한 근접 무기", java.util.List.of("장비"), null),
+                        "E-2", new EquipDefinition("E-2", "휴대용 권총", EquipSlot.WEAPON, "장착 가능한 원거리 무기", "장착 가능한 원거리 무기", java.util.List.of("장비"), null)
                 )
         );
     }

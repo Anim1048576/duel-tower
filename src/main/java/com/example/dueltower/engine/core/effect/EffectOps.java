@@ -3,6 +3,7 @@ package com.example.dueltower.engine.core.effect;
 import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.engine.core.combat.DamageFlags;
 import com.example.dueltower.engine.core.combat.DamageOps;
+import com.example.dueltower.engine.core.combat.EquipmentCombatOps;
 import com.example.dueltower.engine.core.combat.HealOps;
 import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierOps;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
@@ -95,7 +96,7 @@ public final class EffectOps {
     }
 
     public void damageWithActorAttack(Target t) {
-        damage(t, actor().attackPower());
+        damage(t, actorAttackPower());
     }
 
     public void healWithActorHeal(Target t) {
@@ -103,11 +104,11 @@ public final class EffectOps {
     }
 
     public void damageWithActorAttackPlus(int bonus, Target t) {
-        damage(t, actor().attackPower() + bonus);
+        damage(t, actorAttackPower() + bonus);
     }
 
     public void addStatusWithActorAttack(Target t, String key) {
-        addStatus(t, key, actor().attackPower());
+        addStatus(t, key, actorAttackPower());
     }
 
     public void addStatus(Target t, String key, int delta) {
@@ -438,5 +439,10 @@ public final class EffectOps {
         PlayerState me = ec.state().player(ec.actor());
         if (me == null) throw new IllegalStateException("missing player: " + ec.actor().value());
         return me;
+    }
+
+    private int actorAttackPower() {
+        PlayerState actor = actor();
+        return actor.attackPower() + EquipmentCombatOps.attackPowerBonus(actor);
     }
 }

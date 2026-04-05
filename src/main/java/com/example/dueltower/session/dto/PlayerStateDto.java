@@ -28,7 +28,11 @@ public record PlayerStateDto(
 ) {
     public record EquippedItemDto(
             String slot,
+            String inventoryEquipId,
             String equipId,
-            boolean bound
+            boolean bound,
+            Integer loadedAmmo,
+            Integer maxLoadedAmmo,
+            boolean actionAvailable
     ) {}
 }

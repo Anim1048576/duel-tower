@@ -289,7 +289,7 @@ class UseItemCommandTest {
 
     private static void addInventoryItem(GameState state, String itemId, int count) {
         var next = new java.util.ArrayList<>(state.runState().inventory().items());
-        next.add(new RunState.InventoryEntry(new ItemRef(itemId), count, false));
+        next.add(RunState.InventoryEntry.item(new ItemRef(itemId), count, false));
         state.runState().inventory().replaceItems(next);
     }
 

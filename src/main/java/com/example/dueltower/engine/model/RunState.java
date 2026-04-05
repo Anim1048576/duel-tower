@@ -62,10 +62,35 @@ public final class RunState {
     ) {}
 
     public record InventoryEntry(
+            String inventoryEquipId,
             InventoryEntryRef ref,
             int count,
-            boolean bound
-    ) {}
+            boolean bound,
+            Integer loadedAmmo,
+            Integer maxLoadedAmmo
+    ) {
+        public InventoryEntry {
+            count = Math.max(0, count);
+            if (ref instanceof EquipRef) {
+                if (inventoryEquipId == null || inventoryEquipId.isBlank()) {
+                    throw new IllegalArgumentException("inventoryEquipId is required for equip entry");
+                }
+                count = 1;
+            } else {
+                inventoryEquipId = null;
+                loadedAmmo = null;
+                maxLoadedAmmo = null;
+            }
+        }
+
+        public static InventoryEntry item(ItemRef ref, int count, boolean bound) {
+            return new InventoryEntry(null, ref, count, bound, null, null);
+        }
+
+        public static InventoryEntry equip(String inventoryEquipId, EquipRef ref, boolean bound, Integer loadedAmmo, Integer maxLoadedAmmo) {
+            return new InventoryEntry(inventoryEquipId, ref, 1, bound, loadedAmmo, maxLoadedAmmo);
+        }
+    }
 
     public record ShopOffer(
             String offerId,
@@ -307,10 +332,10 @@ public final class RunState {
 
     private static List<InventoryEntry> defaultInventoryItems() {
         return List.of(
-                new InventoryEntry(new ItemRef("I-1"), 3, false),
-                new InventoryEntry(new ItemRef("I-2"), 1, false),
-                new InventoryEntry(new ItemRef("I-4"), 1, false),
-                new InventoryEntry(new ItemRef("I-6"), 1, false)
+                InventoryEntry.item(new ItemRef("I-1"), 3, false),
+                InventoryEntry.item(new ItemRef("I-2"), 1, false),
+                InventoryEntry.item(new ItemRef("I-4"), 1, false),
+                InventoryEntry.item(new ItemRef("I-6"), 1, false)
         );
     }
 }

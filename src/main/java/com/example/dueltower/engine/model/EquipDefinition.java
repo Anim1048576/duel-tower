@@ -8,7 +8,8 @@ public record EquipDefinition(
         EquipSlot slot,
         String summary,
         String description,
-        List<String> tags
+        List<String> tags,
+        EquipActionDefinition action
 ) {
     public EquipDefinition {
         tags = (tags == null) ? List.of() : List.copyOf(tags);

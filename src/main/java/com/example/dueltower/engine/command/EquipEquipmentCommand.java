@@ -13,7 +13,7 @@ public record EquipEquipmentCommand(
         UUID commandId,
         long expectedVersion,
         PlayerId playerId,
-        String equipId
+        String inventoryEquipId
 ) implements GameCommand {
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
@@ -27,8 +27,8 @@ public record EquipEquipmentCommand(
             errors.add("player not found");
             return errors;
         }
-        if (equipId == null || equipId.isBlank()) {
-            errors.add("equipId is required");
+        if (inventoryEquipId == null || inventoryEquipId.isBlank()) {
+            errors.add("inventoryEquipId is required");
             return errors;
         }
         if (state.combat() != null || state.nodeState() == NodeState.COMBAT) {
@@ -36,7 +36,7 @@ public record EquipEquipmentCommand(
             return errors;
         }
 
-        RunState.InventoryEntry entry = InventoryCommandSupport.findEquipEntry(state, equipId);
+        RunState.InventoryEntry entry = InventoryCommandSupport.findEquipEntryByInventoryId(state, inventoryEquipId);
         if (entry == null) {
             errors.add("equipment not found");
             return errors;
@@ -62,15 +62,15 @@ public record EquipEquipmentCommand(
     @Override
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         PlayerState player = state.player(playerId);
-        RunState.InventoryEntry entry = InventoryCommandSupport.findEquipEntry(state, equipId);
+        RunState.InventoryEntry entry = InventoryCommandSupport.findEquipEntryByInventoryId(state, inventoryEquipId);
         if (player == null || entry == null) {
             return List.of();
         }
         EquipDefinition def = ctx.equipDef(((EquipRef) entry.ref()).equipId());
 
         InventoryCommandSupport.consumeInventoryEntry(state, entry, 1);
-        player.equipItem(def.slot(), new EquippedItem(def.id(), entry.bound()));
+        player.equipItem(def.slot(), new EquippedItem(entry.inventoryEquipId(), def.id(), entry.bound(), entry.loadedAmmo(), entry.maxLoadedAmmo()));
 
-        return List.of(new GameEvent.LogAppended(playerId.value() + " 장착: " + def.id() + " [" + def.slot().name() + "]"));
+        return List.of(new GameEvent.LogAppended(playerId.value() + " 장착: " + def.id() + " [" + def.slot().name() + "] #" + entry.inventoryEquipId()));
     }
 }

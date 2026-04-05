@@ -51,10 +51,13 @@ public record RunStateDto(
     public record InventoryItemDto(
             String entryType,
             String id,
+            String inventoryEquipId,
             String name,
             int count,
             boolean bound,
             boolean battleUsable,
+            Integer loadedAmmo,
+            Integer maxLoadedAmmo,
             String summary,
             String description,
             List<String> tags
