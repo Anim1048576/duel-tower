@@ -7,10 +7,12 @@ import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.Ids;
+import com.example.dueltower.engine.model.ItemDefinition;
 import com.example.dueltower.engine.model.NodeState;
 import com.example.dueltower.engine.model.PlayerState;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -36,6 +38,10 @@ class OpenChestCommandTest {
                 RewardTableConfig.defaults().judgement(),
                 RewardTableConfig.defaults().sellPrices()
         );
+        Map<String, ItemDefinition> itemDefs = Map.of(
+                "I-4",
+                new ItemDefinition("I-4", "테스트 보급 물약", true, "", "", List.of())
+        );
 
         EngineResult result = new GameEngine().process(state, new EngineContext(
                         Map.of(), Map.of(),
@@ -43,7 +49,7 @@ class OpenChestCommandTest {
                         Map.of(), Map.of(),
                         Map.of(), Map.of(),
                         Map.of(), Map.of(),
-                        Map.of(), Map.of(),
+                        itemDefs, Map.of(),
                         Map.of(),
                         GameRules.defaults(),
                         rewardConfig
@@ -54,7 +60,7 @@ class OpenChestCommandTest {
         assertEquals(beforeGold + 440, state.runState().inventory().gold());
         assertEquals(0, state.runState().inventory().chests());
         assertEquals(beforeItemCount + 4, InventoryCommandSupport.findItemEntry(state, "I-4").count());
-        assertEquals("상자에서 440G와 I-4 4개를 획득했다.", state.runState().recentResults().get(0).detail());
+        assertEquals("상자에서 440G와 테스트 보급 물약 4개를 획득했다.", state.runState().recentResults().get(0).detail());
         assertTrue(state.runState().resultPending());
     }
 }
