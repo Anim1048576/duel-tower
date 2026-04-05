@@ -8,6 +8,7 @@ public final class ItemIds {
     public static final String BARRIER_GENERATOR = "I-5";
     public static final String ANTIDOTE = "I-6";
     public static final String EMERGENCY_SMOKE_BOMB = "I-7";
+    public static final String BULLET_BUNDLE = "I-8";
 
     private ItemIds() {
     }

@@ -44,6 +44,7 @@ public record CommandRequest(
         String cardId,
         String summonId,
         String itemId,
+        String equipId,
         String offerId,
         List<String> targetPlayerIds, // legacy
         List<String> targetEnemyIds,  // legacy
@@ -78,6 +79,10 @@ public record CommandRequest(
 
     public String trimmedItemId() {
         return trimToNull(itemId);
+    }
+
+    public String trimmedEquipId() {
+        return trimToNull(equipId);
     }
 
     public String trimmedOfferId() {

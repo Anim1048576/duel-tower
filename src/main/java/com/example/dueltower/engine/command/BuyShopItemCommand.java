@@ -2,10 +2,8 @@ package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.event.GameEvent;
-import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.PlayerId;
-import com.example.dueltower.engine.model.NodeState;
-import com.example.dueltower.engine.model.RunState;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -66,9 +64,10 @@ public record BuyShopItemCommand(
             return List.of();
         }
 
-        InventoryCommandSupport.addInventoryItemCount(
+        InventoryCommandSupport.addInventoryEntryCount(
                 state,
-                new RunState.InventoryItem(offer.itemId(), 1, offer.bound()),
+                offer.ref(),
+                offer.bound(),
                 count
         );
         int totalCost = offer.price() * count;
@@ -76,13 +75,23 @@ public record BuyShopItemCommand(
         state.runState().resolveCurrentNode(
                 "reward",
                 "상점 구매 완료",
-                offer.itemId() + " x" + count + " 구매",
-                "상점에서 " + offer.itemId() + "을(를) 구매했다. 총 " + totalCost + "G 지불.",
+                inventoryRefLabel(offer.ref()) + " x" + count + " 구매",
+                "상점에서 " + inventoryRefLabel(offer.ref()) + "을(를) 구매했다. 총 " + totalCost + "G 지불.",
                 -totalCost,
                 0,
                 0
         );
 
         return List.of(new GameEvent.LogAppended(playerId.value() + " 상점 구매: " + offer.offerId() + " x" + count));
+    }
+
+    private static String inventoryRefLabel(InventoryEntryRef ref) {
+        if (ref instanceof ItemRef itemRef) {
+            return itemRef.itemId();
+        }
+        if (ref instanceof EquipRef equipRef) {
+            return equipRef.equipId();
+        }
+        return "unknown";
     }
 }

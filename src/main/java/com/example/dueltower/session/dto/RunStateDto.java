@@ -49,6 +49,7 @@ public record RunStateDto(
     ) {}
 
     public record InventoryItemDto(
+            String entryType,
             String id,
             String name,
             int count,

@@ -1,8 +1,7 @@
 package com.example.dueltower.engine.command;
 
-import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids;
-import com.example.dueltower.engine.model.RunState;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -12,69 +11,74 @@ import static org.junit.jupiter.api.Assertions.*;
 class InventoryCommandSupportTest {
 
     @Test
-    void addInventoryItemCountShouldMergeSameItemIdAndBound() {
+    void addInventoryEntryCountShouldMergeSameRefAndBound() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 10L);
 
-        RunState.InventoryItem before = InventoryCommandSupport.findInventoryItem(state, "I-1");
+        RunState.InventoryEntry before = InventoryCommandSupport.findItemEntry(state, "I-1");
         assertNotNull(before);
 
-        InventoryCommandSupport.addInventoryItemCount(state, new RunState.InventoryItem("I-1", 1, false), 2);
+        InventoryCommandSupport.addInventoryEntryCount(state, new ItemRef("I-1"), false, 2);
 
-        RunState.InventoryItem after = InventoryCommandSupport.findInventoryItem(state, "I-1");
+        RunState.InventoryEntry after = InventoryCommandSupport.findItemEntry(state, "I-1");
         assertNotNull(after);
         assertEquals(before.count() + 2, after.count());
         assertFalse(after.bound());
     }
 
     @Test
-    void addInventoryItemCountShouldNotMergeDifferentBound() {
+    void addInventoryEntryCountShouldNotMergeDifferentBound() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 11L);
 
-        InventoryCommandSupport.addInventoryItemCount(state, new RunState.InventoryItem("I-1", 1, true), 2);
+        InventoryCommandSupport.addInventoryEntryCount(state, new ItemRef("I-1"), true, 2);
 
         long sameIdCount = state.runState().inventory().items().stream()
-                .filter(item -> "I-1".equals(item.itemId()))
+                .filter(entry -> entry.ref() instanceof ItemRef itemRef && "I-1".equals(itemRef.itemId()))
                 .count();
 
         assertEquals(2, sameIdCount);
         assertTrue(state.runState().inventory().items().stream()
-                .anyMatch(item -> "I-1".equals(item.itemId()) && item.bound() && item.count() == 2));
+                .anyMatch(entry -> entry.ref() instanceof ItemRef itemRef
+                        && "I-1".equals(itemRef.itemId())
+                        && entry.bound()
+                        && entry.count() == 2));
     }
 
     @Test
-    void consumeInventoryItemKeepsEntryWhenCountRemains() {
+    void consumeInventoryEntryKeepsEntryWhenCountRemains() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 12L);
 
-        RunState.InventoryItem item = InventoryCommandSupport.findInventoryItem(state, "I-1");
+        RunState.InventoryEntry item = InventoryCommandSupport.findItemEntry(state, "I-1");
         assertNotNull(item);
 
-        InventoryCommandSupport.consumeInventoryItem(state, item, 1);
+        InventoryCommandSupport.consumeInventoryEntry(state, item, 1);
 
-        RunState.InventoryItem remained = InventoryCommandSupport.findInventoryItem(state, "I-1");
+        RunState.InventoryEntry remained = InventoryCommandSupport.findItemEntry(state, "I-1");
         assertNotNull(remained);
         assertEquals(item.count() - 1, remained.count());
     }
 
     @Test
-    void consumeInventoryItemRemovesEntryWhenCountBecomesZero() {
+    void consumeInventoryEntryRemovesEntryWhenCountBecomesZero() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 13L);
 
-        RunState.InventoryItem item = state.runState().inventory().items().stream()
-                .filter(it -> "I-2".equals(it.itemId()))
+        RunState.InventoryEntry item = state.runState().inventory().items().stream()
+                .filter(it -> it.ref() instanceof ItemRef itemRef && "I-2".equals(itemRef.itemId()))
                 .findFirst()
                 .orElseThrow();
 
-        InventoryCommandSupport.consumeInventoryItem(state, item, item.count());
+        InventoryCommandSupport.consumeInventoryEntry(state, item, item.count());
 
         assertTrue(state.runState().inventory().items().stream()
-                .noneMatch(it -> "I-2".equals(it.itemId()) && it.bound() == item.bound()));
+                .noneMatch(it -> it.ref() instanceof ItemRef itemRef
+                        && "I-2".equals(itemRef.itemId())
+                        && it.bound() == item.bound()));
     }
 
     @Test
-    void findInventoryItemReturnsNullForUnknownId() {
+    void findItemEntryReturnsNullForUnknownId() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 14L);
 
-        RunState.InventoryItem item = InventoryCommandSupport.findInventoryItem(state, "__UNKNOWN_ITEM__");
+        RunState.InventoryEntry item = InventoryCommandSupport.findItemEntry(state, "__UNKNOWN_ITEM__");
 
         assertNull(item);
     }

@@ -9,7 +9,7 @@ public record UseItemValidationContext(
         RunState run,
         CombatState combat,
         PlayerState actor,
-        RunState.InventoryItem inventoryItem,
+        RunState.InventoryEntry inventoryItem,
         int useCount,
         String targetCharacterId
 ) {

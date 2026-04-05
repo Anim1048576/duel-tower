@@ -3,12 +3,8 @@ package com.example.dueltower.session.runtime;
 import com.example.dueltower.engine.command.StartCombatCommand;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.GameEngine;
-import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids;
-import com.example.dueltower.engine.model.ItemDefinition;
-import com.example.dueltower.engine.model.NodeState;
-import com.example.dueltower.engine.model.PlayerState;
-import com.example.dueltower.engine.model.RunState;
 import com.example.dueltower.session.dto.SessionStateDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +19,7 @@ class StateMapperRunStateTest {
 
     @BeforeEach
     void setUp() {
-        StateMapper.configureItemDefsForTest(defaultItemDefs());
+        StateMapper.configureDefsForTest(defaultItemDefs(), defaultEquipDefs());
     }
 
     @Test
@@ -106,6 +102,7 @@ class StateMapperRunStateTest {
                 .findFirst()
                 .orElseThrow();
 
+        assertEquals("ITEM", item.entryType());
         assertEquals("염가형 회복물약", item.name());
         assertEquals(3, item.count());
         assertFalse(item.bound());
@@ -122,15 +119,42 @@ class StateMapperRunStateTest {
         assertFalse(i4.bound());
     }
 
+
+    @Test
+    void toDtoMapsEquipInventoryEntryWithEntryType() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1234L);
+        var next = new java.util.ArrayList<>(state.runState().inventory().items());
+        next.add(new RunState.InventoryEntry(new EquipRef("E-1"), 1, false));
+        state.runState().inventory().replaceItems(next);
+
+        SessionStateDto dto = StateMapper.toDto("ABCD1234", state);
+
+        var equip = dto.run().inventory().items().stream()
+                .filter(i -> "E-1".equals(i.id()))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("EQUIP", equip.entryType());
+        assertEquals("튼튼한 죽창", equip.name());
+        assertFalse(equip.battleUsable());
+    }
+
     @Test
     void toDtoFailsFastWhenItemDefinitionIsMissing() {
-        StateMapper.configureItemDefsForTest(Map.of());
+        StateMapper.configureDefsForTest(Map.of(), defaultEquipDefs());
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 321L);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> StateMapper.toDto("ABCD1234", state));
 
         assertTrue(ex.getMessage().contains("item definition not found"));
+    }
+
+    private static Map<String, EquipDefinition> defaultEquipDefs() {
+        return Map.of(
+                "E-1", new EquipDefinition("E-1", "튼튼한 죽창", EquipSlot.WEAPON, "장착 가능한 근접 무기", "장착 가능한 근접 무기", List.of("장비", "근접", "무기")),
+                "E-2", new EquipDefinition("E-2", "휴대용 권총", EquipSlot.WEAPON, "장착 가능한 원거리 무기", "장착 가능한 원거리 무기", List.of("장비", "원거리", "무기"))
+        );
     }
 
     private static Map<String, ItemDefinition> defaultItemDefs() {
@@ -141,7 +165,8 @@ class StateMapperRunStateTest {
                 "I-4", new ItemDefinition("I-4", "염가형 장벽 생성기", true, "전투 중 사용 가능 · 아군 진영 [방벽] 8", "아군 진영에 [방벽] 8을 적용합니다.", List.of("소모품", "방어")),
                 "I-5", new ItemDefinition("I-5", "장벽 생성기", true, "전투 중 사용 가능 · 아군 진영 [방벽] 20", "아군 진영에 [방벽] 20을 적용합니다.", List.of("소모품", "방어")),
                 "I-6", new ItemDefinition("I-6", "해독제", true, "전투 중 사용 가능 · 아군 1명 해로운 상태 1개 해제", "아군 1명의 무작위 [해로운 상태] 1개를 해제합니다.", List.of("소모품", "정화")),
-                "I-7", new ItemDefinition("I-7", "긴급 연막탄", true, "전투 중 사용 가능 · 사용자 [회피] 1", "사용자에게 [회피] 1을 부여합니다.", List.of("소모품", "회피"))
+                "I-7", new ItemDefinition("I-7", "긴급 연막탄", true, "전투 중 사용 가능 · 사용자 [회피] 1", "사용자에게 [회피] 1을 부여합니다.", List.of("소모품", "회피")),
+                "I-8", new ItemDefinition("I-8", "탄환 묶음", false, "사용 불가 · 휴대용 권총과 연동될 예정인 예비 탄약", "현재는 직접 사용할 수 없는 아이템입니다.", List.of("기타", "탄약"))
         );
     }
 }

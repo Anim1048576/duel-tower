@@ -8,6 +8,7 @@ import com.example.dueltower.engine.core.effect.passive.PassiveEffect;
 import com.example.dueltower.engine.core.effect.status.StatusEffect;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardModifierDefinition;
+import com.example.dueltower.engine.model.EquipDefinition;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import com.example.dueltower.engine.model.ItemDefinition;
 import com.example.dueltower.engine.model.KeywordDefinition;
@@ -34,9 +35,10 @@ public final class EngineContext {
 
     private final Map<String, ItemDefinition> itemDefs;
     private final Map<String, ItemEffect> itemEffects;
+    private final Map<String, EquipDefinition> equipDefs;
 
     public EngineContext(Map<CardDefId, CardDefinition> definitions, Map<CardDefId, CardEffect> effects) {
-        this(definitions, effects, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+        this(definitions, effects, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
     }
 
     public EngineContext(
@@ -45,7 +47,7 @@ public final class EngineContext {
             Map<String, StatusDefinition> statusDefs,
             Map<String, StatusEffect> statusEffects
     ) {
-        this(definitions, effects, statusDefs, statusEffects, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+        this(definitions, effects, statusDefs, statusEffects, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
     }
 
     public EngineContext(
@@ -56,7 +58,7 @@ public final class EngineContext {
             Map<String, KeywordDefinition> keywordDefs,
             Map<String, KeywordEffect> keywordEffects
     ) {
-        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
     }
 
     public EngineContext(
@@ -69,7 +71,7 @@ public final class EngineContext {
             Map<String, PassiveDefinition> passiveDefs,
             Map<String, PassiveEffect> passiveEffects
     ) {
-        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, passiveDefs, passiveEffects, Map.of(), Map.of(), Map.of(), Map.of());
+        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, passiveDefs, passiveEffects, Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
     }
 
     public EngineContext(
@@ -84,7 +86,7 @@ public final class EngineContext {
             Map<String, CardModifierDefinition> cardModifierDefs,
             Map<String, CardModifierEffect> cardModifierEffects
     ) {
-        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, passiveDefs, passiveEffects, cardModifierDefs, cardModifierEffects, Map.of(), Map.of());
+        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, passiveDefs, passiveEffects, cardModifierDefs, cardModifierEffects, Map.of(), Map.of(), Map.of());
     }
 
     public EngineContext(
@@ -101,6 +103,25 @@ public final class EngineContext {
             Map<String, ItemDefinition> itemDefs,
             Map<String, ItemEffect> itemEffects
     ) {
+        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, passiveDefs, passiveEffects,
+                cardModifierDefs, cardModifierEffects, itemDefs, itemEffects, Map.of());
+    }
+
+    public EngineContext(
+            Map<CardDefId, CardDefinition> definitions,
+            Map<CardDefId, CardEffect> effects,
+            Map<String, StatusDefinition> statusDefs,
+            Map<String, StatusEffect> statusEffects,
+            Map<String, KeywordDefinition> keywordDefs,
+            Map<String, KeywordEffect> keywordEffects,
+            Map<String, PassiveDefinition> passiveDefs,
+            Map<String, PassiveEffect> passiveEffects,
+            Map<String, CardModifierDefinition> cardModifierDefs,
+            Map<String, CardModifierEffect> cardModifierEffects,
+            Map<String, ItemDefinition> itemDefs,
+            Map<String, ItemEffect> itemEffects,
+            Map<String, EquipDefinition> equipDefs
+    ) {
         this.definitions = Map.copyOf(definitions);
         this.effects = Map.copyOf(effects);
         this.statusDefs = Map.copyOf(statusDefs);
@@ -113,6 +134,7 @@ public final class EngineContext {
         this.cardModifierEffects = Map.copyOf(cardModifierEffects);
         this.itemDefs = Map.copyOf(itemDefs);
         this.itemEffects = Map.copyOf(itemEffects);
+        this.equipDefs = Map.copyOf(equipDefs);
     }
 
     public CardDefinition def(CardDefId id) {
@@ -197,5 +219,12 @@ public final class EngineContext {
         ItemEffect e = itemEffects.get(id);
         if (e == null) throw new IllegalArgumentException("missing ItemEffect: " + id);
         return e;
+    }
+
+    public boolean hasEquipDef(String id) { return equipDefs.containsKey(id); }
+    public EquipDefinition equipDef(String id) {
+        EquipDefinition d = equipDefs.get(id);
+        if (d == null) throw new IllegalArgumentException("missing EquipDefinition: " + id);
+        return d;
     }
 }

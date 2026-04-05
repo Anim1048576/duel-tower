@@ -20,13 +20,21 @@ class RunStateTest {
         assertEquals(12450, run.inventory().gold());
         assertFalse(run.inventory().items().isEmpty());
         assertEquals(4, run.inventory().items().size());
-        assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-1") && item.count() == 3 && !item.bound()));
-        assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-2") && item.count() == 1 && !item.bound()));
-        assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-4") && item.count() == 1 && !item.bound()));
-        assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-6") && item.count() == 1 && !item.bound()));
-        assertTrue(run.inventory().items().stream().noneMatch(item -> item.itemId().equals("I-3")));
-        assertTrue(run.inventory().items().stream().noneMatch(item -> item.itemId().equals("I-5")));
-        assertTrue(run.inventory().items().stream().noneMatch(item -> item.itemId().equals("I-7")));
+        assertTrue(run.inventory().items().stream().anyMatch(item -> item.ref() instanceof ItemRef ref && ref.itemId().equals("I-1") && item.count() == 3 && !item.bound()));
+        assertTrue(run.inventory().items().stream().anyMatch(item -> item.ref() instanceof ItemRef ref && ref.itemId().equals("I-2") && item.count() == 1 && !item.bound()));
+        assertTrue(run.inventory().items().stream().anyMatch(item -> item.ref() instanceof ItemRef ref && ref.itemId().equals("I-4") && item.count() == 1 && !item.bound()));
+        assertTrue(run.inventory().items().stream().anyMatch(item -> item.ref() instanceof ItemRef ref && ref.itemId().equals("I-6") && item.count() == 1 && !item.bound()));
+    }
+
+    @Test
+    void shopOffersContainConsumablesEquipmentsAndBulletBundle() {
+        RunState run = new RunState();
+
+        assertEquals("I-1", ((ItemRef) run.findShopOffer("O-1").ref()).itemId());
+        assertEquals("I-7", ((ItemRef) run.findShopOffer("O-7").ref()).itemId());
+        assertEquals("E-1", ((EquipRef) run.findShopOffer("O-8").ref()).equipId());
+        assertEquals("E-2", ((EquipRef) run.findShopOffer("O-9").ref()).equipId());
+        assertEquals("I-8", ((ItemRef) run.findShopOffer("O-10").ref()).itemId());
     }
 
     @Test

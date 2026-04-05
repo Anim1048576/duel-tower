@@ -1,7 +1,6 @@
 package com.example.dueltower.engine.command;
 
-import com.example.dueltower.engine.model.GameState;
-import com.example.dueltower.engine.model.RunState;
+import com.example.dueltower.engine.model.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,51 +8,64 @@ import java.util.List;
 final class InventoryCommandSupport {
     private InventoryCommandSupport() {}
 
-    static RunState.InventoryItem findInventoryItem(GameState state, String rawItemId) {
+    static RunState.InventoryEntry findItemEntry(GameState state, String rawItemId) {
         if (rawItemId == null || rawItemId.isBlank()) {
             return null;
         }
         String normalized = rawItemId.trim();
-        for (RunState.InventoryItem item : state.runState().inventory().items()) {
-            if (normalized.equals(item.itemId())) {
-                return item;
+        for (RunState.InventoryEntry entry : state.runState().inventory().items()) {
+            if (entry.ref() instanceof ItemRef itemRef && normalized.equals(itemRef.itemId())) {
+                return entry;
             }
         }
         return null;
     }
 
-    static void consumeInventoryItem(GameState state, RunState.InventoryItem usedItem, int usedCount) {
-        List<RunState.InventoryItem> nextItems = new ArrayList<>();
-        for (RunState.InventoryItem item : state.runState().inventory().items()) {
-            if (!item.itemId().equals(usedItem.itemId()) || item.bound() != usedItem.bound()) {
-                nextItems.add(item);
+    static RunState.InventoryEntry findEquipEntry(GameState state, String rawEquipId) {
+        if (rawEquipId == null || rawEquipId.isBlank()) {
+            return null;
+        }
+        String normalized = rawEquipId.trim();
+        for (RunState.InventoryEntry entry : state.runState().inventory().items()) {
+            if (entry.ref() instanceof EquipRef equipRef && normalized.equals(equipRef.equipId())) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    static void consumeInventoryEntry(GameState state, RunState.InventoryEntry usedEntry, int usedCount) {
+        List<RunState.InventoryEntry> nextItems = new ArrayList<>();
+        for (RunState.InventoryEntry entry : state.runState().inventory().items()) {
+            if (!entry.ref().equals(usedEntry.ref()) || entry.bound() != usedEntry.bound()) {
+                nextItems.add(entry);
                 continue;
             }
 
-            int remain = Math.max(0, item.count() - usedCount);
+            int remain = Math.max(0, entry.count() - usedCount);
             if (remain > 0) {
-                nextItems.add(new RunState.InventoryItem(item.itemId(), remain, item.bound()));
+                nextItems.add(new RunState.InventoryEntry(entry.ref(), remain, entry.bound()));
             }
         }
         state.runState().inventory().replaceItems(nextItems);
     }
 
-    static void addInventoryItemCount(GameState state, RunState.InventoryItem gainedItem, int gainedCount) {
-        if (gainedItem == null || gainedCount <= 0) {
+    static void addInventoryEntryCount(GameState state, InventoryEntryRef ref, boolean bound, int gainedCount) {
+        if (ref == null || gainedCount <= 0) {
             return;
         }
         boolean merged = false;
-        List<RunState.InventoryItem> nextItems = new ArrayList<>();
-        for (RunState.InventoryItem item : state.runState().inventory().items()) {
-            if (!item.itemId().equals(gainedItem.itemId()) || item.bound() != gainedItem.bound()) {
-                nextItems.add(item);
+        List<RunState.InventoryEntry> nextItems = new ArrayList<>();
+        for (RunState.InventoryEntry entry : state.runState().inventory().items()) {
+            if (!entry.ref().equals(ref) || entry.bound() != bound) {
+                nextItems.add(entry);
                 continue;
             }
-            nextItems.add(new RunState.InventoryItem(item.itemId(), item.count() + gainedCount, item.bound()));
+            nextItems.add(new RunState.InventoryEntry(entry.ref(), entry.count() + gainedCount, entry.bound()));
             merged = true;
         }
         if (!merged) {
-            nextItems.add(new RunState.InventoryItem(gainedItem.itemId(), gainedCount, gainedItem.bound()));
+            nextItems.add(new RunState.InventoryEntry(ref, gainedCount, bound));
         }
         state.runState().inventory().replaceItems(nextItems);
     }

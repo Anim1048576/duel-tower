@@ -61,15 +61,15 @@ public final class RunState {
             String at
     ) {}
 
-    public record InventoryItem(
-            String itemId,
+    public record InventoryEntry(
+            InventoryEntryRef ref,
             int count,
             boolean bound
     ) {}
 
     public record ShopOffer(
             String offerId,
-            String itemId,
+            InventoryEntryRef ref,
             int price,
             int stock,
             boolean bound
@@ -79,7 +79,7 @@ public final class RunState {
         private int keys;
         private int chests;
         private int gold;
-        private final List<InventoryItem> items = new ArrayList<>();
+        private final List<InventoryEntry> items = new ArrayList<>();
 
         public int keys() { return keys; }
         public void keys(int keys) { this.keys = Math.max(0, keys); }
@@ -90,9 +90,9 @@ public final class RunState {
         public int gold() { return gold; }
         public void gold(int gold) { this.gold = Math.max(0, gold); }
 
-        public List<InventoryItem> items() { return Collections.unmodifiableList(items); }
+        public List<InventoryEntry> items() { return Collections.unmodifiableList(items); }
 
-        public void replaceItems(List<InventoryItem> value) {
+        public void replaceItems(List<InventoryEntry> value) {
             items.clear();
             if (value != null) {
                 items.addAll(value);
@@ -109,13 +109,16 @@ public final class RunState {
     );
 
     private static final List<ShopOffer> DEFAULT_SHOP_OFFERS = List.of(
-            new ShopOffer("O-1", "I-1", 50, 5, false),
-            new ShopOffer("O-2", "I-2", 200, 5, false),
-            new ShopOffer("O-3", "I-3", 500, 5, false),
-            new ShopOffer("O-4", "I-4", 50, 5, false),
-            new ShopOffer("O-5", "I-5", 200, 5, false),
-            new ShopOffer("O-6", "I-6", 250, 5, false),
-            new ShopOffer("O-7", "I-7", 500, 5, false)
+            new ShopOffer("O-1", new ItemRef("I-1"), 50, 5, false),
+            new ShopOffer("O-2", new ItemRef("I-2"), 200, 5, false),
+            new ShopOffer("O-3", new ItemRef("I-3"), 500, 5, false),
+            new ShopOffer("O-4", new ItemRef("I-4"), 50, 5, false),
+            new ShopOffer("O-5", new ItemRef("I-5"), 200, 5, false),
+            new ShopOffer("O-6", new ItemRef("I-6"), 250, 5, false),
+            new ShopOffer("O-7", new ItemRef("I-7"), 500, 5, false),
+            new ShopOffer("O-8", new EquipRef("E-1"), 200, 5, false),
+            new ShopOffer("O-9", new EquipRef("E-2"), 250, 5, false),
+            new ShopOffer("O-10", new ItemRef("I-8"), 25, 5, false)
     );
 
     private int floor = 1;
@@ -302,12 +305,12 @@ public final class RunState {
         return selected;
     }
 
-    private static List<InventoryItem> defaultInventoryItems() {
+    private static List<InventoryEntry> defaultInventoryItems() {
         return List.of(
-                new InventoryItem("I-1", 3, false),
-                new InventoryItem("I-2", 1, false),
-                new InventoryItem("I-4", 1, false),
-                new InventoryItem("I-6", 1, false)
+                new InventoryEntry(new ItemRef("I-1"), 3, false),
+                new InventoryEntry(new ItemRef("I-2"), 1, false),
+                new InventoryEntry(new ItemRef("I-4"), 1, false),
+                new InventoryEntry(new ItemRef("I-6"), 1, false)
         );
     }
 }

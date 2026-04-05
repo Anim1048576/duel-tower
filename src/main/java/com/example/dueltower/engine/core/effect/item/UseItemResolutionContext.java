@@ -12,7 +12,7 @@ public record UseItemResolutionContext(
         RunState run,
         CombatState combat,
         PlayerState actor,
-        RunState.InventoryItem inventoryItem,
+        RunState.InventoryEntry inventoryItem,
         int useCount,
         String targetCharacterId,
         List<GameEvent> out

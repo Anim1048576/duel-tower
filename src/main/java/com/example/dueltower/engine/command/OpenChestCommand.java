@@ -2,10 +2,8 @@ package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.event.GameEvent;
-import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.PlayerId;
-import com.example.dueltower.engine.model.NodeState;
-import com.example.dueltower.engine.model.RunState;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,9 +47,10 @@ public record OpenChestCommand(
         int gainedGold = 150 * count;
         int gainedPotion = count;
 
-        InventoryCommandSupport.addInventoryItemCount(
+        InventoryCommandSupport.addInventoryEntryCount(
                 state,
-                new RunState.InventoryItem("I-1", 1, false),
+                new ItemRef("I-1"),
+                false,
                 gainedPotion
         );
 

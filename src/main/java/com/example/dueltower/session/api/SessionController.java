@@ -8,6 +8,7 @@ import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.TargetRef;
 import com.example.dueltower.engine.model.TargetSelection;
+import com.example.dueltower.content.equip.service.EquipService;
 import com.example.dueltower.content.item.service.ItemService;
 import com.example.dueltower.session.service.SessionService;
 import com.example.dueltower.session.dto.*;
@@ -42,6 +43,8 @@ public class SessionController {
             "USE_SUMMON_ACTION",
             "USE_ITEM",
             "BUY_SHOP_ITEM",
+            "EQUIP_EQUIPMENT",
+            "UNEQUIP_EQUIPMENT",
             "OPEN_CHEST",
             "RESOLVE_JUDGEMENT",
             "SURRENDER_COMBAT",
@@ -63,9 +66,9 @@ public class SessionController {
 
     private final SessionService sessionService;
 
-    public SessionController(SessionService sessionService, ItemService itemService) {
+    public SessionController(SessionService sessionService, ItemService itemService, EquipService equipService) {
         this.sessionService = sessionService;
-        StateMapper.configureItemService(itemService);
+        StateMapper.configureContentServices(itemService, equipService);
     }
 
     @PostMapping
@@ -633,6 +636,16 @@ public class SessionController {
                 String offerId = requireText(req.trimmedOfferId(), "offerId");
                 int count = countOrDefault(req, 1);
                 return new BuyShopItemCommand(commandId, expectedVersion, playerId, offerId, count);
+            }
+            case "EQUIP_EQUIPMENT" -> {
+                PlayerId playerId = commandPlayerId(req);
+                String equipId = requireText(req.trimmedEquipId(), "equipId");
+                return new EquipEquipmentCommand(commandId, expectedVersion, playerId, equipId);
+            }
+            case "UNEQUIP_EQUIPMENT" -> {
+                PlayerId playerId = commandPlayerId(req);
+                String equipId = requireText(req.trimmedEquipId(), "equipId");
+                return new UnequipEquipmentCommand(commandId, expectedVersion, playerId, equipId);
             }
             case "OPEN_CHEST" -> {
                 PlayerId playerId = commandPlayerId(req);
