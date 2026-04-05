@@ -62,9 +62,12 @@ class ReloadEquipmentCommandTest {
                 Map.of(), Map.of(),
                 Map.of(), Map.of(),
                 Map.of(
-                        "E-1", new EquipDefinition("E-1", "튼튼한 죽창", EquipSlot.WEAPON, "s", "d", List.of("장비"), null),
+                        "E-1", new EquipDefinition("E-1", "튼튼한 죽창", EquipSlot.WEAPON, "s", "d", List.of("장비"), null, null, null, null),
                         "E-2", new EquipDefinition("E-2", "휴대용 권총", EquipSlot.WEAPON, "s", "d", List.of("장비"),
-                                new EquipActionDefinition("E-2-FIRE", "사격", "s", "d", Target.ENEMY_ONE, 0, true, 1))
+                                new EquipAmmoPolicy(6, 6),
+                                new EquipReloadPolicy("I-8", 6),
+                                new EquipActionDefinition("E-2-FIRE", "사격", "s", "d", Target.ENEMY_ONE, 0, true, 1, 12),
+                                null)
                 )
         );
     }

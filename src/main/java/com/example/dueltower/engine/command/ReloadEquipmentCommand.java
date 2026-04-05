@@ -1,7 +1,5 @@
 package com.example.dueltower.engine.command;
 
-import com.example.dueltower.content.equip.edb.EquipIds;
-import com.example.dueltower.content.item.idb.ItemIds;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.EquipDefinition;
@@ -41,18 +39,18 @@ public record ReloadEquipmentCommand(
             return errors;
         }
         EquipDefinition def = ctx.equipDef(equipped.equipId());
-        if (!EquipIds.PORTABLE_PISTOL.equals(def.id())) {
-            errors.add("reload is only available for portable pistol");
+        if (def.ammoPolicy() == null || def.reloadPolicy() == null) {
+            errors.add("reload is not available for this equipment");
             return errors;
         }
         int loadedAmmo = equipped.loadedAmmo() == null ? 0 : equipped.loadedAmmo();
-        int maxLoadedAmmo = equipped.maxLoadedAmmo() == null ? InventoryCommandSupport.PORTABLE_PISTOL_MAX_AMMO : equipped.maxLoadedAmmo();
+        int maxLoadedAmmo = equipped.maxLoadedAmmo() == null ? def.ammoPolicy().maxLoadedAmmo() : equipped.maxLoadedAmmo();
         if (loadedAmmo >= maxLoadedAmmo) {
             errors.add("loaded ammo is already full");
         }
-        RunState.InventoryEntry ammoBundle = InventoryCommandSupport.findItemEntry(state, ItemIds.BULLET_BUNDLE);
+        RunState.InventoryEntry ammoBundle = InventoryCommandSupport.findItemEntry(state, def.reloadPolicy().ammoItemId());
         if (ammoBundle == null || ammoBundle.count() <= 0) {
-            errors.add("bullet bundle is required");
+            errors.add(def.reloadPolicy().ammoItemId() + " is required");
         }
         return errors;
     }
@@ -70,15 +68,21 @@ public record ReloadEquipmentCommand(
         if (equipped == null) {
             return List.of();
         }
-        RunState.InventoryEntry ammoBundle = InventoryCommandSupport.findItemEntry(state, ItemIds.BULLET_BUNDLE);
+        EquipDefinition def = ctx.equipDef(equipped.equipId());
+        if (def.ammoPolicy() == null || def.reloadPolicy() == null) {
+            return List.of();
+        }
+        RunState.InventoryEntry ammoBundle = InventoryCommandSupport.findItemEntry(state, def.reloadPolicy().ammoItemId());
         if (ammoBundle == null) {
             return List.of();
         }
         InventoryCommandSupport.consumeInventoryEntry(state, ammoBundle, 1);
-        int maxLoadedAmmo = equipped.maxLoadedAmmo() == null ? InventoryCommandSupport.PORTABLE_PISTOL_MAX_AMMO : equipped.maxLoadedAmmo();
+        int maxLoadedAmmo = equipped.maxLoadedAmmo() == null ? def.ammoPolicy().maxLoadedAmmo() : equipped.maxLoadedAmmo();
+        int currentLoadedAmmo = equipped.loadedAmmo() == null ? 0 : equipped.loadedAmmo();
+        int nextLoadedAmmo = Math.min(maxLoadedAmmo, currentLoadedAmmo + def.reloadPolicy().ammoPerReload());
         player.equipItem(
-                ctx.equipDef(equipped.equipId()).slot(),
-                new EquippedItem(equipped.inventoryEquipId(), equipped.equipId(), equipped.bound(), maxLoadedAmmo, maxLoadedAmmo)
+                def.slot(),
+                new EquippedItem(equipped.inventoryEquipId(), equipped.equipId(), equipped.bound(), nextLoadedAmmo, maxLoadedAmmo)
         );
         return List.of(new GameEvent.LogAppended(playerId.value() + " 장전 완료: " + equipped.equipId() + " #" + equipped.inventoryEquipId()));
     }

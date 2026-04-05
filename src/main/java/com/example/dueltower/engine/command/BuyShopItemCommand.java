@@ -66,6 +66,7 @@ public record BuyShopItemCommand(
 
         InventoryCommandSupport.addInventoryEntryCount(
                 state,
+                ctx,
                 offer.ref(),
                 offer.bound(),
                 count

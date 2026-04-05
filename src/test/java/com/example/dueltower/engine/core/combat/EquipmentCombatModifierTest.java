@@ -14,6 +14,19 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class EquipmentCombatModifierTest {
+    private static EngineContext equipCtx() {
+        return new EngineContext(
+                Map.of(), Map.of(),
+                Map.of(), Map.of(),
+                Map.of(), Map.of(),
+                Map.of(), Map.of(),
+                Map.of(), Map.of(),
+                Map.of(), Map.of(),
+                Map.of(
+                        "E-1", new EquipDefinition("E-1", "튼튼한 죽창", EquipSlot.WEAPON, "s", "d", List.of("장비"), null, null, null, new EquipCombatModifierDefinition(2, 1))
+                )
+        );
+    }
 
     @Test
     void sturdySpearAddsAttackPowerToGeneralDamageCalculation() {
@@ -26,7 +39,7 @@ class EquipmentCombatModifierTest {
         state.enemies().put(enemyId, new EnemyState(enemyId, 100));
 
         EffectOps withoutEquip = new EffectOps(new EffectContext(
-                state, new EngineContext(Map.of(), Map.of()), playerId, null,
+                state, equipCtx(), playerId, null,
                 new TargetSelection(List.of(TargetRef.ofEnemy(enemyId))), new ArrayList<>()
         ));
         int before = state.enemy(enemyId).hp();
@@ -36,7 +49,7 @@ class EquipmentCombatModifierTest {
         state.enemy(enemyId).hp(100);
         player.equipItem(EquipSlot.WEAPON, new EquippedItem("eq-1", "E-1", false, null, null));
         EffectOps withEquip = new EffectOps(new EffectContext(
-                state, new EngineContext(Map.of(), Map.of()), playerId, null,
+                state, equipCtx(), playerId, null,
                 new TargetSelection(List.of(TargetRef.ofEnemy(enemyId))), new ArrayList<>()
         ));
         int beforeWithEquip = state.enemy(enemyId).hp();
@@ -55,13 +68,13 @@ class EquipmentCombatModifierTest {
         state.players().put(playerId, player);
 
         List<com.example.dueltower.engine.event.GameEvent> events = new ArrayList<>();
-        DamageOps.apply(state, new EngineContext(Map.of(), Map.of()), events,
+        DamageOps.apply(state, equipCtx(), events,
                 "src", TargetRef.ofPlayer(playerId), 5);
         int hpWithoutEquip = player.hp();
 
         player.hp(20);
         player.equipItem(EquipSlot.WEAPON, new EquippedItem("eq-2", "E-1", false, null, null));
-        DamageOps.apply(state, new EngineContext(Map.of(), Map.of()), events,
+        DamageOps.apply(state, equipCtx(), events,
                 "src", TargetRef.ofPlayer(playerId), 5);
         int hpWithEquip = player.hp();
 

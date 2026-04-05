@@ -1,14 +1,13 @@
 package com.example.dueltower.engine.command;
 
+import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.model.EquipAmmoPolicy;
 import com.example.dueltower.engine.model.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
 final class InventoryCommandSupport {
-    static final String PORTABLE_PISTOL_ID = "E-2";
-    static final int PORTABLE_PISTOL_MAX_AMMO = 6;
-
     private InventoryCommandSupport() {}
 
     static RunState.InventoryEntry findItemEntry(GameState state, String rawItemId) {
@@ -70,11 +69,15 @@ final class InventoryCommandSupport {
     }
 
     static void addInventoryEntryCount(GameState state, InventoryEntryRef ref, boolean bound, int gainedCount) {
+        addInventoryEntryCount(state, null, ref, bound, gainedCount);
+    }
+
+    static void addInventoryEntryCount(GameState state, EngineContext ctx, InventoryEntryRef ref, boolean bound, int gainedCount) {
         if (ref == null || gainedCount <= 0) {
             return;
         }
         if (ref instanceof EquipRef equipRef) {
-            addEquipInventoryEntries(state, equipRef, bound, gainedCount);
+            addEquipInventoryEntries(state, ctx, equipRef, bound, gainedCount);
             return;
         }
         boolean merged = false;
@@ -99,16 +102,16 @@ final class InventoryCommandSupport {
         state.runState().inventory().replaceItems(nextItems);
     }
 
-    private static void addEquipInventoryEntries(GameState state, EquipRef equipRef, boolean bound, int gainedCount) {
+    private static void addEquipInventoryEntries(GameState state, EngineContext ctx, EquipRef equipRef, boolean bound, int gainedCount) {
         List<RunState.InventoryEntry> nextItems = new ArrayList<>(state.runState().inventory().items());
         for (int i = 0; i < gainedCount; i++) {
             String inventoryEquipId = java.util.UUID.randomUUID().toString();
-            Integer loadedAmmo = null;
-            Integer maxLoadedAmmo = null;
-            if (PORTABLE_PISTOL_ID.equals(equipRef.equipId())) {
-                loadedAmmo = PORTABLE_PISTOL_MAX_AMMO;
-                maxLoadedAmmo = PORTABLE_PISTOL_MAX_AMMO;
+            EquipAmmoPolicy ammoPolicy = null;
+            if (ctx != null && ctx.hasEquipDef(equipRef.equipId())) {
+                ammoPolicy = ctx.equipDef(equipRef.equipId()).ammoPolicy();
             }
+            Integer loadedAmmo = ammoPolicy == null ? null : ammoPolicy.initialLoadedAmmo();
+            Integer maxLoadedAmmo = ammoPolicy == null ? null : ammoPolicy.maxLoadedAmmo();
             nextItems.add(RunState.InventoryEntry.equip(inventoryEquipId, equipRef, bound, loadedAmmo, maxLoadedAmmo));
         }
         state.runState().inventory().replaceItems(nextItems);

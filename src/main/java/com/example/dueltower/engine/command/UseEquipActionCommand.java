@@ -1,6 +1,5 @@
 package com.example.dueltower.engine.command;
 
-import com.example.dueltower.content.equip.edb.EquipIds;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.event.GameEvent;
@@ -73,20 +72,25 @@ public record UseEquipActionCommand(
             return List.of();
         }
         EquipDefinition def = ctx.equipDef(equipped.equipId());
-        if (def.action() == null || !EquipIds.PORTABLE_PISTOL.equals(def.id())) {
+        if (def.action() == null) {
+            return List.of();
+        }
+        if (def.action().target() != Target.ENEMY_ONE) {
             return List.of();
         }
         TargetRef.Enemy enemy = (TargetRef.Enemy) selection.targets().get(0);
         List<GameEvent> events = new ArrayList<>();
-        DamageOps.apply(
-                state,
-                ctx,
-                events,
-                TargetRef.ofPlayer(playerId),
-                playerId.value(),
-                TargetRef.ofEnemy(enemy.id()),
-                12
-        );
+        if (def.action().fixedDamage() > 0) {
+            DamageOps.apply(
+                    state,
+                    ctx,
+                    events,
+                    TargetRef.ofPlayer(playerId),
+                    playerId.value(),
+                    TargetRef.ofEnemy(enemy.id()),
+                    def.action().fixedDamage()
+            );
+        }
         player.equipItem(def.slot(), new EquippedItem(
                 equipped.inventoryEquipId(),
                 equipped.equipId(),

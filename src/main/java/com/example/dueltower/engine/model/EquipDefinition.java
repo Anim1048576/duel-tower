@@ -9,7 +9,10 @@ public record EquipDefinition(
         String summary,
         String description,
         List<String> tags,
-        EquipActionDefinition action
+        EquipAmmoPolicy ammoPolicy,
+        EquipReloadPolicy reloadPolicy,
+        EquipActionDefinition action,
+        EquipCombatModifierDefinition combatModifier
 ) {
     public EquipDefinition {
         tags = (tags == null) ? List.of() : List.copyOf(tags);
