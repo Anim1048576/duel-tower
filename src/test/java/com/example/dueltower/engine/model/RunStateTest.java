@@ -19,13 +19,14 @@ class RunStateTest {
         assertEquals(1, run.inventory().chests());
         assertEquals(12450, run.inventory().gold());
         assertFalse(run.inventory().items().isEmpty());
-        assertEquals(5, run.inventory().items().size());
+        assertEquals(4, run.inventory().items().size());
         assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-1") && item.count() == 3 && !item.bound()));
         assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-2") && item.count() == 1 && !item.bound()));
-        assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-3") && item.count() == 2 && !item.bound()));
-        assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-4") && item.count() == 1 && item.bound()));
-        assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-5") && item.count() == 8 && !item.bound()));
-        assertTrue(run.inventory().items().stream().noneMatch(item -> item.itemId().equals("I-4") && !item.bound()));
+        assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-4") && item.count() == 1 && !item.bound()));
+        assertTrue(run.inventory().items().stream().anyMatch(item -> item.itemId().equals("I-6") && item.count() == 1 && !item.bound()));
+        assertTrue(run.inventory().items().stream().noneMatch(item -> item.itemId().equals("I-3")));
+        assertTrue(run.inventory().items().stream().noneMatch(item -> item.itemId().equals("I-5")));
+        assertTrue(run.inventory().items().stream().noneMatch(item -> item.itemId().equals("I-7")));
     }
 
     @Test

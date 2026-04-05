@@ -9,7 +9,7 @@ import com.example.dueltower.engine.model.RunState;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 
 public record SellInventoryItemCommand(
@@ -20,7 +20,15 @@ public record SellInventoryItemCommand(
         int count
 ) implements GameCommand {
 
-    private static final Set<String> BATTLE_USABLE_IDS = Set.of("I-1", "I-2", "I-4");
+    private static final Map<String, Integer> SELL_UNIT_PRICES = Map.of(
+            "I-1", 25,
+            "I-2", 100,
+            "I-3", 250,
+            "I-4", 25,
+            "I-5", 100,
+            "I-6", 125,
+            "I-7", 250
+    );
 
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
@@ -65,7 +73,7 @@ public record SellInventoryItemCommand(
         }
         InventoryCommandSupport.consumeInventoryItem(state, item, count);
 
-        int gainedGold = sellUnitPrice(item) * count;
+        int gainedGold = sellUnitPrice(item.itemId()) * count;
         state.runState().inventory().gold(state.runState().inventory().gold() + gainedGold);
         state.runState().appendRecentResult(
                 "inventory",
@@ -78,13 +86,7 @@ public record SellInventoryItemCommand(
         return List.of(new GameEvent.LogAppended(playerId.value() + " 인벤토리 판매: " + item.itemId() + " x" + count + " (+" + gainedGold + "G)"));
     }
 
-    private static int sellUnitPrice(RunState.InventoryItem item) {
-        if (item.bound()) {
-            return 40;
-        }
-        if (BATTLE_USABLE_IDS.contains(item.itemId())) {
-            return 60;
-        }
-        return 50;
+    private static int sellUnitPrice(String itemId) {
+        return SELL_UNIT_PRICES.getOrDefault(itemId, 0);
     }
 }

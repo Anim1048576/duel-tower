@@ -12,7 +12,7 @@ import java.util.List;
 
 @Component
 public class I001_SmallPotion implements ItemBlueprint {
-    public static final String ID = ItemIds.SMALL_POTION;
+    public static final String ID = ItemIds.CHEAP_HEALING_POTION;
 
     @Override
     public String id() {
@@ -23,10 +23,10 @@ public class I001_SmallPotion implements ItemBlueprint {
     public ItemDefinition definition() {
         return new ItemDefinition(
                 id(),
-                "소형 회복 물약",
+                "염가형 회복물약",
                 true,
-                "전투 중 사용 가능 · 체력 20 회복",
-                "즉시 체력을 20 회복합니다. 턴 소모 없이 사용됩니다.",
+                "전투 중 사용 가능 · 아군 1명 체력 10 회복",
+                "아군 1명의 체력을 10 회복합니다.",
                 List.of("소모품", "회복")
         );
     }
@@ -43,7 +43,7 @@ public class I001_SmallPotion implements ItemBlueprint {
                 ctx.out(),
                 "item:" + id(),
                 TargetRef.ofPlayer(targetId),
-                20 * ctx.useCount()
+                10 * ctx.useCount()
         );
     }
 }

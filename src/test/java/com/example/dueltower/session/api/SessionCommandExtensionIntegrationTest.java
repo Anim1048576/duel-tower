@@ -174,7 +174,7 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "USE_ITEM",
                   "playerId": "player1",
-                  "itemId": "I-2",
+                  "itemId": "I-6",
                   "count": 1,
                   "expectedVersion": %d
                 }
@@ -197,7 +197,7 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "USE_ITEM",
                   "playerId": "player1",
-                  "itemId": "I-2",
+                  "itemId": "I-6",
                   "count": 1,
                   "targetPlayerIds": ["player1"],
                   "expectedVersion": %d
@@ -540,14 +540,14 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "BUY_SHOP_ITEM",
                   "playerId": "player1",
-                  "offerId": "O-2",
+                  "offerId": "O-4",
                   "expectedVersion": %d
                 }
                 """.formatted(expectedVersion)
         );
 
         assertTrue(bought.get("accepted").asBoolean());
-        assertEquals(beforeGold - 60, bought.get("state").path("run").path("inventory").path("gold").asInt());
+        assertEquals(beforeGold - 50, bought.get("state").path("run").path("inventory").path("gold").asInt());
         assertEquals(beforeSmokeBomb + 1, findItemCount(bought.get("state"), "I-4"));
         assertTrue(bought.get("state").path("run").path("resultPending").asBoolean());
     }

@@ -109,8 +109,13 @@ public final class RunState {
     );
 
     private static final List<ShopOffer> DEFAULT_SHOP_OFFERS = List.of(
-            new ShopOffer("O-1", "I-1", 25, 5, false),
-            new ShopOffer("O-2", "I-4", 60, 2, true)
+            new ShopOffer("O-1", "I-1", 50, 5, false),
+            new ShopOffer("O-2", "I-2", 200, 5, false),
+            new ShopOffer("O-3", "I-3", 500, 5, false),
+            new ShopOffer("O-4", "I-4", 50, 5, false),
+            new ShopOffer("O-5", "I-5", 200, 5, false),
+            new ShopOffer("O-6", "I-6", 250, 5, false),
+            new ShopOffer("O-7", "I-7", 500, 5, false)
     );
 
     private int floor = 1;
@@ -301,9 +306,8 @@ public final class RunState {
         return List.of(
                 new InventoryItem("I-1", 3, false),
                 new InventoryItem("I-2", 1, false),
-                new InventoryItem("I-3", 2, false),
-                new InventoryItem("I-4", 1, true),
-                new InventoryItem("I-5", 8, false)
+                new InventoryItem("I-4", 1, false),
+                new InventoryItem("I-6", 1, false)
         );
     }
 }

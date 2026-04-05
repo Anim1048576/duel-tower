@@ -1,18 +1,18 @@
 package com.example.dueltower.content.item.idb;
 
 import com.example.dueltower.content.item.model.ItemBlueprint;
-import com.example.dueltower.engine.core.combat.HealOps;
+import com.example.dueltower.content.status.sdb.S004_Evasion;
 import com.example.dueltower.engine.core.effect.item.UseItemResolutionContext;
 import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.ItemDefinition;
-import com.example.dueltower.engine.model.TargetRef;
+import com.example.dueltower.engine.model.PlayerState;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
-public class I002_Antidote implements ItemBlueprint {
-    public static final String ID = ItemIds.HEALING_POTION;
+public class I007_EmergencySmokeBomb implements ItemBlueprint {
+    public static final String ID = ItemIds.EMERGENCY_SMOKE_BOMB;
 
     @Override
     public String id() {
@@ -23,27 +23,25 @@ public class I002_Antidote implements ItemBlueprint {
     public ItemDefinition definition() {
         return new ItemDefinition(
                 id(),
-                "회복물약",
+                "긴급 연막탄",
                 true,
-                "전투 중 사용 가능 · 아군 1명 체력 30 회복",
-                "아군 1명의 체력을 30 회복합니다.",
-                List.of("소모품", "회복")
+                "전투 중 사용 가능 · 사용자 [회피] 1",
+                "사용자에게 [회피] 1을 부여합니다.",
+                List.of("소모품", "회피")
         );
     }
 
     @Override
     public void resolveUse(UseItemResolutionContext ctx) {
-        Ids.PlayerId targetId = (ctx.targetCharacterId() == null || ctx.targetCharacterId().isBlank())
+        Ids.PlayerId targetPlayerId = (ctx.targetCharacterId() == null || ctx.targetCharacterId().isBlank())
                 ? ctx.actor().playerId()
                 : new Ids.PlayerId(ctx.targetCharacterId().trim());
 
-        HealOps.apply(
-                ctx.state(),
-                ctx.ctx(),
-                ctx.out(),
-                "item:" + id(),
-                TargetRef.ofPlayer(targetId),
-                30 * ctx.useCount()
-        );
+        PlayerState ps = ctx.state().player(targetPlayerId);
+        if (ps == null) {
+            return;
+        }
+
+        ps.statusAdd(S004_Evasion.ID, ctx.useCount());
     }
 }
