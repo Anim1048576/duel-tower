@@ -44,8 +44,6 @@ public class S005_Taunt implements StatusBlueprint {
             List<TargetRef> enemyCandidates,
             List<String> errors
     ) {
-        if (!(chosenEnemy instanceof TargetRef.Enemy)) return;
-
         List<TargetRef> taunts = tauntHolders(rt, enemyCandidates);
         if (taunts.isEmpty()) return;
 
@@ -62,8 +60,6 @@ public class S005_Taunt implements StatusBlueprint {
             TargetRef chosenEnemy,
             List<TargetRef> candidates
     ) {
-        if (!(chosenEnemy instanceof TargetRef.Enemy)) return chosenEnemy;
-
         List<TargetRef> taunts = tauntHolders(rt, candidates);
         if (taunts.isEmpty()) return chosenEnemy;
 
