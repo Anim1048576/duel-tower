@@ -11,6 +11,9 @@ import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.NodeState;
 import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.RunState;
+import com.example.dueltower.engine.core.combat.VictoryOps;
+import com.example.dueltower.engine.model.CombatState;
+import com.example.dueltower.engine.event.GameEvent;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -183,6 +186,132 @@ class SelectNodeChoiceCommandTest {
         assertTrue(state.runState().resultPending());
     }
 
+    @Test
+    void combatNodeStillTransitionsToCombatStartWaitingFlow() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 201L, nodeTypeRunConfig("전투", null, List.of()));
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        state.players().put(playerId, new PlayerState(playerId));
+
+        EngineResult result = new GameEngine().process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new SelectNodeChoiceCommand(UUID.randomUUID(), state.version(), playerId, state.runState().availableChoices().get(0).id())
+        );
+
+        assertTrue(result.accepted());
+        assertEquals(NodeState.COMBAT, state.nodeState());
+        assertFalse(state.runState().resultPending());
+        assertTrue(result.events().stream()
+                .filter(event -> event instanceof GameEvent.LogAppended)
+                .map(event -> ((GameEvent.LogAppended) event).line())
+                .anyMatch(message -> message.contains("START_COMBAT")));
+    }
+
+    @Test
+    void bossNodeIsSeparatedFromNormalCombatInResultAndLogs() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 202L, nodeTypeRunConfig("보스", null, List.of()));
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        state.players().put(playerId, new PlayerState(playerId));
+
+        EngineResult selectResult = new GameEngine().process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new SelectNodeChoiceCommand(UUID.randomUUID(), state.version(), playerId, state.runState().availableChoices().get(0).id())
+        );
+        assertTrue(selectResult.accepted());
+        assertEquals(NodeState.COMBAT, state.nodeState());
+        assertTrue(selectResult.events().stream()
+                .filter(event -> event instanceof GameEvent.LogAppended)
+                .map(event -> ((GameEvent.LogAppended) event).line())
+                .anyMatch(message -> message.contains("보스 노드")));
+
+        state.combat(new CombatState());
+        List<GameEvent> postEvents = new java.util.ArrayList<>();
+        VictoryOps.postHandleCheck(state, new EngineContext(Map.of(), Map.of()), postEvents);
+
+        assertTrue(state.runState().resultPending());
+        assertEquals("보스 전투 결과", state.runState().recentResults().get(0).title());
+        assertTrue(postEvents.stream()
+                .filter(event -> event instanceof GameEvent.LogAppended)
+                .map(event -> ((GameEvent.LogAppended) event).line())
+                .anyMatch(message -> message.contains("boss combat ends")));
+    }
+
+    @Test
+    void facilityNodeResolvesImmediatelyWithoutCombatPending() {
+        RunConfig.NodeEffect effect = new RunConfig.NodeEffect(55, 0, 0, 4, "시설 보상", "시설에서 휴식하고 55G를 얻는다.");
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 203L, nodeTypeRunConfig("시설", effect, List.of()));
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        PlayerState player = new PlayerState(playerId);
+        player.hp(10);
+        state.players().put(playerId, player);
+        int beforeGold = state.runState().inventory().gold();
+
+        EngineResult result = new GameEngine().process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new SelectNodeChoiceCommand(UUID.randomUUID(), state.version(), playerId, state.runState().availableChoices().get(0).id())
+        );
+
+        assertTrue(result.accepted());
+        assertEquals(NodeState.NON_COMBAT, state.nodeState());
+        assertTrue(state.runState().resultPending());
+        assertEquals(beforeGold + 55, state.runState().inventory().gold());
+        assertEquals(14, player.hp());
+        assertEquals("시설 이용", state.runState().recentResults().get(0).title());
+    }
+
+    @Test
+    void curseNodeAppliesPenaltyDifferentFromNormalNode() {
+        RunConfig.NodeEffect effect = new RunConfig.NodeEffect(-70, 0, 0, -3, "저주 패널티", "저주로 70G를 잃고 체력 3 감소.");
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 204L, nodeTypeRunConfig("저주", effect, List.of()));
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        PlayerState player = new PlayerState(playerId);
+        player.hp(20);
+        state.players().put(playerId, player);
+        int beforeGold = state.runState().inventory().gold();
+
+        EngineResult result = new GameEngine().process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new SelectNodeChoiceCommand(UUID.randomUUID(), state.version(), playerId, state.runState().availableChoices().get(0).id())
+        );
+
+        assertTrue(result.accepted());
+        assertTrue(state.runState().resultPending());
+        assertEquals(beforeGold - 70, state.runState().inventory().gold());
+        assertEquals(17, player.hp());
+        assertEquals("저주 노출", state.runState().recentResults().get(0).title());
+    }
+
+    @Test
+    void mysteryNodeChoosesConfiguredFacilityOutcomeDeterministically() {
+        RunConfig.NodeEffect effect = new RunConfig.NodeEffect(30, 0, 0, 2, "???-시설", "??? 결과로 시설 보상.");
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 205L,
+                nodeTypeRunConfig("???", effect, List.of("FACILITY")));
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        PlayerState player = new PlayerState(playerId);
+        player.hp(10);
+        state.players().put(playerId, player);
+        int beforeGold = state.runState().inventory().gold();
+
+        EngineResult result = new GameEngine().process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new SelectNodeChoiceCommand(UUID.randomUUID(), state.version(), playerId, state.runState().availableChoices().get(0).id())
+        );
+
+        assertTrue(result.accepted());
+        assertEquals(NodeState.NON_COMBAT, state.nodeState());
+        assertTrue(state.runState().resultPending());
+        assertEquals(beforeGold + 30, state.runState().inventory().gold());
+        assertEquals(12, player.hp());
+        assertTrue(result.events().stream()
+                .filter(event -> event instanceof GameEvent.LogAppended)
+                .map(event -> ((GameEvent.LogAppended) event).line())
+                .anyMatch(message -> message.contains("??? 노드 결과: FACILITY")));
+    }
+
     private static RunConfig forcedJudgementRunConfig() {
         return new RunConfig(
                 0,
@@ -202,5 +331,36 @@ class SelectNodeChoiceCommandTest {
                 )),
                 List.of(new RunState.ShopOffer("TEST-OFFER", new ItemRef("I-1"), 10, 1, false))
         );
+    }
+
+    private static RunConfig nodeTypeRunConfig(String typeLabel, RunConfig.NodeEffect effect, List<String> mysteryOutcomes) {
+        return RunConfig.fromRaw(new RunConfig.RunConfigRaw(
+                0,
+                0,
+                100,
+                List.of(),
+                List.of(new RunConfig.RunNodeDefinitionRaw(
+                        "NODE-1",
+                        typeLabel + " 테스트",
+                        typeLabel,
+                        typeLabel + " 규칙",
+                        "전투".equals(typeLabel) || "보스".equals(typeLabel) ? RunState.NodePhase.COMBAT : RunState.NodePhase.EVENT,
+                        RunState.Danger.MID,
+                        false,
+                        null,
+                        false,
+                        null,
+                        effect == null ? null : new RunConfig.NodeEffectRaw(
+                                effect.goldDelta(),
+                                effect.keyDelta(),
+                                effect.chestDelta(),
+                                effect.hpDelta(),
+                                effect.summary(),
+                                effect.detail()
+                        ),
+                        mysteryOutcomes
+                )),
+                List.of(new RunConfig.ShopOfferRaw("TEST-OFFER", "I-1", 10, 1, false))
+        ));
     }
 }
