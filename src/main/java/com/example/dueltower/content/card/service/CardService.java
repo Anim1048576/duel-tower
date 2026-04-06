@@ -16,9 +16,9 @@ import java.util.*;
 public class CardService {
     private final List<CardDefinition> all;
     private final Map<CardDefId, CardDefinition> byId;
+    private final Map<CardDefId, CardBlueprint> blueprintsById;
     private final Map<CardDefId, CardEffect> effectsById;
     private final Map<CardDefId, Integer> maxDeckCopiesById;
-    private final Map<CardDefId, CardPlaySpec> playSpecById;
 
     public CardService(List<CardBlueprint> blueprints) {
         // Spring 주입 순서는 보장되지 않으니, 항상 정렬해서 노출
@@ -27,9 +27,9 @@ public class CardService {
                 .toList();
 
         Map<CardDefId, CardDefinition> m = new HashMap<>();
+        Map<CardDefId, CardBlueprint> bpById = new HashMap<>();
         Map<CardDefId, CardEffect> e = new HashMap<>();
         Map<CardDefId, Integer> deckLimits = new HashMap<>();
-        Map<CardDefId, CardPlaySpec> playSpecs = new HashMap<>();
         List<CardDefinition> defs = new ArrayList<>();
 
         for (CardBlueprint bp : sorted) {
@@ -49,9 +49,10 @@ public class CardService {
             if (prevEff != null) {
                 throw new IllegalStateException("duplicate card effect id: " + def.id().value());
             }
-            CardPlaySpec prevPlaySpec = playSpecs.put(def.id(), bp.playSpec());
-            if (prevPlaySpec != null) {
-                throw new IllegalStateException("duplicate card play spec id: " + def.id().value());
+
+            CardBlueprint prevBlueprint = bpById.put(def.id(), bp);
+            if (prevBlueprint != null) {
+                throw new IllegalStateException("duplicate card blueprint id: " + def.id().value());
             }
 
             Integer maxDeckCopies = bp.maxDeckCopies();
@@ -66,9 +67,9 @@ public class CardService {
 
         this.all = List.copyOf(defs);
         this.byId = Map.copyOf(m);
+        this.blueprintsById = Map.copyOf(bpById);
         this.effectsById = Map.copyOf(e);
         this.maxDeckCopiesById = Map.copyOf(deckLimits);
-        this.playSpecById = Map.copyOf(playSpecs);
     }
 
     /** API 용: 전체 목록 */
@@ -85,7 +86,8 @@ public class CardService {
     /** API 용: 카드 상세 */
     public CardDetailResponse get(String id) {
         CardDefinition definition = ContentLookupSupport.requireById(byId, id, CardDefId::new, "card");
-        CardPlaySpec playSpec = playSpecById.getOrDefault(definition.id(), CardPlaySpec.none());
+        CardBlueprint blueprint = blueprintsById.get(definition.id());
+        CardPlaySpec playSpec = blueprint == null ? CardPlaySpec.none() : blueprint.playSpec();
         return CardDetailResponse.of(definition, playSpec);
     }
 
@@ -120,6 +122,7 @@ public class CardService {
         return maxDeckCopiesById.get(id);
     }
     public CardPlaySpec playSpec(CardDefId id) {
-        return playSpecById.getOrDefault(id, CardPlaySpec.none());
+        CardBlueprint blueprint = blueprintsById.get(id);
+        return blueprint == null ? CardPlaySpec.none() : blueprint.playSpec();
     }
 }
