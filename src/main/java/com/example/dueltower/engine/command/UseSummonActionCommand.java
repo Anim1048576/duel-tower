@@ -60,7 +60,7 @@ public final class UseSummonActionCommand implements GameCommand {
 
         CardEffect effect = ctx.effect(source.defId());
         List<GameEvent> dummyOut = new ArrayList<>();
-        EffectContext ec = new EffectContext(state, ctx, playerId, sourceCardId, selection, dummyOut);
+        EffectContext ec = new EffectContext(state, ctx, playerId, sourceCardId, selection, dummyOut, summonId);
         errors.addAll(effect.validate(ec));
 
         return errors;
@@ -90,7 +90,7 @@ public final class UseSummonActionCommand implements GameCommand {
         if (source == null) throw new IllegalStateException("summon source card missing: " + sourceCardId.value());
 
         CardEffect effect = ctx.effect(source.defId());
-        EffectContext ec = new EffectContext(state, ctx, playerId, sourceCardId, selection, events);
+        EffectContext ec = new EffectContext(state, ctx, playerId, sourceCardId, selection, events, summonId);
         effect.resolve(ec);
 
         summon.actionUsedThisTurn(true);

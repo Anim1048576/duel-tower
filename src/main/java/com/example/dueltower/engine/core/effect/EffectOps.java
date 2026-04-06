@@ -100,7 +100,7 @@ public final class EffectOps {
     }
 
     public void healWithActorHeal(Target t) {
-        heal(t, actor().healPower());
+        heal(t, actorHealPower());
     }
 
     public void damageWithActorAttackPlus(int bonus, Target t) {
@@ -442,7 +442,21 @@ public final class EffectOps {
     }
 
     private int actorAttackPower() {
+        if (ec.statSourceSummonId() != null) {
+            SummonState summon = ec.state().summon(ec.statSourceSummonId());
+            if (summon == null) throw new IllegalStateException("missing summon: " + ec.statSourceSummonId().value());
+            return summon.atk();
+        }
         PlayerState actor = actor();
         return actor.attackPower() + EquipmentCombatOps.attackPowerBonus(actor, ec.ctx());
+    }
+
+    private int actorHealPower() {
+        if (ec.statSourceSummonId() != null) {
+            SummonState summon = ec.state().summon(ec.statSourceSummonId());
+            if (summon == null) throw new IllegalStateException("missing summon: " + ec.statSourceSummonId().value());
+            return summon.heal();
+        }
+        return actor().healPower();
     }
 }
