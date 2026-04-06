@@ -36,8 +36,21 @@ final class JudgementEngine {
         this.ownedCardPicker = Objects.requireNonNull(ownedCardPicker, "ownedCardPicker");
     }
 
-    static List<String> judgementAbilityChoices() {
-        return List.of(Ability.BODY.id, Ability.SKILL.id, Ability.SENSE.id, Ability.WILL.id);
+    static List<String> judgementAbilityChoices(PlayerState player) {
+        List<String> choices = new ArrayList<>();
+        if (player.body() < MAX_ABILITY) {
+            choices.add(Ability.BODY.id);
+        }
+        if (player.skill() < MAX_ABILITY) {
+            choices.add(Ability.SKILL.id);
+        }
+        if (player.sense() < MAX_ABILITY) {
+            choices.add(Ability.SENSE.id);
+        }
+        if (player.will() < MAX_ABILITY) {
+            choices.add(Ability.WILL.id);
+        }
+        return List.copyOf(choices);
     }
 
     Result resolve(PlayerState player,
