@@ -8,9 +8,10 @@ import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.Ids.CardDefId;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,10 +23,8 @@ import java.util.Set;
 
 @Service
 public class CardService {
-    private final List<CardDefinition> all;
-    private final Map<CardDefId, CardDefinition> byId;
+    private final List<CardBlueprint> allBlueprints;
     private final Map<CardDefId, CardBlueprint> blueprintsById;
-    private final Map<CardDefId, CardEffect> effectsById;
     private final Map<CardDefId, Integer> maxDeckCopiesById;
 
     public CardService(List<CardBlueprint> blueprints) {
@@ -34,11 +33,9 @@ public class CardService {
                 .sorted(Comparator.comparing(CardBlueprint::id))
                 .toList();
 
-        Map<CardDefId, CardDefinition> m = new HashMap<>();
         Map<CardDefId, CardBlueprint> bpById = new HashMap<>();
-        Map<CardDefId, CardEffect> e = new HashMap<>();
         Map<CardDefId, Integer> deckLimits = new HashMap<>();
-        List<CardDefinition> defs = new ArrayList<>();
+        Set<CardDefId> definitionIds = new HashSet<>();
 
         for (CardBlueprint bp : sorted) {
             CardDefinition def = bp.definition();
@@ -48,16 +45,9 @@ public class CardService {
                 throw new IllegalStateException("definition id mismatch: def=" + def.id().value() + ", bp=" + bp.id());
             }
 
-            CardDefinition prev = m.put(def.id(), def);
-            if (prev != null) {
+            if (!definitionIds.add(def.id())) {
                 throw new IllegalStateException("duplicate card id: " + def.id().value());
             }
-
-            CardEffect prevEff = e.put(def.id(), bp);
-            if (prevEff != null) {
-                throw new IllegalStateException("duplicate card effect id: " + def.id().value());
-            }
-
             CardBlueprint prevBlueprint = bpById.put(def.id(), bp);
             if (prevBlueprint != null) {
                 throw new IllegalStateException("duplicate card blueprint id: " + def.id().value());
@@ -70,20 +60,19 @@ public class CardService {
                 }
                 deckLimits.put(def.id(), maxDeckCopies);
             }
-            defs.add(def);
         }
 
-        validateDefinitionBlueprintConsistency(m, bpById);
-        this.all = List.copyOf(defs);
-        this.byId = Map.copyOf(m);
+        validateDefinitionBlueprintConsistency(definitionIds, bpById.keySet());
+        this.allBlueprints = List.copyOf(sorted);
         this.blueprintsById = Map.copyOf(bpById);
-        this.effectsById = Map.copyOf(e);
         this.maxDeckCopiesById = Map.copyOf(deckLimits);
     }
 
     /** API 용: 전체 목록 */
     public List<CardDefinition> list() {
-        return all;
+        return allBlueprints.stream()
+                .map(CardBlueprint::definition)
+                .toList();
     }
 
     /** API 용: 타입별 목록 */
@@ -94,8 +83,8 @@ public class CardService {
 
     /** API 용: 카드 상세 */
     public CardDetailResponse get(String id) {
-        CardDefinition definition = ContentLookupSupport.requireById(byId, id, CardDefId::new, "card");
-        CardBlueprint blueprint = requireBlueprint(definition.id());
+        CardBlueprint blueprint = requireBlueprint(id);
+        CardDefinition definition = blueprint.definition();
         return CardDetailResponse.of(definition, blueprint.playSpec());
     }
 
@@ -106,7 +95,8 @@ public class CardService {
         String query = ContentLookupSupport.normalizeId(q).toLowerCase(Locale.ROOT);
         String normalizedKeywordId = ContentLookupSupport.normalizeId(keywordId);
 
-        return all.stream()
+        return allBlueprints.stream()
+                .map(CardBlueprint::definition)
                 .filter(card -> type == null || card.type() == type)
                 .filter(card -> query.isEmpty() || card.name().toLowerCase(Locale.ROOT).contains(query)
                         || card.description().toLowerCase(Locale.ROOT).contains(query)
@@ -117,12 +107,20 @@ public class CardService {
 
     /** 엔진 구성/검증/디버깅용 */
     public Map<CardDefId, CardDefinition> asMap() {
-        return byId;
+        Map<CardDefId, CardDefinition> definitions = new HashMap<>();
+        for (Map.Entry<CardDefId, CardBlueprint> entry : blueprintsById.entrySet()) {
+            definitions.put(entry.getKey(), entry.getValue().definition());
+        }
+        return Map.copyOf(definitions);
     }
 
     /** 엔진용: 카드 ID -> 실제 효과 구현체(CardBlueprint) */
     public Map<CardDefId, CardEffect> effectsMap() {
-        return effectsById;
+        Map<CardDefId, CardEffect> effects = new HashMap<>();
+        for (Map.Entry<CardDefId, CardBlueprint> entry : blueprintsById.entrySet()) {
+            effects.put(entry.getKey(), entry.getValue());
+        }
+        return Map.copyOf(effects);
     }
 
     /** 덱 구성 시 카드별 허용 최대 매수. 오버라이드가 없으면 null */
@@ -142,15 +140,25 @@ public class CardService {
         return blueprint;
     }
 
-    private void validateDefinitionBlueprintConsistency(
-            Map<CardDefId, CardDefinition> definitions,
-            Map<CardDefId, CardBlueprint> blueprints
-    ) {
-        Set<CardDefId> missingBlueprints = new HashSet<>(definitions.keySet());
-        missingBlueprints.removeAll(blueprints.keySet());
+    private CardBlueprint requireBlueprint(String rawId) {
+        String normalized = ContentLookupSupport.normalizeId(rawId);
+        CardDefId id = new CardDefId(normalized);
+        CardBlueprint blueprint = blueprintsById.get(id);
+        if (blueprint == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "card not found: " + normalized);
+        }
+        return blueprint;
+    }
 
-        Set<CardDefId> orphanBlueprints = new HashSet<>(blueprints.keySet());
-        orphanBlueprints.removeAll(definitions.keySet());
+    private void validateDefinitionBlueprintConsistency(
+            Set<CardDefId> definitionIds,
+            Set<CardDefId> blueprintIds
+    ) {
+        Set<CardDefId> missingBlueprints = new HashSet<>(definitionIds);
+        missingBlueprints.removeAll(blueprintIds);
+
+        Set<CardDefId> orphanBlueprints = new HashSet<>(blueprintIds);
+        orphanBlueprints.removeAll(definitionIds);
 
         if (!missingBlueprints.isEmpty() || !orphanBlueprints.isEmpty()) {
             throw new IllegalStateException(
