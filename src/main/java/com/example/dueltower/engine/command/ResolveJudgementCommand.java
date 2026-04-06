@@ -78,107 +78,24 @@ public record ResolveJudgementCommand(
     @Override
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         String normalizedChoice = choiceId.trim();
-        PendingDecision.JudgementChoice pending = (PendingDecision.JudgementChoice) state.player(playerId).pendingDecision();
-        if (pending.usedAbility() == null) {
-            return handleInitialSelection(state, ctx, normalizedChoice);
-        }
-        return handleMemorySelection(state, ctx, pending, normalizedChoice);
-    }
-
-    private List<GameEvent> handleInitialSelection(GameState state, EngineContext ctx, String abilityChoice) {
-        JudgementEngine.InitialResult initial = judgementEngine.resolveInitial(
-                state.player(playerId),
-                playerId,
-                abilityChoice,
-                state.seed(),
-                state.version()
-        );
-
-        if (initial.initialSuccess()) {
-            JudgementEngine.Result result = judgementEngine.finalizeResult(
-                    state.player(playerId),
-                    playerId,
-                    initial,
-                    false,
-                    state.seed(),
-                    state.version()
-            );
-            state.player(playerId).pendingDecision(null);
-            return finalizeNodeWithResult(state, ctx, result);
-        }
-
-        if (!initial.memoryAcceptAllowed()) {
-            JudgementEngine.Result result = judgementEngine.finalizeResult(
-                    state.player(playerId),
-                    playerId,
-                    initial,
-                    false,
-                    state.seed(),
-                    state.version()
-            );
-            state.player(playerId).pendingDecision(null);
-            return finalizeNodeWithResult(state, ctx, result);
-        }
-
-        state.player(playerId).pendingDecision(new PendingDecision.JudgementChoice(
-                "판정 실패: [기억 받아들이기] 여부를 선택하세요",
-                List.of(JudgementEngine.MEMORY_ACCEPT_CHOICE, JudgementEngine.MEMORY_REJECT_CHOICE),
-                initial.usedAbility(),
-                initial.roll(),
-                initial.abilityBefore(),
-                initial.initialSuccess(),
-                initial.memoryAcceptAllowed(),
-                initial.naturalTwenty()
-        ));
-        return List.of(new GameEvent.LogAppended(playerId.value()
-                + " 판정 1차 처리: ability=" + initial.usedAbility()
-                + ", d20=" + initial.roll()
-                + ", initialSuccess=" + initial.initialSuccess()
-                + ", memoryAcceptAllowed=" + initial.memoryAcceptAllowed()
-                + ", naturalTwenty=" + initial.naturalTwenty()
-                + ", pending=MEMORY_CHOICE"));
-    }
-
-    private List<GameEvent> handleMemorySelection(GameState state, EngineContext ctx, PendingDecision.JudgementChoice pending, String memoryChoice) {
-        boolean acceptMemory = JudgementEngine.MEMORY_ACCEPT_CHOICE.equals(memoryChoice);
-        JudgementEngine.InitialResult initial = new JudgementEngine.InitialResult(
-                pending.usedAbility(),
-                abilityLabel(pending.usedAbility()),
-                pending.roll(),
-                pending.abilityBefore(),
-                Boolean.TRUE.equals(pending.initialSuccess()),
-                Boolean.TRUE.equals(pending.memoryAcceptAllowed()),
-                Boolean.TRUE.equals(pending.naturalTwenty())
-        );
-        JudgementEngine.Result result = judgementEngine.finalizeResult(
-                state.player(playerId),
-                playerId,
-                initial,
-                acceptMemory,
-                state.seed(),
-                state.version()
-        );
-        state.player(playerId).pendingDecision(null);
-        return finalizeNodeWithResult(state, ctx, result);
-    }
-
-    private List<GameEvent> finalizeNodeWithResult(GameState state, EngineContext ctx, JudgementEngine.Result result) {
         int successGold = ctx.rewardTable().judgement().successGold();
         int successKeys = ctx.rewardTable().judgement().successKeys();
         int failureGold = ctx.rewardTable().judgement().failureGold();
+        JudgementEngine.Result result = new JudgementEngine().resolve(
+                state.player(playerId),
+                playerId,
+                normalizedChoice,
+                state.seed(),
+                state.version()
+        );
 
-        if (result.finalSuccess()) {
-            String detail = result.memoryAccepted()
-                    ? result.usedAbilityLabel() + " 판정(" + result.usedAbility() + ") D20=" + result.roll() + ", 능력치=" + result.abilityBefore()
-                    + "로 최초 실패했지만 [기억 받아들이기]를 선택해 성공으로 전환. 약화 " + result.grantedWeakness()
-                    + " 부여, " + result.increasedAbility() + " 능력치 " + result.increasedAbilityValue() + "로 상승. 보상: " + successGold + "G, 열쇠 " + successKeys + "개."
-                    : result.usedAbilityLabel() + " 판정(" + result.usedAbility() + ") D20=" + result.roll() + ", 능력치=" + result.abilityBefore()
-                    + "로 즉시 성공. 보상: " + successGold + "G, 열쇠 " + successKeys + "개.";
+        if (result.success()) {
             state.runState().resolveCurrentNode(
                     "reward",
                     "판정 성공",
                     "위험 구역 돌파 성공",
-                    detail,
+                    result.usedAbilityLabel() + " 판정(" + result.usedAbility() + ") D20=" + result.roll() + ", 능력치=" + result.abilityBefore()
+                            + "로 성공. 보상: " + successGold + "G, 열쇠 " + successKeys + "개.",
                     successGold,
                     successKeys,
                     0
@@ -189,9 +106,8 @@ public record ResolveJudgementCommand(
                     "판정 실패",
                     "위험 구역 돌파 실패",
                     result.usedAbilityLabel() + " 판정(" + result.usedAbility() + ") D20=" + result.roll() + ", 능력치=" + result.abilityBefore()
-                            + "로 최초 실패. 기억 받아들이기 가능 여부=" + result.memoryAcceptAllowed()
-                            + ", 최종 선택=" + (result.memoryAccepted() ? "수락" : "거부")
-                            + ", " + result.increasedAbility() + " 능력치 " + result.increasedAbilityValue() + "로 상승. 보상: " + failureGold + "G.",
+                            + "로 실패. [기억 받아들이기] 발동: 약화 " + result.grantedWeakness()
+                            + " 부여, " + result.increasedAbility() + " 능력치 " + result.increasedAbilityValue() + "로 상승. 보상: " + failureGold + "G.",
                     failureGold,
                     0,
                     0
@@ -199,24 +115,12 @@ public record ResolveJudgementCommand(
         }
 
         return List.of(new GameEvent.LogAppended(playerId.value()
-                + " 판정 최종 처리: ability=" + result.usedAbility()
+                + " 판정 처리: ability=" + result.usedAbility()
                 + ", d20=" + result.roll()
-                + ", initialSuccess=" + result.initialSuccess()
-                + ", memoryAcceptAllowed=" + result.memoryAcceptAllowed()
+                + ", success=" + result.success()
                 + ", memoryAccepted=" + result.memoryAccepted()
-                + ", finalSuccess=" + result.finalSuccess()
                 + ", weakness=" + result.grantedWeakness()
                 + ", increasedAbility=" + result.increasedAbility()
-                + ", increasedBefore=" + result.abilityBefore()
-                + ", increasedAfter=" + result.increasedAbilityValue()
-                + ", naturalTwenty=" + (result.roll() == 20)));
-    }
-
-    private static String abilityLabel(String abilityId) {
-        if ("BODY".equalsIgnoreCase(abilityId)) return "신체";
-        if ("SKILL".equalsIgnoreCase(abilityId)) return "기술";
-        if ("SENSE".equalsIgnoreCase(abilityId)) return "감각";
-        if ("WILL".equalsIgnoreCase(abilityId)) return "의지";
-        return abilityId;
+                + ", increasedValue=" + result.increasedAbilityValue()));
     }
 }

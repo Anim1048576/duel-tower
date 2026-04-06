@@ -11,8 +11,6 @@ import java.util.Random;
 
 final class JudgementEngine {
     static final int MAX_ABILITY = 20;
-    static final String MEMORY_ACCEPT_CHOICE = "ACCEPT_MEMORY";
-    static final String MEMORY_REJECT_CHOICE = "REJECT_MEMORY";
     static final String WEAKNESS_STATUS_PREFIX = "judgement.weakness.";
     private static final List<String> WEAKNESS_POOL = List.of(
             CardModifierIds.WEAKENED_COST_PLUS_ONE,
@@ -34,19 +32,15 @@ final class JudgementEngine {
         this.weaknessPicker = Objects.requireNonNull(weaknessPicker, "weaknessPicker");
     }
 
-    static List<String> judgementAbilityChoices(PlayerState player) {
-        Objects.requireNonNull(player, "player");
-        return List.of(Ability.BODY, Ability.SKILL, Ability.SENSE, Ability.WILL).stream()
-                .filter(ability -> ability.read(player) < MAX_ABILITY)
-                .map(ability -> ability.id)
-                .toList();
+    static List<String> judgementAbilityChoices() {
+        return List.of(Ability.BODY.id, Ability.SKILL.id, Ability.SENSE.id, Ability.WILL.id);
     }
 
-    InitialResult resolveInitial(PlayerState player,
-                                 Ids.PlayerId playerId,
-                                 String abilityId,
-                                 long seed,
-                                 long version) {
+    Result resolve(PlayerState player,
+                   Ids.PlayerId playerId,
+                   String abilityId,
+                   long seed,
+                   long version) {
         Ability ability = Ability.fromId(abilityId);
         int abilityBefore = ability.read(player);
         if (abilityBefore >= MAX_ABILITY) {
@@ -55,81 +49,15 @@ final class JudgementEngine {
 
         int roll = diceRoller.rollD20(seed, version, playerId, ability.id);
         boolean success = roll <= abilityBefore;
-        boolean naturalTwenty = roll == 20;
-        boolean memoryAcceptAllowed = !success && !naturalTwenty;
-        return new InitialResult(ability.id, ability.label, roll, abilityBefore, success, memoryAcceptAllowed, naturalTwenty);
-    }
-
-    Result finalizeResult(PlayerState player,
-                          Ids.PlayerId playerId,
-                          InitialResult initialResult,
-                          boolean acceptMemory,
-                          long seed,
-                          long version) {
-        Objects.requireNonNull(initialResult, "initialResult");
-        if (initialResult.initialSuccess()) {
-            return new Result(
-                    initialResult.usedAbility(),
-                    initialResult.usedAbilityLabel(),
-                    initialResult.roll(),
-                    initialResult.abilityBefore(),
-                    true,
-                    initialResult.initialSuccess(),
-                    false,
-                    false,
-                    null,
-                    null,
-                    null
-            );
+        if (success) {
+            return new Result(ability.id, ability.label, roll, abilityBefore, true, false, null, ability.id, abilityBefore);
         }
 
-        if (acceptMemory && !initialResult.memoryAcceptAllowed()) {
-            throw new IllegalArgumentException("memory acceptance is not allowed");
-        }
-
-        if (acceptMemory) {
-            String weakness = weaknessPicker.pick(WEAKNESS_POOL, seed, version, playerId, initialResult.usedAbility());
-            // TODO: 현재는 플레이어 스킬 덱 카드 개별 약화 부여 모델이 없어 임시로 status에 누적한다.
-            player.statusAdd(WEAKNESS_STATUS_PREFIX + weakness, 1);
-            int delta = Math.max(1, (int) Math.ceil((initialResult.roll() - initialResult.abilityBefore()) / 2.0d));
-            int abilityAfter = increaseAbility(player, initialResult.usedAbility(), delta);
-            return new Result(
-                    initialResult.usedAbility(),
-                    initialResult.usedAbilityLabel(),
-                    initialResult.roll(),
-                    initialResult.abilityBefore(),
-                    true,
-                    initialResult.initialSuccess(),
-                    initialResult.memoryAcceptAllowed(),
-                    true,
-                    weakness,
-                    initialResult.usedAbility(),
-                    abilityAfter
-            );
-        }
-
-        int abilityAfter = increaseAbility(player, initialResult.usedAbility(), 1);
-        return new Result(
-                initialResult.usedAbility(),
-                initialResult.usedAbilityLabel(),
-                initialResult.roll(),
-                initialResult.abilityBefore(),
-                false,
-                initialResult.initialSuccess(),
-                initialResult.memoryAcceptAllowed(),
-                false,
-                null,
-                initialResult.usedAbility(),
-                abilityAfter
-        );
-    }
-
-    private static int increaseAbility(PlayerState player, String abilityId, int amount) {
-        Ability ability = Ability.fromId(abilityId);
-        int before = ability.read(player);
-        int after = Math.min(MAX_ABILITY, before + Math.max(0, amount));
-        ability.write(player, after);
-        return after;
+        String weakness = weaknessPicker.pick(WEAKNESS_POOL, seed, version, playerId, ability.id);
+        player.statusAdd(WEAKNESS_STATUS_PREFIX + weakness, 1);
+        int abilityAfter = Math.min(MAX_ABILITY, abilityBefore + 1);
+        ability.write(player, abilityAfter);
+        return new Result(ability.id, ability.label, roll, abilityBefore, false, true, weakness, ability.id, abilityAfter);
     }
 
     interface DiceRoller {
@@ -140,28 +68,16 @@ final class JudgementEngine {
         String pick(List<String> pool, long seed, long version, Ids.PlayerId playerId, String abilityId);
     }
 
-    record InitialResult(
-            String usedAbility,
-            String usedAbilityLabel,
-            int roll,
-            int abilityBefore,
-            boolean initialSuccess,
-            boolean memoryAcceptAllowed,
-            boolean naturalTwenty
-    ) {}
-
     record Result(
             String usedAbility,
             String usedAbilityLabel,
             int roll,
             int abilityBefore,
-            boolean finalSuccess,
-            boolean initialSuccess,
-            boolean memoryAcceptAllowed,
+            boolean success,
             boolean memoryAccepted,
             String grantedWeakness,
             String increasedAbility,
-            Integer increasedAbilityValue
+            int increasedAbilityValue
     ) {}
 
     private enum Ability {
