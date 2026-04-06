@@ -32,12 +32,8 @@ final class JudgementEngine {
         this.weaknessPicker = Objects.requireNonNull(weaknessPicker, "weaknessPicker");
     }
 
-    static List<String> judgementAbilityChoices(PlayerState player) {
-        Objects.requireNonNull(player, "player");
-        return List.of(Ability.BODY, Ability.SKILL, Ability.SENSE, Ability.WILL).stream()
-                .filter(ability -> ability.read(player) < MAX_ABILITY)
-                .map(ability -> ability.id)
-                .toList();
+    static List<String> judgementAbilityChoices() {
+        return List.of(Ability.BODY.id, Ability.SKILL.id, Ability.SENSE.id, Ability.WILL.id);
     }
 
     Result resolve(PlayerState player,
@@ -54,7 +50,7 @@ final class JudgementEngine {
         int roll = diceRoller.rollD20(seed, version, playerId, ability.id);
         boolean success = roll <= abilityBefore;
         if (success) {
-            return new Result(ability.id, ability.label, roll, abilityBefore, true, false, null, null, null);
+            return new Result(ability.id, ability.label, roll, abilityBefore, true, false, null, ability.id, abilityBefore);
         }
 
         String weakness = weaknessPicker.pick(WEAKNESS_POOL, seed, version, playerId, ability.id);
@@ -81,7 +77,7 @@ final class JudgementEngine {
             boolean memoryAccepted,
             String grantedWeakness,
             String increasedAbility,
-            Integer increasedAbilityValue
+            int increasedAbilityValue
     ) {}
 
     private enum Ability {

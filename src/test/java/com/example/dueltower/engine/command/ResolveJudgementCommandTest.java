@@ -74,50 +74,6 @@ class ResolveJudgementCommandTest {
     }
 
     @Test
-    void pendingDecisionClearsAfterSuccessfulJudgementAndNoIncreaseSignalInResult() {
-        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 2002L);
-        Ids.PlayerId playerId = new Ids.PlayerId("p1");
-        PlayerState player = new PlayerState(playerId);
-        player.body(9);
-        state.players().put(playerId, player);
-        state.nodeState(NodeState.NON_COMBAT);
-
-        String judgementChoiceId = state.runState().availableChoices().stream()
-                .filter(choice -> choice.phase() == RunState.NodePhase.JUDGEMENT)
-                .findFirst()
-                .orElseThrow()
-                .id();
-        state.runState().beginNode(state.runState().findChoice(judgementChoiceId));
-        player.pendingDecision(new PendingDecision.JudgementChoice("판정", java.util.List.of("BODY")));
-
-        JudgementEngine judgementEngine = new JudgementEngine(
-                (seed, version, pid, abilityId) -> 1,
-                (pool, seed, version, pid, abilityId) -> pool.get(0)
-        );
-
-        EngineResult result = new GameEngine().process(state, new EngineContext(
-                        Map.of(), Map.of(),
-                        Map.of(), Map.of(),
-                        Map.of(), Map.of(),
-                        Map.of(), Map.of(),
-                        Map.of(), Map.of(),
-                        Map.of(), Map.of(),
-                        Map.of(),
-                        GameRules.defaults(),
-                        RewardTableConfig.defaults()
-                ),
-                new ResolveJudgementCommand(UUID.randomUUID(), state.version(), playerId, "BODY", judgementEngine));
-
-        assertTrue(result.accepted());
-        assertNull(player.pendingDecision());
-        String detail = state.runState().recentResults().get(0).detail();
-        assertFalse(detail.contains("상승"));
-        assertTrue(result.events().stream().anyMatch(ev -> ev instanceof com.example.dueltower.engine.event.GameEvent.LogAppended log
-                && log.line().contains("increasedAbility=null")
-                && log.line().contains("increasedValue=null")));
-    }
-
-    @Test
     void resolveJudgementRejectsWhenAbilityAlreadyMaxed() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1001L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");

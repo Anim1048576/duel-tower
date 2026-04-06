@@ -81,14 +81,13 @@ public record ResolveJudgementCommand(
         int successGold = ctx.rewardTable().judgement().successGold();
         int successKeys = ctx.rewardTable().judgement().successKeys();
         int failureGold = ctx.rewardTable().judgement().failureGold();
-        JudgementEngine.Result result = judgementEngine.resolve(
+        JudgementEngine.Result result = new JudgementEngine().resolve(
                 state.player(playerId),
                 playerId,
                 normalizedChoice,
                 state.seed(),
                 state.version()
         );
-        state.player(playerId).pendingDecision(null);
 
         if (result.success()) {
             state.runState().resolveCurrentNode(
