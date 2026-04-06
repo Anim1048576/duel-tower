@@ -67,6 +67,8 @@ public final class CombatCleanupOps {
         ps.usedExThisTurn(false);
         ps.usedTenacityThisTurn(false);
         ps.tenacityDebtThisTurn(0);
+        ps.consumablesUsedThisTurn(0);
+        ps.consumablesUsedThisCombat(0);
         ps.exCooldownUntilRound(0);
         ps.exActivatable(true);
         if (clearTransientBattleIncapacitation) {

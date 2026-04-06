@@ -255,6 +255,45 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    void useItemRejectsSecondConsumableInSameTurn() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
+
+        JsonNode first = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "USE_ITEM",
+                  "playerId": "player1",
+                  "itemId": "I-1",
+                  "count": 1,
+                  "expectedVersion": %d
+                }
+                """.formatted(stateAfterStart.get("version").asLong())
+        );
+
+        assertTrue(first.path("accepted").asBoolean());
+
+        JsonNode second = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "USE_ITEM",
+                  "playerId": "player1",
+                  "itemId": "I-4",
+                  "count": 1,
+                  "expectedVersion": %d
+                }
+                """.formatted(first.path("state").path("version").asLong())
+        );
+
+        assertFalse(second.path("accepted").asBoolean());
+        assertTrue(hasError(second, "consumable use limit reached this turn"));
+    }
+
+    @Test
     void useItemRejectsWhenExpectedVersionMismatched() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
