@@ -944,7 +944,7 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "RESOLVE_JUDGEMENT",
                   "playerId": "player1",
-                  "choiceId": "SUCCESS",
+                  "choiceId": "BODY",
                   "expectedVersion": %d
                 }
                 """.formatted(expectedVersion)
@@ -966,7 +966,7 @@ class SessionCommandExtensionIntegrationTest {
                                 {
                                   "type": "RESOLVE_JUDGEMENT",
                                   "playerId": "player1",
-                                  "choiceId": "SUCCESS",
+                                  "choiceId": "BODY",
                                   "expectedVersion": %d
                                 }
                                 """.formatted(selected.path("state").path("version").asLong())))
@@ -985,7 +985,7 @@ class SessionCommandExtensionIntegrationTest {
                                 {
                                   "type": "RESOLVE_JUDGEMENT",
                                   "playerId": "player1",
-                                  "choiceId": "SUCCESS",
+                                  "choiceId": "BODY",
                                   "expectedVersion": %d
                                 }
                                 """.formatted(selected.path("state").path("version").asLong())))
@@ -1003,7 +1003,7 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "RESOLVE_JUDGEMENT",
                   "playerId": "player1",
-                  "choiceId": "SUCCESS",
+                  "choiceId": "BODY",
                   "expectedVersion": 0
                 }
                 """
@@ -1048,7 +1048,7 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "RESOLVE_JUDGEMENT",
                   "playerId": "player1",
-                  "choiceId": "SUCCESS",
+                  "choiceId": "BODY",
                   "expectedVersion": %d
                 }
                 """.formatted(staleVersion)

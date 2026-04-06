@@ -17,20 +17,24 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResolveJudgementCommandTest {
 
     @Test
-    void resolveJudgementUsesConfiguredSuccessReward() {
+    void resolveJudgementUsesRuleEngineAndConfiguredReward() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1001L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
         PlayerState player = new PlayerState(playerId);
+        player.body(20);
+        player.skill(20);
+        player.sense(20);
+        player.will(0);
         state.players().put(playerId, player);
         state.nodeState(NodeState.NON_COMBAT);
         int beforeGold = state.runState().inventory().gold();
-        int beforeKeys = state.runState().inventory().keys();
 
         String judgementChoiceId = state.runState().availableChoices().stream()
                 .filter(choice -> choice.phase() == RunState.NodePhase.JUDGEMENT)
@@ -38,7 +42,7 @@ class ResolveJudgementCommandTest {
                 .orElseThrow()
                 .id();
         state.runState().beginNode(state.runState().findChoice(judgementChoiceId));
-        player.pendingDecision(new PendingDecision.JudgementChoice("판정", java.util.List.of("SUCCESS", "FAIL")));
+        player.pendingDecision(new PendingDecision.JudgementChoice("판정", java.util.List.of("WILL")));
 
         RewardTableConfig rewardConfig = new RewardTableConfig(
                 RewardTableConfig.defaults().chest(),
@@ -57,12 +61,49 @@ class ResolveJudgementCommandTest {
                         GameRules.defaults(),
                         rewardConfig
                 ),
-                new ResolveJudgementCommand(UUID.randomUUID(), state.version(), playerId, "SUCCESS"));
+                new ResolveJudgementCommand(UUID.randomUUID(), state.version(), playerId, "WILL"));
 
         assertTrue(result.accepted());
-        assertEquals(beforeGold + 310, state.runState().inventory().gold());
-        assertEquals(beforeKeys + 2, state.runState().inventory().keys());
-        assertEquals("판정을 통과해 310G와 열쇠 2개를 확보했다.", state.runState().recentResults().get(0).detail());
+        assertTrue(state.runState().resultPending());
+        assertEquals(beforeGold + 99, state.runState().inventory().gold());
+        assertFalse(state.runState().recentResults().get(0).detail().isBlank());
+        assertEquals(1, player.will());
+        assertTrue(result.events().stream().anyMatch(ev -> ev instanceof com.example.dueltower.engine.event.GameEvent.LogAppended log
+                && log.line().contains("memoryAccepted=true")));
         assertNull(player.pendingDecision());
+    }
+
+    @Test
+    void resolveJudgementRejectsWhenAbilityAlreadyMaxed() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1001L);
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        PlayerState player = new PlayerState(playerId);
+        player.body(20);
+        state.players().put(playerId, player);
+        state.nodeState(NodeState.NON_COMBAT);
+
+        String judgementChoiceId = state.runState().availableChoices().stream()
+                .filter(choice -> choice.phase() == RunState.NodePhase.JUDGEMENT)
+                .findFirst()
+                .orElseThrow()
+                .id();
+        state.runState().beginNode(state.runState().findChoice(judgementChoiceId));
+        player.pendingDecision(new PendingDecision.JudgementChoice("판정", java.util.List.of("BODY")));
+
+        EngineResult result = new GameEngine().process(state, new EngineContext(
+                        Map.of(), Map.of(),
+                        Map.of(), Map.of(),
+                        Map.of(), Map.of(),
+                        Map.of(), Map.of(),
+                        Map.of(), Map.of(),
+                        Map.of(), Map.of(),
+                        Map.of(),
+                        GameRules.defaults(),
+                        RewardTableConfig.defaults()
+                ),
+                new ResolveJudgementCommand(UUID.randomUUID(), state.version(), playerId, "BODY"));
+
+        assertFalse(result.accepted());
+        assertTrue(result.errors().stream().anyMatch(error -> error.contains("already maxed")));
     }
 }
