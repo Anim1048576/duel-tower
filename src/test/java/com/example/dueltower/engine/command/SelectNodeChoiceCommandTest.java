@@ -1,14 +1,19 @@
 package com.example.dueltower.engine.command;
 
+import com.example.dueltower.config.RewardTableConfig;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
+import com.example.dueltower.engine.config.RunConfig;
 import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.ItemRef;
 import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.NodeState;
 import com.example.dueltower.engine.model.PlayerState;
+import com.example.dueltower.engine.model.RunState;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -121,5 +126,81 @@ class SelectNodeChoiceCommandTest {
         assertTrue(state.runState().resultPending());
         assertEquals(beforeGold + failureGold, state.runState().inventory().gold());
         assertEquals("판정 불가", state.runState().recentResults().get(0).title());
+    }
+
+    @Test
+    void forcedJudgementNodeResolvesImmediatelyWithoutPendingDecision() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 101L, forcedJudgementRunConfig());
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        PlayerState player = new PlayerState(playerId);
+        player.body(20);
+        player.skill(20);
+        player.sense(20);
+        player.will(20);
+        state.players().put(playerId, player);
+
+        int beforeGold = state.runState().inventory().gold();
+        int beforeKeys = state.runState().inventory().keys();
+        int successGold = RewardTableConfig.defaults().judgement().successGold();
+        int successKeys = RewardTableConfig.defaults().judgement().successKeys();
+        String choiceId = state.runState().availableChoices().get(0).id();
+
+        EngineResult result = new GameEngine().process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new SelectNodeChoiceCommand(UUID.randomUUID(), state.version(), playerId, choiceId)
+        );
+
+        assertTrue(result.accepted());
+        assertNull(player.pendingDecision());
+        assertTrue(state.runState().resultPending());
+        assertEquals(beforeGold + successGold, state.runState().inventory().gold());
+        assertEquals(beforeKeys + successKeys, state.runState().inventory().keys());
+        assertEquals("판정 성공", state.runState().recentResults().get(0).title());
+        assertTrue(state.runState().recentResults().get(0).detail().contains("강제 진행 판정"));
+        assertTrue(result.events().stream()
+                .filter(event -> event instanceof com.example.dueltower.engine.event.GameEvent.LogAppended)
+                .map(event -> ((com.example.dueltower.engine.event.GameEvent.LogAppended) event).line())
+                .anyMatch(message -> message.contains("강제 진행 판정")));
+    }
+
+    @Test
+    void forcedJudgementNodeDoesNotCreateMemoryAcceptanceStep() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 102L, forcedJudgementRunConfig());
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        state.players().put(playerId, new PlayerState(playerId));
+
+        String choiceId = state.runState().availableChoices().get(0).id();
+
+        EngineResult result = new GameEngine().process(
+                state,
+                new EngineContext(Map.of(), Map.of()),
+                new SelectNodeChoiceCommand(UUID.randomUUID(), state.version(), playerId, choiceId)
+        );
+
+        assertTrue(result.accepted());
+        assertNull(state.player(playerId).pendingDecision());
+        assertTrue(state.runState().resultPending());
+    }
+
+    private static RunConfig forcedJudgementRunConfig() {
+        return new RunConfig(
+                0,
+                0,
+                100,
+                List.of(),
+                List.of(new RunConfig.RunNodeDefinition(
+                        "FORCED-JUDGE-1",
+                        "강제 판정",
+                        "판정",
+                        "무조건 진행",
+                        RunState.NodePhase.JUDGEMENT,
+                        RunState.Danger.LOW,
+                        false,
+                        null,
+                        true
+                )),
+                List.of(new RunState.ShopOffer("TEST-OFFER", new ItemRef("I-1"), 10, 1, false))
+        );
     }
 }
