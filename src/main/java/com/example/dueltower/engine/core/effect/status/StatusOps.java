@@ -2,6 +2,7 @@ package com.example.dueltower.engine.core.effect.status;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
+import com.example.dueltower.engine.core.targeting.TargetingOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -198,7 +199,7 @@ public final class StatusOps {
         List<TargetRef> allCandidates = new ArrayList<>();
         state.players().keySet().forEach(pid -> allCandidates.add(TargetRef.ofPlayer(pid)));
         state.enemies().keySet().forEach(eid -> allCandidates.add(TargetRef.ofEnemy(eid)));
-        allCandidates.addAll(allSummonTargets(state, ctx));
+        allCandidates.addAll(allSummonTargets(state));
 
         TargetRef cur = chosenEnemy;
 
@@ -285,16 +286,7 @@ public final class StatusOps {
     }
 
     private static List<TargetRef> enemyOneCandidates(GameState state, EngineContext ctx, TargetRef actor, TargetRef chosenEnemy) {
-        List<TargetRef> candidates = new ArrayList<>();
-        if (actor instanceof TargetRef.Player p) {
-            state.enemies().keySet().forEach(eid -> candidates.add(TargetRef.ofEnemy(eid)));
-            for (TargetRef summon : allSummonTargets(state, ctx)) {
-                if (summon instanceof TargetRef.Summon s && !s.ownerId().equals(p.id())) candidates.add(summon);
-            }
-        } else if (actor instanceof TargetRef.Enemy) {
-            state.players().keySet().forEach(pid -> candidates.add(TargetRef.ofPlayer(pid)));
-            candidates.addAll(allSummonTargets(state, ctx));
-        }
+        List<TargetRef> candidates = new ArrayList<>(TargetingOps.enemyFactionCandidates(state, actor));
 
         if (chosenEnemy != null && candidates.stream().noneMatch(chosenEnemy::equals)) {
             candidates.add(chosenEnemy);
@@ -302,7 +294,7 @@ public final class StatusOps {
         return candidates;
     }
 
-    private static List<TargetRef> allSummonTargets(GameState state, EngineContext ctx) {
+    private static List<TargetRef> allSummonTargets(GameState state) {
         List<TargetRef> summons = new ArrayList<>();
         for (SummonState summon : state.summons().values()) {
             summons.add(TargetRef.ofSummon(summon.owner(), summon.id()));

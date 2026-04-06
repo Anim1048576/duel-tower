@@ -875,6 +875,158 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    void enemyOneAllowsEnemyBodyAndEnemySummonSelection() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.ap(10);
+
+        CardInstId hit = fx.addHandCard(fx.player, "ENEMY_ONE_HIT_FIXED");
+        PlayerId enemyOwner = new PlayerId(fx.enemyId.value());
+        SummonInstId enemySummonId = fx.addSummon(enemyOwner, 6, 6);
+        SummonState enemySummon = fx.state.summons().get(enemySummonId);
+
+        int enemyHpBefore = fx.enemy.hp();
+        int enemySummonHpBefore = enemySummon.hp();
+
+        EngineResult targetSummon = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, hit,
+                new TargetSelection(List.of(TargetRef.ofSummon(enemyOwner, enemySummonId)))
+        ));
+        assertTrue(targetSummon.accepted());
+        assertEquals(enemyHpBefore, fx.enemy.hp());
+        assertEquals(enemySummonHpBefore - 2, enemySummon.hp());
+
+        CardInstId hitBody = fx.addHandCard(fx.player, "ENEMY_ONE_HIT_FIXED");
+        EngineResult targetEnemy = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, hitBody,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+        assertTrue(targetEnemy.accepted());
+        assertEquals(enemyHpBefore - 2, fx.enemy.hp());
+    }
+
+    @Test
+    void enemyAllAndSideIncludeEnemyBodyAndAllEnemySummonsWithoutDuplicates() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.ap(10);
+
+        PlayerId enemyOwner = new PlayerId(fx.enemyId.value());
+        SummonInstId enemySummonId = fx.addSummon(enemyOwner, 10, 10);
+        SummonState enemySummon = fx.state.summons().get(enemySummonId);
+        int enemyHpBefore = fx.enemy.hp();
+        int enemySummonHpBefore = enemySummon.hp();
+
+        CardInstId enemyAll = fx.addHandCard(fx.player, "ENEMY_ALL_HIT");
+        EngineResult all = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, enemyAll, TargetSelection.empty()
+        ));
+        assertTrue(all.accepted());
+        assertEquals(enemyHpBefore - 2, fx.enemy.hp());
+        assertEquals(enemySummonHpBefore - 2, enemySummon.hp());
+
+        CardInstId enemySide = fx.addHandCard(fx.player, "ENEMY_SIDE_HIT");
+        EngineResult side = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, enemySide, TargetSelection.empty()
+        ));
+        assertTrue(side.accepted());
+        assertEquals(enemyHpBefore - 5, fx.enemy.hp());
+        assertEquals(enemySummonHpBefore - 5, enemySummon.hp());
+    }
+
+    @Test
+    void allyOneAllowsSelectingPlayerAndAllySummon() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.ap(10);
+
+        SummonInstId allySummonId = fx.addSummon(fx.playerId, 3, 8);
+        SummonState allySummon = fx.state.summons().get(allySummonId);
+        fx.player.hp(fx.player.hp() - 5);
+        allySummon.hp(allySummon.hp() - 2);
+        int playerHpBefore = fx.player.hp();
+        int summonHpBefore = allySummon.hp();
+
+        CardInstId healPlayer = fx.addHandCard(fx.player, "ALLY_ONE_HEAL_FIXED");
+        EngineResult toPlayer = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, healPlayer,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))
+        ));
+        assertTrue(toPlayer.accepted());
+        assertEquals(playerHpBefore + 2, fx.player.hp());
+        assertEquals(summonHpBefore, allySummon.hp());
+
+        CardInstId healSummon = fx.addHandCard(fx.player, "ALLY_ONE_HEAL_FIXED");
+        EngineResult toSummon = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, healSummon,
+                new TargetSelection(List.of(TargetRef.ofSummon(fx.playerId, allySummonId)))
+        ));
+        assertTrue(toSummon.accepted());
+        assertEquals(summonHpBefore + 2, allySummon.hp());
+    }
+
+    @Test
+    void allyAllAndSideIncludePlayerAndAllAllySummonsWithoutDuplicates() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.ap(10);
+
+        SummonInstId allySummonId = fx.addSummon(fx.playerId, 5, 10);
+        SummonState allySummon = fx.state.summons().get(allySummonId);
+        fx.player.hp(fx.player.hp() - 8);
+        allySummon.hp(allySummon.hp() - 4);
+        int playerHpBefore = fx.player.hp();
+        int summonHpBefore = allySummon.hp();
+
+        CardInstId allyAll = fx.addHandCard(fx.player, "ALLY_ALL_HEAL_FIXED");
+        EngineResult all = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, allyAll, TargetSelection.empty()
+        ));
+        assertTrue(all.accepted());
+        assertEquals(playerHpBefore + 2, fx.player.hp());
+        assertEquals(summonHpBefore + 2, allySummon.hp());
+
+        CardInstId allySide = fx.addHandCard(fx.player, "ALLY_SIDE_HEAL_FIXED");
+        EngineResult side = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, allySide, TargetSelection.empty()
+        ));
+        assertTrue(side.accepted());
+        assertEquals(playerHpBefore + 5, fx.player.hp());
+        assertEquals(summonHpBefore + 5, allySummon.hp());
+    }
+
+    @Test
+    void allAndSideTargetsKeepPreviousBehaviorWhenNoSummonsExist() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.ap(10);
+
+        fx.player.hp(fx.player.hp() - 4);
+        int playerHpBefore = fx.player.hp();
+        int enemyHpBefore = fx.enemy.hp();
+
+        CardInstId enemyAll = fx.addHandCard(fx.player, "ENEMY_ALL_HIT");
+        EngineResult damage = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, enemyAll, TargetSelection.empty()
+        ));
+        assertTrue(damage.accepted());
+        assertEquals(enemyHpBefore - 2, fx.enemy.hp());
+        assertEquals(playerHpBefore, fx.player.hp());
+
+        CardInstId allyAll = fx.addHandCard(fx.player, "ALLY_ALL_HEAL_FIXED");
+        EngineResult heal = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, allyAll, TargetSelection.empty()
+        ));
+        assertTrue(heal.accepted());
+        assertEquals(playerHpBefore + 2, fx.player.hp());
+    }
+
+    @Test
     void combatRestartGathersNonExOwnedCardsFromCombatZonesToDeck() {
         TestFixture fx = TestFixture.basic();
         fx.state.combat(new CombatState());
@@ -967,6 +1119,12 @@ class RuleEngineRegressionTest {
             registerCard(defs, effects, new ScaleWithActorHealCardEffect("SUMMON_SCALE_HEAL"));
             registerCard(defs, effects, new SelfStatusCardEffect("SUMMON_SELF_WEAK"));
             registerCard(defs, effects, new SelfFixedHealCardEffect("SUMMON_SELF_HEAL_FIXED"));
+            registerCard(defs, effects, new TargetFixedValueCardEffect("ENEMY_ONE_HIT_FIXED", Target.ENEMY_ONE, true, 2));
+            registerCard(defs, effects, new TargetFixedValueCardEffect("ENEMY_ALL_HIT", Target.ENEMY_ALL, true, 2));
+            registerCard(defs, effects, new TargetFixedValueCardEffect("ENEMY_SIDE_HIT", Target.ENEMY_SIDE, true, 3));
+            registerCard(defs, effects, new TargetFixedValueCardEffect("ALLY_ONE_HEAL_FIXED", Target.ALLY_ONE, false, 2));
+            registerCard(defs, effects, new TargetFixedValueCardEffect("ALLY_ALL_HEAL_FIXED", Target.ALLY_ALL, false, 2));
+            registerCard(defs, effects, new TargetFixedValueCardEffect("ALLY_SIDE_HEAL_FIXED", Target.ALLY_SIDE, false, 3));
 
             Map<String, StatusDefinition> statusDefs = new HashMap<>();
             Map<String, com.example.dueltower.engine.core.effect.status.StatusEffect> statusEffects = new HashMap<>();
@@ -1088,6 +1246,25 @@ class RuleEngineRegressionTest {
             return id;
         }
 
+        SummonInstId addSummon(PlayerId owner, int hp, int maxHp) {
+            SummonInstId summonId = new SummonInstId(UUID.randomUUID());
+            PlayerState ownerState = state.player(owner);
+            CardInstId sourceCardId;
+            SummonState summon;
+            if (ownerState != null) {
+                sourceCardId = addCard(ownerState, "FILLER", Zone.FIELD);
+                summon = new SummonState(summonId, owner, sourceCardId, hp, maxHp, 1, 1, 1, false);
+                state.summons().put(summonId, summon);
+                ownerState.activeSummons().add(summonId);
+                ownerState.summonByCard().put(sourceCardId, summonId);
+            } else {
+                sourceCardId = Ids.newCardInstId();
+                summon = new SummonState(summonId, owner, sourceCardId, hp, maxHp, 1, 1, 1, false);
+                state.summons().put(summonId, summon);
+            }
+            return summonId;
+        }
+
         private static void registerCard(Map<CardDefId, CardDefinition> defs, Map<CardDefId, CardEffect> effects, TestCardEffect effect) {
             CardDefinition def = effect.definition();
             defs.put(def.id(), def);
@@ -1113,6 +1290,12 @@ class RuleEngineRegressionTest {
         }
 
         private static void registerCard(Map<CardDefId, CardDefinition> defs, Map<CardDefId, CardEffect> effects, SelfFixedHealCardEffect effect) {
+            CardDefinition def = effect.definition();
+            defs.put(def.id(), def);
+            effects.put(def.id(), effect);
+        }
+
+        private static void registerCard(Map<CardDefId, CardDefinition> defs, Map<CardDefId, CardEffect> effects, TargetFixedValueCardEffect effect) {
             CardDefinition def = effect.definition();
             defs.put(def.id(), def);
             effects.put(def.id(), effect);
@@ -1541,6 +1724,44 @@ class RuleEngineRegressionTest {
         @Override
         public void resolve(EffectContext ec) {
             new EffectOps(ec).heal(Target.SELF, 3);
+        }
+    }
+
+    private static final class TargetFixedValueCardEffect implements CardEffect {
+        private final String id;
+        private final Target target;
+        private final boolean damage;
+        private final int value;
+
+        private TargetFixedValueCardEffect(String id, Target target, boolean damage, int value) {
+            this.id = id;
+            this.target = target;
+            this.damage = damage;
+            this.value = value;
+        }
+
+        @Override
+        public String id() {
+            return id;
+        }
+
+        CardDefinition definition() {
+            return new CardDefinition(new CardDefId(id), id, CardType.SKILL, 1, Map.of(), Zone.GRAVE, false, id);
+        }
+
+        @Override
+        public List<String> validate(EffectContext ec) {
+            return new EffectOps(ec).validateTarget(target);
+        }
+
+        @Override
+        public void resolve(EffectContext ec) {
+            EffectOps ops = new EffectOps(ec);
+            if (damage) {
+                ops.damage(target, value);
+                return;
+            }
+            ops.heal(target, value);
         }
     }
 }
