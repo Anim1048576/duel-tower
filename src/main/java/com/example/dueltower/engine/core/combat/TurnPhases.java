@@ -46,6 +46,12 @@ public final class TurnPhases {
             PlayerState ps = state.player(p.id());
             if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
 
+            for (SummonState summon : state.summons().values()) {
+                if (ps.playerId().equals(summon.owner())) {
+                    StatusPhases.turnStart(state, ctx, TargetRef.ofSummon(ps.playerId(), summon.id()), out, source);
+                }
+            }
+
             // 우선순위 규칙: 동일 우선순위에서는 카드 정의 ID 오름차순, 그다음 인스턴스 ID 오름차순
             // (구현은 FieldEffectOps.orderedActiveCards 참고)
             FieldEffectOps.onTurnStart(state, ctx, ps, out, source);
@@ -93,6 +99,12 @@ public final class TurnPhases {
         if (actor instanceof TargetRef.Player p) {
             PlayerState ps = state.player(p.id());
             if (ps == null) throw new IllegalStateException("missing player: " + p.id().value());
+
+            for (SummonState summon : state.summons().values()) {
+                if (ps.playerId().equals(summon.owner())) {
+                    StatusPhases.turnEnd(state, ctx, TargetRef.ofSummon(ps.playerId(), summon.id()), out, source);
+                }
+            }
 
             FieldEffectOps.onTurnEnd(state, ctx, ps, out, source);
 
