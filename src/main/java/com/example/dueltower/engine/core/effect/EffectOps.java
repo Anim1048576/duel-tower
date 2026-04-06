@@ -49,7 +49,7 @@ public final class EffectOps {
 
             // 도발(등) 타겟 강제 규칙 검증
             if (one instanceof TargetRef.Enemy || one instanceof TargetRef.Summon) {
-                StatusOps.validateEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), one, errors);
+                StatusOps.validateEnemyOneTarget(ec.state(), ec.ctx(), ec.actorRef(), ec.cardId(), one, errors);
             }
         }
         return errors;
@@ -65,7 +65,7 @@ public final class EffectOps {
     public void damageSelected(List<TargetRef> targets, int amount, int hits) {
         if (amount <= 0 || hits <= 0 || targets == null || targets.isEmpty()) return;
 
-        TargetRef src = actorRef();
+        TargetRef src = ec.actorRef();
         for (TargetRef chosen : targets) {
             TargetRef resolved = StatusOps.resolveEnemyOneTarget(
                     ec.state(),
@@ -74,16 +74,16 @@ public final class EffectOps {
                     ec.cardId(),
                     chosen,
                     ec.out(),
-                    ec.actor().value()
+                    ec.sourceLabel()
             );
             CardInstance ci = ec.state().card(ec.cardId());
             if (ci != null) {
                 resolved = CardModifierOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), src, ec.cardId(), ci, ec.ctx().def(ci.defId()), resolved,
-                        enemyCandidatesFor(src), ec.out(), ec.actor().value());
+                        enemyCandidatesFor(src), ec.out(), ec.sourceLabel());
             }
             DamageFlags flags = KeywordOps.damageFlags(ec.state(), ec.ctx(), src, ec.cardId(), resolved);
             for (int i = 0; i < hits; i++) {
-                DamageOps.apply(ec.state(), ec.ctx(), ec.out(), src, ec.cardId(), ec.actor().value(), resolved, amount, flags);
+                DamageOps.apply(ec.state(), ec.ctx(), ec.out(), src, ec.cardId(), ec.sourceLabel(), resolved, amount, flags);
             }
         }
     }
@@ -115,7 +115,7 @@ public final class EffectOps {
         if (delta == 0) return;
 
         StatusScope scope = ec.ctx().statusDef(key).scope();
-        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
+        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.sourceLabel());
 
         switch (scope) {
             case CHARACTER -> {
@@ -146,7 +146,7 @@ public final class EffectOps {
         return switch (t) {
             case NONE -> List.of();
 
-            case SELF -> List.of(actorRef());
+            case SELF -> List.of(ec.actorRef());
 
             case ALLY_ALL, ALLY_SIDE ->
                     ec.state().players().keySet().stream().map(TargetRef::ofPlayer).toList();
@@ -157,20 +157,20 @@ public final class EffectOps {
             case ALLY_ONE -> List.of(TargetRef.ofPlayer(ec.selection().requireOnePlayer()));
             case ENEMY_ONE -> {
                 TargetRef chosen = ec.selection().requireOneEnemyOrSummon();
-                TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), chosen, ec.out(), ec.actor().value());
+                TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), ec.actorRef(), ec.cardId(), chosen, ec.out(), ec.sourceLabel());
                 CardInstance ci = ec.state().card(ec.cardId());
                 if (ci != null) {
-                    resolved = CardModifierOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), ci, ec.ctx().def(ci.defId()), resolved, enemyCandidatesFor(actorRef()), ec.out(), ec.actor().value());
+                    resolved = CardModifierOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), ec.actorRef(), ec.cardId(), ci, ec.ctx().def(ci.defId()), resolved, enemyCandidatesFor(ec.actorRef()), ec.out(), ec.sourceLabel());
                 }
                 yield List.of(resolved);
             }
             case ANY_ONE -> {
                 TargetRef chosen = ec.selection().requireOne();
                 if (chosen instanceof TargetRef.Enemy || chosen instanceof TargetRef.Summon) {
-                    TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), chosen, ec.out(), ec.actor().value());
+                    TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), ec.actorRef(), ec.cardId(), chosen, ec.out(), ec.sourceLabel());
                     CardInstance ci = ec.state().card(ec.cardId());
                     if (ci != null) {
-                        resolved = CardModifierOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), actorRef(), ec.cardId(), ci, ec.ctx().def(ci.defId()), resolved, enemyCandidatesFor(actorRef()), ec.out(), ec.actor().value());
+                        resolved = CardModifierOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), ec.actorRef(), ec.cardId(), ci, ec.ctx().def(ci.defId()), resolved, enemyCandidatesFor(ec.actorRef()), ec.out(), ec.sourceLabel());
                     }
                     yield List.of(resolved);
                 }
@@ -184,13 +184,13 @@ public final class EffectOps {
         Rational multiplier = criticalAmountMultiplier(ref, "damage");
         if (multiplier.compareTo(Rational.ONE) > 0 && isCritical(ref, "damage")) {
             finalAmount = multiplyAndRound(finalAmount, multiplier);
-            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! damage x" + formatMultiplier(multiplier)));
+            ec.out().add(new GameEvent.LogAppended(ec.sourceLabel() + " critical! damage x" + formatMultiplier(multiplier)));
         }
 
         DamageFlags flags = KeywordOps.damageFlags(
                 ec.state(),
                 ec.ctx(),
-                actorRef(),
+                ec.actorRef(),
                 ec.cardId(),
                 ref
         );
@@ -198,9 +198,9 @@ public final class EffectOps {
                 ec.state(),
                 ec.ctx(),
                 ec.out(),
-                actorRef(),
+                ec.actorRef(),
                 ec.cardId(),
-                ec.actor().value(),
+                ec.sourceLabel(),
                 ref,
                 finalAmount,
                 flags
@@ -212,22 +212,22 @@ public final class EffectOps {
         Rational multiplier = criticalAmountMultiplier(ref, "heal");
         if (multiplier.compareTo(Rational.ONE) > 0 && isCritical(ref, "heal")) {
             finalAmount = multiplyAndRound(finalAmount, multiplier);
-            ec.out().add(new GameEvent.LogAppended(ec.actor().value() + " critical! heal x" + formatMultiplier(multiplier)));
+            ec.out().add(new GameEvent.LogAppended(ec.sourceLabel() + " critical! heal x" + formatMultiplier(multiplier)));
         }
         HealOps.apply(
                 ec.state(),
                 ec.ctx(),
                 ec.out(),
-                actorRef(),
+                ec.actorRef(),
                 ec.cardId(),
-                ec.actor().value(),
+                ec.sourceLabel(),
                 ref,
                 finalAmount
         );
     }
 
     private Rational criticalAmountMultiplier(TargetRef target, String kind) {
-        TargetRef source = actorRef();
+        TargetRef source = ec.actorRef();
         Rational multiplier = KeywordOps.criticalAmountMultiplier(
                 ec.state(),
                 ec.ctx(),
@@ -245,7 +245,7 @@ public final class EffectOps {
                 target,
                 kind,
                 multiplier,
-                ec.actor().value()
+                ec.sourceLabel()
         );
         multiplier = applyStatusIncomingCriticalAmountMultiplier(source, target, kind, multiplier);
 
@@ -258,12 +258,12 @@ public final class EffectOps {
                 target,
                 kind,
                 multiplier,
-                ec.actor().value()
+                ec.sourceLabel()
         );
     }
 
     private boolean isCritical(TargetRef target, String kind) {
-        TargetRef source = actorRef();
+        TargetRef source = ec.actorRef();
         int chance = KeywordOps.criticalChancePercent(
                 ec.state(),
                 ec.ctx(),
@@ -280,7 +280,7 @@ public final class EffectOps {
                 target,
                 kind,
                 chance,
-                ec.actor().value()
+                ec.sourceLabel()
         );
         chance = applyStatusCriticalChancePercent(source, target, kind, chance);
 
@@ -292,7 +292,7 @@ public final class EffectOps {
                 target,
                 kind,
                 chance,
-                ec.actor().value()
+                ec.sourceLabel()
         );
         chance = applyStatusIncomingCriticalChancePercent(source, target, kind, chance);
         if (chance == 0) return false;
@@ -321,16 +321,8 @@ public final class EffectOps {
         return enemyCandidates;
     }
 
-    private TargetRef actorRef() {
-        if (ec.actor() != null && ec.state().enemy(new Ids.EnemyId(ec.actor().value())) != null) {
-            return TargetRef.ofEnemy(new Ids.EnemyId(ec.actor().value()));
-        }
-        return TargetRef.ofPlayer(ec.actor());
-    }
-
-
     private int applyStatusCriticalChancePercent(TargetRef source, TargetRef target, String kind, int baseChance) {
-        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
+        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.sourceLabel());
         int cur = baseChance;
         for (HookEntry it : collectStatusEntries(rt, source)) {
             if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
@@ -342,7 +334,7 @@ public final class EffectOps {
     }
 
     private Rational applyStatusCriticalAmountMultiplier(TargetRef source, TargetRef target, String kind, Rational baseMultiplier) {
-        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
+        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.sourceLabel());
         Rational cur = Rational.max(Rational.ONE, baseMultiplier);
         for (HookEntry it : collectStatusEntries(rt, source)) {
             if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
@@ -355,7 +347,7 @@ public final class EffectOps {
 
 
     private int applyStatusIncomingCriticalChancePercent(TargetRef source, TargetRef target, String kind, int baseChance) {
-        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
+        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.sourceLabel());
         int cur = baseChance;
         for (HookEntry it : collectStatusEntries(rt, target)) {
             if (!ec.ctx().hasStatusEffect(it.statusId())) continue;
@@ -367,7 +359,7 @@ public final class EffectOps {
     }
 
     private Rational applyStatusIncomingCriticalAmountMultiplier(TargetRef source, TargetRef target, String kind, Rational baseMultiplier) {
-        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.actor().value());
+        StatusRuntime rt = new StatusRuntime(ec.state(), ec.ctx(), ec.out(), ec.sourceLabel());
         Rational cur = Rational.max(Rational.ONE, baseMultiplier);
         for (HookEntry it : collectStatusEntries(rt, target)) {
             if (!ec.ctx().hasStatusEffect(it.statusId())) continue;

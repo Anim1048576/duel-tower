@@ -716,6 +716,112 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    void summonActionSelfStatusTargetsSummonNotPlayer() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        CardInstId summonCard = fx.addCard(fx.player, "SUMMON_SELF_WEAK", Zone.FIELD);
+        SummonInstId summonId = new SummonInstId(UUID.randomUUID());
+        SummonState summon = new SummonState(summonId, fx.playerId, summonCard, 5, 5, 2, 0, 1, false);
+        fx.state.summons().put(summonId, summon);
+        fx.player.activeSummons().add(summonId);
+        fx.player.summonByCard().put(summonCard, summonId);
+
+        EngineResult use = fx.process(new UseSummonActionCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                summonId,
+                TargetSelection.empty()
+        ));
+
+        assertTrue(use.accepted());
+        assertEquals(2, summon.statusValues().getOrDefault(S105_Weak.ID, 0));
+        assertTrue(summon.statusValues().containsKey(S105_Weak.ID));
+        assertEquals(0, fx.player.status(S105_Weak.ID));
+        assertFalse(fx.player.statusValues().containsKey(S105_Weak.ID));
+    }
+
+    @Test
+    void summonActionSelfHealTargetsSummonNotPlayer() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        CardInstId summonCard = fx.addCard(fx.player, "SUMMON_SELF_HEAL_FIXED", Zone.FIELD);
+        SummonInstId summonId = new SummonInstId(UUID.randomUUID());
+        SummonState summon = new SummonState(summonId, fx.playerId, summonCard, 2, 8, 0, 0, 1, false);
+        fx.state.summons().put(summonId, summon);
+        fx.player.activeSummons().add(summonId);
+        fx.player.summonByCard().put(summonCard, summonId);
+
+        fx.player.hp(fx.player.maxHp() - 5);
+        int playerHpBefore = fx.player.hp();
+        int summonHpBefore = summon.hp();
+
+        EngineResult use = fx.process(new UseSummonActionCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                summonId,
+                TargetSelection.empty()
+        ));
+
+        assertTrue(use.accepted());
+        assertEquals(summonHpBefore + 3, summon.hp());
+        assertEquals(playerHpBefore, fx.player.hp());
+    }
+
+    @Test
+    void summonActionUsesSummonAsSourceForOutgoingStatusHook() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        CardInstId summonCard = fx.addCard(fx.player, "SUMMON_SCALE_ATTACK", Zone.FIELD);
+        SummonInstId summonId = new SummonInstId(UUID.randomUUID());
+        SummonState summon = new SummonState(summonId, fx.playerId, summonCard, 5, 5, 5, 0, 1, false);
+        summon.statusSet(S105_Weak.ID, 2);
+        fx.state.summons().put(summonId, summon);
+        fx.player.activeSummons().add(summonId);
+        fx.player.summonByCard().put(summonCard, summonId);
+
+        int hpBefore = fx.enemy.hp();
+        EngineResult use = fx.process(new UseSummonActionCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                summonId,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+
+        assertTrue(use.accepted());
+        assertEquals(hpBefore - 3, fx.enemy.hp(), "weak on summon should reduce summon action damage");
+    }
+
+    @Test
+    void playCardSelfHealStillTargetsPlayer() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId cardId = fx.addHandCard(fx.player, "SUMMON_SELF_HEAL_FIXED");
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        fx.player.hp(fx.player.maxHp() - 5);
+        int hpBefore = fx.player.hp();
+        EngineResult play = fx.process(new PlayCardCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                cardId,
+                TargetSelection.empty()
+        ));
+
+        assertTrue(play.accepted());
+        assertEquals(hpBefore + 3, fx.player.hp());
+    }
+
+    @Test
     void playCardStillUsesPlayerStatsForActorScaling() {
         TestFixture fx = TestFixture.basic();
         CardInstId cardId = fx.addHandCard(fx.player, "SUMMON_SCALE_ATTACK");
@@ -859,6 +965,8 @@ class RuleEngineRegressionTest {
             registerCard(defs, effects, new TestCardEffect("EX_BLAST", CardType.EX, 1, Map.of(), 4));
             registerCard(defs, effects, new ScaleWithActorAttackCardEffect("SUMMON_SCALE_ATTACK"));
             registerCard(defs, effects, new ScaleWithActorHealCardEffect("SUMMON_SCALE_HEAL"));
+            registerCard(defs, effects, new SelfStatusCardEffect("SUMMON_SELF_WEAK"));
+            registerCard(defs, effects, new SelfFixedHealCardEffect("SUMMON_SELF_HEAL_FIXED"));
 
             Map<String, StatusDefinition> statusDefs = new HashMap<>();
             Map<String, com.example.dueltower.engine.core.effect.status.StatusEffect> statusEffects = new HashMap<>();
@@ -993,6 +1101,18 @@ class RuleEngineRegressionTest {
         }
 
         private static void registerCard(Map<CardDefId, CardDefinition> defs, Map<CardDefId, CardEffect> effects, ScaleWithActorHealCardEffect effect) {
+            CardDefinition def = effect.definition();
+            defs.put(def.id(), def);
+            effects.put(def.id(), effect);
+        }
+
+        private static void registerCard(Map<CardDefId, CardDefinition> defs, Map<CardDefId, CardEffect> effects, SelfStatusCardEffect effect) {
+            CardDefinition def = effect.definition();
+            defs.put(def.id(), def);
+            effects.put(def.id(), effect);
+        }
+
+        private static void registerCard(Map<CardDefId, CardDefinition> defs, Map<CardDefId, CardEffect> effects, SelfFixedHealCardEffect effect) {
             CardDefinition def = effect.definition();
             defs.put(def.id(), def);
             effects.put(def.id(), effect);
@@ -1377,6 +1497,50 @@ class RuleEngineRegressionTest {
         @Override
         public void resolve(EffectContext ec) {
             new EffectOps(ec).healWithActorHeal(Target.ALLY_ONE);
+        }
+    }
+
+    private static final class SelfStatusCardEffect implements CardEffect {
+        private final String id;
+
+        private SelfStatusCardEffect(String id) {
+            this.id = id;
+        }
+
+        @Override
+        public String id() {
+            return id;
+        }
+
+        CardDefinition definition() {
+            return new CardDefinition(new CardDefId(id), id, CardType.SKILL, 1, Map.of(), Zone.GRAVE, false, id);
+        }
+
+        @Override
+        public void resolve(EffectContext ec) {
+            new EffectOps(ec).addStatus(Target.SELF, S105_Weak.ID, 2);
+        }
+    }
+
+    private static final class SelfFixedHealCardEffect implements CardEffect {
+        private final String id;
+
+        private SelfFixedHealCardEffect(String id) {
+            this.id = id;
+        }
+
+        @Override
+        public String id() {
+            return id;
+        }
+
+        CardDefinition definition() {
+            return new CardDefinition(new CardDefId(id), id, CardType.SKILL, 1, Map.of(), Zone.GRAVE, false, id);
+        }
+
+        @Override
+        public void resolve(EffectContext ec) {
+            new EffectOps(ec).heal(Target.SELF, 3);
         }
     }
 }
