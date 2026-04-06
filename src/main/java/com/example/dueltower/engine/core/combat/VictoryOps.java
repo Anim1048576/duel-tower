@@ -1,5 +1,6 @@
 package com.example.dueltower.engine.core.combat;
 
+import com.example.dueltower.engine.config.RunConfig;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
@@ -67,22 +68,28 @@ public final class VictoryOps {
         CombatCleanupOps.cleanupAfterCombatEnd(state, ctx, false);
 
         // Record post-combat result and release combat context.
+        RunConfig.RunNodeDefinition nodeDefinition = state.runState().currentNodeDefinition();
+        boolean bossCombat = nodeDefinition != null && nodeDefinition.nodeType() == RunConfig.NodeType.BOSS;
         if (oc == Outcome.PLAYERS_WIN) {
             state.runState().resolveCurrentNode(
                     "combat",
-                    "전투 결과",
-                    "전투 승리",
-                    "적을 제압하고 180G와 상자 1개를 확보했다.",
-                    180,
+                    bossCombat ? "보스 전투 결과" : "전투 결과",
+                    bossCombat ? "보스 전투 승리" : "전투 승리",
+                    bossCombat
+                            ? "보스를 제압하고 300G와 상자 1개를 확보했다. 다음 층으로 진입할 수 있다."
+                            : "적을 제압하고 180G와 상자 1개를 확보했다.",
+                    bossCombat ? 300 : 180,
                     0,
                     1
             );
         } else {
             state.runState().resolveCurrentNode(
                     "combat",
-                    "전투 결과",
-                    "전투 패배",
-                    "전열이 무너져 추가 보상 없이 후퇴했다.",
+                    bossCombat ? "보스 전투 결과" : "전투 결과",
+                    bossCombat ? "보스 전투 패배" : "전투 패배",
+                    bossCombat
+                            ? "보스에게 밀려 추가 보상 없이 후퇴했다."
+                            : "전열이 무너져 추가 보상 없이 후퇴했다.",
                     0,
                     0,
                     0
@@ -91,7 +98,11 @@ public final class VictoryOps {
         state.combat(null);
         state.enemies().clear();
 
-        out.add(new GameEvent.LogAppended("combat ends: " + oc));
+        if (bossCombat) {
+            out.add(new GameEvent.LogAppended("boss combat ends: " + oc));
+        } else {
+            out.add(new GameEvent.LogAppended("combat ends: " + oc));
+        }
         return oc;
     }
 

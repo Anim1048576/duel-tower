@@ -89,7 +89,10 @@ public record RunConfig(
                         Objects.requireNonNull(node.danger(), "nodePool[].danger"),
                         node.requiresKey(),
                         node.keyRequiredReason() == null ? null : node.keyRequiredReason().trim(),
-                        Boolean.TRUE.equals(node.forcedSuccessJudgement())
+                        Boolean.TRUE.equals(node.forcedSuccessJudgement()),
+                        NodeType.parse(node.nodeType(), node.typeLabel()),
+                        NodeEffect.fromRaw(node.effect()),
+                        parseMysteryOutcomes(node.mysteryOutcomes())
                 ));
             }
         }
@@ -144,7 +147,10 @@ public record RunConfig(
             RunState.Danger danger,
             boolean requiresKey,
             String keyRequiredReason,
-            boolean forcedSuccessJudgement
+            boolean forcedSuccessJudgement,
+            NodeType nodeType,
+            NodeEffect effect,
+            List<NodeType> mysteryOutcomes
     ) {
         public RunNodeDefinition {
             id = Objects.requireNonNull(id, "id");
@@ -153,6 +159,8 @@ public record RunConfig(
             rule = Objects.requireNonNull(rule, "rule");
             phase = Objects.requireNonNull(phase, "phase");
             danger = Objects.requireNonNull(danger, "danger");
+            nodeType = Objects.requireNonNull(nodeType, "nodeType");
+            mysteryOutcomes = mysteryOutcomes == null ? List.of() : List.copyOf(mysteryOutcomes);
         }
 
         public RunNodeDefinition(
@@ -165,7 +173,74 @@ public record RunConfig(
                 boolean requiresKey,
                 String keyRequiredReason
         ) {
-            this(id, name, typeLabel, rule, phase, danger, requiresKey, keyRequiredReason, false);
+            this(id, name, typeLabel, rule, phase, danger, requiresKey, keyRequiredReason, false,
+                    NodeType.parse(null, typeLabel), null, List.of());
+        }
+
+        public RunNodeDefinition(
+                String id,
+                String name,
+                String typeLabel,
+                String rule,
+                RunState.NodePhase phase,
+                RunState.Danger danger,
+                boolean requiresKey,
+                String keyRequiredReason,
+                boolean forcedSuccessJudgement
+        ) {
+            this(id, name, typeLabel, rule, phase, danger, requiresKey, keyRequiredReason, forcedSuccessJudgement,
+                    NodeType.parse(null, typeLabel), null, List.of());
+        }
+    }
+
+    public enum NodeType {
+        NORMAL,
+        COMBAT,
+        BOSS,
+        FACILITY,
+        CURSE,
+        MYSTERY;
+
+        public static NodeType parse(String rawNodeType, String typeLabel) {
+            if (rawNodeType != null && !rawNodeType.isBlank()) {
+                try {
+                    return NodeType.valueOf(rawNodeType.trim().toUpperCase());
+                } catch (IllegalArgumentException ignored) {
+                    // fallback to type label
+                }
+            }
+            String normalized = typeLabel == null ? "" : typeLabel.trim();
+            return switch (normalized) {
+                case "전투" -> COMBAT;
+                case "보스" -> BOSS;
+                case "시설" -> FACILITY;
+                case "저주" -> CURSE;
+                case "???" -> MYSTERY;
+                default -> NORMAL;
+            };
+        }
+    }
+
+    public record NodeEffect(
+            int goldDelta,
+            int keyDelta,
+            int chestDelta,
+            int hpDelta,
+            String summary,
+            String detail
+    ) {
+        public static NodeEffect fromRaw(NodeEffectRaw raw) {
+            if (raw == null) {
+                return null;
+            }
+            return new NodeEffect(
+                    raw.goldDelta(),
+                    raw.keyDelta(),
+                    raw.chestDelta(),
+                    raw.hpDelta(),
+                    raw.summary(),
+                    raw.detail()
+            );
         }
     }
 
@@ -193,7 +268,19 @@ public record RunConfig(
             RunState.Danger danger,
             boolean requiresKey,
             String keyRequiredReason,
-            Boolean forcedSuccessJudgement
+            Boolean forcedSuccessJudgement,
+            String nodeType,
+            NodeEffectRaw effect,
+            List<String> mysteryOutcomes
+    ) {}
+
+    public record NodeEffectRaw(
+            int goldDelta,
+            int keyDelta,
+            int chestDelta,
+            int hpDelta,
+            String summary,
+            String detail
     ) {}
 
     public record ShopOfferRaw(
@@ -203,4 +290,22 @@ public record RunConfig(
             int stock,
             boolean bound
     ) {}
+
+    private static List<NodeType> parseMysteryOutcomes(List<String> rawOutcomes) {
+        if (rawOutcomes == null || rawOutcomes.isEmpty()) {
+            return List.of(NodeType.FACILITY, NodeType.CURSE, NodeType.COMBAT);
+        }
+        List<NodeType> parsed = new ArrayList<>();
+        for (String rawOutcome : rawOutcomes) {
+            NodeType nodeType = NodeType.parse(rawOutcome, rawOutcome);
+            if (nodeType == NodeType.MYSTERY || nodeType == NodeType.NORMAL || nodeType == NodeType.BOSS) {
+                continue;
+            }
+            parsed.add(nodeType);
+        }
+        if (parsed.isEmpty()) {
+            return List.of(NodeType.FACILITY, NodeType.CURSE, NodeType.COMBAT);
+        }
+        return List.copyOf(parsed);
+    }
 }

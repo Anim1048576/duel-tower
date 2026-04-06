@@ -220,6 +220,17 @@ public final class RunState {
         return definition != null && definition.forcedSuccessJudgement();
     }
 
+    public RunConfig.RunNodeDefinition currentNodeDefinition() {
+        if (currentNode == null) {
+            return null;
+        }
+        return findNodeDefinition(currentNode.id());
+    }
+
+    public RunConfig.RunNodeDefinition nodeDefinition(String nodeId) {
+        return findNodeDefinition(nodeId);
+    }
+
     public void resolveCurrentNode(String type,
                                    String title,
                                    String summary,
