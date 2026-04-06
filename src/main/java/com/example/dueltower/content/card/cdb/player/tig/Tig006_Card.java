@@ -1,6 +1,10 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.DiscardFilter;
+import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
+import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.CardDefinition;
@@ -30,6 +34,15 @@ public class Tig006_Card implements CardBlueprint {
                 """
                         패 1장을 버리고 설치된 카드를 3장 까지 파괴한다.
                         """
+        );
+    }
+
+
+    @Override
+    public CardPlaySpec playSpec() {
+        return new CardPlaySpec(
+                TargetSpec.none(),
+                List.of(new DiscardFromHandRequirement(1, true, DiscardFilter.ANY))
         );
     }
 

@@ -1,6 +1,10 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.DiscardFilter;
+import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
+import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
 import com.example.dueltower.engine.model.CardDefinition;
@@ -32,6 +36,15 @@ public class Tig004_Card implements CardBlueprint {
                         패를 1장 버리고 적 하나에게 공격력+{극복}피해를 입힌다.
                         극복이 3이상인 경우, 해당 공격은 2회로 변경된다.
                         """
+        );
+    }
+
+
+    @Override
+    public CardPlaySpec playSpec() {
+        return new CardPlaySpec(
+                TargetSpec.required(Target.ENEMY_ONE),
+                List.of(new DiscardFromHandRequirement(1, true, DiscardFilter.ANY))
         );
     }
 

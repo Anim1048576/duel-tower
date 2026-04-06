@@ -1,5 +1,6 @@
 package com.example.dueltower.content.card.api;
 
+import com.example.dueltower.content.card.dto.CardDetailResponse;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
@@ -28,7 +29,7 @@ public class CardController {
     }
 
     @GetMapping("/{id}")
-    public CardDefinition get(@PathVariable String id) {
+    public CardDetailResponse get(@PathVariable String id) {
         return service.get(id);
     }
 }

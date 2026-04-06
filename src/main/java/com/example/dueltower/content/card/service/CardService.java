@@ -1,6 +1,8 @@
 package com.example.dueltower.content.card.service;
 
+import com.example.dueltower.content.card.dto.CardDetailResponse;
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.support.ContentLookupSupport;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
@@ -16,6 +18,7 @@ public class CardService {
     private final Map<CardDefId, CardDefinition> byId;
     private final Map<CardDefId, CardEffect> effectsById;
     private final Map<CardDefId, Integer> maxDeckCopiesById;
+    private final Map<CardDefId, CardPlaySpec> playSpecById;
 
     public CardService(List<CardBlueprint> blueprints) {
         // Spring 주입 순서는 보장되지 않으니, 항상 정렬해서 노출
@@ -26,6 +29,7 @@ public class CardService {
         Map<CardDefId, CardDefinition> m = new HashMap<>();
         Map<CardDefId, CardEffect> e = new HashMap<>();
         Map<CardDefId, Integer> deckLimits = new HashMap<>();
+        Map<CardDefId, CardPlaySpec> playSpecs = new HashMap<>();
         List<CardDefinition> defs = new ArrayList<>();
 
         for (CardBlueprint bp : sorted) {
@@ -45,6 +49,11 @@ public class CardService {
             if (prevEff != null) {
                 throw new IllegalStateException("duplicate card effect id: " + def.id().value());
             }
+            CardPlaySpec prevPlaySpec = playSpecs.put(def.id(), bp.playSpec());
+            if (prevPlaySpec != null) {
+                throw new IllegalStateException("duplicate card play spec id: " + def.id().value());
+            }
+
             Integer maxDeckCopies = bp.maxDeckCopies();
             if (maxDeckCopies != null) {
                 if (maxDeckCopies < 1) {
@@ -59,6 +68,7 @@ public class CardService {
         this.byId = Map.copyOf(m);
         this.effectsById = Map.copyOf(e);
         this.maxDeckCopiesById = Map.copyOf(deckLimits);
+        this.playSpecById = Map.copyOf(playSpecs);
     }
 
     /** API 용: 전체 목록 */
@@ -73,8 +83,10 @@ public class CardService {
 
 
     /** API 용: 카드 상세 */
-    public CardDefinition get(String id) {
-        return ContentLookupSupport.requireById(byId, id, CardDefId::new, "card");
+    public CardDetailResponse get(String id) {
+        CardDefinition definition = ContentLookupSupport.requireById(byId, id, CardDefId::new, "card");
+        CardPlaySpec playSpec = playSpecById.getOrDefault(definition.id(), CardPlaySpec.none());
+        return CardDetailResponse.of(definition, playSpec);
     }
 
     /**
@@ -106,5 +118,8 @@ public class CardService {
     /** 덱 구성 시 카드별 허용 최대 매수. 오버라이드가 없으면 null */
     public Integer maxDeckCopies(CardDefId id) {
         return maxDeckCopiesById.get(id);
+    }
+    public CardPlaySpec playSpec(CardDefId id) {
+        return playSpecById.getOrDefault(id, CardPlaySpec.none());
     }
 }

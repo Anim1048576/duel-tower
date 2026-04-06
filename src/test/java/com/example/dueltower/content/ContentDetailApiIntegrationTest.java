@@ -62,7 +62,10 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(jsonPath("$.keywords").isMap())
                 .andExpect(jsonPath("$.resolveTo").isString())
                 .andExpect(jsonPath("$.token").isBoolean())
-                .andExpect(jsonPath("$.description", not(emptyOrNullString())));
+                .andExpect(jsonPath("$.description", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.playSpec").exists())
+                .andExpect(jsonPath("$.playSpec.target").exists())
+                .andExpect(jsonPath("$.playSpec.extraRequirements").isArray());
     }
 
 
