@@ -27,13 +27,26 @@ public final class PlayCardCommand implements GameCommand {
     private final PlayerId playerId;
     private final CardInstId cardId;
     private final TargetSelection selection;
+    private final List<CardInstId> discardIds;
 
     public PlayCardCommand(UUID commandId, long expectedVersion, PlayerId playerId, CardInstId cardId, TargetSelection selection) {
+        this(commandId, expectedVersion, playerId, cardId, selection, List.of());
+    }
+
+    public PlayCardCommand(
+            UUID commandId,
+            long expectedVersion,
+            PlayerId playerId,
+            CardInstId cardId,
+            TargetSelection selection,
+            List<CardInstId> discardIds
+    ) {
         this.commandId = commandId;
         this.expectedVersion = expectedVersion;
         this.playerId = playerId;
         this.cardId = cardId;
         this.selection = selection == null ? TargetSelection.empty() : selection;
+        this.discardIds = discardIds == null ? List.of() : List.copyOf(discardIds);
     }
 
     @Override public UUID commandId() { return commandId; }
@@ -86,7 +99,7 @@ public final class PlayCardCommand implements GameCommand {
         }
 
         CardEffect eff = ctx.effect(ci.defId());
-        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, dummyOut);
+        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, discardIds, dummyOut);
         errors.addAll(eff.validate(ec));
 
         return errors;
@@ -143,7 +156,7 @@ public final class PlayCardCommand implements GameCommand {
 
         // 효과 해결
         CardEffect eff = ctx.effect(ci.defId());
-        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, events);
+        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, discardIds, events);
         eff.resolve(ec);
 
         // 카드 사용 후 훅 순서: passive -> status

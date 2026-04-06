@@ -37,7 +37,11 @@ public class Tig004_Card implements CardBlueprint {
 
     @Override
     public List<String> validate(EffectContext ec) {
-        return new EffectOps(ec).validateTarget(Target.ENEMY_ONE);
+        EffectOps ops = new EffectOps(ec);
+        PlayerState me = ec.state().player(ec.actor());
+        List<String> errors = ops.validateTarget(Target.ENEMY_ONE);
+        TigEffectSupport.validateSingleDiscardSelection(ec, me, errors);
+        return errors;
     }
 
     @Override
@@ -45,7 +49,7 @@ public class Tig004_Card implements CardBlueprint {
         EffectOps ops = new EffectOps(ec);
         PlayerState me = ec.state().player(ec.actor());
 
-        if (!TigEffectSupport.requireDiscardOrAbort(ec, me, id())) return;
+        if (!TigEffectSupport.discardSelectedOrAbort(ec, me)) return;
 
         int overcome = TigEffectSupport.overcome(me);
         int hits = TigEffectSupport.isOvercome3Plus(me) ? 2 : 1;

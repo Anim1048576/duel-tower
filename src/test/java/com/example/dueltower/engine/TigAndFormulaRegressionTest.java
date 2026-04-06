@@ -6,6 +6,8 @@ import com.example.dueltower.content.card.cdb.C004_BasicCurse;
 import com.example.dueltower.content.card.cdb.player.tig.Tig005_Card;
 import com.example.dueltower.content.card.cdb.player.tig.Tig901_EX;
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.keyword.kdb.K006_Immovable;
+import com.example.dueltower.content.keyword.model.KeywordBlueprint;
 import com.example.dueltower.content.status.model.StatusBlueprint;
 import com.example.dueltower.content.status.sdb.S101_Pain;
 import com.example.dueltower.content.status.sdb.player.tig.Tig201_Status;
@@ -14,6 +16,8 @@ import com.example.dueltower.engine.command.UseExCommand;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
+import com.example.dueltower.engine.core.effect.EffectContext;
+import com.example.dueltower.engine.core.effect.keyword.KeywordEffect;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
@@ -30,31 +34,67 @@ import static org.junit.jupiter.api.Assertions.*;
 class TigAndFormulaRegressionTest {
 
     @Test
-    void discardGatedTigCardAbortsPayloadWhenNoDiscardableCardExists() {
+    void discardGatedTigCardRejectsWhenDiscardIdMissing() {
         TigFixture fx = new TigFixture();
         CardInstId tig005 = fx.addToHand("Tig005_Card");
 
-        int hpBefore = fx.enemy1.hp();
-        EngineResult result = fx.play(tig005, List.of());
+        EngineResult result = fx.play(tig005, List.of(), List.of());
 
-        assertTrue(result.accepted());
-        assertEquals(hpBefore, fx.enemy1.hp(), "payload damage must not apply when discard fails");
-        assertTrue(result.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l
-                && l.line().contains("Tig005_Card: discard failed, no card to discard")));
+        assertFalse(result.accepted());
+        assertTrue(result.errors().stream().anyMatch(e -> e.contains("discardIds must contain exactly 1 card")));
     }
 
     @Test
-    void discardGatedTigCardExecutesPayloadWhenDiscardSucceeds() {
+    void discardGatedTigCardExecutesPayloadWhenSelectedDiscardSucceeds() {
         TigFixture fx = new TigFixture();
         CardInstId tig005 = fx.addToHand("Tig005_Card");
-        CardInstId discardable = fx.addToHand("C001");
+        CardInstId discard1 = fx.addToHand("C001");
+        CardInstId discard2 = fx.addToHand("C002");
 
         int hpBefore = fx.enemy1.hp();
-        EngineResult result = fx.play(tig005, List.of());
+        EngineResult result = fx.play(tig005, List.of(), List.of(discard2));
 
         assertTrue(result.accepted());
         assertTrue(hpBefore > fx.enemy1.hp(), "payload damage should apply after discard success");
-        assertEquals(Zone.GRAVE, fx.state.card(discardable).zone());
+        assertEquals(Zone.HAND, fx.state.card(discard1).zone());
+        assertEquals(Zone.GRAVE, fx.state.card(discard2).zone());
+    }
+
+    @Test
+    void discardGatedTigCardRejectsWhenSourceCardIsSelected() {
+        TigFixture fx = new TigFixture();
+        CardInstId tig005 = fx.addToHand("Tig005_Card");
+        fx.addToHand("C001");
+
+        EngineResult result = fx.play(tig005, List.of(), List.of(tig005));
+
+        assertFalse(result.accepted());
+        assertTrue(result.errors().stream().anyMatch(e -> e.contains("source card cannot be selected for discard")));
+    }
+
+    @Test
+    void discardGatedTigCardRejectsWhenDiscardCardNotInHand() {
+        TigFixture fx = new TigFixture();
+        CardInstId tig005 = fx.addToHand("Tig005_Card");
+        CardInstId notInHand = fx.addToGrave("C001");
+        fx.addToHand("C002");
+
+        EngineResult result = fx.play(tig005, List.of(), List.of(notInHand));
+
+        assertFalse(result.accepted());
+        assertTrue(result.errors().stream().anyMatch(e -> e.contains("discard card not in hand")));
+    }
+
+    @Test
+    void discardGatedTigCardRejectsWhenSelectedCardCannotBeDiscardedByEffect() {
+        TigFixture fx = new TigFixture();
+        CardInstId tig005 = fx.addToHand("Tig005_Card");
+        CardInstId immovable = fx.addToHand("IMMOVABLE_TEST");
+
+        EngineResult result = fx.play(tig005, List.of(), List.of(immovable));
+
+        assertFalse(result.accepted());
+        assertTrue(result.errors().stream().anyMatch(e -> e.contains("부동 카드는 버릴 수 없습니다.")));
     }
 
     @Test
@@ -64,9 +104,9 @@ class TigAndFormulaRegressionTest {
         fx.player.ap(1);
 
         CardInstId tig005 = fx.addToHand("Tig005_Card");
-        fx.addToHand("C001");
+        CardInstId discardable = fx.addToHand("C001");
 
-        EngineResult result = fx.play(tig005, List.of());
+        EngineResult result = fx.play(tig005, List.of(), List.of(discardable));
 
         assertTrue(result.accepted(), "overcome 3+ should reduce Tig005 cost from 2 to 1");
         assertEquals(0, fx.player.ap(), "actual payment should consume 1 AP");
@@ -79,9 +119,9 @@ class TigAndFormulaRegressionTest {
         fx.player.ap(0);
 
         CardInstId tig005 = fx.addToHand("Tig005_Card");
-        fx.addToHand("C001");
+        CardInstId discardable = fx.addToHand("C001");
 
-        EngineResult result = fx.play(tig005, List.of());
+        EngineResult result = fx.play(tig005, List.of(), List.of(discardable));
 
         assertFalse(result.accepted());
         assertTrue(result.errors().stream().anyMatch(e -> e.contains("not enough ap")));
@@ -244,13 +284,17 @@ class TigAndFormulaRegressionTest {
             registerCard(defs, effects, new C004_BasicCurse());
             registerCard(defs, effects, new Tig005_Card());
             registerCard(defs, effects, new Tig901_EX());
+            registerCard(defs, effects, new ImmovableTestCard());
 
             Map<String, StatusDefinition> statusDefs = new HashMap<>();
             Map<String, com.example.dueltower.engine.core.effect.status.StatusEffect> statusEffects = new HashMap<>();
             registerStatus(statusDefs, statusEffects, new S101_Pain());
             registerStatus(statusDefs, statusEffects, new Tig201_Status());
+            Map<String, KeywordDefinition> keywordDefs = new HashMap<>();
+            Map<String, KeywordEffect> keywordEffects = new HashMap<>();
+            registerKeyword(keywordDefs, keywordEffects, new K006_Immovable());
 
-            this.ctx = new EngineContext(defs, effects, statusDefs, statusEffects, Map.of(), Map.of());
+            this.ctx = new EngineContext(defs, effects, statusDefs, statusEffects, keywordDefs, keywordEffects);
 
             state.combat(new CombatState());
             CombatState cs = state.combat();
@@ -262,7 +306,11 @@ class TigAndFormulaRegressionTest {
         }
 
         EngineResult play(CardInstId cardId, List<TargetRef> targets) {
-            return engine.process(state, ctx, new PlayCardCommand(UUID.randomUUID(), state.version(), playerId, cardId, new TargetSelection(targets)));
+            return play(cardId, targets, List.of());
+        }
+
+        EngineResult play(CardInstId cardId, List<TargetRef> targets, List<CardInstId> discardIds) {
+            return engine.process(state, ctx, new PlayCardCommand(UUID.randomUUID(), state.version(), playerId, cardId, new TargetSelection(targets), discardIds));
         }
 
         EngineResult useEx(List<TargetRef> targets) {
@@ -308,6 +356,39 @@ class TigAndFormulaRegressionTest {
                                            StatusBlueprint bp) {
             defs.put(bp.id(), bp.definition());
             effects.put(bp.id(), bp);
+        }
+
+        private static void registerKeyword(Map<String, KeywordDefinition> defs,
+                                            Map<String, KeywordEffect> effects,
+                                            KeywordBlueprint bp) {
+            defs.put(bp.id(), bp.definition());
+            effects.put(bp.id(), bp);
+        }
+    }
+
+    private static final class ImmovableTestCard implements CardBlueprint {
+        @Override
+        public String id() {
+            return "IMMOVABLE_TEST";
+        }
+
+        @Override
+        public CardDefinition definition() {
+            return new CardDefinition(
+                    new CardDefId(id()),
+                    "Immovable Test",
+                    CardType.SKILL,
+                    0,
+                    Map.of(K006_Immovable.ID, 1),
+                    Zone.GRAVE,
+                    false,
+                    "test"
+            );
+        }
+
+        @Override
+        public void resolve(EffectContext ec) {
+            // no-op
         }
     }
 }

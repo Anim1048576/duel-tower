@@ -7,6 +7,8 @@ import com.example.dueltower.engine.core.effect.card.CardCostCtx;
 import com.example.dueltower.engine.model.*;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -45,11 +47,19 @@ public class Tig005_Card implements CardBlueprint {
     }
 
     @Override
+    public List<String> validate(EffectContext ec) {
+        PlayerState me = ec.state().player(ec.actor());
+        List<String> errors = new ArrayList<>();
+        TigEffectSupport.validateSingleDiscardSelection(ec, me, errors);
+        return errors;
+    }
+
+    @Override
     public void resolve(EffectContext ec) {
         EffectOps ops = new EffectOps(ec);
         PlayerState me = ec.state().player(ec.actor());
 
-        if (!TigEffectSupport.requireDiscardOrAbort(ec, me, id())) return;
+        if (!TigEffectSupport.discardSelectedOrAbort(ec, me)) return;
 
         int overcome = TigEffectSupport.overcome(me);
         ops.damageWithActorAttackPlus(overcome, Target.ENEMY_ALL);

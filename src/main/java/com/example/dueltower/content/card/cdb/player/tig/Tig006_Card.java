@@ -9,6 +9,8 @@ import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.Zone;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -32,9 +34,17 @@ public class Tig006_Card implements CardBlueprint {
     }
 
     @Override
+    public List<String> validate(EffectContext ec) {
+        PlayerState me = ec.state().player(ec.actor());
+        List<String> errors = new ArrayList<>();
+        TigEffectSupport.validateSingleDiscardSelection(ec, me, errors);
+        return errors;
+    }
+
+    @Override
     public void resolve(EffectContext ec) {
         PlayerState me = ec.state().player(ec.actor());
-        if (!TigEffectSupport.requireDiscardOrAbort(ec, me, id())) return;
+        if (!TigEffectSupport.discardSelectedOrAbort(ec, me)) return;
         TigEffectSupport.destroyInstalledCards(ec, 3);
     }
 }
