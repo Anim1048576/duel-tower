@@ -86,6 +86,42 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    void cardDetailShouldExposePlaySpecMetadataForTigDiscardCards() throws Exception {
+        mockMvc.perform(get("/api/content/cards/{id}", "Tig004_Card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1));
+
+        mockMvc.perform(get("/api/content/cards/{id}", "Tig005_Card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1));
+
+        mockMvc.perform(get("/api/content/cards/{id}", "Tig006_Card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1));
+
+        mockMvc.perform(get("/api/content/cards/{id}", "Tig008_Card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1));
+    }
+
+    @Test
+    void cardDetailShouldExposeNonePlaySpecForDefaultCard() throws Exception {
+        mockMvc.perform(get("/api/content/cards/{id}", "Tig001_Card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(0));
+    }
+
+    @Test
     void passiveDetailShouldReturnOkForKnownId() throws Exception {
         PassiveDefinition knownPassive = passiveService.list().stream().findFirst().orElseThrow();
 

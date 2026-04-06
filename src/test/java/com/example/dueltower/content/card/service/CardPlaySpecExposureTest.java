@@ -57,6 +57,16 @@ class CardPlaySpecExposureTest {
                 .isInstanceOf(DiscardFromHandRequirement.class);
     }
 
+    @Test
+    void defaultCardDetailShouldExposeNonePlaySpec() {
+        CardDetailResponse detail = cardService.get("Tig001_Card");
+
+        assertThat(detail.playSpec()).isNotNull();
+        assertThat(detail.playSpec().target().target()).isEqualTo(Target.NONE);
+        assertThat(detail.playSpec().target().requiredSelection()).isFalse();
+        assertThat(detail.playSpec().extraRequirements()).isEmpty();
+    }
+
     private void assertDiscardOneFromHand(String cardId, boolean targetRequired, Target expectedTarget) {
         CardDetailResponse detail = cardService.get(cardId);
         CardPlaySpec playSpec = detail.playSpec();
