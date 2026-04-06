@@ -1233,6 +1233,37 @@ class SessionCommandExtensionIntegrationTest {
         return state;
     }
 
+    private JsonNode advanceToPlayerMainTurn(Fixture fx, JsonNode currentState) throws Exception {
+        JsonNode state = currentState;
+        for (int i = 0; i < 6; i++) {
+            String actor = state.path("combat").path("currentTurnPlayer").asText("");
+            if (actor.startsWith("P:player1")) {
+                return state;
+            }
+            if (!actor.startsWith("E:")) {
+                break;
+            }
+
+            String enemyId = actor.substring(2);
+            JsonNode enemyEnd = commandAsGm(
+                    fx.code,
+                    fx.gmToken,
+                    """
+                    {
+                      "type": "ENEMY_END_TURN",
+                      "enemyId": "%s",
+                      "expectedVersion": %d
+                    }
+                    """.formatted(enemyId, state.get("version").asLong())
+            );
+            assertTrue(enemyEnd.get("accepted").asBoolean());
+            state = enemyEnd.get("state");
+        }
+
+        fail("player turn was not reached after end turn");
+        return state;
+    }
+
     private boolean hasError(JsonNode response, String expected) {
         JsonNode errors = response.get("errors");
         if (errors == null || !errors.isArray()) {
