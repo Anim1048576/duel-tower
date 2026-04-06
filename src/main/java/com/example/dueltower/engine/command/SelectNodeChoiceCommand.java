@@ -59,6 +59,22 @@ public record SelectNodeChoiceCommand(
             events.add(new GameEvent.LogAppended("전투 노드를 선택했다. START_COMBAT 명령 대기 중."));
         } else if (choice.phase() == RunState.NodePhase.JUDGEMENT) {
             state.nodeState(NodeState.NON_COMBAT);
+            if (state.runState().currentNodeForcedSuccessJudgement()) {
+                int successGold = ctx.rewardTable().judgement().successGold();
+                int successKeys = ctx.rewardTable().judgement().successKeys();
+                state.runState().resolveCurrentNode(
+                        "reward",
+                        "판정 성공",
+                        "강제 진행 판정 성공",
+                        "강제 진행 판정으로 능력치 선택/주사위/기억 받아들이기 없이 즉시 성공했다. 보상: "
+                                + successGold + "G, 열쇠 " + successKeys + "개.",
+                        successGold,
+                        successKeys,
+                        0
+                );
+                events.add(new GameEvent.LogAppended("판정 노드 진입: 강제 진행 판정이라 즉시 성공 처리했다."));
+                return events;
+            }
             List<String> abilityChoices = JudgementEngine.judgementAbilityChoices(state.player(playerId));
             if (abilityChoices.isEmpty()) {
                 int failureGold = ctx.rewardTable().judgement().failureGold();

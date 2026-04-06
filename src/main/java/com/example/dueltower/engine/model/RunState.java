@@ -212,6 +212,14 @@ public final class RunState {
         availableChoices.clear();
     }
 
+    public boolean currentNodeForcedSuccessJudgement() {
+        if (currentNode == null || currentNode.phase() != NodePhase.JUDGEMENT) {
+            return false;
+        }
+        RunConfig.RunNodeDefinition definition = findNodeDefinition(currentNode.id());
+        return definition != null && definition.forcedSuccessJudgement();
+    }
+
     public void resolveCurrentNode(String type,
                                    String title,
                                    String summary,
@@ -322,5 +330,17 @@ public final class RunState {
             }
         }
         return selected;
+    }
+
+    private RunConfig.RunNodeDefinition findNodeDefinition(String nodeId) {
+        if (nodeId == null || nodeId.isBlank()) {
+            return null;
+        }
+        for (RunConfig.RunNodeDefinition node : runConfig.nodePool()) {
+            if (node.id().equals(nodeId)) {
+                return node;
+            }
+        }
+        return null;
     }
 }

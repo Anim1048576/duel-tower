@@ -88,7 +88,8 @@ public record RunConfig(
                         Objects.requireNonNull(node.phase(), "nodePool[].phase"),
                         Objects.requireNonNull(node.danger(), "nodePool[].danger"),
                         node.requiresKey(),
-                        node.keyRequiredReason() == null ? null : node.keyRequiredReason().trim()
+                        node.keyRequiredReason() == null ? null : node.keyRequiredReason().trim(),
+                        Boolean.TRUE.equals(node.forcedSuccessJudgement())
                 ));
             }
         }
@@ -142,7 +143,8 @@ public record RunConfig(
             RunState.NodePhase phase,
             RunState.Danger danger,
             boolean requiresKey,
-            String keyRequiredReason
+            String keyRequiredReason,
+            boolean forcedSuccessJudgement
     ) {
         public RunNodeDefinition {
             id = Objects.requireNonNull(id, "id");
@@ -151,6 +153,19 @@ public record RunConfig(
             rule = Objects.requireNonNull(rule, "rule");
             phase = Objects.requireNonNull(phase, "phase");
             danger = Objects.requireNonNull(danger, "danger");
+        }
+
+        public RunNodeDefinition(
+                String id,
+                String name,
+                String typeLabel,
+                String rule,
+                RunState.NodePhase phase,
+                RunState.Danger danger,
+                boolean requiresKey,
+                String keyRequiredReason
+        ) {
+            this(id, name, typeLabel, rule, phase, danger, requiresKey, keyRequiredReason, false);
         }
     }
 
@@ -177,7 +192,8 @@ public record RunConfig(
             RunState.NodePhase phase,
             RunState.Danger danger,
             boolean requiresKey,
-            String keyRequiredReason
+            String keyRequiredReason,
+            Boolean forcedSuccessJudgement
     ) {}
 
     public record ShopOfferRaw(
