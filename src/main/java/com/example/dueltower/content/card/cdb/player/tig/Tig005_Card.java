@@ -1,6 +1,10 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.DiscardFilter;
+import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
+import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
 import com.example.dueltower.engine.core.effect.card.CardCostCtx;
@@ -44,6 +48,15 @@ public class Tig005_Card implements CardBlueprint {
         return TigEffectSupport.isOvercome3Plus(me)
                 ? Math.max(0, currentCost - 1)
                 : currentCost;
+    }
+
+
+    @Override
+    public CardPlaySpec playSpec() {
+        return new CardPlaySpec(
+                TargetSpec.none(),
+                List.of(new DiscardFromHandRequirement(1, true, DiscardFilter.ANY))
+        );
     }
 
     @Override

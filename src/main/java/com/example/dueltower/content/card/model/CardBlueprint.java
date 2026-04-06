@@ -1,5 +1,6 @@
 package com.example.dueltower.content.card.model;
 
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.Ids.CardDefId;
@@ -13,6 +14,10 @@ public interface CardBlueprint extends CardEffect {
      */
     default Integer maxDeckCopies() {
         return null;
+    }
+
+    default CardPlaySpec playSpec() {
+        return CardPlaySpec.none();
     }
 
     default CardDefId defId() {
