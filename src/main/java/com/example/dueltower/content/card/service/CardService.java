@@ -4,12 +4,20 @@ import com.example.dueltower.content.card.dto.CardDetailResponse;
 import com.example.dueltower.content.card.model.CardBlueprint;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.support.ContentLookupSupport;
-import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
+import com.example.dueltower.engine.model.CardDefinition;
+import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 
 @Service
@@ -65,6 +73,7 @@ public class CardService {
             defs.add(def);
         }
 
+        validateDefinitionBlueprintConsistency(m, bpById);
         this.all = List.copyOf(defs);
         this.byId = Map.copyOf(m);
         this.blueprintsById = Map.copyOf(bpById);
@@ -86,9 +95,8 @@ public class CardService {
     /** API 용: 카드 상세 */
     public CardDetailResponse get(String id) {
         CardDefinition definition = ContentLookupSupport.requireById(byId, id, CardDefId::new, "card");
-        CardBlueprint blueprint = blueprintsById.get(definition.id());
-        CardPlaySpec playSpec = blueprint == null ? CardPlaySpec.none() : blueprint.playSpec();
-        return CardDetailResponse.of(definition, playSpec);
+        CardBlueprint blueprint = requireBlueprint(definition.id());
+        return CardDetailResponse.of(definition, blueprint.playSpec());
     }
 
     /**
@@ -121,8 +129,34 @@ public class CardService {
     public Integer maxDeckCopies(CardDefId id) {
         return maxDeckCopiesById.get(id);
     }
+
     public CardPlaySpec playSpec(CardDefId id) {
+        return requireBlueprint(id).playSpec();
+    }
+
+    private CardBlueprint requireBlueprint(CardDefId id) {
         CardBlueprint blueprint = blueprintsById.get(id);
-        return blueprint == null ? CardPlaySpec.none() : blueprint.playSpec();
+        if (blueprint == null) {
+            throw new IllegalStateException("Missing CardBlueprint for card id: " + id.value());
+        }
+        return blueprint;
+    }
+
+    private void validateDefinitionBlueprintConsistency(
+            Map<CardDefId, CardDefinition> definitions,
+            Map<CardDefId, CardBlueprint> blueprints
+    ) {
+        Set<CardDefId> missingBlueprints = new HashSet<>(definitions.keySet());
+        missingBlueprints.removeAll(blueprints.keySet());
+
+        Set<CardDefId> orphanBlueprints = new HashSet<>(blueprints.keySet());
+        orphanBlueprints.removeAll(definitions.keySet());
+
+        if (!missingBlueprints.isEmpty() || !orphanBlueprints.isEmpty()) {
+            throw new IllegalStateException(
+                    "Card definition/blueprint inconsistency: missingBlueprints=" + missingBlueprints
+                            + ", orphanBlueprints=" + orphanBlueprints
+            );
+        }
     }
 }
