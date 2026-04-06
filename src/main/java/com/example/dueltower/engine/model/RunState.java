@@ -130,6 +130,7 @@ public final class RunState {
 
     private final RunConfig runConfig;
     private int floor = 1;
+    private boolean currentFloorCleared;
     private CurrentNode currentNode;
     private boolean resultPending;
     private final List<NodeChoice> availableChoices = new ArrayList<>();
@@ -145,6 +146,9 @@ public final class RunState {
     }
 
     public int floor() { return floor; }
+    public boolean currentFloorCleared() { return currentFloorCleared; }
+    public boolean currentFloorSafeZone() { return currentFloorCleared; }
+    public boolean canAdvanceToNextFloor() { return currentFloorCleared; }
 
     public CurrentNode currentNode() { return currentNode; }
 
@@ -174,6 +178,7 @@ public final class RunState {
 
     public void initialize(long seed) {
         floor = 1;
+        currentFloorCleared = false;
         currentNode = null;
         resultPending = false;
         inventory.keys(runConfig.startingKeys());
@@ -262,13 +267,22 @@ public final class RunState {
     }
 
     public void completeResultAndPrepareNext(long seed) {
-        if (resultPending && currentNode != null) {
+        if (resultPending && currentNode != null && canAdvanceToNextFloor()) {
             floor = Math.max(floor, currentNode.floor() + 1);
+            currentFloorCleared = false;
         }
         clearRecentResults();
         if (status() == LoopStatus.CHOOSE_NODE && availableChoices.isEmpty()) {
             availableChoices.addAll(generateChoices(floor, seed, inventory, runConfig.nodePool()));
         }
+    }
+
+    public boolean markCurrentFloorClearedByBoss() {
+        if (currentFloorCleared) {
+            return false;
+        }
+        currentFloorCleared = true;
+        return true;
     }
 
     public ShopOffer findShopOffer(String offerId) {

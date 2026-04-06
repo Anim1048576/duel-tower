@@ -30,6 +30,9 @@ class StateMapperRunStateTest {
 
         assertNotNull(dto.run());
         assertEquals(1, dto.run().floor());
+        assertFalse(dto.run().currentFloorCleared());
+        assertFalse(dto.run().currentFloorSafeZone());
+        assertFalse(dto.run().canAdvanceToNextFloor());
         assertEquals("CHOOSE_NODE", dto.run().status());
         assertFalse(dto.run().resultPending());
         assertNull(dto.run().currentNode());

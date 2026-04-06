@@ -71,17 +71,21 @@ public final class VictoryOps {
         RunConfig.RunNodeDefinition nodeDefinition = state.runState().currentNodeDefinition();
         boolean bossCombat = nodeDefinition != null && nodeDefinition.nodeType() == RunConfig.NodeType.BOSS;
         if (oc == Outcome.PLAYERS_WIN) {
+            boolean floorClearedByBoss = bossCombat && state.runState().markCurrentFloorClearedByBoss();
             state.runState().resolveCurrentNode(
                     "combat",
                     bossCombat ? "보스 전투 결과" : "전투 결과",
                     bossCombat ? "보스 전투 승리" : "전투 승리",
                     bossCombat
-                            ? "보스를 제압하고 300G와 상자 1개를 확보했다. 다음 층으로 진입할 수 있다."
+                            ? "보스를 제압하고 300G와 상자 1개를 확보했다. 현재 층이 안전 구획으로 전환되어 다음 층으로 진입할 수 있다."
                             : "적을 제압하고 180G와 상자 1개를 확보했다.",
                     bossCombat ? 300 : 180,
                     0,
                     1
             );
+            if (floorClearedByBoss) {
+                out.add(new GameEvent.LogAppended("보스 처치: 현재 층이 안전 구획으로 전환되었다."));
+            }
         } else {
             state.runState().resolveCurrentNode(
                     "combat",

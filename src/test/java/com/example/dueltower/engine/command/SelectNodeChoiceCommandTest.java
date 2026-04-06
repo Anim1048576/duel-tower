@@ -230,11 +230,60 @@ class SelectNodeChoiceCommandTest {
         VictoryOps.postHandleCheck(state, new EngineContext(Map.of(), Map.of()), postEvents);
 
         assertTrue(state.runState().resultPending());
+        assertTrue(state.runState().currentFloorCleared());
+        assertTrue(state.runState().canAdvanceToNextFloor());
         assertEquals("보스 전투 결과", state.runState().recentResults().get(0).title());
+        assertTrue(state.runState().recentResults().get(0).detail().contains("안전 구획"));
         assertTrue(postEvents.stream()
                 .filter(event -> event instanceof GameEvent.LogAppended)
                 .map(event -> ((GameEvent.LogAppended) event).line())
                 .anyMatch(message -> message.contains("boss combat ends")));
+        assertTrue(postEvents.stream()
+                .filter(event -> event instanceof GameEvent.LogAppended)
+                .map(event -> ((GameEvent.LogAppended) event).line())
+                .anyMatch(message -> message.contains("안전 구획")));
+
+        state.runState().completeResultAndPrepareNext(202L);
+        assertEquals(2, state.runState().floor());
+        assertFalse(state.runState().currentFloorCleared());
+        assertFalse(state.runState().canAdvanceToNextFloor());
+    }
+
+    @Test
+    void normalCombatWinDoesNotClearFloor() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 302L, nodeTypeRunConfig("전투", null, List.of()));
+
+        state.runState().beginNode(state.runState().availableChoices().get(0));
+        state.combat(new CombatState());
+        List<GameEvent> postEvents = new java.util.ArrayList<>();
+        VictoryOps.postHandleCheck(state, new EngineContext(Map.of(), Map.of()), postEvents);
+
+        assertTrue(state.runState().resultPending());
+        assertFalse(state.runState().currentFloorCleared());
+        assertFalse(state.runState().canAdvanceToNextFloor());
+        state.runState().completeResultAndPrepareNext(302L);
+        assertEquals(1, state.runState().floor());
+    }
+
+    @Test
+    void bossCombatLoseDoesNotClearFloor() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 303L, nodeTypeRunConfig("보스", null, List.of()));
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        PlayerState player = new PlayerState(playerId);
+        player.hp(0);
+        state.players().put(playerId, player);
+        state.runState().beginNode(state.runState().availableChoices().get(0));
+        state.combat(new CombatState());
+
+        List<GameEvent> postEvents = new java.util.ArrayList<>();
+        VictoryOps.postHandleCheck(state, new EngineContext(Map.of(), Map.of()), postEvents);
+
+        assertTrue(state.runState().resultPending());
+        assertEquals("보스 전투 패배", state.runState().recentResults().get(0).summary());
+        assertFalse(state.runState().currentFloorCleared());
+        assertFalse(state.runState().canAdvanceToNextFloor());
+        state.runState().completeResultAndPrepareNext(303L);
+        assertEquals(1, state.runState().floor());
     }
 
     @Test

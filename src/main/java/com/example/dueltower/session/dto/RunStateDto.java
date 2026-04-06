@@ -4,6 +4,9 @@ import java.util.List;
 
 public record RunStateDto(
         int floor,
+        boolean currentFloorCleared,
+        boolean currentFloorSafeZone,
+        boolean canAdvanceToNextFloor,
         String status,
         boolean resultPending,
         CurrentNodeDto currentNode,
