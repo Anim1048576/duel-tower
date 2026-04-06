@@ -1,6 +1,11 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.FieldCardFilter;
+import com.example.dueltower.content.card.model.playspec.FieldCardSelectionScope;
+import com.example.dueltower.content.card.model.playspec.SelectFieldCardsRequirement;
+import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.effect.EffectOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.model.CardDefinition;
@@ -11,8 +16,8 @@ import com.example.dueltower.engine.model.Target;
 import com.example.dueltower.engine.model.Zone;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
-
 import java.util.Map;
 
 @Component
@@ -37,8 +42,29 @@ public class Tig001_Card implements CardBlueprint {
     }
 
     @Override
+    public CardPlaySpec playSpec() {
+        return new CardPlaySpec(
+                TargetSpec.required(Target.ENEMY_ONE),
+                List.of(new SelectFieldCardsRequirement(
+                        0,
+                        1,
+                        FieldCardSelectionScope.ALL_PLAYER_FIELDS,
+                        FieldCardFilter.INSTALLED_ONLY,
+                        true
+                ))
+        );
+    }
+
+    @Override
     public List<String> validate(EffectContext ec) {
-        return new EffectOps(ec).validateTarget(Target.ENEMY_ONE);
+        List<String> errors = new ArrayList<>(new EffectOps(ec).validateTarget(Target.ENEMY_ONE));
+        PlayerState me = ec.state().player(ec.actor());
+        if (TigEffectSupport.isOvercome3Plus(me)) {
+            TigEffectSupport.validateInstalledCardSelection(ec, 0, 1, errors);
+        } else if (!ec.selectedIds().isEmpty()) {
+            errors.add("selectedIds not allowed when overcome is below 3");
+        }
+        return errors;
     }
 
     @Override
@@ -48,6 +74,8 @@ public class Tig001_Card implements CardBlueprint {
         int overcome = TigEffectSupport.overcome(me);
 
         ops.damageWithActorAttackPlus(overcome, Target.ENEMY_ONE);
-        if (TigEffectSupport.isOvercome3Plus(me)) TigEffectSupport.destroyInstalledCards(ec, 1);
+        if (TigEffectSupport.isOvercome3Plus(me)) {
+            TigEffectSupport.destroySelectedInstalledCards(ec);
+        }
     }
 }
