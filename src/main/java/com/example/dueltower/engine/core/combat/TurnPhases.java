@@ -55,6 +55,7 @@ public final class TurnPhases {
             ps.usedExThisTurn(false);
             ps.usedTenacityThisTurn(false);
             ps.tenacityDebtThisTurn(0);
+            ps.consumablesUsedThisTurn(0);
             for (SummonState summon : state.summons().values()) {
                 if (ps.playerId().equals(summon.owner())) {
                     summon.actionUsedThisTurn(false);

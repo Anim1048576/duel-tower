@@ -11,7 +11,9 @@ public record GameRules(
         int combatStartDrawCount,
         int turnStartBonusDrawHandThreshold,
         int turnStartDrawBelowThreshold,
-        int turnStartDrawAtOrAboveThreshold
+        int turnStartDrawAtOrAboveThreshold,
+        int maxConsumableUsesPerTurn,
+        int maxConsumableUsesPerCombat
 ) {
     public GameRules {
         requirePositive(deckSize, "deckSize");
@@ -25,10 +27,12 @@ public record GameRules(
         requireNonNegative(turnStartBonusDrawHandThreshold, "turnStartBonusDrawHandThreshold");
         requirePositive(turnStartDrawBelowThreshold, "turnStartDrawBelowThreshold");
         requirePositive(turnStartDrawAtOrAboveThreshold, "turnStartDrawAtOrAboveThreshold");
+        requirePositive(maxConsumableUsesPerTurn, "maxConsumableUsesPerTurn");
+        requirePositive(maxConsumableUsesPerCombat, "maxConsumableUsesPerCombat");
     }
 
     public static GameRules defaults() {
-        return new GameRules(12, 3, 2, 2, 20, 6, 5, 4, 4, 2, 1);
+        return new GameRules(12, 3, 2, 2, 20, 6, 5, 4, 4, 2, 1, 1, 3);
     }
 
     public int turnStartDrawCount(int handSize) {

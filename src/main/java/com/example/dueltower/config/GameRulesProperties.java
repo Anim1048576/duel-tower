@@ -53,6 +53,14 @@ public class GameRulesProperties {
     @Positive
     private Integer turnStartDrawAtOrAboveThreshold;
 
+    @NotNull
+    @Positive
+    private Integer maxConsumableUsesPerTurn;
+
+    @NotNull
+    @Positive
+    private Integer maxConsumableUsesPerCombat;
+
     public Integer getDeckSize() {
         return deckSize;
     }
@@ -139,5 +147,21 @@ public class GameRulesProperties {
 
     public void setTurnStartDrawAtOrAboveThreshold(Integer turnStartDrawAtOrAboveThreshold) {
         this.turnStartDrawAtOrAboveThreshold = turnStartDrawAtOrAboveThreshold;
+    }
+
+    public Integer getMaxConsumableUsesPerTurn() {
+        return maxConsumableUsesPerTurn;
+    }
+
+    public void setMaxConsumableUsesPerTurn(Integer maxConsumableUsesPerTurn) {
+        this.maxConsumableUsesPerTurn = maxConsumableUsesPerTurn;
+    }
+
+    public Integer getMaxConsumableUsesPerCombat() {
+        return maxConsumableUsesPerCombat;
+    }
+
+    public void setMaxConsumableUsesPerCombat(Integer maxConsumableUsesPerCombat) {
+        this.maxConsumableUsesPerCombat = maxConsumableUsesPerCombat;
     }
 }

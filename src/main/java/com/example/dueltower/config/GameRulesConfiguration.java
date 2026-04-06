@@ -21,7 +21,9 @@ public class GameRulesConfiguration {
                 requireConfigured(properties.getCombatStartDrawCount(), "duel.game.rules.combat-start-draw-count"),
                 requireConfigured(properties.getTurnStartBonusDrawHandThreshold(), "duel.game.rules.turn-start-bonus-draw-hand-threshold"),
                 requireConfigured(properties.getTurnStartDrawBelowThreshold(), "duel.game.rules.turn-start-draw-below-threshold"),
-                requireConfigured(properties.getTurnStartDrawAtOrAboveThreshold(), "duel.game.rules.turn-start-draw-at-or-above-threshold")
+                requireConfigured(properties.getTurnStartDrawAtOrAboveThreshold(), "duel.game.rules.turn-start-draw-at-or-above-threshold"),
+                requireConfigured(properties.getMaxConsumableUsesPerTurn(), "duel.game.rules.max-consumable-uses-per-turn"),
+                requireConfigured(properties.getMaxConsumableUsesPerCombat(), "duel.game.rules.max-consumable-uses-per-combat")
         );
     }
 

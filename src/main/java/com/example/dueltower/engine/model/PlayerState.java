@@ -44,6 +44,10 @@ public final class PlayerState {
     private boolean usedTenacityThisTurn;
     /** 집념으로 인해 발생한 AP 부채 (턴 종료 AP 회복에서 차감) */
     private int tenacityDebtThisTurn;
+    /** 이번 턴 소모품 사용 횟수 */
+    private int consumablesUsedThisTurn;
+    /** 이번 전투 소모품 사용 횟수 */
+    private int consumablesUsedThisCombat;
 
     private PendingDecision pendingDecision;
 
@@ -115,6 +119,14 @@ public final class PlayerState {
 
     public int tenacityDebtThisTurn() { return tenacityDebtThisTurn; }
     public void tenacityDebtThisTurn(int v) { this.tenacityDebtThisTurn = Math.max(0, v); }
+
+    public int consumablesUsedThisTurn() { return consumablesUsedThisTurn; }
+    public void consumablesUsedThisTurn(int v) { this.consumablesUsedThisTurn = Math.max(0, v); }
+    public void incConsumablesUsedThisTurn() { this.consumablesUsedThisTurn++; }
+
+    public int consumablesUsedThisCombat() { return consumablesUsedThisCombat; }
+    public void consumablesUsedThisCombat(int v) { this.consumablesUsedThisCombat = Math.max(0, v); }
+    public void incConsumablesUsedThisCombat() { this.consumablesUsedThisCombat++; }
 
     public PendingDecision pendingDecision() { return pendingDecision; }
     public void pendingDecision(PendingDecision d) { this.pendingDecision = d; }
