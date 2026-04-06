@@ -49,7 +49,14 @@ public enum SessionCommandType {
         @Override
         GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             CardInstId id = parseCardInstId(requireText(req.trimmedCardId(), "cardId"), "cardId");
-            return new PlayCardCommand(commandId, expectedVersion, commandPlayerId(req), id, parseTargetSelection(req));
+            return new PlayCardCommand(
+                    commandId,
+                    expectedVersion,
+                    commandPlayerId(req),
+                    id,
+                    parseTargetSelection(req),
+                    parseCardInstIds(req.discardIds(), "discardIds")
+            );
         }
     },
     USE_EX("USE_EX", SessionCommandAuth.PLAYER, false) {

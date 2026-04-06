@@ -29,15 +29,60 @@ final class TigEffectSupport {
         return isOvercomeAtLeast(me, 3);
     }
 
-    static boolean discardOneFromHandExcludingSource(EffectContext ec, PlayerState me) {
+    static List<Ids.CardInstId> discardCandidatesExcludingSource(EffectContext ec, PlayerState me) {
         List<Ids.CardInstId> hand = new ArrayList<>(me.hand());
+        List<Ids.CardInstId> candidates = new ArrayList<>();
         for (Ids.CardInstId id : hand) {
             if (id.equals(ec.cardId())) continue;
             if (!KeywordOps.validateDiscard(ec.state(), ec.ctx(), me, id, DiscardReason.EFFECT).isEmpty()) continue;
-            ZoneOps.moveToZoneOrVanishIfToken(ec.state(), ec.ctx(), me, id, Zone.GRAVE, ec.out());
-            return true;
+            candidates.add(id);
         }
-        return false;
+        return candidates;
+    }
+
+    static boolean validateSingleDiscardSelection(EffectContext ec, PlayerState me, List<String> errors) {
+        List<Ids.CardInstId> selected = ec.discardIds();
+        if (selected.size() != 1) {
+            errors.add("discardIds must contain exactly 1 card");
+            return false;
+        }
+
+        Ids.CardInstId selectedId = selected.get(0);
+        if (!me.hand().contains(selectedId)) {
+            errors.add("discard card not in hand: " + selectedId.value());
+            return false;
+        }
+        if (selectedId.equals(ec.cardId())) {
+            errors.add("source card cannot be selected for discard: " + selectedId.value());
+            return false;
+        }
+
+        KeywordOps.validateDiscard(ec.state(), ec.ctx(), me, selectedId, DiscardReason.EFFECT, errors);
+        if (!errors.isEmpty()) {
+            return false;
+        }
+
+        List<Ids.CardInstId> candidates = discardCandidatesExcludingSource(ec, me);
+        if (candidates.isEmpty()) {
+            errors.add("no effect-discardable cards in hand");
+            return false;
+        }
+        return true;
+    }
+
+    static boolean discardSelectedOrAbort(EffectContext ec, PlayerState me) {
+        List<String> errors = new ArrayList<>();
+        if (!validateSingleDiscardSelection(ec, me, errors)) return false;
+        Ids.CardInstId selectedId = ec.discardIds().get(0);
+        ZoneOps.moveToZoneOrVanishIfToken(ec.state(), ec.ctx(), me, selectedId, Zone.GRAVE, ec.out());
+        return true;
+    }
+
+    static boolean discardOneFromHandExcludingSource(EffectContext ec, PlayerState me) {
+        List<Ids.CardInstId> candidates = discardCandidatesExcludingSource(ec, me);
+        if (candidates.isEmpty()) return false;
+        ZoneOps.moveToZoneOrVanishIfToken(ec.state(), ec.ctx(), me, candidates.get(0), Zone.GRAVE, ec.out());
+        return true;
     }
 
     static boolean requireDiscardOrAbort(EffectContext ec, PlayerState me, String cardId) {
