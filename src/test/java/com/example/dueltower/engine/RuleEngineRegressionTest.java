@@ -801,6 +801,79 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    void summonIncomingDamageStatusHooksApplyToSummonTarget() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        SummonInstId summonId = fx.addSummon(fx.playerId, 12, 20);
+        SummonState summon = fx.state.summons().get(summonId);
+        assertNotNull(summon);
+
+        summon.statusSet(S106_Vulnerable.ID, 2);
+        summon.statusSet(S001_Shield.ID, 3);
+        int hpBefore = summon.hp();
+
+        DamageOps.apply(
+                fx.state,
+                fx.ctx,
+                new ArrayList<>(),
+                TargetRef.ofEnemy(fx.enemyId),
+                "TEST_SUMMON_INCOMING",
+                TargetRef.ofSummon(fx.playerId, summonId),
+                5
+        );
+
+        assertEquals(hpBefore - 4, summon.hp(), "vulnerable(+2) and shield(3) should be applied on summon incoming damage");
+        assertEquals(0, summon.statusValues().getOrDefault(S001_Shield.ID, 0), "shield should be consumed on summon first");
+    }
+
+    @Test
+    void playerTurnEndProcessesSummonTurnStatuses() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        SummonInstId summonId = fx.addSummon(fx.playerId, 10, 20);
+        SummonState summon = fx.state.summons().get(summonId);
+        assertNotNull(summon);
+
+        summon.statusSet(S002_Regeneration.ID, 6);
+        summon.statusSet(S101_Pain.ID, 4);
+        int hpBefore = summon.hp();
+
+        EngineResult end = fx.process(new EndTurnCommand(UUID.randomUUID(), fx.state.version(), fx.playerId));
+
+        assertTrue(end.accepted());
+        assertEquals(hpBefore + 2, summon.hp(), "summon regen/pain turn-end hooks should run on owner turn end");
+        assertEquals(3, summon.statusValues().getOrDefault(S002_Regeneration.ID, 0));
+        assertEquals(2, summon.statusValues().getOrDefault(S101_Pain.ID, 0));
+    }
+
+    @Test
+    void playerIncomingDamageStatusHookRegressionStillWorks() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        fx.player.statusSet(S001_Shield.ID, 3);
+        int hpBefore = fx.player.hp();
+
+        DamageOps.apply(
+                fx.state,
+                fx.ctx,
+                new ArrayList<>(),
+                TargetRef.ofEnemy(fx.enemyId),
+                "TEST_PLAYER_INCOMING_REGRESSION",
+                TargetRef.ofPlayer(fx.playerId),
+                5
+        );
+
+        assertEquals(hpBefore - 2, fx.player.hp(), "player shield should still absorb incoming damage");
+        assertEquals(0, fx.player.status(S001_Shield.ID));
+    }
+
+    @Test
     void playCardSelfHealStillTargetsPlayer() {
         TestFixture fx = TestFixture.basic();
         CardInstId cardId = fx.addHandCard(fx.player, "SUMMON_SELF_HEAL_FIXED");

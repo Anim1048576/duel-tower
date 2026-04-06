@@ -37,6 +37,10 @@ public class S002_Regeneration implements StatusBlueprint {
             EnemyState es = rt.state().enemy(e.id());
             if (es == null) throw new IllegalStateException("missing enemy: " + e.id().value());
             es.hp(es.hp() + stacks);
+        } else if (owner instanceof TargetRef.Summon s) {
+            SummonState ss = rt.state().summon(s.summonId());
+            if (ss == null) throw new IllegalStateException("missing summon: " + s.summonId().value());
+            ss.hp(ss.hp() + stacks);
         }
 
         rt.stacksSet(owner, id(), stacks / 2);
