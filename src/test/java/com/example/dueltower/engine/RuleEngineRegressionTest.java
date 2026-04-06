@@ -1,6 +1,7 @@
 package com.example.dueltower.engine;
 
 import com.example.dueltower.common.util.Rational;
+import com.example.dueltower.content.keyword.kdb.K007_ClearMind;
 import com.example.dueltower.content.keyword.kdb.K008_Accurate;
 import com.example.dueltower.content.keyword.kdb.K009_Penetration;
 import com.example.dueltower.content.keyword.kdb.K010_Tenacity;
@@ -980,6 +981,183 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    void enemyOneTauntOnEnemySummonForcesSummonAsFinalTarget() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.ap(10);
+
+        PlayerId enemyOwner = new PlayerId(fx.enemyId.value());
+        SummonInstId enemySummonId = fx.addSummon(enemyOwner, 6, 6);
+        SummonState enemySummon = fx.state.summons().get(enemySummonId);
+        enemySummon.statusSet(S005_Taunt.ID, 1);
+
+        int enemyHpBefore = fx.enemy.hp();
+        int summonHpBefore = enemySummon.hp();
+        CardInstId hit = fx.addHandCard(fx.player, "ENEMY_ONE_HIT_FIXED");
+
+        EngineResult blocked = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, hit,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+
+        assertFalse(blocked.accepted(), "validate should reject enemy-body choice when summon taunt exists");
+        assertTrue(blocked.errors().stream().anyMatch(e -> e.contains("taunt: must target one of")));
+        assertEquals(enemyHpBefore, fx.enemy.hp());
+        assertEquals(summonHpBefore, enemySummon.hp());
+
+        CardInstId forcedHit = fx.addHandCard(fx.player, "ENEMY_ONE_HIT_FIXED");
+        EngineResult forced = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, forcedHit,
+                new TargetSelection(List.of(TargetRef.ofSummon(enemyOwner, enemySummonId)))
+        ));
+        assertTrue(forced.accepted(), "selecting taunt summon should pass and hit summon");
+        assertEquals(enemyHpBefore, fx.enemy.hp(), "enemy body should not be hit when summon has taunt");
+        assertEquals(summonHpBefore - 2, enemySummon.hp(), "taunt summon should be final target");
+    }
+
+    @Test
+    void enemyOneTauntOnEnemyBodyStillForcesEnemyBody() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.ap(10);
+
+        fx.enemy.statusSet(S005_Taunt.ID, 1);
+        PlayerId enemyOwner = new PlayerId(fx.enemyId.value());
+        SummonInstId enemySummonId = fx.addSummon(enemyOwner, 6, 6);
+        SummonState enemySummon = fx.state.summons().get(enemySummonId);
+
+        int enemyHpBefore = fx.enemy.hp();
+        int summonHpBefore = enemySummon.hp();
+        CardInstId hit = fx.addHandCard(fx.player, "ENEMY_ONE_HIT_FIXED");
+
+        EngineResult play = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, hit,
+                new TargetSelection(List.of(TargetRef.ofSummon(enemyOwner, enemySummonId)))
+        ));
+
+        assertFalse(play.accepted(), "validate should reject non-taunt target");
+        assertTrue(play.errors().stream().anyMatch(e -> e.contains("taunt: must target one of")));
+        assertEquals(enemyHpBefore, fx.enemy.hp());
+        assertEquals(summonHpBefore, enemySummon.hp());
+    }
+
+    @Test
+    void enemyOneConfusionIgnoresTauntAndCanRedirectToFullCandidateSet() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.ap(10);
+
+        PlayerId enemyOwner = new PlayerId(fx.enemyId.value());
+        SummonInstId allySummonId = fx.addSummon(fx.playerId, 6, 6);
+        SummonInstId enemySummonId = fx.addSummon(enemyOwner, 6, 6);
+        SummonState allySummon = fx.state.summons().get(allySummonId);
+        SummonState enemySummon = fx.state.summons().get(enemySummonId);
+
+        fx.enemy.statusSet(S005_Taunt.ID, 2);
+        fx.player.statusSet(S107_Confusion.ID, 1);
+
+        int playerHpBefore = fx.player.hp();
+        int enemyHpBefore = fx.enemy.hp();
+        int allySummonHpBefore = allySummon.hp();
+        int enemySummonHpBefore = enemySummon.hp();
+        CardInstId hit = fx.addHandCard(fx.player, "ENEMY_ONE_HIT_FIXED");
+
+        EngineResult play = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, hit,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+
+        assertTrue(play.accepted(), "confusion should bypass taunt validation");
+        int changed = 0;
+        if (fx.player.hp() != playerHpBefore) changed++;
+        if (fx.enemy.hp() != enemyHpBefore) changed++;
+        if (allySummon.hp() != allySummonHpBefore) changed++;
+        if (enemySummon.hp() != enemySummonHpBefore) changed++;
+        assertEquals(1, changed, "confusion redirect should apply to exactly one full-candidate target");
+    }
+
+    @Test
+    void anyOneEnemyOrSummonUsesEnemyOneSpecialRulesButPlayerSelectionDoesNot() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.ap(10);
+
+        PlayerId enemyOwner = new PlayerId(fx.enemyId.value());
+        SummonInstId enemySummonId = fx.addSummon(enemyOwner, 6, 6);
+        SummonState enemySummon = fx.state.summons().get(enemySummonId);
+        enemySummon.statusSet(S005_Taunt.ID, 1);
+
+        int enemyHpBefore = fx.enemy.hp();
+        int summonHpBefore = enemySummon.hp();
+        CardInstId anyHit = fx.addHandCard(fx.player, "ANY_ONE_HIT_FIXED");
+
+        EngineResult toEnemy = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, anyHit,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+        assertFalse(toEnemy.accepted(), "ANY_ONE enemy selection should still run taunt validation");
+        assertTrue(toEnemy.errors().stream().anyMatch(e -> e.contains("taunt: must target one of")));
+        assertEquals(enemyHpBefore, fx.enemy.hp(), "blocked validation should keep hp");
+        assertEquals(summonHpBefore, enemySummon.hp());
+
+        CardInstId anyHitSummon = fx.addHandCard(fx.player, "ANY_ONE_HIT_FIXED");
+        EngineResult toSummon = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, anyHitSummon,
+                new TargetSelection(List.of(TargetRef.ofSummon(enemyOwner, enemySummonId)))
+        ));
+        assertTrue(toSummon.accepted());
+        assertEquals(enemyHpBefore, fx.enemy.hp(), "ANY_ONE summon selection should stay on summon");
+        assertEquals(summonHpBefore - 2, enemySummon.hp());
+
+        CardInstId anyHitPlayer = fx.addHandCard(fx.player, "ANY_ONE_HIT_FIXED");
+        int playerHpBefore = fx.player.hp();
+        EngineResult toPlayer = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, anyHitPlayer,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))
+        ));
+        assertTrue(toPlayer.accepted(), "ANY_ONE player selection should bypass enemy-only special rules");
+        assertEquals(playerHpBefore - 2, fx.player.hp());
+    }
+
+    @Test
+    void clearMindStillIgnoresTauntForEnemyOneAndAnyOneEnemySelection() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+        fx.player.ap(10);
+
+        PlayerId enemyOwner = new PlayerId(fx.enemyId.value());
+        SummonInstId enemySummonId = fx.addSummon(enemyOwner, 6, 6);
+        SummonState enemySummon = fx.state.summons().get(enemySummonId);
+        enemySummon.statusSet(S005_Taunt.ID, 2);
+
+        int enemyHpBefore = fx.enemy.hp();
+        int summonHpBefore = enemySummon.hp();
+
+        CardInstId enemyOneClearMind = fx.addHandCard(fx.player, "ENEMY_ONE_CLEAR_MIND_HIT");
+        EngineResult enemyOnePlay = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, enemyOneClearMind,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+        assertTrue(enemyOnePlay.accepted());
+        assertEquals(enemyHpBefore - 2, fx.enemy.hp());
+        assertEquals(summonHpBefore, enemySummon.hp(), "clear mind should ignore taunt on enemy summon");
+
+        CardInstId anyOneClearMind = fx.addHandCard(fx.player, "ANY_ONE_CLEAR_MIND_HIT");
+        EngineResult anyOnePlay = fx.process(new PlayCardCommand(
+                UUID.randomUUID(), fx.state.version(), fx.playerId, anyOneClearMind,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+        assertTrue(anyOnePlay.accepted());
+        assertEquals(enemyHpBefore - 4, fx.enemy.hp());
+        assertEquals(summonHpBefore, enemySummon.hp());
+    }
+
+    @Test
     void enemyAllAndSideIncludeEnemyBodyAndAllEnemySummonsWithoutDuplicates() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -1193,6 +1371,9 @@ class RuleEngineRegressionTest {
             registerCard(defs, effects, new SelfStatusCardEffect("SUMMON_SELF_WEAK"));
             registerCard(defs, effects, new SelfFixedHealCardEffect("SUMMON_SELF_HEAL_FIXED"));
             registerCard(defs, effects, new TargetFixedValueCardEffect("ENEMY_ONE_HIT_FIXED", Target.ENEMY_ONE, true, 2));
+            registerCard(defs, effects, new TargetFixedValueCardEffect("ANY_ONE_HIT_FIXED", Target.ANY_ONE, true, 2));
+            registerCard(defs, effects, new TargetFixedValueCardEffect("ENEMY_ONE_CLEAR_MIND_HIT", Target.ENEMY_ONE, true, 2, Map.of(K007_ClearMind.ID, 1)));
+            registerCard(defs, effects, new TargetFixedValueCardEffect("ANY_ONE_CLEAR_MIND_HIT", Target.ANY_ONE, true, 2, Map.of(K007_ClearMind.ID, 1)));
             registerCard(defs, effects, new TargetFixedValueCardEffect("ENEMY_ALL_HIT", Target.ENEMY_ALL, true, 2));
             registerCard(defs, effects, new TargetFixedValueCardEffect("ENEMY_SIDE_HIT", Target.ENEMY_SIDE, true, 3));
             registerCard(defs, effects, new TargetFixedValueCardEffect("ALLY_ONE_HEAL_FIXED", Target.ALLY_ONE, false, 2));
@@ -1202,9 +1383,9 @@ class RuleEngineRegressionTest {
             Map<String, StatusDefinition> statusDefs = new HashMap<>();
             Map<String, com.example.dueltower.engine.core.effect.status.StatusEffect> statusEffects = new HashMap<>();
             for (StatusBlueprint bp : List.of(
-                    new S001_Shield(), new S002_Regeneration(), new S004_Evasion(),
+                    new S001_Shield(), new S002_Regeneration(), new S004_Evasion(), new S005_Taunt(),
                     new S101_Pain(), new S102_Stun(), new S103_Pressure(), new S104_Destruction(),
-                    new S105_Weak(), new S106_Vulnerable(), new S108_Seal(), new S301_Barrier(),
+                    new S105_Weak(), new S106_Vulnerable(), new S107_Confusion(), new S108_Seal(), new S301_Barrier(),
                     new TestCriticalStatus(), new TestIncomingCriticalStatus(), new TestCriticalChanceOnlyStatus()
             )) {
                 statusDefs.put(bp.id(), bp.definition());
@@ -1213,7 +1394,7 @@ class RuleEngineRegressionTest {
 
             Map<String, KeywordDefinition> keywordDefs = new HashMap<>();
             Map<String, com.example.dueltower.engine.core.effect.keyword.KeywordEffect> keywordEffects = new HashMap<>();
-            for (var bp : List.of(new K008_Accurate(), new K009_Penetration(), new K010_Tenacity(), new K011_Critical(), new FakeCriticalHalfKeyword())) {
+            for (var bp : List.of(new K007_ClearMind(), new K008_Accurate(), new K009_Penetration(), new K010_Tenacity(), new K011_Critical(), new FakeCriticalHalfKeyword())) {
                 keywordDefs.put(bp.id(), bp.definition());
                 keywordEffects.put(bp.id(), bp);
             }
@@ -1805,12 +1986,18 @@ class RuleEngineRegressionTest {
         private final Target target;
         private final boolean damage;
         private final int value;
+        private final Map<String, Integer> keywords;
 
         private TargetFixedValueCardEffect(String id, Target target, boolean damage, int value) {
+            this(id, target, damage, value, Map.of());
+        }
+
+        private TargetFixedValueCardEffect(String id, Target target, boolean damage, int value, Map<String, Integer> keywords) {
             this.id = id;
             this.target = target;
             this.damage = damage;
             this.value = value;
+            this.keywords = keywords;
         }
 
         @Override
@@ -1819,7 +2006,7 @@ class RuleEngineRegressionTest {
         }
 
         CardDefinition definition() {
-            return new CardDefinition(new CardDefId(id), id, CardType.SKILL, 1, Map.of(), Zone.GRAVE, false, id);
+            return new CardDefinition(new CardDefId(id), id, CardType.SKILL, 1, keywords, Zone.GRAVE, false, id);
         }
 
         @Override
