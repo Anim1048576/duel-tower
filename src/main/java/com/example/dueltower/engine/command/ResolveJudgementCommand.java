@@ -6,6 +6,7 @@ import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.NodeState;
 import com.example.dueltower.engine.model.PendingDecision;
+import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.RunState;
 
 import java.util.ArrayList;
@@ -49,6 +50,18 @@ public record ResolveJudgementCommand(
         }
         if (!decision.choiceIds().contains(choiceId.trim())) {
             errors.add("invalid judgement choice");
+            return errors;
+        }
+        PlayerState player = state.player(playerId);
+        String normalizedChoice = choiceId.trim().toUpperCase();
+        if ("BODY".equals(normalizedChoice) && player.body() >= JudgementEngine.MAX_ABILITY) {
+            errors.add("judgement blocked: ability BODY already maxed");
+        } else if ("SKILL".equals(normalizedChoice) && player.skill() >= JudgementEngine.MAX_ABILITY) {
+            errors.add("judgement blocked: ability SKILL already maxed");
+        } else if ("SENSE".equals(normalizedChoice) && player.sense() >= JudgementEngine.MAX_ABILITY) {
+            errors.add("judgement blocked: ability SENSE already maxed");
+        } else if ("WILL".equals(normalizedChoice) && player.will() >= JudgementEngine.MAX_ABILITY) {
+            errors.add("judgement blocked: ability WILL already maxed");
         }
         return errors;
     }
@@ -60,14 +73,21 @@ public record ResolveJudgementCommand(
         int successGold = ctx.rewardTable().judgement().successGold();
         int successKeys = ctx.rewardTable().judgement().successKeys();
         int failureGold = ctx.rewardTable().judgement().failureGold();
+        JudgementEngine.Result result = new JudgementEngine().resolve(
+                state.player(playerId),
+                playerId,
+                normalizedChoice,
+                state.seed(),
+                state.version()
+        );
 
-        boolean success = "SUCCESS".equalsIgnoreCase(normalizedChoice);
-        if (success) {
+        if (result.success()) {
             state.runState().resolveCurrentNode(
                     "reward",
                     "판정 성공",
                     "위험 구역 돌파 성공",
-                    "판정을 통과해 " + successGold + "G와 열쇠 " + successKeys + "개를 확보했다.",
+                    result.usedAbilityLabel() + " 판정(" + result.usedAbility() + ") D20=" + result.roll() + ", 능력치=" + result.abilityBefore()
+                            + "로 성공. 보상: " + successGold + "G, 열쇠 " + successKeys + "개.",
                     successGold,
                     successKeys,
                     0
@@ -77,13 +97,22 @@ public record ResolveJudgementCommand(
                     "reward",
                     "판정 실패",
                     "위험 구역 돌파 실패",
-                    "시간을 소모했지만 " + failureGold + "G를 건졌다.",
+                    result.usedAbilityLabel() + " 판정(" + result.usedAbility() + ") D20=" + result.roll() + ", 능력치=" + result.abilityBefore()
+                            + "로 실패. [기억 받아들이기] 발동: 약화 " + result.grantedWeakness()
+                            + " 부여, " + result.increasedAbility() + " 능력치 " + result.increasedAbilityValue() + "로 상승. 보상: " + failureGold + "G.",
                     failureGold,
                     0,
                     0
             );
         }
 
-        return List.of(new GameEvent.LogAppended(playerId.value() + " 판정 처리: " + normalizedChoice));
+        return List.of(new GameEvent.LogAppended(playerId.value()
+                + " 판정 처리: ability=" + result.usedAbility()
+                + ", d20=" + result.roll()
+                + ", success=" + result.success()
+                + ", memoryAccepted=" + result.memoryAccepted()
+                + ", weakness=" + result.grantedWeakness()
+                + ", increasedAbility=" + result.increasedAbility()
+                + ", increasedValue=" + result.increasedAbilityValue()));
     }
 }

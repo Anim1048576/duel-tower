@@ -60,8 +60,8 @@ public record SelectNodeChoiceCommand(
         } else if (choice.phase() == RunState.NodePhase.JUDGEMENT) {
             state.nodeState(NodeState.NON_COMBAT);
             state.player(playerId).pendingDecision(new PendingDecision.JudgementChoice(
-                    "판정 결과를 선택하세요",
-                    List.of("SUCCESS", "FAIL")
+                    "판정에 사용할 능력치를 선택하세요",
+                    JudgementEngine.judgementAbilityChoices()
             ));
             events.add(new GameEvent.LogAppended("판정 노드 진입: RESOLVE_JUDGEMENT 명령 대기 중."));
         } else {
