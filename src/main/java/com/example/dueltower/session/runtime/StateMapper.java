@@ -233,6 +233,9 @@ public final class StateMapper {
 
         return new RunStateDto(
                 run.floor(),
+                run.currentFloorCleared(),
+                run.currentFloorSafeZone(),
+                run.canAdvanceToNextFloor(),
                 run.status().name(),
                 run.resultPending(),
                 currentNode,

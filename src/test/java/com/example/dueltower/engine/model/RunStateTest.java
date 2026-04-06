@@ -41,7 +41,7 @@ class RunStateTest {
     }
 
     @Test
-    void selectNonCombatNodeAddsRecentResultAndAdvancesFloor() {
+    void selectNonCombatNodeAddsRecentResultButDoesNotAdvanceFloorWithoutBossClear() {
         RunState run = new RunState();
         run.initialize(42L);
 
@@ -64,7 +64,7 @@ class RunStateTest {
 
         run.completeResultAndPrepareNext(42L);
 
-        assertEquals(2, run.floor());
+        assertEquals(1, run.floor());
         assertFalse(run.resultPending());
         assertNull(run.currentNode());
     }
@@ -85,7 +85,30 @@ class RunStateTest {
         run.completeResultAndPrepareNext(99L);
 
         assertTrue(run.recentResults().isEmpty());
+        assertEquals(1, run.floor());
+    }
+
+    @Test
+    void bossClearAllowsFloorAdvanceAndResetsClearStateOnNextFloor() {
+        RunState run = new RunState();
+        run.initialize(100L);
+        RunState.NodeChoice choice = run.availableChoices().get(0);
+        run.beginNode(choice);
+        run.resolveCurrentNode("combat", "보스 전투 결과", "보스 전투 승리", "테스트", 0, 0, 0);
+
+        assertFalse(run.currentFloorCleared());
+        assertFalse(run.canAdvanceToNextFloor());
+
+        assertTrue(run.markCurrentFloorClearedByBoss());
+        assertTrue(run.currentFloorCleared());
+        assertTrue(run.currentFloorSafeZone());
+        assertTrue(run.canAdvanceToNextFloor());
+
+        run.completeResultAndPrepareNext(100L);
+
         assertEquals(2, run.floor());
+        assertFalse(run.currentFloorCleared());
+        assertFalse(run.canAdvanceToNextFloor());
     }
 
     @Test

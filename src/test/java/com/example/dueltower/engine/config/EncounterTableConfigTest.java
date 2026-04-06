@@ -29,6 +29,7 @@ class EncounterTableConfigTest {
         RunState.NodeChoice choice = runState.availableChoices().stream().findFirst().orElseThrow();
         runState.beginNode(choice);
         runState.resolveCurrentNode("전투", "테스트", "요약", "상세", 0, 0, 0);
+        runState.markCurrentFloorClearedByBoss();
         runState.completeResultAndPrepareNext(456L);
 
         List<EnemyState> floorTwoEnemies = EncounterTableConfig.defaults().instantiateEncounterEnemies(runState);

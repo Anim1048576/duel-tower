@@ -38,7 +38,7 @@ class ClearRecentResultsCommandTest {
 
         assertTrue(result.accepted());
         assertTrue(state.runState().recentResults().isEmpty());
-        assertEquals(2, state.runState().floor());
+        assertEquals(1, state.runState().floor());
         assertNull(state.runState().currentNode());
     }
 
