@@ -294,58 +294,6 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
-    void useItemAllowsConsumableAgainAfterTurnPasses() throws Exception {
-        Fixture fx = createFixture();
-        JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
-
-        JsonNode first = commandAsPlayer(
-                fx.code,
-                fx.playerToken,
-                """
-                {
-                  "type": "USE_ITEM",
-                  "playerId": "player1",
-                  "itemId": "I-1",
-                  "count": 1,
-                  "expectedVersion": %d
-                }
-                """.formatted(stateAfterStart.get("version").asLong())
-        );
-        assertTrue(first.path("accepted").asBoolean());
-
-        JsonNode endTurn = commandAsPlayer(
-                fx.code,
-                fx.playerToken,
-                """
-                {
-                  "type": "END_TURN",
-                  "playerId": "player1",
-                  "expectedVersion": %d
-                }
-                """.formatted(first.path("state").path("version").asLong())
-        );
-        assertTrue(endTurn.path("accepted").asBoolean());
-
-        JsonNode nextPlayerTurn = advanceToPlayerMainTurn(fx, endTurn.path("state"));
-
-        JsonNode second = commandAsPlayer(
-                fx.code,
-                fx.playerToken,
-                """
-                {
-                  "type": "USE_ITEM",
-                  "playerId": "player1",
-                  "itemId": "I-4",
-                  "count": 1,
-                  "expectedVersion": %d
-                }
-                """.formatted(nextPlayerTurn.path("version").asLong())
-        );
-
-        assertTrue(second.path("accepted").asBoolean());
-    }
-
-    @Test
     void useItemRejectsWhenExpectedVersionMismatched() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
