@@ -11,14 +11,23 @@ import com.example.dueltower.engine.model.RunState;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public record ResolveJudgementCommand(
         UUID commandId,
         long expectedVersion,
         PlayerId playerId,
-        String choiceId
+        String choiceId,
+        JudgementEngine judgementEngine
 ) implements GameCommand {
+    public ResolveJudgementCommand {
+        judgementEngine = Objects.requireNonNull(judgementEngine, "judgementEngine");
+    }
+
+    public ResolveJudgementCommand(UUID commandId, long expectedVersion, PlayerId playerId, String choiceId) {
+        this(commandId, expectedVersion, playerId, choiceId, new JudgementEngine());
+    }
 
     @Override
     public List<String> validate(GameState state, EngineContext ctx) {
@@ -69,7 +78,6 @@ public record ResolveJudgementCommand(
     @Override
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
         String normalizedChoice = choiceId.trim();
-        state.player(playerId).pendingDecision(null);
         int successGold = ctx.rewardTable().judgement().successGold();
         int successKeys = ctx.rewardTable().judgement().successKeys();
         int failureGold = ctx.rewardTable().judgement().failureGold();
