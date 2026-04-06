@@ -46,6 +46,7 @@ public final class StartCombatCommand implements GameCommand {
         resetBeforeCombatStart(state, ctx, events);
         ensureRunEncounterExists(state, ctx, events);
         clearTransientBattleIncapacitation(state);
+        resetConsumableUsageCounters(state);
 
         // 1) 참가자 목록(플레이어 + 적)
         List<TargetRef> order = new ArrayList<>();
@@ -226,6 +227,14 @@ public final class StartCombatCommand implements GameCommand {
                 ));
                 events.add(new GameEvent.PendingDecisionSet(pid.value(), "INITIATIVE_TIE_ORDER", "resolve initiative tie order"));
             }
+        }
+    }
+
+    private static void resetConsumableUsageCounters(GameState state) {
+        for (PlayerState ps : state.players().values()) {
+            if (ps == null) continue;
+            ps.consumablesUsedThisTurn(0);
+            ps.consumablesUsedThisCombat(0);
         }
     }
 

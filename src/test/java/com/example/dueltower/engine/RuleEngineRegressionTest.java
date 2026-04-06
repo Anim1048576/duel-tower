@@ -12,6 +12,7 @@ import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
 import com.example.dueltower.engine.core.combat.CombatStatuses;
+import com.example.dueltower.engine.core.combat.CombatCleanupOps;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.combat.TurnPhases;
 import com.example.dueltower.engine.core.effect.EffectContext;
@@ -77,6 +78,32 @@ class RuleEngineRegressionTest {
         assertInstanceOf(PendingDecision.DiscardToHandLimit.class, fx.player.pendingDecision());
         PendingDecision.DiscardToHandLimit pd = (PendingDecision.DiscardToHandLimit) fx.player.pendingDecision();
         assertEquals(6, pd.limit());
+    }
+
+    @Test
+    void turnStartResetsOnlyConsumablesUsedThisTurn() {
+        TestFixture fx = TestFixture.basic();
+        fx.state.combat(new CombatState());
+        fx.player.consumablesUsedThisTurn(1);
+        fx.player.consumablesUsedThisCombat(2);
+        fx.addDeckCards(fx.player, "FILLER", 2);
+
+        TurnPhases.turnStart(fx.state, fx.ctx, TargetRef.ofPlayer(fx.playerId), new ArrayList<>(), "TEST");
+
+        assertEquals(0, fx.player.consumablesUsedThisTurn());
+        assertEquals(2, fx.player.consumablesUsedThisCombat());
+    }
+
+    @Test
+    void combatCleanupResetsConsumableCounters() {
+        TestFixture fx = TestFixture.basic();
+        fx.player.consumablesUsedThisTurn(1);
+        fx.player.consumablesUsedThisCombat(3);
+
+        CombatCleanupOps.cleanupAfterCombatEnd(fx.state, fx.ctx);
+
+        assertEquals(0, fx.player.consumablesUsedThisTurn());
+        assertEquals(0, fx.player.consumablesUsedThisCombat());
     }
 
     @Test

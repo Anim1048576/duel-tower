@@ -18,6 +18,8 @@ class GameRulesTest {
         assertEquals(6, rules.handLimit());
         assertEquals(5, rules.fieldLimit());
         assertEquals(4, rules.combatStartDrawCount());
+        assertEquals(1, rules.maxConsumableUsesPerTurn());
+        assertEquals(3, rules.maxConsumableUsesPerCombat());
     }
 
     @Test

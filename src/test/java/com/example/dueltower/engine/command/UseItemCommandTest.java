@@ -42,15 +42,118 @@ class UseItemCommandTest {
                 state.version(),
                 playerId,
                 "I-1",
-                2,
+                1,
                 TargetSelection.empty()
         );
 
         EngineResult result = new GameEngine().process(state, defaultItemCtx(), command);
 
         assertTrue(result.accepted());
-        assertEquals(beforeCount - 2, findItem(state, "I-1").count());
+        assertEquals(beforeCount - 1, findItem(state, "I-1").count());
         assertTrue(player.hp() > 5);
+        assertEquals(1, player.consumablesUsedThisTurn());
+        assertEquals(1, player.consumablesUsedThisCombat());
+    }
+
+    @Test
+    void useItemRejectsSecondConsumableInSameTurn() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1231L);
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        PlayerState player = new PlayerState(playerId);
+        state.players().put(playerId, player);
+        seedCombatMainTurn(state, playerId);
+
+        EngineContext ctx = defaultItemCtx();
+
+        EngineResult first = new GameEngine().process(
+                state,
+                ctx,
+                new UseItemCommand(UUID.randomUUID(), state.version(), playerId, "I-1", 1, TargetSelection.empty())
+        );
+
+        assertTrue(first.accepted());
+        assertEquals(1, player.consumablesUsedThisTurn());
+
+        EngineResult second = new GameEngine().process(
+                state,
+                ctx,
+                new UseItemCommand(UUID.randomUUID(), state.version(), playerId, "I-4", 1, TargetSelection.empty())
+        );
+
+        assertFalse(second.accepted());
+        assertTrue(second.errors().contains("consumable use limit reached this turn"));
+        assertEquals(1, player.consumablesUsedThisTurn());
+    }
+
+    @Test
+    void useItemAllowsThreeConsumablesPerCombatAndRejectsFourth() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1232L);
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        PlayerState player = new PlayerState(playerId);
+        state.players().put(playerId, player);
+        seedCombatMainTurn(state, playerId);
+        addInventoryItem(state, "I-3", 1);
+        addInventoryItem(state, "I-5", 1);
+        addInventoryItem(state, "I-7", 1);
+
+        EngineContext ctx = defaultItemCtx();
+
+        EngineResult first = new GameEngine().process(
+                state,
+                ctx,
+                new UseItemCommand(UUID.randomUUID(), state.version(), playerId, "I-1", 1, TargetSelection.empty())
+        );
+        assertTrue(first.accepted());
+
+        player.consumablesUsedThisTurn(0);
+        EngineResult second = new GameEngine().process(
+                state,
+                ctx,
+                new UseItemCommand(UUID.randomUUID(), state.version(), playerId, "I-3", 1, TargetSelection.empty())
+        );
+        assertTrue(second.accepted());
+
+        player.consumablesUsedThisTurn(0);
+        EngineResult third = new GameEngine().process(
+                state,
+                ctx,
+                new UseItemCommand(UUID.randomUUID(), state.version(), playerId, "I-5", 1, TargetSelection.empty())
+        );
+        assertTrue(third.accepted());
+        assertEquals(3, player.consumablesUsedThisCombat());
+
+        player.consumablesUsedThisTurn(0);
+        EngineResult fourth = new GameEngine().process(
+                state,
+                ctx,
+                new UseItemCommand(UUID.randomUUID(), state.version(), playerId, "I-7", 1, TargetSelection.empty())
+        );
+
+        assertFalse(fourth.accepted());
+        assertTrue(fourth.errors().contains("consumable use limit reached this combat"));
+        assertEquals(3, player.consumablesUsedThisCombat());
+    }
+
+    @Test
+    void useItemRejectsConsumableWhenCountIsTwo() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1233L);
+        Ids.PlayerId playerId = new Ids.PlayerId("p1");
+        state.players().put(playerId, new PlayerState(playerId));
+        seedCombatMainTurn(state, playerId);
+
+        UseItemCommand command = new UseItemCommand(
+                UUID.randomUUID(),
+                state.version(),
+                playerId,
+                "I-1",
+                2,
+                TargetSelection.empty()
+        );
+
+        EngineResult result = new GameEngine().process(state, defaultItemCtx(), command);
+
+        assertFalse(result.accepted());
+        assertTrue(result.errors().contains("consumable count must be 1"));
     }
 
     @Test

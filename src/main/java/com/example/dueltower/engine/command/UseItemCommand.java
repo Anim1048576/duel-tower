@@ -55,6 +55,17 @@ public record UseItemCommand(
         if (!definition.battleUsable()) {
             errors.add("item is not battle usable");
         }
+        if (definition.isConsumable() && count != 1) {
+            errors.add("consumable count must be 1");
+        }
+        if (definition.isConsumable()
+                && actor.consumablesUsedThisTurn() >= ctx.gameRules().maxConsumableUsesPerTurn()) {
+            errors.add("consumable use limit reached this turn");
+        }
+        if (definition.isConsumable()
+                && actor.consumablesUsedThisCombat() >= ctx.gameRules().maxConsumableUsesPerCombat()) {
+            errors.add("consumable use limit reached this combat");
+        }
         if (item.count() < count) {
             errors.add("not enough item count");
         }
@@ -101,6 +112,7 @@ public record UseItemCommand(
         }
 
         ItemEffect effect = ctx.itemEffect(((ItemRef) item.ref()).itemId());
+        ItemDefinition definition = ctx.itemDef(((ItemRef) item.ref()).itemId());
 
         InventoryCommandSupport.consumeInventoryEntry(state, item, count);
 
@@ -121,6 +133,10 @@ public record UseItemCommand(
                 events
         );
         effect.resolveUse(rc);
+        if (definition.isConsumable()) {
+            actor.incConsumablesUsedThisTurn();
+            actor.incConsumablesUsedThisCombat();
+        }
 
         return events;
     }
