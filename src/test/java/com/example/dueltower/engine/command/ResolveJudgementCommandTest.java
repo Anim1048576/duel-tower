@@ -1,10 +1,11 @@
 package com.example.dueltower.engine.command;
 
-import com.example.dueltower.config.RewardTableConfig;
 import com.example.dueltower.config.GameRules;
+import com.example.dueltower.config.RewardTableConfig;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
+import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.NodeState;
@@ -13,6 +14,7 @@ import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.RunState;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -44,10 +46,16 @@ class ResolveJudgementCommandTest {
         state.runState().beginNode(state.runState().findChoice(judgementChoiceId));
         player.pendingDecision(new PendingDecision.JudgementChoice("판정", java.util.List.of("WILL")));
 
-        RewardTableConfig rewardConfig = new RewardTableConfig(
-                RewardTableConfig.defaults().chest(),
-                new RewardTableConfig.JudgementReward(310, 2, 99),
-                RewardTableConfig.defaults().sellPrices()
+        EngineContext ctx = new EngineContext(
+                Map.of(), Map.of(),
+                Map.of(), Map.of(),
+                Map.of(), Map.of(),
+                Map.of(), Map.of(),
+                Map.of(), Map.of(),
+                Map.of(), Map.of(),
+                Map.of(),
+                GameRules.defaults(),
+                RewardTableConfig.defaults()
         );
 
         EngineResult result = new GameEngine().process(state, new EngineContext(

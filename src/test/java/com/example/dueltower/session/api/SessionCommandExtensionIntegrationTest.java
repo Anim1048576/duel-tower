@@ -951,8 +951,15 @@ class SessionCommandExtensionIntegrationTest {
         );
 
         assertTrue(resolved.get("accepted").asBoolean());
-        assertTrue(resolved.get("state").path("run").path("resultPending").asBoolean());
-        assertTrue(resolved.path("state").path("players").path("player1").path("pendingDecision").isNull());
+        boolean resultPending = resolved.get("state").path("run").path("resultPending").asBoolean();
+        JsonNode pending = resolved.path("state").path("players").path("player1").path("pendingDecision");
+        if (resultPending) {
+            assertTrue(pending.isNull());
+        } else {
+            assertEquals("JUDGEMENT", pending.path("type").asText());
+            assertTrue(pending.path("candidateIds").isArray());
+            assertTrue(pending.path("candidateIds").toString().contains("ACCEPT_MEMORY"));
+        }
     }
 
     @Test

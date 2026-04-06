@@ -42,7 +42,20 @@ public sealed interface PendingDecision permits PendingDecision.DiscardToHandLim
         }
     }
 
-    record JudgementChoice(String reason, java.util.List<String> choiceIds) implements PendingDecision {
+    record JudgementChoice(
+            String reason,
+            java.util.List<String> choiceIds,
+            String usedAbility,
+            Integer roll,
+            Integer abilityBefore,
+            Boolean initialSuccess,
+            Boolean memoryAcceptAllowed,
+            Boolean naturalTwenty
+    ) implements PendingDecision {
+        public JudgementChoice(String reason, java.util.List<String> choiceIds) {
+            this(reason, choiceIds, null, null, null, null, null, null);
+        }
+
         public JudgementChoice {
             Objects.requireNonNull(reason);
             Objects.requireNonNull(choiceIds);
