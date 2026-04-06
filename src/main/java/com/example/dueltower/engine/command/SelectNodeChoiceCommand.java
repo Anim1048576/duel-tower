@@ -59,11 +59,26 @@ public record SelectNodeChoiceCommand(
             events.add(new GameEvent.LogAppended("전투 노드를 선택했다. START_COMBAT 명령 대기 중."));
         } else if (choice.phase() == RunState.NodePhase.JUDGEMENT) {
             state.nodeState(NodeState.NON_COMBAT);
-            state.player(playerId).pendingDecision(new PendingDecision.JudgementChoice(
-                    "판정 결과를 선택하세요",
-                    List.of("SUCCESS", "FAIL")
-            ));
-            events.add(new GameEvent.LogAppended("판정 노드 진입: RESOLVE_JUDGEMENT 명령 대기 중."));
+            List<String> availableAbilities = JudgementEngine.judgementAbilityChoices(state.player(playerId));
+            if (availableAbilities.isEmpty()) {
+                int failureGold = ctx.rewardTable().judgement().failureGold();
+                state.runState().resolveCurrentNode(
+                        "reward",
+                        "판정 불가",
+                        "시도 가능한 능력치 없음",
+                        "모든 능력치가 20에 도달해 판정을 시도할 수 없다. " + failureGold + "G를 확보했다.",
+                        failureGold,
+                        0,
+                        0
+                );
+                events.add(new GameEvent.LogAppended("판정 노드 진입 실패: 선택 가능한 능력치가 없다."));
+            } else {
+                state.player(playerId).pendingDecision(new PendingDecision.JudgementChoice(
+                        "판정에 사용할 능력치를 선택하세요",
+                        availableAbilities
+                ));
+                events.add(new GameEvent.LogAppended("판정 노드 진입: RESOLVE_JUDGEMENT 명령 대기 중."));
+            }
         } else {
             state.nodeState(NodeState.NON_COMBAT);
             events.add(new GameEvent.LogAppended("이벤트 노드 진입: BUY_SHOP_ITEM 명령 대기 중."));

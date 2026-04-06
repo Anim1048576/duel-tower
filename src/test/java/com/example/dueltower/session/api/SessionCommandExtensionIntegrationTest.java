@@ -944,15 +944,22 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "RESOLVE_JUDGEMENT",
                   "playerId": "player1",
-                  "choiceId": "SUCCESS",
+                  "choiceId": "BODY",
                   "expectedVersion": %d
                 }
                 """.formatted(expectedVersion)
         );
 
         assertTrue(resolved.get("accepted").asBoolean());
-        assertTrue(resolved.get("state").path("run").path("resultPending").asBoolean());
-        assertTrue(resolved.path("state").path("players").path("player1").path("pendingDecision").isNull());
+        boolean resultPending = resolved.get("state").path("run").path("resultPending").asBoolean();
+        JsonNode pending = resolved.path("state").path("players").path("player1").path("pendingDecision");
+        if (resultPending) {
+            assertTrue(pending.isNull());
+        } else {
+            assertEquals("JUDGEMENT", pending.path("type").asText());
+            assertTrue(pending.path("candidateIds").isArray());
+            assertTrue(pending.path("candidateIds").toString().contains("ACCEPT_MEMORY"));
+        }
     }
 
     @Test
@@ -966,7 +973,7 @@ class SessionCommandExtensionIntegrationTest {
                                 {
                                   "type": "RESOLVE_JUDGEMENT",
                                   "playerId": "player1",
-                                  "choiceId": "SUCCESS",
+                                  "choiceId": "BODY",
                                   "expectedVersion": %d
                                 }
                                 """.formatted(selected.path("state").path("version").asLong())))
@@ -985,7 +992,7 @@ class SessionCommandExtensionIntegrationTest {
                                 {
                                   "type": "RESOLVE_JUDGEMENT",
                                   "playerId": "player1",
-                                  "choiceId": "SUCCESS",
+                                  "choiceId": "BODY",
                                   "expectedVersion": %d
                                 }
                                 """.formatted(selected.path("state").path("version").asLong())))
@@ -1003,7 +1010,7 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "RESOLVE_JUDGEMENT",
                   "playerId": "player1",
-                  "choiceId": "SUCCESS",
+                  "choiceId": "BODY",
                   "expectedVersion": 0
                 }
                 """
@@ -1048,7 +1055,7 @@ class SessionCommandExtensionIntegrationTest {
                 {
                   "type": "RESOLVE_JUDGEMENT",
                   "playerId": "player1",
-                  "choiceId": "SUCCESS",
+                  "choiceId": "BODY",
                   "expectedVersion": %d
                 }
                 """.formatted(staleVersion)
