@@ -59,6 +59,8 @@ class ConfigurationFailFastTest {
                         "duel.game.rules.turn-start-bonus-draw-hand-threshold=4",
                         "duel.game.rules.turn-start-draw-below-threshold=2",
                         "duel.game.rules.turn-start-draw-at-or-above-threshold=1",
+                        "duel.game.rules.max-consumable-uses-per-turn=1",
+                        "duel.game.rules.max-consumable-uses-per-combat=3",
                         "duel.balance.chest.gold-per-chest=150",
                         "duel.balance.chest.item-id=I-1",
                         "duel.balance.chest.item-count-per-chest=1",
