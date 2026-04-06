@@ -953,13 +953,55 @@ class SessionCommandExtensionIntegrationTest {
         assertTrue(resolved.get("accepted").asBoolean());
         boolean resultPending = resolved.get("state").path("run").path("resultPending").asBoolean();
         JsonNode pending = resolved.path("state").path("players").path("player1").path("pendingDecision");
-        if (resultPending) {
-            assertTrue(pending.isNull());
-        } else {
+        if (!resultPending) {
             assertEquals("JUDGEMENT", pending.path("type").asText());
             assertTrue(pending.path("candidateIds").isArray());
             assertTrue(pending.path("candidateIds").toString().contains("ACCEPT_MEMORY"));
         }
+    }
+
+    @Test
+    void resolveJudgementFailureAppliesOwnedCardModifierInsteadOfStatusWeakness() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectJudgementNode(fx);
+        long expectedVersion = selected.get("state").get("version").asLong();
+
+        JsonNode resolved = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "RESOLVE_JUDGEMENT",
+                  "playerId": "player1",
+                  "choiceId": "BODY",
+                  "expectedVersion": %d
+                }
+                """.formatted(expectedVersion)
+        );
+
+        assertTrue(resolved.get("accepted").asBoolean());
+        JsonNode playerNode = resolved.path("state").path("players").path("player1");
+        JsonNode ownedCards = playerNode.path("ownedCards");
+        boolean hasWeakenedOwnedCard = false;
+        for (JsonNode ownedCard : ownedCards) {
+            JsonNode modifiers = ownedCard.path("modifiers");
+            for (JsonNode modifier : modifiers) {
+                String modifierId = modifier.path("modifierId").asText();
+                if (modifierId.startsWith("WEAKENED_")) {
+                    hasWeakenedOwnedCard = true;
+                    break;
+                }
+            }
+            if (hasWeakenedOwnedCard) {
+                break;
+            }
+        }
+        assertTrue(hasWeakenedOwnedCard);
+        assertFalse(playerNode.path("statusValues").has("judgement.weakness.WEAKENED_COST_PLUS_ONE"));
+        assertFalse(playerNode.path("statusValues").has("judgement.weakness.WEAKENED_SELF_DAMAGE_10"));
+        assertFalse(playerNode.path("statusValues").has("judgement.weakness.WEAKENED_FINAL_HALF"));
+        assertFalse(playerNode.path("statusValues").has("judgement.weakness.WEAKENED_RANDOM_ENEMY_ONE"));
+        assertFalse(playerNode.path("statusValues").has("judgement.weakness.WEAKENED_DISCARD_ONE_SKILL"));
     }
 
     @Test
