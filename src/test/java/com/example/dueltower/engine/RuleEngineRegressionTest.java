@@ -16,6 +16,7 @@ import com.example.dueltower.engine.core.combat.CombatCleanupOps;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.core.combat.TurnPhases;
 import com.example.dueltower.engine.core.effect.EffectContext;
+import com.example.dueltower.engine.core.effect.EffectOps;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.keyword.DamageKeywordCtx;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
@@ -660,6 +661,114 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    void summonActionDamageUsesSummonAttackPowerNotPlayerAttackPower() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        CardInstId summonCard = fx.addCard(fx.player, "SUMMON_SCALE_ATTACK", Zone.FIELD);
+        SummonInstId summonId = new SummonInstId(UUID.randomUUID());
+        SummonState summon = new SummonState(summonId, fx.playerId, summonCard, 5, 5, 2, 0, 1, false);
+        fx.state.summons().put(summonId, summon);
+        fx.player.activeSummons().add(summonId);
+        fx.player.summonByCard().put(summonCard, summonId);
+
+        int hpBefore = fx.enemy.hp();
+        EngineResult use = fx.process(new UseSummonActionCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                summonId,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+
+        assertTrue(use.accepted());
+        assertEquals(hpBefore - 2, fx.enemy.hp(), "summon action should use summon atk");
+        assertNotEquals(hpBefore - fx.player.attackPower(), fx.enemy.hp(), "must not use player atk");
+    }
+
+    @Test
+    void summonActionHealUsesSummonHealPowerNotPlayerHealPower() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        CardInstId summonCard = fx.addCard(fx.player, "SUMMON_SCALE_HEAL", Zone.FIELD);
+        SummonInstId summonId = new SummonInstId(UUID.randomUUID());
+        SummonState summon = new SummonState(summonId, fx.playerId, summonCard, 5, 5, 0, 3, 1, false);
+        fx.state.summons().put(summonId, summon);
+        fx.player.activeSummons().add(summonId);
+        fx.player.summonByCard().put(summonCard, summonId);
+
+        fx.player.hp(fx.player.maxHp() - 10);
+        int hpBefore = fx.player.hp();
+        EngineResult use = fx.process(new UseSummonActionCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                summonId,
+                new TargetSelection(List.of(TargetRef.ofPlayer(fx.playerId)))
+        ));
+
+        assertTrue(use.accepted());
+        assertEquals(hpBefore + 3, fx.player.hp(), "summon action should use summon heal");
+        assertNotEquals(hpBefore + fx.player.healPower(), fx.player.hp(), "must not use player heal");
+    }
+
+    @Test
+    void playCardStillUsesPlayerStatsForActorScaling() {
+        TestFixture fx = TestFixture.basic();
+        CardInstId cardId = fx.addHandCard(fx.player, "SUMMON_SCALE_ATTACK");
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        int hpBefore = fx.enemy.hp();
+        EngineResult play = fx.process(new PlayCardCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                cardId,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+
+        assertTrue(play.accepted());
+        assertEquals(hpBefore - fx.player.attackPower(), fx.enemy.hp(), "normal card path should keep player atk scaling");
+    }
+
+    @Test
+    void summonActionCanOnlyBeUsedOncePerTurn() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        CardInstId summonCard = fx.addCard(fx.player, "SUMMON_SCALE_ATTACK", Zone.FIELD);
+        SummonInstId summonId = new SummonInstId(UUID.randomUUID());
+        SummonState summon = new SummonState(summonId, fx.playerId, summonCard, 5, 5, 2, 0, 1, false);
+        fx.state.summons().put(summonId, summon);
+        fx.player.activeSummons().add(summonId);
+        fx.player.summonByCard().put(summonCard, summonId);
+
+        EngineResult first = fx.process(new UseSummonActionCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                summonId,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+        assertTrue(first.accepted());
+
+        EngineResult second = fx.process(new UseSummonActionCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                summonId,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId)))
+        ));
+        assertFalse(second.accepted());
+        assertTrue(second.errors().contains("summon action already used this turn"));
+    }
+
+    @Test
     void combatRestartGathersNonExOwnedCardsFromCombatZonesToDeck() {
         TestFixture fx = TestFixture.basic();
         fx.state.combat(new CombatState());
@@ -748,6 +857,8 @@ class RuleEngineRegressionTest {
             registerCard(defs, effects, new TestCardEffect("CRITICAL_STRIKE", CardType.SKILL, 1, Map.of(K011_Critical.ID, 2), 5));
             registerCard(defs, effects, new TestCardEffect("DUAL_CRITICAL_STRIKE", CardType.SKILL, 1, Map.of(K011_Critical.ID, 2, "FAKE_CRIT_HALF", 1), 5));
             registerCard(defs, effects, new TestCardEffect("EX_BLAST", CardType.EX, 1, Map.of(), 4));
+            registerCard(defs, effects, new ScaleWithActorAttackCardEffect("SUMMON_SCALE_ATTACK"));
+            registerCard(defs, effects, new ScaleWithActorHealCardEffect("SUMMON_SCALE_HEAL"));
 
             Map<String, StatusDefinition> statusDefs = new HashMap<>();
             Map<String, com.example.dueltower.engine.core.effect.status.StatusEffect> statusEffects = new HashMap<>();
@@ -870,6 +981,18 @@ class RuleEngineRegressionTest {
         }
 
         private static void registerCard(Map<CardDefId, CardDefinition> defs, Map<CardDefId, CardEffect> effects, TestCardEffect effect) {
+            CardDefinition def = effect.definition();
+            defs.put(def.id(), def);
+            effects.put(def.id(), effect);
+        }
+
+        private static void registerCard(Map<CardDefId, CardDefinition> defs, Map<CardDefId, CardEffect> effects, ScaleWithActorAttackCardEffect effect) {
+            CardDefinition def = effect.definition();
+            defs.put(def.id(), def);
+            effects.put(def.id(), effect);
+        }
+
+        private static void registerCard(Map<CardDefId, CardDefinition> defs, Map<CardDefId, CardEffect> effects, ScaleWithActorHealCardEffect effect) {
             CardDefinition def = effect.definition();
             defs.put(def.id(), def);
             effects.put(def.id(), effect);
@@ -1200,6 +1323,60 @@ class RuleEngineRegressionTest {
 
             entries.sort(Comparator.comparingInt(HookEntry::priority));
             return entries;
+        }
+    }
+
+    private static final class ScaleWithActorAttackCardEffect implements CardEffect {
+        private final String id;
+
+        private ScaleWithActorAttackCardEffect(String id) {
+            this.id = id;
+        }
+
+        @Override
+        public String id() {
+            return id;
+        }
+
+        CardDefinition definition() {
+            return new CardDefinition(new CardDefId(id), id, CardType.SKILL, 1, Map.of(), Zone.GRAVE, false, id);
+        }
+
+        @Override
+        public List<String> validate(EffectContext ec) {
+            return new EffectOps(ec).validateTarget(Target.ENEMY_ONE);
+        }
+
+        @Override
+        public void resolve(EffectContext ec) {
+            new EffectOps(ec).damageWithActorAttack(Target.ENEMY_ONE);
+        }
+    }
+
+    private static final class ScaleWithActorHealCardEffect implements CardEffect {
+        private final String id;
+
+        private ScaleWithActorHealCardEffect(String id) {
+            this.id = id;
+        }
+
+        @Override
+        public String id() {
+            return id;
+        }
+
+        CardDefinition definition() {
+            return new CardDefinition(new CardDefId(id), id, CardType.SKILL, 1, Map.of(), Zone.GRAVE, false, id);
+        }
+
+        @Override
+        public List<String> validate(EffectContext ec) {
+            return new EffectOps(ec).validateTarget(Target.ALLY_ONE);
+        }
+
+        @Override
+        public void resolve(EffectContext ec) {
+            new EffectOps(ec).healWithActorHeal(Target.ALLY_ONE);
         }
     }
 }
