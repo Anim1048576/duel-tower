@@ -10,6 +10,7 @@ import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
+import com.example.dueltower.engine.core.targeting.TargetingOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -42,7 +43,9 @@ public final class EffectOps {
                 return errors;
             }
             TargetRef one = ec.selection().targets().get(0);
-            if (t == Target.ALLY_ONE && !(one instanceof TargetRef.Player)) errors.add("ally(one player) target required");
+            if (t == Target.ALLY_ONE && !TargetingOps.allyFactionCandidates(ec.state(), ec.actorRef()).contains(one)) {
+                errors.add("ally(one player/summon) target required");
+            }
             if (t == Target.ENEMY_ONE && !(one instanceof TargetRef.Enemy) && !(one instanceof TargetRef.Summon)) {
                 errors.add("enemy(one enemy/summon) target required");
             }
@@ -149,12 +152,18 @@ public final class EffectOps {
             case SELF -> List.of(ec.actorRef());
 
             case ALLY_ALL, ALLY_SIDE ->
-                    ec.state().players().keySet().stream().map(TargetRef::ofPlayer).toList();
+                    TargetingOps.allyFactionCandidates(ec.state(), ec.actorRef());
 
             case ENEMY_ALL, ENEMY_SIDE ->
-                    ec.state().enemies().keySet().stream().map(TargetRef::ofEnemy).toList();
+                    TargetingOps.enemyFactionCandidates(ec.state(), ec.actorRef());
 
-            case ALLY_ONE -> List.of(TargetRef.ofPlayer(ec.selection().requireOnePlayer()));
+            case ALLY_ONE -> {
+                TargetRef chosen = ec.selection().requireOne();
+                if (!TargetingOps.allyFactionCandidates(ec.state(), ec.actorRef()).contains(chosen)) {
+                    throw new IllegalArgumentException("ally(one player/summon) target required");
+                }
+                yield List.of(chosen);
+            }
             case ENEMY_ONE -> {
                 TargetRef chosen = ec.selection().requireOneEnemyOrSummon();
                 TargetRef resolved = StatusOps.resolveEnemyOneTarget(ec.state(), ec.ctx(), ec.actorRef(), ec.cardId(), chosen, ec.out(), ec.sourceLabel());
@@ -311,14 +320,7 @@ public final class EffectOps {
 
 
     private List<TargetRef> enemyCandidatesFor(TargetRef actor) {
-        List<TargetRef> enemyCandidates = new ArrayList<>();
-        if (actor instanceof TargetRef.Player) {
-            ec.state().enemies().keySet().forEach(id -> enemyCandidates.add(TargetRef.ofEnemy(id)));
-            ec.state().summons().values().forEach(s -> enemyCandidates.add(TargetRef.ofSummon(s.owner(), s.id())));
-            return enemyCandidates;
-        }
-        ec.state().players().keySet().forEach(id -> enemyCandidates.add(TargetRef.ofPlayer(id)));
-        return enemyCandidates;
+        return TargetingOps.enemyFactionCandidates(ec.state(), actor);
     }
 
     private int applyStatusCriticalChancePercent(TargetRef source, TargetRef target, String kind, int baseChance) {
