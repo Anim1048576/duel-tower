@@ -1077,6 +1077,7 @@ class RuleEngineRegressionTest {
         if (allySummon.hp() != allySummonHpBefore) changed++;
         if (enemySummon.hp() != enemySummonHpBefore) changed++;
         assertEquals(1, changed, "confusion redirect should apply to exactly one full-candidate target");
+        assertEquals(0, fx.player.statusValues().getOrDefault(S107_Confusion.ID, 0));
     }
 
     @Test

@@ -11,6 +11,7 @@ import java.util.Random;
 /**
  * [해로운 상태 : 혼란]
  * 적을 대상으로 할 때 아군도 대상으로 할 수 있으며, [도발]을 무시하고 무작위로 대상을 지정해야 한다.
+ * 효과 적용시, 이 수치를 1 내린다.
  */
 @Component
 public class S107_Confusion implements StatusBlueprint {
@@ -29,6 +30,7 @@ public class S107_Confusion implements StatusBlueprint {
                 false,
                 """
                         적을 대상으로 할 때 아군도 대상으로 할 수 있으며, [도발]을 무시하고 무작위로 대상을 지정해야 한다.
+                        효과 적용시, 이 수치를 1 내린다.
                         """
         );
     }
@@ -54,7 +56,13 @@ public class S107_Confusion implements StatusBlueprint {
         Random rnd = new Random(seed);
         TargetRef picked = candidates.get(rnd.nextInt(candidates.size()));
 
-        rt.log("CONFUSION overrides target: " + CombatState.actorKey(picked));
+        int next = stacks - 1;
+        rt.stacksSet(actor, id(), next);
+
+        rt.log("CONFUSION overrides target: "
+                + CombatState.actorKey(picked)
+                + " (remaining=" + next + ")");
+
         return picked;
     }
 }
