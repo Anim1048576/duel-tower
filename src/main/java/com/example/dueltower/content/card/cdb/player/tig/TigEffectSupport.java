@@ -3,6 +3,7 @@ package com.example.dueltower.content.card.cdb.player.tig;
 import com.example.dueltower.common.util.DiceUtility;
 import com.example.dueltower.content.keyword.kdb.K003_Installed;
 import com.example.dueltower.content.status.sdb.player.tig.Tig201_Status;
+import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.keyword.DiscardReason;
@@ -91,19 +92,54 @@ final class TigEffectSupport {
         return false;
     }
 
-    static int destroyInstalledCards(EffectContext ec, int maxCount) {
-        if (maxCount <= 0) return 0;
-
-        int destroyed = 0;
+    static List<Ids.CardInstId> installedCardCandidates(EffectContext ec, boolean excludeSourceCard) {
+        List<Ids.CardInstId> candidates = new ArrayList<>();
         for (PlayerState ps : ec.state().players().values()) {
             List<Ids.CardInstId> field = new ArrayList<>(ps.field());
             for (Ids.CardInstId id : field) {
-                if (destroyed >= maxCount) return destroyed;
-                if (id.equals(ec.cardId())) continue;
+                if (excludeSourceCard && id.equals(ec.cardId())) continue;
                 if (!KeywordOps.hasKeyword(ec.state(), ec.ctx(), id, K003_Installed.ID)) continue;
-                ZoneOps.moveToZoneOrVanishIfToken(ec.state(), ec.ctx(), ps, id, Zone.GRAVE, ec.out());
-                destroyed++;
+                candidates.add(id);
             }
+        }
+        return candidates;
+    }
+
+    static void validateInstalledCardSelection(EffectContext ec, int minSelections, int maxSelections, List<String> errors) {
+        List<Ids.CardInstId> selected = ec.selectedIds();
+        int count = selected.size();
+        if (count < minSelections || count > maxSelections) {
+            errors.add("selectedIds must contain between " + minSelections + " and " + maxSelections + " cards");
+            return;
+        }
+
+        List<Ids.CardInstId> candidates = installedCardCandidates(ec, true);
+        var unique = new java.util.HashSet<Ids.CardInstId>();
+        for (Ids.CardInstId id : selected) {
+            if (!unique.add(id)) {
+                errors.add("duplicate selected card: " + id.value());
+                continue;
+            }
+            if (!candidates.contains(id)) {
+                errors.add("selected installed-destroy target is invalid: " + id.value());
+            }
+        }
+    }
+
+    static int destroySelectedInstalledCards(EffectContext ec) {
+        int destroyed = 0;
+        GameState state = ec.state();
+        EngineContext ctx = ec.ctx();
+        for (Ids.CardInstId id : ec.selectedIds()) {
+            CardInstance card = state.card(id);
+            if (card == null) continue;
+            Ids.PlayerId ownerId = card.ownerId();
+            if (ownerId == null) continue;
+            PlayerState owner = state.player(ownerId);
+            if (owner == null) continue;
+            if (!owner.field().contains(id)) continue;
+            ZoneOps.moveToZoneOrVanishIfToken(state, ctx, owner, id, Zone.GRAVE, ec.out());
+            destroyed++;
         }
         return destroyed;
     }

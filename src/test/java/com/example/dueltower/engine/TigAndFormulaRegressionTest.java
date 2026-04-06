@@ -3,8 +3,11 @@ package com.example.dueltower.engine;
 import com.example.dueltower.content.card.cdb.C001_BasicAttack;
 import com.example.dueltower.content.card.cdb.C002_BasicRecovery;
 import com.example.dueltower.content.card.cdb.C004_BasicCurse;
+import com.example.dueltower.content.card.cdb.player.tig.Tig001_Card;
 import com.example.dueltower.content.card.cdb.player.tig.Tig005_Card;
+import com.example.dueltower.content.card.cdb.player.tig.Tig006_Card;
 import com.example.dueltower.content.card.cdb.player.tig.Tig901_EX;
+import com.example.dueltower.content.keyword.kdb.K003_Installed;
 import com.example.dueltower.content.card.model.CardBlueprint;
 import com.example.dueltower.content.keyword.kdb.K006_Immovable;
 import com.example.dueltower.content.keyword.model.KeywordBlueprint;
@@ -95,6 +98,110 @@ class TigAndFormulaRegressionTest {
 
         assertFalse(result.accepted());
         assertTrue(result.errors().stream().anyMatch(e -> e.contains("부동 카드는 버릴 수 없습니다.")));
+    }
+
+    @Test
+    void tig001Overcome3PlusDoesNotDestroyInstalledCardUnlessSelected() {
+        TigFixture fx = new TigFixture();
+        fx.player.statusSet(Tig201_Status.ID, 3);
+        CardInstId tig001 = fx.addToHand("Tig001_Card");
+        CardInstId installed = fx.addToField("INSTALLED_TEST");
+
+        EngineResult result = fx.play(tig001, List.of(TargetRef.ofEnemy(fx.enemy1Id)), List.of(), List.of());
+
+        assertTrue(result.accepted());
+        assertEquals(Zone.FIELD, fx.state.card(installed).zone());
+        assertTrue(fx.player.field().contains(installed));
+    }
+
+    @Test
+    void tig001Overcome3PlusDestroysOnlySelectedInstalledCard() {
+        TigFixture fx = new TigFixture();
+        fx.player.statusSet(Tig201_Status.ID, 3);
+        CardInstId tig001 = fx.addToHand("Tig001_Card");
+        CardInstId installed1 = fx.addToField("INSTALLED_TEST");
+        CardInstId installed2 = fx.addToField("INSTALLED_TEST");
+
+        EngineResult result = fx.play(tig001, List.of(TargetRef.ofEnemy(fx.enemy1Id)), List.of(), List.of(installed1));
+
+        assertTrue(result.accepted());
+        assertEquals(Zone.GRAVE, fx.state.card(installed1).zone());
+        assertEquals(Zone.FIELD, fx.state.card(installed2).zone());
+    }
+
+    @Test
+    void tig001RejectsSelectedIdsWhenOvercomeBelow3() {
+        TigFixture fx = new TigFixture();
+        fx.player.statusSet(Tig201_Status.ID, 2);
+        CardInstId tig001 = fx.addToHand("Tig001_Card");
+        CardInstId installed = fx.addToField("INSTALLED_TEST");
+
+        EngineResult result = fx.play(tig001, List.of(TargetRef.ofEnemy(fx.enemy1Id)), List.of(), List.of(installed));
+
+        assertFalse(result.accepted());
+        assertTrue(result.errors().contains("selectedIds not allowed when overcome is below 3"));
+    }
+
+    @Test
+    void tig006AllowsDiscardAndZeroInstalledSelections() {
+        TigFixture fx = new TigFixture();
+        CardInstId tig006 = fx.addToHand("Tig006_Card");
+        CardInstId discard = fx.addToHand("C001");
+        CardInstId installed = fx.addToField("INSTALLED_TEST");
+
+        EngineResult result = fx.play(tig006, List.of(), List.of(discard), List.of());
+
+        assertTrue(result.accepted());
+        assertEquals(Zone.GRAVE, fx.state.card(discard).zone());
+        assertEquals(Zone.FIELD, fx.state.card(installed).zone());
+    }
+
+    @Test
+    void tig006DestroysOnlySelectedInstalledCardsUpToThree() {
+        TigFixture fx = new TigFixture();
+        CardInstId tig006 = fx.addToHand("Tig006_Card");
+        CardInstId discard = fx.addToHand("C001");
+        CardInstId i1 = fx.addToField("INSTALLED_TEST");
+        CardInstId i2 = fx.addToField("INSTALLED_TEST");
+        CardInstId i3 = fx.addToField("INSTALLED_TEST");
+        CardInstId i4 = fx.addToField("INSTALLED_TEST");
+
+        EngineResult result = fx.play(tig006, List.of(), List.of(discard), List.of(i1, i2, i3));
+
+        assertTrue(result.accepted());
+        assertEquals(Zone.GRAVE, fx.state.card(i1).zone());
+        assertEquals(Zone.GRAVE, fx.state.card(i2).zone());
+        assertEquals(Zone.GRAVE, fx.state.card(i3).zone());
+        assertEquals(Zone.FIELD, fx.state.card(i4).zone());
+    }
+
+    @Test
+    void tig006RejectsTooManyInstalledSelections() {
+        TigFixture fx = new TigFixture();
+        CardInstId tig006 = fx.addToHand("Tig006_Card");
+        CardInstId discard = fx.addToHand("C001");
+        CardInstId i1 = fx.addToField("INSTALLED_TEST");
+        CardInstId i2 = fx.addToField("INSTALLED_TEST");
+        CardInstId i3 = fx.addToField("INSTALLED_TEST");
+        CardInstId i4 = fx.addToField("INSTALLED_TEST");
+
+        EngineResult result = fx.play(tig006, List.of(), List.of(discard), List.of(i1, i2, i3, i4));
+
+        assertFalse(result.accepted());
+        assertTrue(result.errors().contains("selectedIds must contain between 0 and 3 cards"));
+    }
+
+    @Test
+    void tig006RejectsNonInstalledSelection() {
+        TigFixture fx = new TigFixture();
+        CardInstId tig006 = fx.addToHand("Tig006_Card");
+        CardInstId discard = fx.addToHand("C001");
+        CardInstId nonInstalled = fx.addToField("C001");
+
+        EngineResult result = fx.play(tig006, List.of(), List.of(discard), List.of(nonInstalled));
+
+        assertFalse(result.accepted());
+        assertTrue(result.errors().stream().anyMatch(e -> e.contains("selected installed-destroy target is invalid")));
     }
 
     @Test
@@ -282,9 +389,12 @@ class TigAndFormulaRegressionTest {
             registerCard(defs, effects, new C001_BasicAttack());
             registerCard(defs, effects, new C002_BasicRecovery());
             registerCard(defs, effects, new C004_BasicCurse());
+            registerCard(defs, effects, new Tig001_Card());
             registerCard(defs, effects, new Tig005_Card());
+            registerCard(defs, effects, new Tig006_Card());
             registerCard(defs, effects, new Tig901_EX());
             registerCard(defs, effects, new ImmovableTestCard());
+            registerCard(defs, effects, new InstalledTestCard());
 
             Map<String, StatusDefinition> statusDefs = new HashMap<>();
             Map<String, com.example.dueltower.engine.core.effect.status.StatusEffect> statusEffects = new HashMap<>();
@@ -292,6 +402,7 @@ class TigAndFormulaRegressionTest {
             registerStatus(statusDefs, statusEffects, new Tig201_Status());
             Map<String, KeywordDefinition> keywordDefs = new HashMap<>();
             Map<String, KeywordEffect> keywordEffects = new HashMap<>();
+            registerKeyword(keywordDefs, keywordEffects, new K003_Installed());
             registerKeyword(keywordDefs, keywordEffects, new K006_Immovable());
 
             this.ctx = new EngineContext(defs, effects, statusDefs, statusEffects, keywordDefs, keywordEffects);
@@ -310,7 +421,15 @@ class TigAndFormulaRegressionTest {
         }
 
         EngineResult play(CardInstId cardId, List<TargetRef> targets, List<CardInstId> discardIds) {
-            return engine.process(state, ctx, new PlayCardCommand(UUID.randomUUID(), state.version(), playerId, cardId, new TargetSelection(targets), discardIds));
+            return play(cardId, targets, discardIds, List.of());
+        }
+
+        EngineResult play(CardInstId cardId, List<TargetRef> targets, List<CardInstId> discardIds, List<CardInstId> selectedIds) {
+            return engine.process(
+                    state,
+                    ctx,
+                    new PlayCardCommand(UUID.randomUUID(), state.version(), playerId, cardId, new TargetSelection(targets), discardIds, selectedIds)
+            );
         }
 
         EngineResult useEx(List<TargetRef> targets) {
@@ -327,6 +446,10 @@ class TigAndFormulaRegressionTest {
 
         CardInstId addToGrave(String defId) {
             return addCard(defId, Zone.GRAVE);
+        }
+
+        CardInstId addToField(String defId) {
+            return addCard(defId, Zone.FIELD);
         }
 
         private CardInstId addCard(String defId, Zone zone) {
@@ -380,6 +503,32 @@ class TigAndFormulaRegressionTest {
                     CardType.SKILL,
                     0,
                     Map.of(K006_Immovable.ID, 1),
+                    Zone.GRAVE,
+                    false,
+                    "test"
+            );
+        }
+
+        @Override
+        public void resolve(EffectContext ec) {
+            // no-op
+        }
+    }
+
+    private static final class InstalledTestCard implements CardBlueprint {
+        @Override
+        public String id() {
+            return "INSTALLED_TEST";
+        }
+
+        @Override
+        public CardDefinition definition() {
+            return new CardDefinition(
+                    new CardDefId(id()),
+                    "Installed Test",
+                    CardType.SKILL,
+                    0,
+                    Map.of(K003_Installed.ID, 1),
                     Zone.GRAVE,
                     false,
                     "test"

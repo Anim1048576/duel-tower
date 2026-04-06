@@ -4,6 +4,7 @@ import com.example.dueltower.content.card.dto.CardDetailResponse;
 import com.example.dueltower.content.card.model.CardBlueprint;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
+import com.example.dueltower.content.card.model.playspec.SelectFieldCardsRequirement;
 import com.example.dueltower.engine.model.Target;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +26,7 @@ class CardPlaySpecExposureTest {
     private List<CardBlueprint> cardBlueprints;
 
     @Test
-    void defaultPlaySpecShouldBeNoneForCardWithoutOverride() {
+    void tig001ShouldExposeTargetAndInstalledSelectionPlaySpec() {
         CardBlueprint card = cardBlueprints.stream()
                 .filter(bp -> bp.id().equals("Tig001_Card"))
                 .findFirst()
@@ -33,17 +34,47 @@ class CardPlaySpecExposureTest {
 
         CardPlaySpec playSpec = card.playSpec();
 
-        assertThat(playSpec.target().target()).isEqualTo(Target.NONE);
-        assertThat(playSpec.target().requiredSelection()).isFalse();
-        assertThat(playSpec.extraRequirements()).isEmpty();
+        assertThat(playSpec.target().target()).isEqualTo(Target.ENEMY_ONE);
+        assertThat(playSpec.target().requiredSelection()).isTrue();
+        assertThat(playSpec.extraRequirements())
+                .singleElement()
+                .isInstanceOfSatisfying(SelectFieldCardsRequirement.class, req -> {
+                    assertThat(req.minSelections()).isEqualTo(0);
+                    assertThat(req.maxSelections()).isEqualTo(1);
+                    assertThat(req.scope().name()).isEqualTo("ALL_PLAYER_FIELDS");
+                    assertThat(req.filter().name()).isEqualTo("INSTALLED_ONLY");
+                    assertThat(req.excludeSourceCard()).isTrue();
+                });
     }
 
     @Test
     void tigDiscardCardsShouldExposeDiscardRequirementInPlaySpec() {
         assertDiscardOneFromHand("Tig004_Card", true, Target.ENEMY_ONE);
         assertDiscardOneFromHand("Tig005_Card", false, Target.NONE);
-        assertDiscardOneFromHand("Tig006_Card", false, Target.NONE);
         assertDiscardOneFromHand("Tig008_Card", true, Target.ENEMY_ONE);
+    }
+
+    @Test
+    void tig006ShouldExposeDiscardAndInstalledSelectionRequirementsInPlaySpec() {
+        CardDetailResponse detail = cardService.get("Tig006_Card");
+        CardPlaySpec playSpec = detail.playSpec();
+
+        assertThat(playSpec.target().requiredSelection()).isFalse();
+        assertThat(playSpec.target().target()).isEqualTo(Target.NONE);
+        assertThat(playSpec.extraRequirements()).hasSize(2);
+        assertThat(playSpec.extraRequirements().get(0))
+                .isInstanceOfSatisfying(DiscardFromHandRequirement.class, discard -> {
+                    assertThat(discard.count()).isEqualTo(1);
+                    assertThat(discard.excludeSourceCard()).isTrue();
+                });
+        assertThat(playSpec.extraRequirements().get(1))
+                .isInstanceOfSatisfying(SelectFieldCardsRequirement.class, req -> {
+                    assertThat(req.minSelections()).isEqualTo(0);
+                    assertThat(req.maxSelections()).isEqualTo(3);
+                    assertThat(req.scope().name()).isEqualTo("ALL_PLAYER_FIELDS");
+                    assertThat(req.filter().name()).isEqualTo("INSTALLED_ONLY");
+                    assertThat(req.excludeSourceCard()).isTrue();
+                });
     }
 
     @Test
@@ -58,8 +89,20 @@ class CardPlaySpecExposureTest {
     }
 
     @Test
-    void defaultCardDetailShouldExposeNonePlaySpec() {
+    void tig001CardDetailShouldExposeInstalledSelectionPlaySpec() {
         CardDetailResponse detail = cardService.get("Tig001_Card");
+
+        assertThat(detail.playSpec()).isNotNull();
+        assertThat(detail.playSpec().target().target()).isEqualTo(Target.ENEMY_ONE);
+        assertThat(detail.playSpec().target().requiredSelection()).isTrue();
+        assertThat(detail.playSpec().extraRequirements())
+                .singleElement()
+                .isInstanceOf(SelectFieldCardsRequirement.class);
+    }
+
+    @Test
+    void defaultCardDetailShouldExposeNonePlaySpec() {
+        CardDetailResponse detail = cardService.get("C001");
 
         assertThat(detail.playSpec()).isNotNull();
         assertThat(detail.playSpec().target().target()).isEqualTo(Target.NONE);

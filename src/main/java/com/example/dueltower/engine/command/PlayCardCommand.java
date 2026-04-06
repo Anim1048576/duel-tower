@@ -28,9 +28,10 @@ public final class PlayCardCommand implements GameCommand {
     private final CardInstId cardId;
     private final TargetSelection selection;
     private final List<CardInstId> discardIds;
+    private final List<CardInstId> selectedIds;
 
     public PlayCardCommand(UUID commandId, long expectedVersion, PlayerId playerId, CardInstId cardId, TargetSelection selection) {
-        this(commandId, expectedVersion, playerId, cardId, selection, List.of());
+        this(commandId, expectedVersion, playerId, cardId, selection, List.of(), List.of());
     }
 
     public PlayCardCommand(
@@ -41,12 +42,25 @@ public final class PlayCardCommand implements GameCommand {
             TargetSelection selection,
             List<CardInstId> discardIds
     ) {
+        this(commandId, expectedVersion, playerId, cardId, selection, discardIds, List.of());
+    }
+
+    public PlayCardCommand(
+            UUID commandId,
+            long expectedVersion,
+            PlayerId playerId,
+            CardInstId cardId,
+            TargetSelection selection,
+            List<CardInstId> discardIds,
+            List<CardInstId> selectedIds
+    ) {
         this.commandId = commandId;
         this.expectedVersion = expectedVersion;
         this.playerId = playerId;
         this.cardId = cardId;
         this.selection = selection == null ? TargetSelection.empty() : selection;
         this.discardIds = discardIds == null ? List.of() : List.copyOf(discardIds);
+        this.selectedIds = selectedIds == null ? List.of() : List.copyOf(selectedIds);
     }
 
     @Override public UUID commandId() { return commandId; }
@@ -99,7 +113,7 @@ public final class PlayCardCommand implements GameCommand {
         }
 
         CardEffect eff = ctx.effect(ci.defId());
-        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, discardIds, dummyOut);
+        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, discardIds, selectedIds, dummyOut);
         errors.addAll(eff.validate(ec));
 
         return errors;
@@ -156,7 +170,7 @@ public final class PlayCardCommand implements GameCommand {
 
         // 효과 해결
         CardEffect eff = ctx.effect(ci.defId());
-        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, discardIds, events);
+        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, discardIds, selectedIds, events);
         eff.resolve(ec);
 
         // 카드 사용 후 훅 순서: passive -> status

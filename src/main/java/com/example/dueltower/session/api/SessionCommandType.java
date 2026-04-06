@@ -55,7 +55,8 @@ public enum SessionCommandType {
                     commandPlayerId(req),
                     id,
                     parseTargetSelection(req),
-                    parseCardInstIds(req.discardIds(), "discardIds")
+                    parseCardInstIds(req.discardIds(), "discardIds"),
+                    parseCardInstIds(req.selectedIds(), "selectedIds")
             );
         }
     },

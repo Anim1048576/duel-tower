@@ -4,9 +4,11 @@ import com.example.dueltower.content.card.model.CardBlueprint;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.DiscardFilter;
 import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
+import com.example.dueltower.content.card.model.playspec.FieldCardFilter;
+import com.example.dueltower.content.card.model.playspec.FieldCardSelectionScope;
+import com.example.dueltower.content.card.model.playspec.SelectFieldCardsRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.effect.EffectContext;
-import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.Ids;
@@ -42,22 +44,31 @@ public class Tig006_Card implements CardBlueprint {
     public CardPlaySpec playSpec() {
         return new CardPlaySpec(
                 TargetSpec.none(),
-                List.of(new DiscardFromHandRequirement(1, true, DiscardFilter.ANY))
+                List.of(
+                        new DiscardFromHandRequirement(1, true, DiscardFilter.ANY),
+                        new SelectFieldCardsRequirement(
+                                0,
+                                3,
+                                FieldCardSelectionScope.ALL_PLAYER_FIELDS,
+                                FieldCardFilter.INSTALLED_ONLY,
+                                true
+                        )
+                )
         );
     }
 
     @Override
     public List<String> validate(EffectContext ec) {
-        PlayerState me = ec.state().player(ec.actor());
         List<String> errors = new ArrayList<>();
-        TigEffectSupport.validateSingleDiscardSelection(ec, me, errors);
+        TigEffectSupport.validateSingleDiscardSelection(ec, ec.state().player(ec.actor()), errors);
+        TigEffectSupport.validateInstalledCardSelection(ec, 0, 3, errors);
         return errors;
     }
 
     @Override
     public void resolve(EffectContext ec) {
-        PlayerState me = ec.state().player(ec.actor());
+        var me = ec.state().player(ec.actor());
         if (!TigEffectSupport.discardSelectedOrAbort(ec, me)) return;
-        TigEffectSupport.destroyInstalledCards(ec, 3);
+        TigEffectSupport.destroySelectedInstalledCards(ec);
     }
 }
