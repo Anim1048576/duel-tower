@@ -15,7 +15,7 @@ public final class CardInstance {
     private final CardDefId defId;
     private final PlayerId ownerId;
     private final String sourceOwnedCardId;
-    private final List<OwnedCardModifier> modifiers;
+    private List<OwnedCardModifier> modifiers;
 
     private Zone zone;
     private final Map<String, Integer> counters = new HashMap<>();
@@ -47,6 +47,10 @@ public final class CardInstance {
     public void zone(Zone z) { this.zone = z; }
     public String sourceOwnedCardId() { return sourceOwnedCardId; }
     public List<OwnedCardModifier> modifiers() { return modifiers; }
+
+    public void replaceModifiers(List<OwnedCardModifier> nextModifiers) {
+        this.modifiers = normalizeModifiers(nextModifiers);
+    }
 
     public boolean hasModifier(String modifierId) {
         if (modifierId == null || modifierId.isBlank()) return false;

@@ -81,8 +81,9 @@ public record ResolveJudgementCommand(
         int successGold = ctx.rewardTable().judgement().successGold();
         int successKeys = ctx.rewardTable().judgement().successKeys();
         int failureGold = ctx.rewardTable().judgement().failureGold();
-        JudgementEngine.Result result = new JudgementEngine().resolve(
+        JudgementEngine.Result result = judgementEngine.resolve(
                 state.player(playerId),
+                state,
                 playerId,
                 normalizedChoice,
                 state.seed(),
@@ -107,7 +108,8 @@ public record ResolveJudgementCommand(
                     "위험 구역 돌파 실패",
                     result.usedAbilityLabel() + " 판정(" + result.usedAbility() + ") D20=" + result.roll() + ", 능력치=" + result.abilityBefore()
                             + "로 실패. [기억 받아들이기] 발동: 약화 " + result.grantedWeakness()
-                            + " 부여, " + result.increasedAbility() + " 능력치 " + result.increasedAbilityValue() + "로 상승. 보상: " + failureGold + "G.",
+                            + " 부여(대상 카드: " + result.targetOwnedCardId() + ", 동기화 인스턴스: " + result.syncedInstanceCount() + "), "
+                            + result.increasedAbility() + " 능력치 " + result.increasedAbilityValue() + "로 상승. 보상: " + failureGold + "G.",
                     failureGold,
                     0,
                     0
@@ -120,6 +122,8 @@ public record ResolveJudgementCommand(
                 + ", success=" + result.success()
                 + ", memoryAccepted=" + result.memoryAccepted()
                 + ", weakness=" + result.grantedWeakness()
+                + ", targetOwnedCardId=" + result.targetOwnedCardId()
+                + ", syncedInstanceCount=" + result.syncedInstanceCount()
                 + ", increasedAbility=" + result.increasedAbility()
                 + ", increasedValue=" + result.increasedAbilityValue()));
     }
