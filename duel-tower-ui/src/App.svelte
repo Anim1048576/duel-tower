@@ -10,6 +10,8 @@
   import GmLobbyPage from './pages/GmLobbyPage.svelte'
   import HubPage from './pages/HubPage.svelte'
   import LoginPage from './pages/LoginPage.svelte'
+  import PresetEditorPage from './pages/PresetEditorPage.svelte'
+  import PresetListPage from './pages/PresetListPage.svelte'
   import PlayerLobbyPage from './pages/PlayerLobbyPage.svelte'
   import RulesReferencePage from './pages/RulesReferencePage.svelte'
   import SessionEntryPage from './pages/SessionEntryPage.svelte'
@@ -32,9 +34,11 @@
     'character-create': CharacterDetailPage,
     'character-detail': CharacterDetailPage,
     decks: DeckListPage,
+    presets: PresetListPage,
     'card-detail': CardDetailPage,
     inventory: RulesReferencePage,
     'deck-editor': DeckEditorPage,
+    'preset-editor': PresetEditorPage,
     lobby: SessionEntryPage,
     'player-lobby': PlayerLobbyPage,
     'gm-lobby': GmLobbyPage,

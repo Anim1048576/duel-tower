@@ -6,6 +6,7 @@ export type PageKey =
   | 'home'
   | 'lobby'
   | 'decks'
+  | 'presets'
   | 'card-detail'
   | 'character'
   | 'character-create'
@@ -14,6 +15,7 @@ export type PageKey =
   | 'combat'
   | 'logs'
   | 'deck-editor'
+  | 'preset-editor'
   | 'player-lobby'
   | 'gm-lobby'
 
@@ -48,9 +50,11 @@ export const routePaths = {
   characterCreate: '/characters/new',
   characterDetail: '/characters/detail',
   deckList: '/decks',
+  presetList: '/presets',
   cardDetail: '/cards',
   inventory: '/inventory',
   deckEditor: '/decks/editor',
+  presetEditor: '/presets/editor',
   sessionEntry: '/lobby',
   sessionLobbyPlayer: '/lobby/player',
   sessionLobbyGm: '/lobby/gm',
@@ -61,6 +65,7 @@ export const routePatterns = {
   characterDetail: '/characters/:id',
   cardDetail: '/cards/:id',
   deckEditor: '/decks/:id/editor',
+  presetEditor: '/presets/:id/editor',
   sessionLobbyPlayer: '/sessions/:code/player',
   sessionLobbyGm: '/sessions/:code/gm',
   combat: '/sessions/:code/combat',
@@ -97,6 +102,7 @@ export const pathBuilders = {
       ? buildPathFromPattern(routePatterns.characterDetail, { id })
       : routePaths.characterDetail,
   deckList: () => routePaths.deckList,
+  presetList: () => routePaths.presetList,
   cardDetail: (id?: string) =>
     hasRouteParam(id)
       ? buildPathFromPattern(routePatterns.cardDetail, { id })
@@ -106,6 +112,10 @@ export const pathBuilders = {
     hasRouteParam(id)
       ? buildPathFromPattern(routePatterns.deckEditor, { id })
       : routePaths.deckEditor,
+  presetEditor: (id?: string) =>
+    hasRouteParam(id)
+      ? buildPathFromPattern(routePatterns.presetEditor, { id })
+      : routePaths.presetEditor,
   sessionEntry: () => routePaths.sessionEntry,
   sessionLobbyPlayer: (code?: string) =>
     hasRouteParam(code)
@@ -198,6 +208,13 @@ export const APP_NAV_ITEMS = [
     enabled: true,
   },
   {
+    key: 'presets',
+    label: 'Presets',
+    path: routePaths.presetList,
+    description: 'Preset archive and editor entry flow',
+    enabled: true,
+  },
+  {
     key: 'inventory',
     label: 'Rules',
     path: routePaths.inventory,
@@ -284,6 +301,19 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
+    routePaths.presetList,
+    {
+      key: 'presets',
+      label: 'Presets',
+      path: routePaths.presetList,
+      area: 'app',
+      title: 'Preset Archive',
+      description: 'Browse live preset records and move into the URL-based editor flow from the current selection.',
+      eyebrow: 'Preset Ledger',
+      tags: [{ label: 'Batch 3', tone: 'accent' }],
+    },
+  ],
+  [
     routePaths.cardDetail,
     {
       key: 'card-detail',
@@ -362,6 +392,19 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
+    routePaths.presetEditor,
+    {
+      key: 'preset-editor',
+      label: 'Preset Editor',
+      path: routePaths.presetEditor,
+      area: 'app',
+      title: 'Preset Editor',
+      description: 'Review the selected preset entry before wiring the real editor actions.',
+      eyebrow: 'Loadout Editor',
+      tags: [{ label: 'Batch 3', tone: 'accent' }],
+    },
+  ],
+  [
     routePaths.sessionLobbyPlayer,
     {
       key: 'player-lobby',
@@ -424,6 +467,7 @@ const dynamicRouteEntries = createDynamicRouteEntries([
   { pattern: routePatterns.characterDetail, page: activePageMap.get(routePaths.characterDetail) },
   { pattern: routePatterns.cardDetail, page: activePageMap.get(routePaths.cardDetail) },
   { pattern: routePatterns.deckEditor, page: activePageMap.get(routePaths.deckEditor) },
+  { pattern: routePatterns.presetEditor, page: activePageMap.get(routePaths.presetEditor) },
   { pattern: routePatterns.sessionLobbyPlayer, page: activePageMap.get(routePaths.sessionLobbyPlayer) },
   { pattern: routePatterns.sessionLobbyGm, page: activePageMap.get(routePaths.sessionLobbyGm) },
   { pattern: routePatterns.combat, page: activePageMap.get(routePaths.combat) },
