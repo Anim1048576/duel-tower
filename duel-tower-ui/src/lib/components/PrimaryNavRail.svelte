@@ -1,17 +1,28 @@
 <script lang="ts">
   import TagChip from './TagChip.svelte'
-  import type { AppNavItem } from '../navigation'
+  import type { AppNavItem, PageKey } from '../navigation'
 
   type Props = {
     items: AppNavItem[]
     currentPath: string
+    currentKey: PageKey
     onNavigate: (path: string) => void
   }
 
-  let { items, currentPath, onNavigate }: Props = $props()
+  let { items, currentPath, currentKey, onNavigate }: Props = $props()
 
-  function isSelected(path: string) {
-    return currentPath === path || currentPath.startsWith(`${path}/`)
+  const SESSION_NAV_KEYS = new Set<PageKey>(['lobby', 'player-lobby', 'gm-lobby'])
+
+  function isSelected(item: AppNavItem) {
+    if (item.key === 'lobby' && SESSION_NAV_KEYS.has(currentKey)) {
+      return true
+    }
+
+    if (item.key === currentKey) {
+      return true
+    }
+
+    return currentPath === item.path || currentPath.startsWith(`${item.path}/`)
   }
 </script>
 
@@ -20,7 +31,7 @@
     {#if item.enabled}
       <button
         type="button"
-        class:selected={isSelected(item.path)}
+        class:selected={isSelected(item)}
         onclick={() => onNavigate(item.path)}
       >
         <strong>{item.label}</strong>

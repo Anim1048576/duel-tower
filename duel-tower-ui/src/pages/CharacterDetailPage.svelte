@@ -2,8 +2,12 @@
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
-
-  const CHARACTER_HANDOFF_KEY = 'duel-tower:selected-character-id'
+  import { pathBuilders, resolveRouteMatch } from '../lib/navigation'
+  import {
+    readSelectionHandoff,
+    resolveRouteFirstSelection,
+    selectionHandoffKeys,
+  } from '../lib/selectionHandoff'
 
   const characterRecords = {
     'char-ash': {
@@ -62,101 +66,149 @@
     },
   } as const
 
-  const defaultCharacterId = 'char-ash'
-  const selectedCharacterId =
-    typeof window === 'undefined'
-      ? defaultCharacterId
-      : window.sessionStorage.getItem(CHARACTER_HANDOFF_KEY) ?? defaultCharacterId
+  type CharacterRecordKey = keyof typeof characterRecords
 
-  const character =
-    characterRecords[selectedCharacterId as keyof typeof characterRecords] ??
-    characterRecords[defaultCharacterId]
+  function isCharacterRecordKey(value: string | null | undefined): value is CharacterRecordKey {
+    return typeof value === 'string' && value in characterRecords
+  }
 
-  // TODO: Expand the fixed route /characters/detail into /characters/:id when data IDs are available.
+  function getCharacterIdFromRoute() {
+    if (typeof window === 'undefined') return null
+
+    const match = resolveRouteMatch(window.location.pathname)
+
+    if (match?.page.key !== 'character-detail') {
+      return null
+    }
+
+    return match.params.id ?? null
+  }
+
+  const routeCharacterId = getCharacterIdFromRoute()
+  const characterSelection = resolveRouteFirstSelection({
+    routeValue: routeCharacterId,
+    handoffValue: readSelectionHandoff(selectionHandoffKeys.characterId),
+    isValid: isCharacterRecordKey,
+  })
+  const selectedCharacterId = characterSelection.value
+  const missingCharacterId = characterSelection.missingRouteValue
+  const character = selectedCharacterId !== null ? characterRecords[selectedCharacterId] : null
+  const isSelectionMissing = missingCharacterId === null
+
+  // TODO: Remove the legacy fixed detail route and handoff fallback once /characters/:id is the only entry path.
 </script>
 
 <div class="detail-page">
-  <SectionFrame
-    eyebrow="Selected Record"
-    title={character.name}
-    description="Character Detail / Edit is currently wired to the default selected roster entry from the list page."
-  >
-    <div class="detail-page__hero">
-      <div class="detail-page__hero-copy">
-        <p>{character.role}</p>
-        <h3>{character.summary}</h3>
+  {#if character}
+    <SectionFrame
+      eyebrow="Selected Record"
+      title={character.name}
+      description="Character detail is resolved from the URL id first, with the old fixed-route handoff left only as a temporary fallback."
+    >
+      <div class="detail-page__hero">
+        <div class="detail-page__hero-copy">
+          <p>{character.role}</p>
+          <h3>{character.summary}</h3>
+        </div>
+
+        <div class="detail-page__hero-tags">
+          {#each character.tags as tag}
+            <TagChip label={tag.label} tone={tag.tone} />
+          {/each}
+        </div>
       </div>
 
-      <div class="detail-page__hero-tags">
-        {#each character.tags as tag}
-          <TagChip label={tag.label} tone={tag.tone} />
+      <div class="detail-page__stats">
+        {#each character.stats as stat}
+          <StatBlock value={stat.value} label={stat.label} note={stat.note} />
         {/each}
       </div>
-    </div>
-
-    <div class="detail-page__stats">
-      {#each character.stats as stat}
-        <StatBlock value={stat.value} label={stat.label} note={stat.note} />
-      {/each}
-    </div>
-  </SectionFrame>
-
-  <div class="detail-page__grid">
-    <SectionFrame
-      title="Combat profile"
-      description="The final edit form will replace this read-first profile summary."
-    >
-      <div class="detail-page__list-block">
-        <div>
-          <strong>Role</strong>
-          <p>Primary tank with safe opening patterns and low variance defense turns.</p>
-        </div>
-        <div>
-          <strong>Traits</strong>
-          <ul>
-            {#each character.traits as trait}
-              <li>{trait}</li>
-            {/each}
-          </ul>
-        </div>
-      </div>
     </SectionFrame>
 
+    <div class="detail-page__grid">
+      <SectionFrame
+        title="Combat profile"
+        description="The final edit form will replace this read-first profile summary."
+      >
+        <div class="detail-page__list-block">
+          <div>
+            <strong>Role</strong>
+            <p>Primary tank with safe opening patterns and low variance defense turns.</p>
+          </div>
+          <div>
+            <strong>Traits</strong>
+            <ul>
+              {#each character.traits as trait}
+                <li>{trait}</li>
+              {/each}
+            </ul>
+          </div>
+        </div>
+      </SectionFrame>
+
+      <SectionFrame
+        title="Loadout and notes"
+        description="Equipment, notes, and edit actions remain read-only until the API and form contract are finalized."
+      >
+        <div class="detail-page__list-block">
+          <div>
+            <strong>Loadout</strong>
+            <ul>
+              {#each character.loadout as item}
+                <li>{item}</li>
+              {/each}
+            </ul>
+          </div>
+          <div>
+            <strong>Memo</strong>
+            <p>{character.memo}</p>
+          </div>
+        </div>
+      </SectionFrame>
+    </div>
+
     <SectionFrame
-      title="Loadout and notes"
-      description="Equipment, notes, and edit actions remain read-only until the API and form contract are finalized."
+      title="Edit queue"
+      description="This action strip shows where later batches will connect save, assign, and progression updates."
     >
-      <div class="detail-page__list-block">
-        <div>
-          <strong>Loadout</strong>
-          <ul>
-            {#each character.loadout as item}
-              <li>{item}</li>
-            {/each}
-          </ul>
-        </div>
-        <div>
-          <strong>Memo</strong>
-          <p>{character.memo}</p>
-        </div>
+      <div class="detail-page__actions">
+        <a class="detail-page__link-action" data-nav href={pathBuilders.characterList()}>
+          Back to roster list
+        </a>
+        <button type="button" disabled>Save changes (TODO)</button>
+        <button type="button" disabled>Assign to deck (TODO)</button>
+      </div>
+      <div class="detail-page__todo">
+        <p>TODO: Replace the fixed mock record with API-backed character detail data.</p>
+        <p>TODO: Convert read-only sections into actual edit controls once the contract is ready.</p>
       </div>
     </SectionFrame>
-  </div>
-
-  <SectionFrame
-    title="Edit queue"
-    description="This action strip shows where later batches will connect save, assign, and progression updates."
-  >
-    <div class="detail-page__actions">
-      <a class="detail-page__link-action" data-nav href="/characters">Back to roster list</a>
-      <button type="button" disabled>Save changes (TODO)</button>
-      <button type="button" disabled>Assign to deck (TODO)</button>
-    </div>
-    <div class="detail-page__todo">
-      <p>TODO: Replace the fixed mock record with API-backed character detail data.</p>
-      <p>TODO: Convert read-only sections into actual edit controls once the contract is ready.</p>
-    </div>
-  </SectionFrame>
+  {:else}
+    <SectionFrame
+      eyebrow="Record Missing"
+      title={missingCharacterId ? 'Character not found' : 'Character selection unavailable'}
+      description={
+        missingCharacterId
+          ? 'The requested character id does not match the current mock roster.'
+          : 'Open a character from the roster list or use a valid detail URL to restore this page.'
+      }
+    >
+      <div class="detail-page__todo">
+        {#if missingCharacterId}
+          <p>Requested id: {missingCharacterId}</p>
+          <p>Check the roster list and open a valid character record.</p>
+        {:else if isSelectionMissing}
+          <p>No character id was found in the URL, and no handoff selection is available.</p>
+          <p>Open a character from the roster list to restore the expected detail context.</p>
+        {/if}
+      </div>
+      <div class="detail-page__actions">
+        <a class="detail-page__link-action" data-nav href={pathBuilders.characterList()}>
+          Back to roster list
+        </a>
+      </div>
+    </SectionFrame>
+  {/if}
 </div>
 
 <style>

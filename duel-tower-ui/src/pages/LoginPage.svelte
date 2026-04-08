@@ -1,6 +1,7 @@
 <script lang="ts">
   import TagChip from '../lib/components/TagChip.svelte'
   import { authState } from '../lib/auth/authState.svelte'
+  import { pathBuilders } from '../lib/navigation'
 
   let username = $state('')
   let password = $state('')
@@ -38,7 +39,7 @@
         password,
       })
 
-      history.replaceState({}, '', '/hub')
+      history.replaceState({}, '', pathBuilders.hub())
       window.dispatchEvent(new PopStateEvent('popstate'))
     } catch {
       feedbackVisible = true
@@ -97,7 +98,7 @@
 
     <div class="login-page__actions">
       <button type="submit">기록 보관소 열기</button>
-      <a class="login-page__preview" data-nav href="/hub">허브 미리보기</a>
+      <a class="login-page__preview" data-nav href={pathBuilders.hub()}>허브 미리보기</a>
     </div>
     </fieldset>
   </form>

@@ -2,6 +2,33 @@
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
+  import { pathBuilders, resolveRouteMatch } from '../lib/navigation'
+  import {
+    readSelectionHandoff,
+    resolveRouteFirstSelection,
+    selectionHandoffKeys,
+  } from '../lib/selectionHandoff'
+
+  const sessionRecords = {
+    'TOWER-EMBER-01': {
+      id: 'session-ember-01',
+      title: 'Ember Table 01',
+      subtitle: 'Preparation phase',
+      code: 'TOWER-EMBER-01',
+    },
+    'TOWER-NIGHT-02': {
+      id: 'session-night-02',
+      title: 'Night Watch 02',
+      subtitle: 'Draft phase',
+      code: 'TOWER-NIGHT-02',
+    },
+    'TOWER-SEALED-03': {
+      id: 'session-sealed-03',
+      title: 'Sealed Tower 03',
+      subtitle: 'Ready to launch',
+      code: 'TOWER-SEALED-03',
+    },
+  } as const
 
   const status = {
     round: '03',
@@ -58,129 +85,201 @@
     { name: 'Break March', type: 'Finisher', cost: '2' },
   ]
 
-  // TODO: Replace this fixed page with encounter-based routing such as /combat/:encounterId.
+  type SessionRecordKey = keyof typeof sessionRecords
+  const sessionCodeById = {
+    'session-ember-01': 'TOWER-EMBER-01',
+    'session-night-02': 'TOWER-NIGHT-02',
+    'session-sealed-03': 'TOWER-SEALED-03',
+  } as const
+
+  function isSessionRecordKey(value: string | null | undefined): value is SessionRecordKey {
+    return typeof value === 'string' && value in sessionRecords
+  }
+
+  function getSessionCodeFromRoute() {
+    if (typeof window === 'undefined') return null
+
+    const match = resolveRouteMatch(window.location.pathname)
+
+    if (match?.page.key !== 'combat') {
+      return null
+    }
+
+    return match.params.code ?? null
+  }
+
+  const routeSessionCode = getSessionCodeFromRoute()
+  const fallbackSessionCode = readSelectionHandoff(selectionHandoffKeys.sessionCode)
+  const fallbackSessionId = readSelectionHandoff(selectionHandoffKeys.sessionId)
+  const legacySessionCode =
+    fallbackSessionId && fallbackSessionId in sessionCodeById
+      ? sessionCodeById[fallbackSessionId as keyof typeof sessionCodeById]
+      : null
+  const handoffSessionCode = isSessionRecordKey(fallbackSessionCode)
+    ? fallbackSessionCode
+    : isSessionRecordKey(legacySessionCode)
+      ? legacySessionCode
+      : null
+  const sessionSelection = resolveRouteFirstSelection({
+    routeValue: routeSessionCode,
+    handoffValue: handoffSessionCode,
+    isValid: isSessionRecordKey,
+  })
+  const selectedSessionCode = sessionSelection.value
+  const missingSessionCode = sessionSelection.missingRouteValue
+  const session = selectedSessionCode !== null ? sessionRecords[selectedSessionCode] : null
+
+  // TODO: Remove the legacy fixed combat route and handoff fallback once /sessions/:code/combat is the only entry path.
 </script>
 
 <div class="combat-page">
-  <SectionFrame
-    eyebrow="Combat Status"
-    title="Combat Command"
-    description="Battle state, command planning, and action review stay in one shell for now, with clear panels for later extraction."
-  >
-    <div class="combat-page__status-bar">
-      <div class="combat-page__status-stats">
-        <StatBlock value={status.round} label="Round" note="Current exchange count" />
-        <StatBlock value={status.turn} label="Turn" note="Active initiative owner" />
-        <StatBlock value={status.actionPoints} label="AP" note="Available command budget" />
-      </div>
-
-      <div class="combat-page__status-tags">
-        <TagChip label={status.threat} tone="warning" />
-        <TagChip label="Mock Battle" tone="accent" />
-      </div>
-    </div>
-  </SectionFrame>
-
-  <div class="combat-page__main">
-    <div class="combat-page__field">
-      <SectionFrame
-        title="Player side"
-        description="This panel can later split into party roster cards, target state, and defensive stance modules."
-      >
-        <div class="combat-page__unit-list">
-          {#each playerUnits as unit}
-            <article class="combat-page__unit-card">
-              <div class="combat-page__unit-head">
-                <div>
-                  <h3>{unit.name}</h3>
-                  <p>{unit.role}</p>
-                </div>
-                <TagChip label={unit.state.label} tone={unit.state.tone} />
-              </div>
-              <p>HP {unit.hp}</p>
-              <p>TODO: Add buffs, assigned deck actions, and initiative state.</p>
-            </article>
-          {/each}
+  {#if session}
+    <SectionFrame
+      eyebrow="Combat Status"
+      title="Combat Command"
+      description="Battle state, command planning, and action review stay in one shell for now, with the current session resolved from the URL code first."
+    >
+      <div class="combat-page__status-bar">
+        <div class="combat-page__status-stats">
+          <StatBlock value={status.round} label="Round" note="Current exchange count" />
+          <StatBlock value={status.turn} label="Turn" note="Active initiative owner" />
+          <StatBlock value={status.actionPoints} label="AP" note="Available command budget" />
         </div>
-      </SectionFrame>
+
+        <div class="combat-page__status-tags">
+          <TagChip label={session.code} tone="accent" />
+          <TagChip label={status.threat} tone="warning" />
+          <TagChip label="Mock Battle" tone="accent" />
+        </div>
+      </div>
+    </SectionFrame>
+
+    <div class="combat-page__main">
+      <div class="combat-page__field">
+        <SectionFrame
+          title="Player side"
+          description={`This panel can later split into party roster cards, target state, and defensive stance modules for ${session.title}.`}
+        >
+          <div class="combat-page__unit-list">
+            {#each playerUnits as unit}
+              <article class="combat-page__unit-card">
+                <div class="combat-page__unit-head">
+                  <div>
+                    <h3>{unit.name}</h3>
+                    <p>{unit.role}</p>
+                  </div>
+                  <TagChip label={unit.state.label} tone={unit.state.tone} />
+                </div>
+                <p>HP {unit.hp}</p>
+                <p>TODO: Add buffs, assigned deck actions, and initiative state.</p>
+              </article>
+            {/each}
+          </div>
+        </SectionFrame>
+
+        <SectionFrame
+          title="Enemy side"
+          description="Enemy status remains separate so future targeting and phase logic can evolve without touching the player panel."
+        >
+          <div class="combat-page__unit-list">
+            {#each enemyUnits as unit}
+              <article class="combat-page__unit-card combat-page__unit-card--enemy">
+                <div class="combat-page__unit-head">
+                  <div>
+                    <h3>{unit.name}</h3>
+                    <p>{unit.role}</p>
+                  </div>
+                  <TagChip label={unit.state.label} tone={unit.state.tone} />
+                </div>
+                <p>HP {unit.hp}</p>
+                <p>TODO: Add resistances, enemy intent, and break thresholds.</p>
+              </article>
+            {/each}
+          </div>
+        </SectionFrame>
+      </div>
 
       <SectionFrame
-        title="Enemy side"
-        description="Enemy status remains separate so future targeting and phase logic can evolve without touching the player panel."
+        title="Command and log"
+        description="The right-side panel is deliberately split into command planning and event history for later extraction."
       >
-        <div class="combat-page__unit-list">
-          {#each enemyUnits as unit}
-            <article class="combat-page__unit-card combat-page__unit-card--enemy">
-              <div class="combat-page__unit-head">
-                <div>
-                  <h3>{unit.name}</h3>
-                  <p>{unit.role}</p>
-                </div>
-                <TagChip label={unit.state.label} tone={unit.state.tone} />
-              </div>
-              <p>HP {unit.hp}</p>
-              <p>TODO: Add resistances, enemy intent, and break thresholds.</p>
-            </article>
-          {/each}
+        <div class="combat-page__sidebar">
+          <div class="combat-page__command-panel">
+            <strong>Command panel</strong>
+            <div class="combat-page__command-list">
+              {#each commandOptions as command}
+                <button type="button" disabled>
+                  <span>{command.title}</span>
+                  <small>{command.note}</small>
+                </button>
+              {/each}
+            </div>
+          </div>
+
+          <div class="combat-page__log-panel">
+            <strong>Action log</strong>
+            <ul>
+              {#each combatLog as entry}
+                <li>{entry}</li>
+              {/each}
+            </ul>
+            <p>TODO: Replace mock log lines with streamed battle events.</p>
+          </div>
         </div>
       </SectionFrame>
     </div>
 
     <SectionFrame
-      title="Command and log"
-      description="The right-side panel is deliberately split into command planning and event history for later extraction."
+      title="Hand and action bar"
+      description="This bottom strip is isolated so card hand, selected action, and confirmation controls can later become their own module."
     >
-      <div class="combat-page__sidebar">
-        <div class="combat-page__command-panel">
-          <strong>Command panel</strong>
-          <div class="combat-page__command-list">
-            {#each commandOptions as command}
-              <button type="button" disabled>
-                <span>{command.title}</span>
-                <small>{command.note}</small>
-              </button>
-            {/each}
-          </div>
+      <div class="combat-page__hand-bar">
+        <div class="combat-page__hand-cards">
+          {#each handCards as card}
+            <article class="combat-page__hand-card">
+              <p>{card.type}</p>
+              <h4>{card.name}</h4>
+              <span>Cost {card.cost}</span>
+            </article>
+          {/each}
         </div>
 
-        <div class="combat-page__log-panel">
-          <strong>Action log</strong>
-          <ul>
-            {#each combatLog as entry}
-              <li>{entry}</li>
-            {/each}
-          </ul>
-          <p>TODO: Replace mock log lines with streamed battle events.</p>
+        <div class="combat-page__action-summary">
+          <strong>Selected action</strong>
+          <p>Shield Push is highlighted as the next safe opener for the mock state.</p>
+          <div class="combat-page__action-buttons">
+            <button type="button" disabled>Commit action (TODO)</button>
+            <button type="button" disabled>End turn (TODO)</button>
+          </div>
         </div>
       </div>
     </SectionFrame>
-  </div>
-
-  <SectionFrame
-    title="Hand and action bar"
-    description="This bottom strip is isolated so card hand, selected action, and confirmation controls can later become their own module."
-  >
-    <div class="combat-page__hand-bar">
-      <div class="combat-page__hand-cards">
-        {#each handCards as card}
-          <article class="combat-page__hand-card">
-            <p>{card.type}</p>
-            <h4>{card.name}</h4>
-            <span>Cost {card.cost}</span>
-          </article>
-        {/each}
-      </div>
-
+  {:else}
+    <SectionFrame
+      eyebrow="Session Missing"
+      title={missingSessionCode ? 'Combat session not found' : 'Combat session unavailable'}
+      description={
+        missingSessionCode
+          ? 'The requested session code does not match the current mock session archive.'
+          : 'Open a session from the GM lobby or use a valid combat URL to restore this page.'
+      }
+    >
       <div class="combat-page__action-summary">
-        <strong>Selected action</strong>
-        <p>Shield Push is highlighted as the next safe opener for the mock state.</p>
-        <div class="combat-page__action-buttons">
-          <button type="button" disabled>Commit action (TODO)</button>
-          <button type="button" disabled>End turn (TODO)</button>
-        </div>
+        {#if missingSessionCode}
+          <p>Requested code: {missingSessionCode}</p>
+          <p>Check the session entry screen and open a valid combat route.</p>
+        {:else}
+          <p>No session code was found in the URL, and no handoff selection is available.</p>
+          <p>Open a session from the GM lobby to restore the expected combat context.</p>
+        {/if}
       </div>
-    </div>
-  </SectionFrame>
+      <div class="combat-page__action-buttons">
+        <a class="combat-page__nav-link" data-nav href={pathBuilders.sessionEntry()}>
+          Back to session entry
+        </a>
+      </div>
+    </SectionFrame>
+  {/if}
 </div>
 
 <style>
@@ -322,12 +421,19 @@
     gap: 1rem;
   }
 
+  .combat-page__nav-link,
   .combat-page__action-buttons button {
     min-height: 3rem;
     padding: 0.75rem 1rem;
     border: 1px solid rgba(226, 193, 155, 0.42);
     background: linear-gradient(180deg, rgba(226, 193, 155, 0.18), rgba(226, 193, 155, 0.08));
     color: var(--color-text);
+  }
+
+  .combat-page__nav-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   @media (max-width: 1080px) {

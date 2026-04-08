@@ -4,6 +4,8 @@
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
+  import { pathBuilders } from '../lib/navigation'
+  import { selectionHandoffKeys, setSelectionHandoff } from '../lib/selectionHandoff'
 
   const decks = [
     {
@@ -50,7 +52,6 @@
 
   let query = $state('')
   let selectedId = $state(decks[0]?.id ?? '')
-  const DECK_HANDOFF_KEY = 'duel-tower:selected-deck-id'
 
   const filteredDecks = $derived.by(() => {
     const normalized = query.trim().toLowerCase()
@@ -68,8 +69,7 @@
   )
 
   function persistSelectedDeck(id: string) {
-    if (typeof window === 'undefined' || !id) return
-    window.sessionStorage.setItem(DECK_HANDOFF_KEY, id)
+    setSelectionHandoff(selectionHandoffKeys.deckId, id)
   }
 
   function handleSelectDeck(id: string) {
@@ -80,6 +80,10 @@
   function handleOpenEditor() {
     persistSelectedDeck(selectedDeck?.id ?? decks[0]?.id ?? '')
   }
+
+  const selectedDeckEditorPath = $derived.by(() =>
+    pathBuilders.deckEditor(selectedDeck?.id ?? decks[0]?.id),
+  )
 </script>
 
 <div class="list-page">
@@ -146,12 +150,17 @@
           <p>{selectedDeck.meta}</p>
           <p>{selectedDeck.note}</p>
 
-          <a class="list-page__link-action" data-nav href="/decks/editor" onclick={handleOpenEditor}>
+          <a
+            class="list-page__link-action"
+            data-nav
+            href={selectedDeckEditorPath}
+            onclick={handleOpenEditor}
+          >
             Open editor for {selectedDeck.title}
           </a>
 
           <div class="list-page__todo">
-            <p>TODO: Expand /decks/editor into an id-based route such as /decks/:id/editor.</p>
+            <p>TODO: Remove the legacy fixed editor route fallback after URL-based entry is fully stable.</p>
             <p>TODO: Connect deck selection and editor entry to the deck API contract.</p>
             <p>TODO: Remove mock deck summary data after live deck state is available.</p>
           </div>

@@ -31,25 +31,103 @@ export type PageDefinition = {
   tags?: PageTag[]
 }
 
+export type RouteParams = Record<string, string>
+
+export type RouteMatch = {
+  page: PageDefinition
+  params: RouteParams
+}
+
+export const routePaths = {
+  home: '/',
+  login: '/',
+  hub: '/hub',
+  characterList: '/characters',
+  characterDetail: '/characters/detail',
+  deckList: '/decks',
+  deckEditor: '/decks/editor',
+  sessionEntry: '/lobby',
+  sessionLobbyPlayer: '/lobby/player',
+  sessionLobbyGm: '/lobby/gm',
+  combat: '/combat',
+} as const
+
+export const routePatterns = {
+  characterDetail: '/characters/:id',
+  deckEditor: '/decks/:id/editor',
+  sessionLobbyPlayer: '/sessions/:code/player',
+  sessionLobbyGm: '/sessions/:code/gm',
+  combat: '/sessions/:code/combat',
+} as const
+
+function hasRouteParam(value?: string): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function encodeRouteSegment(value: string) {
+  return encodeURIComponent(value.trim())
+}
+
+function buildPathFromPattern(pattern: string, params: RouteParams) {
+  return pattern.replace(/:([A-Za-z0-9_]+)/g, (_, key: string) => {
+    const value = params[key]
+
+    if (!hasRouteParam(value)) {
+      throw new Error(`Missing route parameter: ${key}`)
+    }
+
+    return encodeRouteSegment(value)
+  })
+}
+
+export const pathBuilders = {
+  home: () => routePaths.home,
+  login: () => routePaths.login,
+  hub: () => routePaths.hub,
+  characterList: () => routePaths.characterList,
+  characterDetail: (id?: string) =>
+    hasRouteParam(id)
+      ? buildPathFromPattern(routePatterns.characterDetail, { id })
+      : routePaths.characterDetail,
+  deckList: () => routePaths.deckList,
+  deckEditor: (id?: string) =>
+    hasRouteParam(id)
+      ? buildPathFromPattern(routePatterns.deckEditor, { id })
+      : routePaths.deckEditor,
+  sessionEntry: () => routePaths.sessionEntry,
+  sessionLobbyPlayer: (code?: string) =>
+    hasRouteParam(code)
+      ? buildPathFromPattern(routePatterns.sessionLobbyPlayer, { code })
+      : routePaths.sessionLobbyPlayer,
+  sessionLobbyGm: (code?: string) =>
+    hasRouteParam(code)
+      ? buildPathFromPattern(routePatterns.sessionLobbyGm, { code })
+      : routePaths.sessionLobbyGm,
+  combat: (code?: string) =>
+    hasRouteParam(code)
+      ? buildPathFromPattern(routePatterns.combat, { code })
+      : routePaths.combat,
+} as const
+
 export const PAGES: PageDefinition[] = [
   {
     key: 'home',
     label: 'Home',
-    path: '/',
+    path: routePaths.home,
     title: 'Home',
     description: '새로운 UI 기반을 위한 출발 지점입니다. 핵심 대시보드는 추후 재구성됩니다.',
   },
   {
     key: 'lobby',
     label: 'Lobby / Session',
-    path: '/lobby',
+    path: routePaths.sessionEntry,
     title: 'Lobby / Session',
     description: '세션 준비, 참여, 관리 흐름은 이후 요구사항에 맞춰 다시 설계될 예정입니다.',
   },
   {
     key: 'decks',
     label: 'Decks',
-    path: '/decks',
+    path: routePaths.deckList,
     title: 'Decks',
     description: '덱 편집과 상세 인터랙션은 이후 단계에서 새 UX 기준으로 재구축됩니다.',
   },
@@ -70,7 +148,7 @@ export const PAGES: PageDefinition[] = [
   {
     key: 'combat',
     label: 'Combat',
-    path: '/combat',
+    path: routePaths.combat,
     title: 'Combat',
     description: '전투 보드 및 액션 UI는 별도 전투 설계안 기반으로 재개발될 예정입니다.',
   },
@@ -89,35 +167,35 @@ export const APP_NAV_ITEMS = [
   {
     key: 'hub',
     label: 'Hub',
-    path: '/hub',
+    path: routePaths.hub,
     description: 'Overview and central entry point',
     enabled: true,
   },
   {
     key: 'character',
     label: 'Characters',
-    path: '/characters',
+    path: routePaths.characterList,
     description: 'Roster and detail records',
     enabled: true,
   },
   {
     key: 'decks',
     label: 'Decks',
-    path: '/decks',
+    path: routePaths.deckList,
     description: 'List and editor flow',
     enabled: true,
   },
   {
     key: 'lobby',
     label: 'Session',
-    path: '/lobby',
+    path: routePaths.sessionEntry,
     description: 'Entry and lobby flow',
     enabled: true,
   },
   {
     key: 'combat',
     label: 'Combat',
-    path: '/combat',
+    path: routePaths.combat,
     description: 'Combat command screen',
     enabled: true,
   },
@@ -133,11 +211,11 @@ export type AppNavItem = {
 
 const activePageMap = new Map<string, PageDefinition>([
   [
-    '/',
+    routePaths.login,
     {
       key: 'login',
       label: 'Login',
-      path: '/',
+      path: routePaths.login,
       area: 'public',
       title: 'Archive Access',
       description: 'Public entry screen for archive access.',
@@ -145,11 +223,11 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    '/hub',
+    routePaths.hub,
     {
       key: 'hub',
       label: 'Hub',
-      path: '/hub',
+      path: routePaths.hub,
       area: 'app',
       title: 'Duel Tower Hub',
       description: 'Internal hub for overview, status, and next work targets.',
@@ -161,11 +239,11 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    '/characters',
+    routePaths.characterList,
     {
       key: 'character',
       label: 'Characters',
-      path: '/characters',
+      path: routePaths.characterList,
       area: 'app',
       title: 'Character Roster',
       description: 'Browse the roster and move into the next detail step from the current selection.',
@@ -174,11 +252,11 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    '/decks',
+    routePaths.deckList,
     {
       key: 'decks',
       label: 'Decks',
-      path: '/decks',
+      path: routePaths.deckList,
       area: 'app',
       title: 'Deck List',
       description: 'Review deck summaries and move into the next editor step from the current selection.',
@@ -187,11 +265,11 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    '/lobby',
+    routePaths.sessionEntry,
     {
       key: 'lobby',
       label: 'Session Entry',
-      path: '/lobby',
+      path: routePaths.sessionEntry,
       area: 'app',
       title: 'Session Entry',
       description: 'Enter by code or choose from open sessions before moving into the player lobby.',
@@ -200,11 +278,11 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    '/characters/detail',
+    routePaths.characterDetail,
     {
       key: 'character-detail',
       label: 'Character Detail',
-      path: '/characters/detail',
+      path: routePaths.characterDetail,
       area: 'app',
       title: 'Character Detail / Edit',
       description: 'Read the selected adventurer record and prepare the next edit step.',
@@ -213,11 +291,11 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    '/decks/editor',
+    routePaths.deckEditor,
     {
       key: 'deck-editor',
       label: 'Deck Editor',
-      path: '/decks/editor',
+      path: routePaths.deckEditor,
       area: 'app',
       title: 'Deck Editor',
       description: 'Review the selected deck structure before wiring the real editor actions.',
@@ -226,11 +304,11 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    '/lobby/player',
+    routePaths.sessionLobbyPlayer,
     {
       key: 'player-lobby',
       label: 'Player Lobby',
-      path: '/lobby/player',
+      path: routePaths.sessionLobbyPlayer,
       area: 'app',
       title: 'Player Lobby',
       description: 'Inspect session summary, participant slots, and readiness flow from the player side.',
@@ -239,11 +317,11 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    '/lobby/gm',
+    routePaths.sessionLobbyGm,
     {
       key: 'gm-lobby',
       label: 'GM Lobby',
-      path: '/lobby/gm',
+      path: routePaths.sessionLobbyGm,
       area: 'app',
       title: 'GM Lobby',
       description: 'Manage participant readiness and session controls from the GM side.',
@@ -252,11 +330,11 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    '/combat',
+    routePaths.combat,
     {
       key: 'combat',
       label: 'Combat Command',
-      path: '/combat',
+      path: routePaths.combat,
       area: 'app',
       title: 'Combat Command',
       description: 'Review battle state, issue commands, and track the action log in one screen.',
@@ -266,15 +344,102 @@ const activePageMap = new Map<string, PageDefinition>([
   ],
 ])
 
-// TODO: Expand fixed routes such as /characters/detail, /decks/editor, /lobby/player,
-// and /lobby/gm into id/code-based routes when the data contract is finalized.
+const dynamicRouteEntries = [
+  { pattern: routePatterns.characterDetail, page: activePageMap.get(routePaths.characterDetail) },
+  { pattern: routePatterns.deckEditor, page: activePageMap.get(routePaths.deckEditor) },
+  { pattern: routePatterns.sessionLobbyPlayer, page: activePageMap.get(routePaths.sessionLobbyPlayer) },
+  { pattern: routePatterns.sessionLobbyGm, page: activePageMap.get(routePaths.sessionLobbyGm) },
+  { pattern: routePatterns.combat, page: activePageMap.get(routePaths.combat) },
+].filter((entry): entry is { pattern: string; page: PageDefinition } => entry.page !== undefined)
+
+function getPathSegments(pathname: string) {
+  const normalized = normalizePath(pathname)
+
+  if (normalized === routePaths.home) {
+    return [] as string[]
+  }
+
+  return normalized.slice(1).split('/')
+}
+
+export function matchRoutePattern(pattern: string, pathname: string): RouteParams | null {
+  const patternSegments = getPathSegments(pattern)
+  const pathSegments = getPathSegments(pathname)
+
+  if (patternSegments.length !== pathSegments.length) {
+    return null
+  }
+
+  const params: RouteParams = {}
+
+  for (const [index, patternSegment] of patternSegments.entries()) {
+    const pathSegment = pathSegments[index]
+
+    if (patternSegment.startsWith(':')) {
+      const key = patternSegment.slice(1)
+
+      if (!key || !pathSegment) {
+        return null
+      }
+
+      params[key] = decodeURIComponent(pathSegment)
+      continue
+    }
+
+    if (patternSegment !== pathSegment) {
+      return null
+    }
+  }
+
+  return params
+}
 
 export function normalizePath(pathname: string): string {
-  if (!pathname) return '/'
-  return pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname
+  if (!pathname) return routePaths.home
+
+  const withoutHash = pathname.split('#')[0] ?? pathname
+  const withoutQuery = withoutHash.split('?')[0] ?? withoutHash
+
+  if (!withoutQuery) return routePaths.home
+
+  return withoutQuery.endsWith('/') && withoutQuery !== routePaths.home
+    ? withoutQuery.slice(0, -1)
+    : withoutQuery
+}
+
+export function resolveRouteMatch(pathname: string): RouteMatch | null {
+  const normalized = normalizePath(pathname)
+  const staticPage = activePageMap.get(normalized) ?? pageMap.get(normalized)
+
+  if (staticPage) {
+    return {
+      page: staticPage,
+      params: {},
+    }
+  }
+
+  for (const entry of dynamicRouteEntries) {
+    const params = matchRoutePattern(entry.pattern, normalized)
+
+    if (params) {
+      return {
+        page: {
+          ...entry.page,
+          path: normalized,
+        },
+        params,
+      }
+    }
+  }
+
+  return null
 }
 
 export function resolvePage(pathname: string): PageDefinition {
-  const normalized = normalizePath(pathname)
-  return activePageMap.get(normalized) ?? activePageMap.get('/') ?? pageMap.get(normalized) ?? PAGES[0]
+  return (
+    resolveRouteMatch(pathname)?.page ??
+    activePageMap.get(routePaths.login) ??
+    pageMap.get(routePaths.home) ??
+    PAGES[0]
+  )
 }

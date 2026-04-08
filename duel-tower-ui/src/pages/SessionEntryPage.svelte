@@ -4,11 +4,13 @@
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
+  import { pathBuilders } from '../lib/navigation'
   import { selectionHandoffKeys, setSelectionHandoff } from '../lib/selectionHandoff'
 
   const sessions = [
     {
       id: 'session-ember-01',
+      code: 'TOWER-EMBER-01',
       title: 'Ember Table 01',
       subtitle: 'GM: Archive Keeper',
       meta: '4 / 6 joined · Preparation phase',
@@ -20,6 +22,7 @@
     },
     {
       id: 'session-night-02',
+      code: 'TOWER-NIGHT-02',
       title: 'Night Watch 02',
       subtitle: 'GM: Mira',
       meta: '3 / 6 joined · Draft phase',
@@ -31,6 +34,7 @@
     },
     {
       id: 'session-sealed-03',
+      code: 'TOWER-SEALED-03',
       title: 'Sealed Tower 03',
       subtitle: 'GM: Ashen Knight',
       meta: '6 / 6 joined · Ready to launch',
@@ -42,6 +46,7 @@
     },
   ] satisfies Array<{
     id: string
+    code: string
     title: string
     subtitle?: string
     meta?: string
@@ -69,22 +74,37 @@
     () => filteredSessions.find((item) => item.id === selectedId) ?? filteredSessions[0] ?? null,
   )
 
-  function persistSelectedSession(id: string) {
-    setSelectionHandoff(selectionHandoffKeys.sessionId, id)
+  function persistSelectedSession(session: { id: string; code: string }) {
+    setSelectionHandoff(selectionHandoffKeys.sessionId, session.id)
+    setSelectionHandoff(selectionHandoffKeys.sessionCode, session.code)
   }
 
   function handleSelectSession(id: string) {
     selectedId = id
-    persistSelectedSession(id)
+
+    const nextSession = sessions.find((item) => item.id === id)
+    if (!nextSession) return
+
+    persistSelectedSession(nextSession)
   }
 
   function handleOpenPlayerLobby() {
-    persistSelectedSession(selectedSession?.id ?? sessions[0]?.id ?? '')
+    if (!selectedSession) return
+    persistSelectedSession(selectedSession)
   }
 
   function handleOpenGmLobby() {
-    persistSelectedSession(selectedSession?.id ?? sessions[0]?.id ?? '')
+    if (!selectedSession) return
+    persistSelectedSession(selectedSession)
   }
+
+  const selectedPlayerLobbyPath = $derived.by(() =>
+    pathBuilders.sessionLobbyPlayer(selectedSession?.code),
+  )
+
+  const selectedGmLobbyPath = $derived.by(() =>
+    pathBuilders.sessionLobbyGm(selectedSession?.code),
+  )
 
   function handleSubmit(event: SubmitEvent) {
     event.preventDefault()
@@ -201,7 +221,7 @@
             <a
               class="session-entry-page__link-action"
               data-nav
-              href="/lobby/player"
+              href={selectedPlayerLobbyPath}
               onclick={handleOpenPlayerLobby}
             >
               Open player lobby for {selectedSession.title}
@@ -210,7 +230,7 @@
             <a
               class="session-entry-page__link-action session-entry-page__link-action--muted"
               data-nav
-              href="/lobby/gm"
+              href={selectedGmLobbyPath}
               onclick={handleOpenGmLobby}
             >
               Open GM lobby for {selectedSession.title}
@@ -218,8 +238,8 @@
 
             <div class="session-entry-page__todo">
               <p>
-                TODO: Expand /lobby/player and /lobby/gm into code-based routes such as
-                /lobby/:code/player and /lobby/:code/gm.
+                TODO: Remove the legacy fixed lobby route fallback after /sessions/:code/player and
+                /sessions/:code/gm are the only entry paths.
               </p>
               <p>TODO: Connect session entry and lobby selection to the session API contract.</p>
               <p>TODO: Remove mock session availability data after live lobby state is available.</p>

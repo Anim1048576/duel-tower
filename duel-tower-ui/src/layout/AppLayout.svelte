@@ -56,7 +56,12 @@
       {/if}
     </div>
 
-    <PrimaryNavRail items={pages} currentPath={current.path} onNavigate={onNavigate} />
+    <PrimaryNavRail
+      items={pages}
+      currentPath={current.path}
+      currentKey={current.key}
+      onNavigate={onNavigate}
+    />
   </aside>
 
   <div class="app-main">

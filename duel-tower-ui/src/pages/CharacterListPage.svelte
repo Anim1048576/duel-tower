@@ -4,6 +4,8 @@
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
+  import { pathBuilders } from '../lib/navigation'
+  import { selectionHandoffKeys, setSelectionHandoff } from '../lib/selectionHandoff'
 
   const characters = [
     {
@@ -50,7 +52,6 @@
 
   let query = $state('')
   let selectedId = $state(characters[0]?.id ?? '')
-  const CHARACTER_HANDOFF_KEY = 'duel-tower:selected-character-id'
 
   const filteredCharacters = $derived.by(() => {
     const normalized = query.trim().toLowerCase()
@@ -68,8 +69,7 @@
   )
 
   function persistSelectedCharacter(id: string) {
-    if (typeof window === 'undefined' || !id) return
-    window.sessionStorage.setItem(CHARACTER_HANDOFF_KEY, id)
+    setSelectionHandoff(selectionHandoffKeys.characterId, id)
   }
 
   function handleSelectCharacter(id: string) {
@@ -80,6 +80,10 @@
   function handleOpenDetail() {
     persistSelectedCharacter(selectedCharacter?.id ?? characters[0]?.id ?? '')
   }
+
+  const selectedCharacterDetailPath = $derived.by(() =>
+    pathBuilders.characterDetail(selectedCharacter?.id ?? characters[0]?.id),
+  )
 </script>
 
 <div class="list-page">
@@ -146,12 +150,17 @@
           <p>{selectedCharacter.meta}</p>
           <p>{selectedCharacter.note}</p>
 
-          <a class="list-page__link-action" data-nav href="/characters/detail" onclick={handleOpenDetail}>
+          <a
+            class="list-page__link-action"
+            data-nav
+            href={selectedCharacterDetailPath}
+            onclick={handleOpenDetail}
+          >
             Open detail for {selectedCharacter.title}
           </a>
 
           <div class="list-page__todo">
-            <p>TODO: Expand /characters/detail into an id-based route such as /characters/:id.</p>
+            <p>TODO: Remove the legacy fixed detail route fallback after URL-based entry is fully stable.</p>
             <p>TODO: Connect roster selection and detail entry to the character API contract.</p>
             <p>TODO: Remove mock roster summary data after live character state is available.</p>
           </div>

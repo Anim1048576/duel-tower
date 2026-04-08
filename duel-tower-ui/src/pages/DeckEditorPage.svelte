@@ -3,8 +3,12 @@
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
-
-  const DECK_HANDOFF_KEY = 'duel-tower:selected-deck-id'
+  import { pathBuilders, resolveRouteMatch } from '../lib/navigation'
+  import {
+    readSelectionHandoff,
+    resolveRouteFirstSelection,
+    selectionHandoffKeys,
+  } from '../lib/selectionHandoff'
 
   const deckRecords = {
     'deck-vanguard': {
@@ -117,94 +121,142 @@
     },
   } as const
 
-  const defaultDeckId = 'deck-vanguard'
-  const selectedDeckId =
-    typeof window === 'undefined'
-      ? defaultDeckId
-      : window.sessionStorage.getItem(DECK_HANDOFF_KEY) ?? defaultDeckId
+  type DeckRecordKey = keyof typeof deckRecords
+  function isDeckRecordKey(value: string | null | undefined): value is DeckRecordKey {
+    return typeof value === 'string' && value in deckRecords
+  }
 
-  const deck = deckRecords[selectedDeckId as keyof typeof deckRecords] ?? deckRecords[defaultDeckId]
-  const slots = [...deck.slots]
+  function getDeckIdFromRoute() {
+    if (typeof window === 'undefined') return null
+
+    const match = resolveRouteMatch(window.location.pathname)
+
+    if (match?.page.key !== 'deck-editor') {
+      return null
+    }
+
+    return match.params.id ?? null
+  }
+
+  const routeDeckId = getDeckIdFromRoute()
+  const deckSelection = resolveRouteFirstSelection({
+    routeValue: routeDeckId,
+    handoffValue: readSelectionHandoff(selectionHandoffKeys.deckId),
+    isValid: isDeckRecordKey,
+  })
+  const selectedDeckId = deckSelection.value
+  const missingDeckId = deckSelection.missingRouteValue
+  const deck = selectedDeckId !== null ? deckRecords[selectedDeckId] : null
+  const slots = deck ? [...deck.slots] : []
 
   let selectedId = $state(slots[0]?.id ?? '')
 
   const selectedSlot = $derived.by(() => slots.find((item) => item.id === selectedId) ?? slots[0] ?? null)
 
-  // TODO: Expand the fixed route /decks/editor into /decks/:id/editor when deck IDs are available.
+  // TODO: Remove the legacy fixed editor route and handoff fallback once /decks/:id/editor is the only entry path.
 </script>
 
 <div class="editor-page">
-  <SectionFrame
-    eyebrow="Selected Deck"
-    title={deck.name}
-    description="Deck editor is currently wired to the default deck selected from the list page."
-  >
-    <div class="editor-page__hero">
-      <div class="editor-page__hero-copy">
-        <p>{deck.role}</p>
-        <h3>{deck.summary}</h3>
-      </div>
-
-      <div class="editor-page__hero-tags">
-        <TagChip label="Active" tone="success" />
-        <TagChip label="Batch 3" tone="accent" />
-      </div>
-    </div>
-
-    <div class="editor-page__stats">
-      {#each deck.stats as stat}
-        <StatBlock value={stat.value} label={stat.label} note={stat.note} />
-      {/each}
-    </div>
-  </SectionFrame>
-
-  <div class="editor-page__grid">
+  {#if deck}
     <SectionFrame
-      title="Deck slots"
-      description="EntityListPane is reused here to keep deck slot browsing consistent with the list pages."
+      eyebrow="Selected Deck"
+      title={deck.name}
+      description="Deck editor is resolved from the URL id first, with the old fixed-route handoff left only as a temporary fallback."
     >
-      <EntityListPane items={slots} selectedId={selectedId} onSelect={(id) => (selectedId = id)} />
-    </SectionFrame>
-
-    <SectionFrame
-      title="Selected slot"
-      description="This is the next handoff point for the real editor controls and card picker."
-    >
-      {#if selectedSlot}
-        <div class="editor-page__slot-detail">
-          <div>
-            <h3>{selectedSlot.title}</h3>
-            <p>{selectedSlot.subtitle}</p>
-          </div>
-
-          <div class="editor-page__slot-tags">
-            {#each selectedSlot.tags ?? [] as tag}
-              <TagChip label={tag.label} tone={tag.tone} />
-            {/each}
-          </div>
-
-          <p>{selectedSlot.meta}</p>
-          <p>{selectedSlot.note}</p>
-
-          <div class="editor-page__todo">
-            <p>TODO: Replace mock slot data with editor state from the API.</p>
-            <p>TODO: Add card picker, reorder, and validation flows.</p>
-          </div>
+      <div class="editor-page__hero">
+        <div class="editor-page__hero-copy">
+          <p>{deck.role}</p>
+          <h3>{deck.summary}</h3>
         </div>
-      {/if}
-    </SectionFrame>
-  </div>
 
-  <SectionFrame
-    title="Editor actions"
-    description="This strip marks where save, duplicate, and assign actions will land in later batches."
-  >
-    <div class="editor-page__actions">
-      <a class="editor-page__link-action" data-nav href="/decks">Back to deck list</a>
-      <button type="button" disabled>Save deck (TODO)</button>
-      <button type="button" disabled>Assign deck (TODO)</button>
+        <div class="editor-page__hero-tags">
+          <TagChip label="Active" tone="success" />
+          <TagChip label="Batch 3" tone="accent" />
+        </div>
+      </div>
+
+      <div class="editor-page__stats">
+        {#each deck.stats as stat}
+          <StatBlock value={stat.value} label={stat.label} note={stat.note} />
+        {/each}
+      </div>
+    </SectionFrame>
+
+    <div class="editor-page__grid">
+      <SectionFrame
+        title="Deck slots"
+        description="EntityListPane is reused here to keep deck slot browsing consistent with the list pages."
+      >
+        <EntityListPane items={slots} selectedId={selectedId} onSelect={(id) => (selectedId = id)} />
+      </SectionFrame>
+
+      <SectionFrame
+        title="Selected slot"
+        description="This is the next handoff point for the real editor controls and card picker."
+      >
+        {#if selectedSlot}
+          <div class="editor-page__slot-detail">
+            <div>
+              <h3>{selectedSlot.title}</h3>
+              <p>{selectedSlot.subtitle}</p>
+            </div>
+
+            <div class="editor-page__slot-tags">
+              {#each selectedSlot.tags ?? [] as tag}
+                <TagChip label={tag.label} tone={tag.tone} />
+              {/each}
+            </div>
+
+            <p>{selectedSlot.meta}</p>
+            <p>{selectedSlot.note}</p>
+
+            <div class="editor-page__todo">
+              <p>TODO: Replace mock slot data with editor state from the API.</p>
+              <p>TODO: Add card picker, reorder, and validation flows.</p>
+            </div>
+          </div>
+        {/if}
+      </SectionFrame>
     </div>
-  </SectionFrame>
+
+    <SectionFrame
+      title="Editor actions"
+      description="This strip marks where save, duplicate, and assign actions will land in later batches."
+    >
+      <div class="editor-page__actions">
+        <a class="editor-page__link-action" data-nav href={pathBuilders.deckList()}>
+          Back to deck list
+        </a>
+        <button type="button" disabled>Save deck (TODO)</button>
+        <button type="button" disabled>Assign deck (TODO)</button>
+      </div>
+    </SectionFrame>
+  {:else}
+    <SectionFrame
+      eyebrow="Deck Missing"
+      title={missingDeckId ? 'Deck not found' : 'Deck selection unavailable'}
+      description={
+        missingDeckId
+          ? 'The requested deck id does not match the current mock deck archive.'
+          : 'Open a deck from the deck list or use a valid editor URL to restore this page.'
+      }
+    >
+      <div class="editor-page__todo">
+        {#if missingDeckId}
+          <p>Requested id: {missingDeckId}</p>
+          <p>Check the deck list and open a valid deck record.</p>
+        {:else}
+          <p>No deck id was found in the URL, and no handoff selection is available.</p>
+          <p>Open a deck from the deck list to restore the expected editor context.</p>
+        {/if}
+      </div>
+      <div class="editor-page__actions">
+        <a class="editor-page__link-action" data-nav href={pathBuilders.deckList()}>
+          Back to deck list
+        </a>
+      </div>
+    </SectionFrame>
+  {/if}
 </div>
 
 <style>

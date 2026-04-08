@@ -11,7 +11,13 @@
   import LoginPage from './pages/LoginPage.svelte'
   import PlayerLobbyPage from './pages/PlayerLobbyPage.svelte'
   import SessionEntryPage from './pages/SessionEntryPage.svelte'
-  import { APP_NAV_ITEMS, normalizePath, resolvePage, type PageKey } from './lib/navigation'
+  import {
+    APP_NAV_ITEMS,
+    normalizePath,
+    pathBuilders,
+    resolvePage,
+    type PageKey,
+  } from './lib/navigation'
   import { authState } from './lib/auth/authState.svelte'
 
   const PUBLIC_PAGE_COMPONENTS = {
@@ -36,8 +42,8 @@
     try {
       await authState.logout()
     } finally {
-      history.replaceState({}, '', '/')
-      updateCurrentPage('/')
+      history.replaceState({}, '', pathBuilders.login())
+      updateCurrentPage(pathBuilders.login())
     }
   }
 
@@ -54,14 +60,14 @@
     if (!authState.isAuthenticated && requestedPage.area === 'app') {
       return {
         requestedPage,
-        finalPage: resolvePage('/'),
+        finalPage: resolvePage(pathBuilders.login()),
       }
     }
 
-    if (authState.isAuthenticated && requestedPage.path === '/') {
+    if (authState.isAuthenticated && requestedPage.path === pathBuilders.login()) {
       return {
         requestedPage,
-        finalPage: resolvePage('/hub'),
+        finalPage: resolvePage(pathBuilders.hub()),
       }
     }
 
@@ -169,7 +175,9 @@
   {@const PublicPage = resolvePublicPageComponent(current.key)}
 
   <PublicEntryLayout>
-    <PublicPage />
+    {#key current.path}
+      <PublicPage />
+    {/key}
   </PublicEntryLayout>
 {:else}
   {@const AppPage = resolveAppPageComponent(current.key)}
@@ -183,7 +191,9 @@
     onLogout={handleLogout}
     onNavigate={navigate}
   >
-    <AppPage />
+    {#key current.path}
+      <AppPage />
+    {/key}
   </AppLayout>
 {/if}
 

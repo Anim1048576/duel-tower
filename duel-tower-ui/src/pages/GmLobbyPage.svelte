@@ -3,10 +3,16 @@
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
   import ParticipantSlot from '../lib/components/ParticipantSlot.svelte'
-  import { getSelectionHandoff, selectionHandoffKeys } from '../lib/selectionHandoff'
+  import { pathBuilders, resolveRouteMatch } from '../lib/navigation'
+  import {
+    readSelectionHandoff,
+    resolveRouteFirstSelection,
+    selectionHandoffKeys,
+  } from '../lib/selectionHandoff'
 
   const sessionRecords = {
-    'session-ember-01': {
+    'TOWER-EMBER-01': {
+      id: 'session-ember-01',
       title: 'Ember Table 01',
       subtitle: 'Preparation phase',
       code: 'TOWER-EMBER-01',
@@ -29,7 +35,8 @@
         'Move to combat only after the party and GM state match.',
       ],
     },
-    'session-night-02': {
+    'TOWER-NIGHT-02': {
+      id: 'session-night-02',
       title: 'Night Watch 02',
       subtitle: 'Draft phase',
       code: 'TOWER-NIGHT-02',
@@ -52,7 +59,8 @@
         'Publish readiness only after deck checks are complete.',
       ],
     },
-    'session-sealed-03': {
+    'TOWER-SEALED-03': {
+      id: 'session-sealed-03',
       title: 'Sealed Tower 03',
       subtitle: 'Ready to launch',
       code: 'TOWER-SEALED-03',
@@ -77,94 +85,165 @@
     },
   } as const
 
-  const defaultSessionId = 'session-ember-01'
-  const selectedSessionId = getSelectionHandoff(selectionHandoffKeys.sessionId, defaultSessionId)
+  type SessionRecordKey = keyof typeof sessionRecords
+  const sessionCodeById = {
+    'session-ember-01': 'TOWER-EMBER-01',
+    'session-night-02': 'TOWER-NIGHT-02',
+    'session-sealed-03': 'TOWER-SEALED-03',
+  } as const
 
-  const session =
-    sessionRecords[selectedSessionId as keyof typeof sessionRecords] ?? sessionRecords[defaultSessionId]
-  const participants = session.participants
+  function isSessionRecordKey(value: string | null | undefined): value is SessionRecordKey {
+    return typeof value === 'string' && value in sessionRecords
+  }
 
-  // TODO: Expand the fixed route /lobby/gm into /lobby/:code/gm when session codes are wired.
+  function getSessionCodeFromRoute() {
+    if (typeof window === 'undefined') return null
+
+    const match = resolveRouteMatch(window.location.pathname)
+
+    if (match?.page.key !== 'gm-lobby') {
+      return null
+    }
+
+    return match.params.code ?? null
+  }
+
+  const routeSessionCode = getSessionCodeFromRoute()
+  const fallbackSessionCode = readSelectionHandoff(selectionHandoffKeys.sessionCode)
+  const fallbackSessionId = readSelectionHandoff(selectionHandoffKeys.sessionId)
+  const legacySessionCode =
+    fallbackSessionId && fallbackSessionId in sessionCodeById
+      ? sessionCodeById[fallbackSessionId as keyof typeof sessionCodeById]
+      : null
+  const handoffSessionCode = isSessionRecordKey(fallbackSessionCode)
+    ? fallbackSessionCode
+    : isSessionRecordKey(legacySessionCode)
+      ? legacySessionCode
+      : null
+  const sessionSelection = resolveRouteFirstSelection({
+    routeValue: routeSessionCode,
+    handoffValue: handoffSessionCode,
+    isValid: isSessionRecordKey,
+  })
+  const selectedSessionCode = sessionSelection.value
+  const missingSessionCode = sessionSelection.missingRouteValue
+  const session = selectedSessionCode !== null ? sessionRecords[selectedSessionCode] : null
+  const participants = session?.participants ?? []
+
+  // TODO: Remove the legacy fixed lobby route and handoff fallback once /sessions/:code/gm is the only entry path.
 </script>
 
 <div class="gm-lobby-page">
-  <SectionFrame
-    eyebrow="Session Summary"
-    title={session.title}
-    description="GM lobby keeps the same overall shell as the player lobby and expands the right panel with control-focused tools."
-  >
-    <div class="gm-lobby-page__summary">
-      <div class="gm-lobby-page__summary-copy">
-        <p>{session.subtitle}</p>
-        <h3>Code: {session.code}</h3>
-      </div>
-
-      <div class="gm-lobby-page__summary-tags">
-        <TagChip label="GM View" tone="warning" />
-        <TagChip label="Batch 4" tone="accent" />
-      </div>
-    </div>
-
-    <div class="gm-lobby-page__stats">
-      {#each session.stats as stat}
-        <StatBlock value={stat.value} label={stat.label} note={stat.note} />
-      {/each}
-    </div>
-  </SectionFrame>
-
-  <div class="gm-lobby-page__main">
+  {#if session}
     <SectionFrame
-      title="Participant slots"
-      description="This slot grid mirrors the player view so the shared lobby structure can be consolidated later."
+      eyebrow="Session Summary"
+      title={session.title}
+      description="GM lobby keeps the same overall shell as the player lobby and resolves the current table from the URL code first."
     >
-      <div class="gm-lobby-page__slots">
-        {#each participants as participant}
-          <ParticipantSlot
-            slot={participant.slot}
-            name={participant.name}
-            state={participant.state}
-            tone={participant.tone}
-            note="TODO: Show selected character, deck ownership, and kick/reassign controls from live lobby state."
-          />
+      <div class="gm-lobby-page__summary">
+        <div class="gm-lobby-page__summary-copy">
+          <p>{session.subtitle}</p>
+          <h3>Code: {session.code}</h3>
+        </div>
+
+        <div class="gm-lobby-page__summary-tags">
+          <TagChip label="GM View" tone="warning" />
+          <TagChip label="Batch 4" tone="accent" />
+        </div>
+      </div>
+
+      <div class="gm-lobby-page__stats">
+        {#each session.stats as stat}
+          <StatBlock value={stat.value} label={stat.label} note={stat.note} />
         {/each}
       </div>
     </SectionFrame>
 
+    <div class="gm-lobby-page__main">
+      <SectionFrame
+        title="Participant slots"
+        description="This slot grid mirrors the player view so the shared lobby structure can be consolidated later."
+      >
+        <div class="gm-lobby-page__slots">
+          {#each participants as participant}
+            <ParticipantSlot
+              slot={participant.slot}
+              name={participant.name}
+              state={participant.state}
+              tone={participant.tone}
+              note="TODO: Show selected character, deck ownership, and kick/reassign controls from live lobby state."
+            />
+          {/each}
+        </div>
+      </SectionFrame>
+
+      <SectionFrame
+        title="GM control panel"
+        description="This right-side panel is the only major extension beyond the player lobby skeleton."
+      >
+        <div class="gm-lobby-page__guide">
+          {#each session.controls as step}
+            <p>{step}</p>
+          {/each}
+        </div>
+
+        <div class="gm-lobby-page__controls">
+          <button type="button" disabled>Lock seats (TODO)</button>
+          <button type="button" disabled>Confirm ready state (TODO)</button>
+          <button type="button" disabled>Broadcast update (TODO)</button>
+        </div>
+
+        <div class="gm-lobby-page__todo">
+          <p>TODO: Add live readiness controls, seat permissions, and launch validation.</p>
+          <p>TODO: Split shared lobby state from player-only and GM-only actions.</p>
+        </div>
+      </SectionFrame>
+    </div>
+
     <SectionFrame
-      title="GM control panel"
-      description="This right-side panel is the only major extension beyond the player lobby skeleton."
+      title="Action zone"
+      description="Bottom action strip remains separate so the GM launch flow can evolve without changing the shared lobby skeleton."
     >
-      <div class="gm-lobby-page__guide">
-        {#each session.controls as step}
-          <p>{step}</p>
-        {/each}
+      <div class="gm-lobby-page__actions">
+        <a
+          class="gm-lobby-page__link-action gm-lobby-page__link-action--muted"
+          data-nav
+          href={pathBuilders.sessionEntry()}
+        >
+          Back to session entry
+        </a>
+        <a class="gm-lobby-page__link-action" data-nav href={pathBuilders.combat(session.code)}>
+          Open combat command
+        </a>
+        <button type="button" disabled>Start session (TODO)</button>
       </div>
-
-      <div class="gm-lobby-page__controls">
-        <button type="button" disabled>Lock seats (TODO)</button>
-        <button type="button" disabled>Confirm ready state (TODO)</button>
-        <button type="button" disabled>Broadcast update (TODO)</button>
-      </div>
-
+    </SectionFrame>
+  {:else}
+    <SectionFrame
+      eyebrow="Session Missing"
+      title={missingSessionCode ? 'Session not found' : 'Session selection unavailable'}
+      description={
+        missingSessionCode
+          ? 'The requested session code does not match the current mock session archive.'
+          : 'Open a session from the entry screen or use a valid GM lobby URL to restore this page.'
+      }
+    >
       <div class="gm-lobby-page__todo">
-        <p>TODO: Add live readiness controls, seat permissions, and launch validation.</p>
-        <p>TODO: Split shared lobby state from player-only and GM-only actions.</p>
+        {#if missingSessionCode}
+          <p>Requested code: {missingSessionCode}</p>
+          <p>Check the session entry screen and open a valid GM lobby.</p>
+        {:else}
+          <p>No session code was found in the URL, and no handoff selection is available.</p>
+          <p>Open a session from the entry screen to restore the expected GM lobby context.</p>
+        {/if}
+      </div>
+      <div class="gm-lobby-page__actions">
+        <a class="gm-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>
+          Back to session entry
+        </a>
       </div>
     </SectionFrame>
-  </div>
-
-  <SectionFrame
-    title="Action zone"
-    description="Bottom action strip remains separate so the GM launch flow can evolve without changing the shared lobby skeleton."
-  >
-    <div class="gm-lobby-page__actions">
-      <a class="gm-lobby-page__link-action gm-lobby-page__link-action--muted" data-nav href="/lobby">
-        Back to session entry
-      </a>
-      <a class="gm-lobby-page__link-action" data-nav href="/combat">Open combat command</a>
-      <button type="button" disabled>Start session (TODO)</button>
-    </div>
-  </SectionFrame>
+  {/if}
 </div>
 
 <style>
