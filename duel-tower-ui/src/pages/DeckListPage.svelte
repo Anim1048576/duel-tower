@@ -1,23 +1,27 @@
 ﻿<script lang="ts">
   import { onMount } from 'svelte'
-  import { listCards, listKeywords } from '../lib/api/content'
-  import type {
-    CardDefinition,
-    CardListQueryParams,
-    CardType,
-    KeywordDefinition,
-  } from '../lib/api/contentTypes'
+  import { listDecks } from '../lib/api/decks'
+  import type { DeckResponse, DeckType } from '../lib/api/deckTypes'
   import { getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import EntityListPane from '../lib/components/EntityListPane.svelte'
-  import SearchFilterBar from '../lib/components/SearchFilterBar.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
-  import { buildCardArchiveMeta, buildCardDisplayTags, getCardTypeLabel } from '../lib/content/display'
+  import { formatContentEnumLabel } from '../lib/content/display'
+  import {
+    deckListStateCopy,
+    readDeckPageFeedback,
+    type DeckPageFeedback,
+  } from '../lib/decks/pageState'
   import { pathBuilders } from '../lib/navigation'
+  import {
+    readSelectionHandoff,
+    selectionHandoffKeys,
+    setSelectionHandoff,
+  } from '../lib/selectionHandoff'
 
-  type CardArchiveItem = {
+  type DeckListItem = {
     id: string
     title: string
     subtitle?: string
@@ -26,88 +30,110 @@
     tags?: { label: string; tone?: 'accent' | 'muted' | 'success' | 'warning' }[]
   }
 
-  type CardTypeFilter = CardType | ''
-
-  const typeOptions: { label: string; value: CardTypeFilter }[] = [
-    { label: 'All', value: '' },
-    { label: getCardTypeLabel('SKILL'), value: 'SKILL' },
-    { label: getCardTypeLabel('EX'), value: 'EX' },
-    { label: getCardTypeLabel('TOKEN'), value: 'TOKEN' },
-  ]
-
-  let query = $state('')
-  let selectedType = $state<CardTypeFilter>('')
-  let selectedKeywordId = $state('')
   let selectedId = $state('')
   let loading = $state(true)
-  let keywordLoading = $state(true)
   let errorMessage = $state<string | null>(null)
-  let keywordErrorMessage = $state<string | null>(null)
-  let cards = $state<CardDefinition[]>([])
-  let keywords = $state<KeywordDefinition[]>([])
+  let feedback = $state<DeckPageFeedback | null>(null)
+  let decks = $state<DeckResponse[]>([])
   let requestSequence = 0
 
-  function toCardArchiveItem(card: CardDefinition): CardArchiveItem {
+  function getDeckId(deck: Pick<DeckResponse, 'id'>) {
+    return String(deck.id)
+  }
+
+  function getDeckTypeTone(type: DeckType) {
+    return type === 'PLAYER' ? 'success' : 'warning'
+  }
+
+  function getDeckSubtitle(deck: DeckResponse) {
+    return `${formatContentEnumLabel(deck.type)} deck`
+  }
+
+  function buildDeckMeta(deck: DeckResponse) {
+    const typeLabel = formatContentEnumLabel(deck.type)
+    const entryLabel = deck.cards.length === 1 ? 'entry' : 'entries'
+    return `${typeLabel} deck · ${deck.totalCards} total cards · ${deck.cards.length} ${entryLabel}`
+  }
+
+  function buildDeckNote(deck: DeckResponse) {
+    if (!deck.cards.length) {
+      return 'No cards are assigned to this deck yet.'
+    }
+
+    const previewCards = deck.cards
+      .slice(0, 3)
+      .map((card) => `${card.cardId} x${card.count}`)
+      .join(', ')
+    const remainingCards = deck.cards.length - 3
+
+    return remainingCards > 0
+      ? `${previewCards} and ${remainingCards} more card entries.`
+      : previewCards
+  }
+
+  function buildDeckTags(deck: DeckResponse) {
+    const tags: DeckListItem['tags'] = [
+      { label: formatContentEnumLabel(deck.type), tone: getDeckTypeTone(deck.type) },
+      { label: `${deck.totalCards} Cards`, tone: 'muted' },
+    ]
+
+    if (!deck.cards.length) {
+      tags.push({ label: 'Empty', tone: 'accent' })
+    }
+
+    return tags
+  }
+
+  function toDeckListItem(deck: DeckResponse): DeckListItem {
     return {
-      id: card.id,
-      title: card.name,
-      subtitle: card.description,
-      meta: buildCardArchiveMeta(card),
-      note: card.token ? `Token: ${card.token}` : undefined,
-      tags: buildCardDisplayTags(card),
+      id: getDeckId(deck),
+      title: deck.name,
+      subtitle: getDeckSubtitle(deck),
+      meta: buildDeckMeta(deck),
+      note: buildDeckNote(deck),
+      tags: buildDeckTags(deck),
     }
   }
 
-  function getCurrentArchiveParams(): CardListQueryParams {
-    return {
-      q: query.trim() || null,
-      type: selectedType || null,
-      keywordId: selectedKeywordId || null,
+  function syncSelectedDeck(nextDecks: DeckResponse[]) {
+    const nextIds = nextDecks.map(getDeckId)
+
+    if (selectedId && nextIds.includes(selectedId)) {
+      return
     }
-  }
 
-  function syncSelectedCard(nextCards: CardDefinition[]) {
-    const nextIds = nextCards.map((card) => card.id)
-    selectedId = nextIds.includes(selectedId) ? selectedId : nextIds[0] ?? ''
-  }
+    const handoffId = readSelectionHandoff(selectionHandoffKeys.deckId)
 
-  async function loadKeywordOptions() {
-    keywordLoading = true
-    keywordErrorMessage = null
-
-    try {
-      keywords = await listKeywords()
-    } catch (error) {
-      keywords = []
-      selectedKeywordId = ''
-      keywordErrorMessage = getApiErrorMessage(error, 'Keyword filters could not be loaded.')
-    } finally {
-      keywordLoading = false
+    if (handoffId && nextIds.includes(handoffId)) {
+      selectedId = handoffId
+      return
     }
+
+    selectedId = nextIds[0] ?? ''
   }
 
-  async function loadCardArchive(params: CardListQueryParams) {
+  async function loadDeckArchive() {
     const requestId = ++requestSequence
     loading = true
     errorMessage = null
 
     try {
-      const response = await listCards(params)
+      const response = await listDecks()
 
       if (requestId !== requestSequence) {
         return
       }
 
-      cards = response
-      syncSelectedCard(response)
+      decks = response
+      syncSelectedDeck(response)
     } catch (error) {
       if (requestId !== requestSequence) {
         return
       }
 
-      cards = []
+      decks = []
       selectedId = ''
-      errorMessage = getApiErrorMessage(error, 'Unable to load the card archive.')
+      errorMessage = getApiErrorMessage(error, 'Unable to load the deck archive.')
     } finally {
       if (requestId === requestSequence) {
         loading = false
@@ -115,175 +141,156 @@
     }
   }
 
+  function persistSelectedDeck(id: string) {
+    if (!id) return
+    setSelectionHandoff(selectionHandoffKeys.deckId, id)
+  }
+
+  function navigateTo(path: string) {
+    if (typeof window === 'undefined') return
+
+    window.history.pushState({}, '', path)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
+  function openDeckEditor(id: string) {
+    if (!id) return
+
+    selectedId = id
+    persistSelectedDeck(id)
+    navigateTo(pathBuilders.deckEditor(id))
+  }
+
   onMount(() => {
-    void loadKeywordOptions()
+    feedback = readDeckPageFeedback()
+    void loadDeckArchive()
   })
 
-  $effect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-
-    const handle = window.setTimeout(() => {
-      void loadCardArchive(getCurrentArchiveParams())
-    }, 250)
-
-    return () => window.clearTimeout(handle)
-  })
-
-  const archiveItems = $derived.by(() => cards.map(toCardArchiveItem))
-  const selectedCard = $derived.by(() => cards.find((card) => card.id === selectedId) ?? cards[0] ?? null)
-  const selectedKeyword = $derived.by(
-    () => keywords.find((keyword) => keyword.id === selectedKeywordId) ?? null,
-  )
-  const skillCount = $derived.by(() => cards.filter((card) => card.type === 'SKILL').length)
-  const exCount = $derived.by(() => cards.filter((card) => card.type === 'EX').length)
-  const tokenCount = $derived.by(() => cards.filter((card) => card.type === 'TOKEN').length)
-  const emptyListMessage = $derived.by(() =>
-    query || selectedType || selectedKeywordId
-      ? 'No cards matched the current archive query.'
-      : 'No cards are currently available in the archive.',
-  )
+  const deckItems = $derived.by(() => decks.map(toDeckListItem))
+  const selectedDeck = $derived.by(() => decks.find((deck) => getDeckId(deck) === selectedId) ?? decks[0] ?? null)
+  const playerDeckCount = $derived.by(() => decks.filter((deck) => deck.type === 'PLAYER').length)
+  const enemyDeckCount = $derived.by(() => decks.filter((deck) => deck.type === 'ENEMY').length)
+  const emptyListMessage = $derived.by(() => deckListStateCopy.emptyMessage)
   const listSummary = $derived.by(() => {
-    if (loading) return 'Loading card archive...'
-    if (errorMessage) return 'Card archive could not be loaded.'
-    return `${cards.length} cards visible from the current archive query.`
+    if (loading) return deckListStateCopy.loadingTitle
+    if (errorMessage) return deckListStateCopy.loadErrorTitle
+    return `${decks.length} live deck records are available from the API.`
   })
-  const detailPath = $derived.by(() =>
-    selectedCard ? pathBuilders.cardDetail(selectedCard.id) : pathBuilders.cardDetail(),
+  const selectedDeckEditorPath = $derived.by(() =>
+    selectedDeck ? pathBuilders.deckEditor(getDeckId(selectedDeck)) : pathBuilders.deckEditor(),
   )
 </script>
 
 <div class="list-page">
   <SectionFrame
-    eyebrow="Archive Overview"
-    title="카드 보관소"
-    description="The card archive now loads live content from the API while keeping the existing browse-and-select layout intact."
+    eyebrow="Deck Overview"
+    title="덱 보관소"
+    description={deckListStateCopy.overviewDescription}
   >
     <div class="list-page__stats">
-      <StatBlock value={cards.length} label="Visible cards" note="Current API query result" />
-      <StatBlock value={skillCount} label="Skill cards" note="Cards tagged as SKILL" />
-      <StatBlock value={exCount + tokenCount} label="Special cards" note="EX and TOKEN results combined" />
+      <StatBlock
+        value={loading ? '...' : errorMessage ? '-' : decks.length}
+        label="Visible decks"
+        note="Current deck API result"
+      />
+      <StatBlock
+        value={loading ? '...' : errorMessage ? '-' : playerDeckCount}
+        label="Player decks"
+        note="Decks marked as PLAYER"
+      />
+      <StatBlock
+        value={loading ? '...' : errorMessage ? '-' : enemyDeckCount}
+        label="Enemy decks"
+        note="Decks marked as ENEMY"
+      />
     </div>
-    {#if keywordErrorMessage}
+
+    <div class="list-page__actions">
+      <a class="list-page__link-action" data-nav href={pathBuilders.deckEditor()}>
+        {deckListStateCopy.createActionLabel}
+      </a>
+    </div>
+
+    {#if feedback}
       <ContentStatePanel
-        title="Keyword filters are unavailable."
-        message={keywordErrorMessage}
-        tone="error"
-        actionLabel="Reload filters"
-        onAction={() => void loadKeywordOptions()}
+        title={feedback.title}
+        message={feedback.message}
       />
     {/if}
   </SectionFrame>
 
   <div class="list-page__content">
     <SectionFrame
-      title="카드 목록"
-      description="Search, type, and keyword filters now query the live card archive."
+      title="덱 목록"
+      description="Each row comes from GET /api/content/decks and keeps the existing open-editor flow on click."
     >
-      <SearchFilterBar
-        query={query}
-        queryPlaceholder="Search cards"
-        summary={listSummary}
-        onQueryChange={(value) => (query = value)}
-      >
-        {#snippet filters()}
-          <div class="card-archive__filter-group" role="group" aria-label="Card type filter">
-            {#each typeOptions as option}
-              <button
-                type="button"
-                class="card-archive__filter-button"
-                class:card-archive__filter-button--active={selectedType === option.value}
-                onclick={() => (selectedType = option.value)}
-              >
-                {option.label}
-              </button>
-            {/each}
-          </div>
-
-          <label class="card-archive__keyword-filter">
-            <span class="visually-hidden">Keyword filter</span>
-            <select
-              bind:value={selectedKeywordId}
-              disabled={keywordLoading || Boolean(keywordErrorMessage)}
-            >
-              <option value="">All keywords</option>
-              {#each keywords as keyword}
-                <option value={keyword.id}>{keyword.name}</option>
-              {/each}
-            </select>
-          </label>
-        {/snippet}
-
-        {#snippet sort()}
-          <TagChip label={selectedType ? getCardTypeLabel(selectedType) : 'All types'} tone="muted" />
-          <TagChip label={selectedKeyword?.name || 'All keywords'} tone="muted" />
-        {/snippet}
-      </SearchFilterBar>
+      <p class="list-page__summary">{listSummary}</p>
 
       {#if loading}
         <ContentStatePanel
-          title="Loading card archive"
-          message="Refreshing the current card list from the content API."
+          title={deckListStateCopy.loadingTitle}
+          message={deckListStateCopy.loadingMessage}
         />
       {:else if errorMessage}
         <ContentStatePanel
-          title="Unable to load the card archive"
+          title={deckListStateCopy.loadErrorTitle}
           message={errorMessage}
           tone="error"
           actionLabel="Retry load"
-          onAction={() => void loadCardArchive(getCurrentArchiveParams())}
+          onAction={() => void loadDeckArchive()}
         />
       {:else}
         <EntityListPane
-          items={archiveItems}
+          items={deckItems}
           selectedId={selectedId}
-          onSelect={(id) => (selectedId = id)}
+          onSelect={openDeckEditor}
           emptyMessage={emptyListMessage}
         />
       {/if}
     </SectionFrame>
 
     <SectionFrame
-      title="선택된 카드"
-      description="Selection stays in this page shell and feeds the live card-detail route used by the next deck flows."
+      title="선택된 덱"
+      description={deckListStateCopy.detailDescription}
     >
       {#if loading}
         <ContentStatePanel
-          title="Preparing selected card"
-          message="The current archive selection is being summarized."
+          title={deckListStateCopy.detailLoadingTitle}
+          message={deckListStateCopy.detailLoadingMessage}
         />
       {:else if errorMessage}
         <ContentStatePanel
-          title="Selected card summary is unavailable"
+          title={deckListStateCopy.detailErrorTitle}
           message={errorMessage}
           tone="error"
         />
-      {:else if selectedCard}
+      {:else if selectedDeck}
         <div class="list-page__detail">
           <div>
-            <h3>{selectedCard.name}</h3>
-            <p>{selectedCard.description || 'No card description is available for this record.'}</p>
+            <h3>{selectedDeck.name}</h3>
+            <p>{buildDeckMeta(selectedDeck)}</p>
           </div>
 
           <div class="list-page__detail-tags">
-            {#each buildCardDisplayTags(selectedCard) as tag}
+            {#each buildDeckTags(selectedDeck) as tag}
               <TagChip label={tag.label} tone={tag.tone} />
             {/each}
           </div>
 
-          <p>{buildCardArchiveMeta(selectedCard)}</p>
-          {#if selectedCard.token}
-            <p>Token: {selectedCard.token}</p>
-          {/if}
+          <p>{buildDeckNote(selectedDeck)}</p>
 
-          <a class="list-page__link-action" data-nav href={detailPath}>
-            Open detail for {selectedCard.name}
+          <a
+            class="list-page__link-action"
+            data-nav
+            href={selectedDeckEditorPath}
+            onclick={() => persistSelectedDeck(getDeckId(selectedDeck))}
+          >
+            Open editor for {selectedDeck.name}
           </a>
         </div>
       {:else}
         <ContentStatePanel
-          title="No card is selected"
+          title={deckListStateCopy.detailEmptyTitle}
           message={emptyListMessage}
         />
       {/if}
@@ -299,6 +306,12 @@
     gap: 1.5rem;
   }
 
+  .list-page__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
   .list-page__stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -310,40 +323,7 @@
     align-items: start;
   }
 
-  .card-archive__filter-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .card-archive__filter-button {
-    min-height: 2.2rem;
-    padding: 0.45rem 0.7rem;
-    border: 1px solid var(--color-border);
-    background: rgba(12, 11, 10, 0.28);
-    color: var(--color-text-muted);
-    font: inherit;
-    font-size: 0.74rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .card-archive__filter-button--active {
-    border-color: rgba(226, 193, 155, 0.38);
-    background: rgba(226, 193, 155, 0.08);
-    color: var(--color-accent);
-  }
-
-  .card-archive__keyword-filter select {
-    min-height: 2.2rem;
-    min-width: 11rem;
-    border: 1px solid var(--color-border);
-    background: rgba(12, 11, 10, 0.28);
-    color: var(--color-text);
-    font: inherit;
-    padding: 0.45rem 0.7rem;
-  }
-
+  .list-page__summary,
   .list-page__detail h3,
   .list-page__detail p {
     margin: 0;
@@ -354,6 +334,7 @@
     font-size: 1.5rem;
   }
 
+  .list-page__summary,
   .list-page__detail > div:first-child p,
   .list-page__detail > p {
     color: var(--color-text-soft);

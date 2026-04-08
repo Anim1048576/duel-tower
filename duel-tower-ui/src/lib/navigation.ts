@@ -192,9 +192,9 @@ export const APP_NAV_ITEMS = [
   },
   {
     key: 'decks',
-    label: 'Cards',
+    label: 'Decks',
     path: routePaths.deckList,
-    description: 'Card archive and lookup flow',
+    description: 'Deck archive and editor entry flow',
     enabled: true,
   },
   {
@@ -274,12 +274,12 @@ const activePageMap = new Map<string, PageDefinition>([
     routePaths.deckList,
     {
       key: 'decks',
-      label: 'Cards',
+      label: 'Decks',
       path: routePaths.deckList,
       area: 'app',
-      title: 'Card Archive',
-      description: 'Browse the live card archive, search by name, and filter by type or keyword.',
-      eyebrow: 'Content Archive',
+      title: 'Deck Archive',
+      description: 'Browse live deck records and move into the URL-based editor flow from the current selection.',
+      eyebrow: 'Deck Ledger',
       tags: [{ label: 'Batch 2', tone: 'accent' }],
     },
   ],
@@ -402,14 +402,32 @@ const activePageMap = new Map<string, PageDefinition>([
   ],
 ])
 
-const dynamicRouteEntries = [
+type DynamicRouteSourceEntry = {
+  pattern: string
+  page: PageDefinition | undefined
+}
+
+type DynamicRouteEntry = {
+  pattern: string
+  page: PageDefinition
+}
+
+function hasDynamicRoutePage(entry: DynamicRouteSourceEntry): entry is DynamicRouteEntry {
+  return entry.page !== undefined
+}
+
+function createDynamicRouteEntries(entries: readonly DynamicRouteSourceEntry[]) {
+  return entries.filter(hasDynamicRoutePage)
+}
+
+const dynamicRouteEntries = createDynamicRouteEntries([
   { pattern: routePatterns.characterDetail, page: activePageMap.get(routePaths.characterDetail) },
   { pattern: routePatterns.cardDetail, page: activePageMap.get(routePaths.cardDetail) },
   { pattern: routePatterns.deckEditor, page: activePageMap.get(routePaths.deckEditor) },
   { pattern: routePatterns.sessionLobbyPlayer, page: activePageMap.get(routePaths.sessionLobbyPlayer) },
   { pattern: routePatterns.sessionLobbyGm, page: activePageMap.get(routePaths.sessionLobbyGm) },
   { pattern: routePatterns.combat, page: activePageMap.get(routePaths.combat) },
-].filter((entry): entry is { pattern: string; page: PageDefinition } => entry.page !== undefined)
+])
 
 function getPathSegments(pathname: string) {
   const normalized = normalizePath(pathname)
@@ -481,11 +499,13 @@ export function resolveRouteMatch(pathname: string): RouteMatch | null {
     const params = matchRoutePattern(entry.pattern, normalized)
 
     if (params) {
+      const page: PageDefinition = {
+        ...entry.page,
+        path: normalized,
+      }
+
       return {
-        page: {
-          ...entry.page,
-          path: normalized,
-        },
+        page,
         params,
       }
     }
