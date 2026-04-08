@@ -44,6 +44,7 @@ export type CombatCommandGuards = {
   hasPlayerToken: boolean
   hasGmToken: boolean
   canIssuePlayerCommand: boolean
+  canClearRecentResultsCommand: boolean
   canResolvePendingCommand: boolean
   canIssueGmCommand: boolean
 }
@@ -196,6 +197,11 @@ export function buildCombatCommandGuards(
       !!runtimePlayerId &&
       !!currentActorPlayerId &&
       runtimePlayerId === currentActorPlayerId,
+    canClearRecentResultsCommand:
+      runtimeAccess?.role === 'player' &&
+      typeof runtimeAccess.playerToken === 'string' &&
+      runtimeAccess.playerToken.length > 0 &&
+      !!runtimePlayerId,
     canResolvePendingCommand:
       runtimeAccess?.role === 'player' &&
       typeof runtimeAccess.playerToken === 'string' &&

@@ -108,6 +108,8 @@
     disabled: boolean
   }
 
+  const combatSidebarEventLimit = 12
+
   let loading = $state(true)
   let notFound = $state(false)
   let errorMessage = $state<string | null>(null)
@@ -127,13 +129,18 @@
   let eventsLoading = $state(true)
   let eventsErrorMessage = $state<string | null>(null)
   let eventItems = $state<SessionEventItemDto[]>([])
+  let eventsRequestSequence = 0
   let logsLoading = $state(true)
   let logsErrorMessage = $state<string | null>(null)
   let logItems = $state<SessionLogItemDto[]>([])
+  let logsRequestSequence = 0
   let recentResultsLoading = $state(true)
   let recentResultsErrorMessage = $state<string | null>(null)
   let recentResults = $state<RecentResultsResponse | null>(null)
+  let recentResultsRequestSequence = 0
   let requestSequence = 0
+  let sidebarSessionCode = $state<string | null>(null)
+  let hadSidebarReadAccess = $state(false)
 
   function getRouteSessionCode() {
     if (typeof window === 'undefined') {
@@ -209,11 +216,62 @@
     }
   }
 
+  function hasCombatReadAccess(nextCode: string | null, nextAccess: StoredSessionAccess | null) {
+    if (!nextCode || !nextAccess) {
+      return false
+    }
+
+    if (!hasStoredSessionCode(nextAccess, nextCode)) {
+      return false
+    }
+
+    if (isStoredPlayerSessionAccess(nextAccess)) {
+      return Boolean(nextAccess.playerToken && nextAccess.playerId)
+    }
+
+    if (isStoredGmSessionAccess(nextAccess)) {
+      return Boolean(nextAccess.gmToken)
+    }
+
+    return false
+  }
+
+  function invalidateCombatSidebarRequests() {
+    eventsRequestSequence += 1
+    logsRequestSequence += 1
+    recentResultsRequestSequence += 1
+  }
+
+  function resetCombatSidebarState() {
+    recentCommandEvents = []
+    eventItems = []
+    logItems = []
+    recentResults = null
+    eventsLoading = false
+    logsLoading = false
+    recentResultsLoading = false
+    eventsErrorMessage = null
+    logsErrorMessage = null
+    recentResultsErrorMessage = null
+  }
+
   async function loadCombatState() {
     const nextCode = requestedSessionCode
     const nextAccess = readStoredSessionAccess()
     const nextInvalidAccessMessage = getInvalidCombatAccessMessage(nextCode)
+    const nextHasSidebarReadAccess = hasCombatReadAccess(nextCode, nextAccess)
     const requestId = ++requestSequence
+
+    if (sidebarSessionCode !== nextCode) {
+      invalidateCombatSidebarRequests()
+      resetCombatSidebarState()
+      sidebarSessionCode = nextCode
+    } else if (hadSidebarReadAccess && !nextHasSidebarReadAccess) {
+      invalidateCombatSidebarRequests()
+      resetCombatSidebarState()
+    }
+
+    hadSidebarReadAccess = nextHasSidebarReadAccess
 
     runtimeAccess = nextAccess
     invalidAccessMessage = nextInvalidAccessMessage
@@ -421,6 +479,14 @@
     }
 
     return merged
+      .sort((left, right) => {
+        if (left.version !== right.version) {
+          return right.version - left.version
+        }
+
+        return (right.cursor ?? '').localeCompare(left.cursor ?? '')
+      })
+      .slice(0, combatSidebarEventLimit)
   }
 
   function handleWindowStateChange() {
@@ -578,6 +644,23 @@
     commandSuccessMessage = null
   }
 
+  function resetCommandDraftAfterSuccess(commandType: CombatCommandType, nextSession: SessionStateDto | null) {
+    commandDraft = syncCombatCommandDraft(
+      {
+        ...commandDraft,
+        selectedCommandType: commandType,
+        selectedCardId: null,
+        selectedTargets: [],
+        selectedDiscardIds: [],
+        selectedIds: [],
+        orderedActorKeys: [],
+        selectedReason: '',
+      },
+      nextSession ?? session,
+      runtimeAccess,
+    )
+  }
+
   function getSessionReadAccess() {
     if (isStoredPlayerSessionAccess(runtimeAccess)) {
       return {
@@ -598,6 +681,8 @@
   }
 
   async function loadCombatEvents() {
+    const requestId = ++eventsRequestSequence
+
     if (!requestedSessionCode) {
       eventsLoading = false
       eventsErrorMessage = 'Session code is required before events can be restored.'
@@ -618,17 +703,34 @@
     eventsErrorMessage = null
 
     try {
-      const response = await getSessionEvents(requestedSessionCode, { limit: 12 }, access)
+      const response = await getSessionEvents(
+        requestedSessionCode,
+        { limit: combatSidebarEventLimit },
+        access,
+      )
+
+      if (requestId !== eventsRequestSequence) {
+        return
+      }
+
       eventItems = response.items
     } catch (error) {
+      if (requestId !== eventsRequestSequence) {
+        return
+      }
+
       eventItems = []
       eventsErrorMessage = getApiErrorMessage(error, 'Unable to load combat events.')
     } finally {
-      eventsLoading = false
+      if (requestId === eventsRequestSequence) {
+        eventsLoading = false
+      }
     }
   }
 
   async function loadCombatLogs() {
+    const requestId = ++logsRequestSequence
+
     if (!requestedSessionCode) {
       logsLoading = false
       logsErrorMessage = 'Session code is required before logs can be restored.'
@@ -650,16 +752,29 @@
 
     try {
       const response = await getSessionLogs(requestedSessionCode, { limit: 12 }, access)
+
+      if (requestId !== logsRequestSequence) {
+        return
+      }
+
       logItems = response.items
     } catch (error) {
+      if (requestId !== logsRequestSequence) {
+        return
+      }
+
       logItems = []
       logsErrorMessage = getApiErrorMessage(error, 'Unable to load combat logs.')
     } finally {
-      logsLoading = false
+      if (requestId === logsRequestSequence) {
+        logsLoading = false
+      }
     }
   }
 
   async function loadCombatRecentResults() {
+    const requestId = ++recentResultsRequestSequence
+
     if (!requestedSessionCode) {
       recentResultsLoading = false
       recentResultsErrorMessage = 'Session code is required before recent results can be restored.'
@@ -680,12 +795,24 @@
     recentResultsErrorMessage = null
 
     try {
-      recentResults = await getSessionRecentResults(requestedSessionCode, access)
+      const response = await getSessionRecentResults(requestedSessionCode, access)
+
+      if (requestId !== recentResultsRequestSequence) {
+        return
+      }
+
+      recentResults = response
     } catch (error) {
+      if (requestId !== recentResultsRequestSequence) {
+        return
+      }
+
       recentResults = null
       recentResultsErrorMessage = getApiErrorMessage(error, 'Unable to load recent results.')
     } finally {
-      recentResultsLoading = false
+      if (requestId === recentResultsRequestSequence) {
+        recentResultsLoading = false
+      }
     }
   }
 
@@ -698,6 +825,7 @@
       syncCombatState(nextSession)
     }
 
+    resetCommandDraftAfterSuccess(commandType, nextSession)
     recentCommandEvents = nextEvents
     commandSuccessMessage = `${commandType} command was accepted and the combat shell synced to the latest session state.`
     void loadCombatEvents()
@@ -717,12 +845,26 @@
       return
     }
 
+    if (commandType === 'CLEAR_RECENT_RESULTS') {
+      if (!isStoredPlayerSessionAccess(runtimeAccess) || !commandGuards.canClearRecentResultsCommand) {
+        commandErrorMessage = 'Player token access is required before clearing recent results.'
+        return
+      }
+    }
+
     clearCommandMessages()
     commandPending = commandType
     commandDraft = {
       ...commandDraft,
       selectedCommandType: commandType,
-      selectedPlayerId: access.role === 'player' ? access.playerId : commandDraft.selectedPlayerId,
+      selectedPlayerId:
+        commandType === 'CLEAR_RECENT_RESULTS'
+          ? isStoredPlayerSessionAccess(runtimeAccess)
+            ? runtimeAccess.playerId
+            : commandDraft.selectedPlayerId
+          : access.role === 'player'
+            ? access.playerId
+            : commandDraft.selectedPlayerId,
     }
 
     try {
@@ -731,9 +873,22 @@
         {
           type: commandType,
           expectedVersion: session.version,
-          playerId: access.role === 'player' ? access.playerId : commandDraft.selectedPlayerId,
+          playerId:
+            commandType === 'CLEAR_RECENT_RESULTS'
+              ? isStoredPlayerSessionAccess(runtimeAccess)
+                ? runtimeAccess.playerId
+                : null
+              : access.role === 'player'
+                ? access.playerId
+                : commandDraft.selectedPlayerId,
         },
-        access,
+        commandType === 'CLEAR_RECENT_RESULTS' && isStoredPlayerSessionAccess(runtimeAccess)
+          ? {
+              role: 'player',
+              playerToken: runtimeAccess.playerToken,
+              playerId: runtimeAccess.playerId,
+            }
+          : access,
       )
 
       if (!response.accepted) {
@@ -826,15 +981,25 @@
     }
 
     try {
+      const payload =
+        commandType === 'PLAY_CARD'
+          ? {
+              type: commandType,
+              expectedVersion: session.version,
+              playerId: runtimeAccess.playerId,
+              cardId,
+              targets: commandDraft.selectedTargets,
+            }
+          : {
+              type: commandType,
+              expectedVersion: session.version,
+              playerId: runtimeAccess.playerId,
+              targets: commandDraft.selectedTargets,
+            }
+
       const response = await executeSessionCommand(
         requestedSessionCode,
-        {
-          type: commandType,
-          expectedVersion: session.version,
-          playerId: runtimeAccess.playerId,
-          cardId,
-          targets: commandDraft.selectedTargets,
-        },
+        payload,
         {
           role: 'player',
           playerToken: runtimeAccess.playerToken,
@@ -1069,10 +1234,10 @@
         {
           id: 'CLEAR_RECENT_RESULTS',
           title: 'Clear recent results',
-          note: commandGuards.canIssueGmCommand
-            ? 'Connected as the first GM-side command shell action.'
-            : 'Requires GM access for the current session.',
-          disabled: !commandGuards.canIssueGmCommand,
+          note: commandGuards.canClearRecentResultsCommand
+            ? 'Connected as a player-side utility command that clears the recent result stack.'
+            : 'Requires player token access for the current session.',
+          disabled: !commandGuards.canClearRecentResultsCommand,
         },
         {
           id: 'PLAY_CARD',
