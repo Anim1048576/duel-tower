@@ -7,6 +7,7 @@ export type PageKey =
   | 'lobby'
   | 'decks'
   | 'character'
+  | 'character-create'
   | 'character-detail'
   | 'inventory'
   | 'combat'
@@ -43,6 +44,7 @@ export const routePaths = {
   login: '/',
   hub: '/hub',
   characterList: '/characters',
+  characterCreate: '/characters/new',
   characterDetail: '/characters/detail',
   deckList: '/decks',
   deckEditor: '/decks/editor',
@@ -85,6 +87,7 @@ export const pathBuilders = {
   login: () => routePaths.login,
   hub: () => routePaths.hub,
   characterList: () => routePaths.characterList,
+  characterCreate: () => routePaths.characterCreate,
   characterDetail: (id?: string) =>
     hasRouteParam(id)
       ? buildPathFromPattern(routePatterns.characterDetail, { id })
@@ -287,6 +290,19 @@ const activePageMap = new Map<string, PageDefinition>([
       title: 'Character Detail / Edit',
       description: 'Read the selected adventurer record and prepare the next edit step.',
       eyebrow: 'Record Detail',
+      tags: [{ label: 'Batch 3', tone: 'accent' }],
+    },
+  ],
+  [
+    routePaths.characterCreate,
+    {
+      key: 'character-create',
+      label: 'Character Create',
+      path: routePaths.characterCreate,
+      area: 'app',
+      title: 'Character Create',
+      description: 'Create a new adventurer record before moving back into the roster flow.',
+      eyebrow: 'Record Creation',
       tags: [{ label: 'Batch 3', tone: 'accent' }],
     },
   ],

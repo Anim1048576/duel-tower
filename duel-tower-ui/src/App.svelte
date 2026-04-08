@@ -27,6 +27,7 @@
   const APP_PAGE_COMPONENTS = {
     hub: HubPage,
     character: CharacterListPage,
+    'character-create': CharacterDetailPage,
     'character-detail': CharacterDetailPage,
     decks: DeckListPage,
     'deck-editor': DeckEditorPage,

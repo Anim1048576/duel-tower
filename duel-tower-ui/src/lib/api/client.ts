@@ -176,3 +176,26 @@ export async function apiPostVoid<TBody = Record<string, unknown>>(
 ) {
   await apiPost<void, TBody>(input, body, options)
 }
+
+export async function apiPut<TResponse, TBody = Record<string, unknown>>(
+  input: string,
+  body?: TBody,
+  options: ApiRequestOptions = {},
+) {
+  return apiRequest<TResponse>(input, {
+    ...options,
+    method: options.method ?? 'PUT',
+    body: (body ?? null) as ApiRequestOptions['body'],
+  })
+}
+
+export async function apiDelete<TResponse>(input: string, options: ApiRequestOptions = {}) {
+  return apiRequest<TResponse>(input, {
+    ...options,
+    method: options.method ?? 'DELETE',
+  })
+}
+
+export async function apiDeleteVoid(input: string, options: ApiRequestOptions = {}) {
+  await apiDelete<void>(input, options)
+}
