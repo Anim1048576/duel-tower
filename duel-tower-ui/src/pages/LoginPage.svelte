@@ -1,15 +1,48 @@
 <script lang="ts">
   import TagChip from '../lib/components/TagChip.svelte'
+  import { authState } from '../lib/auth/authState.svelte'
 
-  let archivistId = $state('')
-  let passphrase = $state('')
+  let username = $state('')
+  let password = $state('')
   let feedbackVisible = $state(false)
+  let localError = $state<string | null>(null)
 
-  function handleSubmit(event: SubmitEvent) {
+  const feedbackMessage = $derived.by(() => localError ?? authState.error)
+  const shouldShowFeedback = $derived.by(() => feedbackVisible || Boolean(authState.error))
+  const isSubmitDisabled = $derived.by(() => authState.loading || !username.trim() || !password)
+
+  function handleInput() {
+    localError = null
+    feedbackVisible = false
+    authState.clearError()
+  }
+
+  async function handleSubmit(event: SubmitEvent) {
     event.preventDefault()
-    feedbackVisible = true
 
-    // TODO: Connect login submission to the authentication API when the session contract is finalized.
+    if (authState.loading) return
+
+    const normalizedUsername = username.trim()
+    if (!normalizedUsername || !password) {
+      localError = 'Enter both username and password to continue.'
+      feedbackVisible = true
+      return
+    }
+
+    localError = null
+    feedbackVisible = false
+
+    try {
+      await authState.login({
+        username: normalizedUsername,
+        password,
+      })
+
+      history.replaceState({}, '', '/hub')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    } catch {
+      feedbackVisible = true
+    }
   }
 </script>
 
@@ -17,7 +50,7 @@
   <header class="login-page__header">
     <div class="login-page__tags">
       <TagChip label="MVP Access" tone="accent" />
-      <TagChip label="Prototype" tone="muted" />
+      <TagChip label="Session Auth" tone="success" />
     </div>
 
     <div class="login-page__copy">
@@ -29,19 +62,36 @@
     </div>
   </header>
 
-  <form class="login-page__form" onsubmit={handleSubmit}>
+  <form class="login-page__form" onsubmit={handleSubmit} aria-busy={authState.loading}>
+    <fieldset class="login-page__fieldset" disabled={authState.loading}>
     <label class="login-page__field">
-      <span>Archivist ID</span>
-      <input bind:value={archivistId} name="archivistId" placeholder="tower-keeper" />
+      <span>Username</span>
+      <input
+        bind:value={username}
+        name="username"
+        autocomplete="username"
+        placeholder="tower-keeper"
+        required
+        aria-invalid={shouldShowFeedback && Boolean(feedbackMessage)}
+        aria-describedby={shouldShowFeedback && feedbackMessage ? 'login-feedback' : undefined}
+        disabled={authState.loading}
+        oninput={handleInput}
+      />
     </label>
 
     <label class="login-page__field">
-      <span>Passphrase</span>
+      <span>Password</span>
       <input
-        bind:value={passphrase}
-        name="passphrase"
+        bind:value={password}
+        name="password"
         type="password"
+        autocomplete="current-password"
         placeholder="********"
+        required
+        aria-invalid={shouldShowFeedback && Boolean(feedbackMessage)}
+        aria-describedby={shouldShowFeedback && feedbackMessage ? 'login-feedback' : undefined}
+        disabled={authState.loading}
+        oninput={handleInput}
       />
     </label>
 
@@ -49,9 +99,16 @@
       <button type="submit">기록 보관소 열기</button>
       <a class="login-page__preview" data-nav href="/hub">허브 미리보기</a>
     </div>
+    </fieldset>
   </form>
 
-  {#if feedbackVisible}
+  {#if shouldShowFeedback && feedbackMessage}
+    <p id="login-feedback" class="login-page__feedback" role="alert" aria-live="polite">
+      {feedbackMessage}
+    </p>
+  {/if}
+
+  {#if false}
     <p class="login-page__feedback">
       인증 API는 아직 연결되지 않았습니다. TODO 위치에 세션 부트스트랩 로직을 연결하면
       됩니다.
@@ -71,6 +128,15 @@
   .login-page__form {
     display: grid;
     gap: 1rem;
+  }
+
+  .login-page__fieldset {
+    padding: 0;
+    margin: 0;
+    border: 0;
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
   }
 
   .login-page__tags {
@@ -115,6 +181,10 @@
     border-color: rgba(255, 179, 175, 0.4);
   }
 
+  .login-page__field input:disabled {
+    opacity: 0.72;
+  }
+
   .login-page__actions {
     display: flex;
     flex-wrap: wrap;
@@ -137,7 +207,12 @@
     color: var(--color-text);
   }
 
+  .login-page__actions button:disabled {
+    opacity: 0.76;
+  }
+
   .login-page__preview {
+    display: none;
     color: var(--color-text-soft);
     background: rgba(255, 255, 255, 0.02);
   }

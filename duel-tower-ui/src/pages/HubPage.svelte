@@ -4,7 +4,7 @@
 
   const readiness = [
     { label: '허브 셸', value: '준비', tone: 'success' as const },
-    { label: '인증 연동', value: 'TODO', tone: 'warning' as const },
+    { label: '인증 연동', value: '연결됨', tone: 'success' as const },
     { label: '세션 실시간', value: '대기', tone: 'muted' as const },
   ]
 
@@ -34,7 +34,7 @@
       </div>
 
       <div class="hub-page__hero-tags">
-        <TagChip label="No API" tone="muted" />
+        <TagChip label="Auth Ready" tone="success" />
         <TagChip label="Shell First" tone="accent" />
       </div>
     </div>

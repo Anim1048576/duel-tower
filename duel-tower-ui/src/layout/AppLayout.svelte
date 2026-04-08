@@ -7,11 +7,24 @@
   type Props = {
     pages: AppNavItem[]
     current: PageDefinition
+    currentUsername?: string | null
+    authMessage?: string | null
+    logoutPending?: boolean
+    onLogout: () => void | Promise<void>
     onNavigate: (path: string) => void
     children?: Snippet
   }
 
-  let { pages, current, onNavigate, children }: Props = $props()
+  let {
+    pages,
+    current,
+    currentUsername = null,
+    authMessage = null,
+    logoutPending = false,
+    onLogout,
+    onNavigate,
+    children,
+  }: Props = $props()
 </script>
 
 <div class="app-shell">
@@ -23,6 +36,24 @@
         Archive shell for roster, decks, sessions, and upcoming battle flows. Later batches can
         extend this structure without changing the routing model.
       </p>
+
+      {#if currentUsername}
+        <div class="app-layout__session-block">
+          <p class="app-layout__session">Signed in as {currentUsername}</p>
+
+          {#if authMessage}
+            <p class="app-layout__auth-message">{authMessage}</p>
+          {/if}
+
+          <button type="button" class="app-layout__logout" onclick={() => onLogout()} disabled={logoutPending}>
+            {#if logoutPending}
+              Signing out...
+            {:else}
+              Sign out
+            {/if}
+          </button>
+        </div>
+      {/if}
     </div>
 
     <PrimaryNavRail items={pages} currentPath={current.path} onNavigate={onNavigate} />
@@ -68,5 +99,38 @@
     color: var(--color-text-soft);
     font-size: 0.95rem;
     line-height: 1.65;
+  }
+
+  .app-layout__session {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .app-layout__session-block {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .app-layout__auth-message {
+    margin: 0;
+    color: var(--color-warning);
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+
+  .app-layout__logout {
+    min-height: 2.7rem;
+    width: fit-content;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid var(--color-border);
+    background: rgba(12, 11, 10, 0.28);
+    color: var(--color-text);
+  }
+
+  .app-layout__logout:disabled {
+    opacity: 0.74;
   }
 </style>

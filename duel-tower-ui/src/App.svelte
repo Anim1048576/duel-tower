@@ -11,7 +11,8 @@
   import LoginPage from './pages/LoginPage.svelte'
   import PlayerLobbyPage from './pages/PlayerLobbyPage.svelte'
   import SessionEntryPage from './pages/SessionEntryPage.svelte'
-  import { APP_NAV_ITEMS, resolvePage, type PageKey } from './lib/navigation'
+  import { APP_NAV_ITEMS, normalizePath, resolvePage, type PageKey } from './lib/navigation'
+  import { authState } from './lib/auth/authState.svelte'
 
   const PUBLIC_PAGE_COMPONENTS = {
     login: LoginPage,
@@ -31,14 +32,67 @@
 
   let current = $state(resolvePage(window.location.pathname))
 
+  async function handleLogout() {
+    try {
+      await authState.logout()
+    } finally {
+      history.replaceState({}, '', '/')
+      updateCurrentPage('/')
+    }
+  }
+
+  function getAccessiblePage(pathname: string) {
+    const requestedPage = resolvePage(pathname)
+
+    if (!authState.initialized) {
+      return {
+        requestedPage,
+        finalPage: requestedPage,
+      }
+    }
+
+    if (!authState.isAuthenticated && requestedPage.area === 'app') {
+      return {
+        requestedPage,
+        finalPage: resolvePage('/'),
+      }
+    }
+
+    if (authState.isAuthenticated && requestedPage.path === '/') {
+      return {
+        requestedPage,
+        finalPage: resolvePage('/hub'),
+      }
+    }
+
+    return {
+      requestedPage,
+      finalPage: requestedPage,
+    }
+  }
+
+  function updateCurrentPage(pathname: string, mode: 'push' | 'replace' = 'replace') {
+    const { requestedPage, finalPage } = getAccessiblePage(pathname)
+    const currentPath = normalizePath(window.location.pathname)
+    const nextPath = finalPage.path
+    const shouldRedirect = currentPath !== nextPath
+
+    if (shouldRedirect) {
+      const historyMethod: 'pushState' | 'replaceState' =
+        requestedPage.path === finalPage.path && mode === 'push' ? 'pushState' : 'replaceState'
+
+      history[historyMethod]({}, '', nextPath)
+    }
+
+    current = finalPage
+  }
+
   function navigate(path: string) {
-    if (path === current.path) return
-    history.pushState({}, '', path)
-    current = resolvePage(window.location.pathname)
+    updateCurrentPage(path, 'push')
   }
 
   function syncFromLocation() {
-    current = resolvePage(window.location.pathname)
+    updateCurrentPage(window.location.pathname)
   }
 
   function handleDocumentClick(event: MouseEvent) {
@@ -75,6 +129,20 @@
   }
 
   $effect(() => {
+    void authState.bootstrap()
+  })
+
+  $effect(() => {
+    const initialized = authState.initialized
+    const isAuthenticated = authState.isAuthenticated
+
+    if (!initialized) return
+
+    void isAuthenticated
+    updateCurrentPage(window.location.pathname)
+  })
+
+  $effect(() => {
     window.addEventListener('popstate', syncFromLocation)
     document.addEventListener('click', handleDocumentClick)
 
@@ -85,7 +153,19 @@
   })
 </script>
 
-{#if current.area === 'public'}
+{#if !authState.initialized}
+  <PublicEntryLayout>
+    <section class="app-bootstrap">
+      <div class="app-bootstrap__panel">
+        <p class="app-bootstrap__eyebrow">Session Restore</p>
+        <h2>Checking archive access</h2>
+        <p class="app-bootstrap__copy">
+          Restoring the current session before routing into the public or internal archive.
+        </p>
+      </div>
+    </section>
+  </PublicEntryLayout>
+{:else if current.area === 'public'}
   {@const PublicPage = resolvePublicPageComponent(current.key)}
 
   <PublicEntryLayout>
@@ -94,7 +174,55 @@
 {:else}
   {@const AppPage = resolveAppPageComponent(current.key)}
 
-  <AppLayout pages={APP_NAV_ITEMS} {current} onNavigate={navigate}>
+  <AppLayout
+    pages={APP_NAV_ITEMS}
+    {current}
+    currentUsername={authState.user?.username ?? null}
+    authMessage={authState.error}
+    logoutPending={authState.loading}
+    onLogout={handleLogout}
+    onNavigate={navigate}
+  >
     <AppPage />
   </AppLayout>
 {/if}
+
+<style>
+  .app-bootstrap {
+    width: min(100%, 32rem);
+    margin: 0 auto;
+  }
+
+  .app-bootstrap__panel {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-panel-soft);
+    padding: 1.5rem;
+    display: grid;
+    gap: 0.75rem;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+  }
+
+  .app-bootstrap__eyebrow,
+  .app-bootstrap__copy {
+    margin: 0;
+  }
+
+  .app-bootstrap__eyebrow {
+    color: var(--color-text-muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .app-bootstrap__panel h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 2.6vw, 2.3rem);
+    line-height: 1.05;
+  }
+
+  .app-bootstrap__copy {
+    color: var(--color-text-soft);
+    line-height: 1.7;
+  }
+</style>
