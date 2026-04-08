@@ -1,18 +1,34 @@
+export type PageArea = 'public' | 'app'
+
 export type PageKey =
+  | 'login'
+  | 'hub'
   | 'home'
   | 'lobby'
   | 'decks'
   | 'character'
+  | 'character-detail'
   | 'inventory'
   | 'combat'
   | 'logs'
+  | 'deck-editor'
+  | 'player-lobby'
+  | 'gm-lobby'
+
+export type PageTag = {
+  label: string
+  tone?: 'accent' | 'muted' | 'success' | 'warning'
+}
 
 export type PageDefinition = {
   key: PageKey
   label: string
   path: string
+  area?: PageArea
   title: string
   description: string
+  eyebrow?: string
+  tags?: PageTag[]
 }
 
 export const PAGES: PageDefinition[] = [
@@ -69,6 +85,190 @@ export const PAGES: PageDefinition[] = [
 
 const pageMap = new Map(PAGES.map((page) => [page.path, page]))
 
+export const APP_NAV_ITEMS = [
+  {
+    key: 'hub',
+    label: 'Hub',
+    path: '/hub',
+    description: 'Overview and central entry point',
+    enabled: true,
+  },
+  {
+    key: 'character',
+    label: 'Characters',
+    path: '/characters',
+    description: 'Roster and detail records',
+    enabled: true,
+  },
+  {
+    key: 'decks',
+    label: 'Decks',
+    path: '/decks',
+    description: 'List and editor flow',
+    enabled: true,
+  },
+  {
+    key: 'lobby',
+    label: 'Session',
+    path: '/lobby',
+    description: 'Entry and lobby flow',
+    enabled: true,
+  },
+  {
+    key: 'combat',
+    label: 'Combat',
+    path: '/combat',
+    description: 'Combat command screen',
+    enabled: true,
+  },
+] satisfies AppNavItem[]
+
+export type AppNavItem = {
+  key: Exclude<PageKey, 'login'>
+  label: string
+  path: string
+  description: string
+  enabled: boolean
+}
+
+const activePageMap = new Map<string, PageDefinition>([
+  [
+    '/',
+    {
+      key: 'login',
+      label: 'Login',
+      path: '/',
+      area: 'public',
+      title: 'Archive Access',
+      description: 'Public entry screen for archive access.',
+      eyebrow: 'Public Entry',
+    },
+  ],
+  [
+    '/hub',
+    {
+      key: 'hub',
+      label: 'Hub',
+      path: '/hub',
+      area: 'app',
+      title: 'Duel Tower Hub',
+      description: 'Internal hub for overview, status, and next work targets.',
+      eyebrow: 'Grand Archive',
+      tags: [
+        { label: 'Batch 1', tone: 'accent' },
+        { label: 'MVP Shell', tone: 'success' },
+      ],
+    },
+  ],
+  [
+    '/characters',
+    {
+      key: 'character',
+      label: 'Characters',
+      path: '/characters',
+      area: 'app',
+      title: 'Character Roster',
+      description: 'Browse the roster and move into the next detail step from the current selection.',
+      eyebrow: 'Roster Ledger',
+      tags: [{ label: 'Batch 2', tone: 'accent' }],
+    },
+  ],
+  [
+    '/decks',
+    {
+      key: 'decks',
+      label: 'Decks',
+      path: '/decks',
+      area: 'app',
+      title: 'Deck List',
+      description: 'Review deck summaries and move into the next editor step from the current selection.',
+      eyebrow: 'Tactical Archive',
+      tags: [{ label: 'Batch 2', tone: 'accent' }],
+    },
+  ],
+  [
+    '/lobby',
+    {
+      key: 'lobby',
+      label: 'Session Entry',
+      path: '/lobby',
+      area: 'app',
+      title: 'Session Entry',
+      description: 'Enter by code or choose from open sessions before moving into the player lobby.',
+      eyebrow: 'Session Gate',
+      tags: [{ label: 'Batch 2', tone: 'accent' }],
+    },
+  ],
+  [
+    '/characters/detail',
+    {
+      key: 'character-detail',
+      label: 'Character Detail',
+      path: '/characters/detail',
+      area: 'app',
+      title: 'Character Detail / Edit',
+      description: 'Read the selected adventurer record and prepare the next edit step.',
+      eyebrow: 'Record Detail',
+      tags: [{ label: 'Batch 3', tone: 'accent' }],
+    },
+  ],
+  [
+    '/decks/editor',
+    {
+      key: 'deck-editor',
+      label: 'Deck Editor',
+      path: '/decks/editor',
+      area: 'app',
+      title: 'Deck Editor',
+      description: 'Review the selected deck structure before wiring the real editor actions.',
+      eyebrow: 'Tactical Editor',
+      tags: [{ label: 'Batch 3', tone: 'accent' }],
+    },
+  ],
+  [
+    '/lobby/player',
+    {
+      key: 'player-lobby',
+      label: 'Player Lobby',
+      path: '/lobby/player',
+      area: 'app',
+      title: 'Player Lobby',
+      description: 'Inspect session summary, participant slots, and readiness flow from the player side.',
+      eyebrow: 'Session Lobby',
+      tags: [{ label: 'Batch 3', tone: 'accent' }],
+    },
+  ],
+  [
+    '/lobby/gm',
+    {
+      key: 'gm-lobby',
+      label: 'GM Lobby',
+      path: '/lobby/gm',
+      area: 'app',
+      title: 'GM Lobby',
+      description: 'Manage participant readiness and session controls from the GM side.',
+      eyebrow: 'Session Control',
+      tags: [{ label: 'Batch 4', tone: 'accent' }],
+    },
+  ],
+  [
+    '/combat',
+    {
+      key: 'combat',
+      label: 'Combat Command',
+      path: '/combat',
+      area: 'app',
+      title: 'Combat Command',
+      description: 'Review battle state, issue commands, and track the action log in one screen.',
+      eyebrow: 'Battlefield Control',
+      tags: [{ label: 'Batch 4', tone: 'accent' }],
+    },
+  ],
+])
+
+// TODO: Expand fixed routes such as /characters/detail, /decks/editor, /lobby/player,
+// and /lobby/gm into id/code-based routes when the data contract is finalized.
+
 export function normalizePath(pathname: string): string {
   if (!pathname) return '/'
   return pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname
@@ -76,5 +276,5 @@ export function normalizePath(pathname: string): string {
 
 export function resolvePage(pathname: string): PageDefinition {
   const normalized = normalizePath(pathname)
-  return pageMap.get(normalized) ?? PAGES[0]
+  return activePageMap.get(normalized) ?? activePageMap.get('/') ?? pageMap.get(normalized) ?? PAGES[0]
 }
