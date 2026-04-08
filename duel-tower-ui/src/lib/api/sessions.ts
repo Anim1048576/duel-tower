@@ -1,19 +1,30 @@
 import { apiGet, apiPost, apiPut } from './client'
 import type {
   ApplyPresetToSessionRequest,
+  CommandRequest,
   CreateSessionRequest,
   CreateSessionResponse,
+  EngineResponseDto,
   JoinSessionRequest,
   JoinSessionResponse,
   KickPlayerRequest,
+  RecentResultsResponse,
   ResetSessionRequest,
   SessionCode,
+  SessionEventsQuery,
+  SessionEventPageResponse,
   SessionIdentifier,
+  SessionLogsQuery,
+  SessionLogPageResponse,
   SessionPlayerId,
+  SessionRequestAccess,
+  SessionRunChoicesResponse,
+  SessionRunInventoryResponse,
   SessionStateDto,
   SessionToken,
   UpdatePlayerReadyRequest,
   UpdateSessionLoadoutRequest,
+  RunStateDto,
 } from './sessionTypes'
 
 const SESSIONS_API_BASE = '/api/sessions'
@@ -57,6 +68,29 @@ function withPlayerToken(playerToken: SessionToken) {
 
 function withGmToken(gmToken: SessionToken) {
   return createTokenHeaders('X-GM-Token', gmToken)
+}
+
+function withSessionAccess(access: SessionRequestAccess) {
+  return access.role === 'gm' ? withGmToken(access.gmToken) : withPlayerToken(access.playerToken)
+}
+
+function buildSessionQueryPath(
+  code: SessionIdentifier,
+  suffix: string,
+  params: Record<string, number | null | undefined>,
+) {
+  const query = new URLSearchParams()
+
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      query.set(key, String(value))
+    }
+  }
+
+  const basePath = `${getSessionResourcePath(code)}${suffix}`
+  const queryString = query.toString()
+
+  return queryString ? `${basePath}?${queryString}` : basePath
 }
 
 export function createSession(payload: CreateSessionRequest) {
@@ -151,5 +185,74 @@ export function resetSession(
     `${getSessionResourcePath(code)}/reset`,
     payload,
     withGmToken(gmToken),
+  )
+}
+
+export function executeSessionCommand(
+  code: SessionCode,
+  payload: CommandRequest,
+  access: SessionRequestAccess,
+) {
+  return apiPost<EngineResponseDto, CommandRequest>(
+    `${getSessionResourcePath(code)}/command`,
+    payload,
+    withSessionAccess(access),
+  )
+}
+
+export function getSessionEvents(
+  code: SessionCode,
+  params: SessionEventsQuery,
+  access: SessionRequestAccess,
+) {
+  return apiGet<SessionEventPageResponse>(
+    buildSessionQueryPath(code, '/events', params),
+    withSessionAccess(access),
+  )
+}
+
+export function getSessionLogs(
+  code: SessionCode,
+  params: SessionLogsQuery,
+  access: SessionRequestAccess,
+) {
+  return apiGet<SessionLogPageResponse>(
+    buildSessionQueryPath(code, '/logs', params),
+    withSessionAccess(access),
+  )
+}
+
+export function getSessionResults(code: SessionCode, access: SessionRequestAccess) {
+  return apiGet<RecentResultsResponse>(
+    `${getSessionResourcePath(code)}/results`,
+    withSessionAccess(access),
+  )
+}
+
+export function getSessionRecentResults(code: SessionCode, access: SessionRequestAccess) {
+  return apiGet<RecentResultsResponse>(
+    `${getSessionResourcePath(code)}/recent-results`,
+    withSessionAccess(access),
+  )
+}
+
+export function getSessionRun(code: SessionCode, access: SessionRequestAccess) {
+  return apiGet<RunStateDto>(
+    `${getSessionResourcePath(code)}/run`,
+    withSessionAccess(access),
+  )
+}
+
+export function getSessionInventory(code: SessionCode, access: SessionRequestAccess) {
+  return apiGet<SessionRunInventoryResponse>(
+    `${getSessionResourcePath(code)}/inventory`,
+    withSessionAccess(access),
+  )
+}
+
+export function getSessionChoices(code: SessionCode, access: SessionRequestAccess) {
+  return apiGet<SessionRunChoicesResponse>(
+    `${getSessionResourcePath(code)}/choices`,
+    withSessionAccess(access),
   )
 }

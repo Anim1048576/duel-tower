@@ -10,6 +10,17 @@ export type SessionToken = string
 
 export type SessionVersion = number
 
+export type SessionRequestAccess =
+  | {
+      role: 'gm'
+      gmToken: SessionToken
+    }
+  | {
+      role: 'player'
+      playerToken: SessionToken
+      playerId?: SessionPlayerId
+    }
+
 export type OwnedCardModifierDto = {
   modifierId: string
   value: number | null
@@ -243,4 +254,104 @@ export type ResetSessionRequest = {
   keepPlayers?: boolean | null
   keepLoadouts?: boolean | null
   newSeed?: number | null
+}
+
+export type TargetRefDto = {
+  playerId?: string | null
+  enemyId?: string | null
+  summonOwnerPlayerId?: string | null
+  summonInstanceId?: string | null
+}
+
+export type CommandRequest = {
+  type: string
+  commandId?: string | null
+  expectedVersion?: number | null
+  playerId?: string | null
+  enemyId?: string | null
+  count?: number | null
+  discardIds?: readonly string[] | null
+  cardId?: string | null
+  summonId?: string | null
+  itemId?: string | null
+  equipId?: string | null
+  inventoryEquipId?: string | null
+  offerId?: string | null
+  targetPlayerIds?: readonly string[] | null
+  targetEnemyIds?: readonly string[] | null
+  targets?: readonly TargetRefDto[] | null
+  tieGroupIndex?: number | null
+  orderedActorKeys?: readonly string[] | null
+  selectedIds?: readonly string[] | null
+  choiceId?: string | null
+  resultId?: string | null
+  resultIndex?: number | null
+  reason?: string | null
+}
+
+export type EngineResponseDto = {
+  accepted: boolean
+  errors: string[]
+  errorDetails: unknown
+  events: SessionEventItemDto[]
+  state: SessionStateDto | null
+}
+
+export type SessionEventItemDto = {
+  cursor: string
+  version: number
+  type: string
+  payload: unknown
+  timestamp: string | null
+}
+
+export type SessionEventPageResponse = {
+  code: SessionCode
+  fromVersion: number | null
+  toVersion: number | null
+  items: SessionEventItemDto[]
+  hasMore: boolean
+}
+
+export type SessionLogItemDto = {
+  cursor: string
+  version: number
+  type: string
+  message: string
+  timestamp: string | null
+}
+
+export type SessionLogPageResponse = {
+  code: SessionCode
+  items: SessionLogItemDto[]
+  nextBefore: number | null
+}
+
+export type RecentResultsResponse = {
+  version: number
+  resultPending: boolean
+  currentNode: RunCurrentNodeDto | null
+  recentResults: RunRecentResultDto[]
+}
+
+export type SessionRunInventoryResponse = {
+  version: number
+  inventory: RunInventoryDto | null
+}
+
+export type SessionRunChoicesResponse = {
+  version: number
+  resultPending: boolean
+  currentNode: RunCurrentNodeDto | null
+  availableChoices: RunNodeChoiceDto[]
+}
+
+export type SessionEventsQuery = {
+  afterVersion?: number | null
+  limit?: number | null
+}
+
+export type SessionLogsQuery = {
+  before?: number | null
+  limit?: number | null
 }
