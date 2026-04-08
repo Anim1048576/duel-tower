@@ -137,81 +137,89 @@ export const PAGES: PageDefinition[] = [
     label: 'Home',
     path: routePaths.home,
     title: 'Home',
-    description: '새로운 UI 기반을 위한 출발 지점입니다. 핵심 대시보드는 추후 재구성됩니다.',
+    description: 'Central entry screen for the Duel Tower interface.',
   },
   {
     key: 'lobby',
     label: 'Lobby / Session',
     path: routePaths.sessionEntry,
     title: 'Lobby / Session',
-    description: '세션 준비, 참여, 관리 흐름은 이후 요구사항에 맞춰 다시 설계될 예정입니다.',
+    description: 'Session entry and lobby flow for player and GM access.',
   },
   {
     key: 'decks',
     label: 'Decks',
     path: routePaths.deckList,
     title: 'Decks',
-    description: '덱 편집과 상세 인터랙션은 이후 단계에서 새 UX 기준으로 재구축됩니다.',
+    description: 'Deck archive and editing access.',
   },
   {
     key: 'character',
     label: 'Character',
     path: '/character',
     title: 'Character',
-    description: '캐릭터 프로필/성장 화면은 향후 API 계약에 맞춰 재작성될 예정입니다.',
+    description: 'Character roster and profile access.',
   },
   {
     key: 'inventory',
     label: 'Inventory',
     path: '/inventory',
     title: 'Inventory',
-    description: '인벤토리 조회 및 아이템 동작 UI는 다음 단계에서 다시 구현합니다.',
+    description: 'Rules, statuses, and passive reference access.',
   },
   {
     key: 'combat',
     label: 'Combat',
     path: routePaths.combat,
     title: 'Combat',
-    description: '전투 보드 및 액션 UI는 별도 전투 설계안 기반으로 재개발될 예정입니다.',
+    description: 'Battlefield state and command screen.',
   },
   {
     key: 'logs',
     label: 'Logs / Results',
     path: '/logs',
     title: 'Logs / Results',
-    description: '전투 로그와 결과 뷰는 이후 정보 구조를 정리한 뒤 다시 구축됩니다.',
+    description: 'Battle logs and recent result records.',
   },
 ]
 
 const pageMap = new Map(PAGES.map((page) => [page.path, page]))
+
+export type AppNavItem = {
+  key: Exclude<PageKey, 'login'>
+  label: string
+  path: string
+  description: string
+  enabled: boolean
+}
 
 export const APP_NAV_ITEMS = [
   {
     key: 'hub',
     label: 'Hub',
     path: routePaths.hub,
-    description: 'Overview and central entry point',
+    description: 'Central overview and archive entry point',
     enabled: true,
   },
   {
     key: 'character',
     label: 'Characters',
     path: routePaths.characterList,
-    description: 'Roster and detail records',
+    description: 'Roster, records, and profile access',
     enabled: true,
   },
   {
     key: 'decks',
     label: 'Decks',
     path: routePaths.deckList,
-    description: 'Deck archive and editor entry flow',
+    description: 'Deck archive and editing flow',
     enabled: true,
   },
   {
     key: 'presets',
     label: 'Presets',
     path: routePaths.presetList,
-    description: 'Preset archive and editor entry flow',
+    description: 'Preset archive and loadout editing flow',
     enabled: true,
   },
   {
@@ -225,25 +233,10 @@ export const APP_NAV_ITEMS = [
     key: 'lobby',
     label: 'Session',
     path: routePaths.sessionEntry,
-    description: 'Entry and lobby flow',
-    enabled: true,
-  },
-  {
-    key: 'combat',
-    label: 'Combat',
-    path: routePaths.combat,
-    description: 'Combat command screen',
+    description: 'Entry, player lobby, and GM lobby',
     enabled: true,
   },
 ] satisfies AppNavItem[]
-
-export type AppNavItem = {
-  key: Exclude<PageKey, 'login'>
-  label: string
-  path: string
-  description: string
-  enabled: boolean
-}
 
 const activePageMap = new Map<string, PageDefinition>([
   [
@@ -266,11 +259,11 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.hub,
       area: 'app',
       title: 'Duel Tower Hub',
-      description: 'Internal hub for overview, status, and next work targets.',
+      description: 'Central hub for overview, status, and movement into the main archive areas.',
       eyebrow: 'Grand Archive',
       tags: [
-        { label: 'Batch 1', tone: 'accent' },
-        { label: 'MVP Shell', tone: 'success' },
+        { label: 'Overview', tone: 'accent' },
+        { label: 'Archive', tone: 'success' },
       ],
     },
   ],
@@ -282,9 +275,9 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.characterList,
       area: 'app',
       title: 'Character Roster',
-      description: 'Browse the roster and move into the next detail step from the current selection.',
+      description: 'Browse the roster and move into detailed character records from the current selection.',
       eyebrow: 'Roster Ledger',
-      tags: [{ label: 'Batch 2', tone: 'accent' }],
+      tags: [{ label: 'Roster', tone: 'accent' }],
     },
   ],
   [
@@ -297,7 +290,7 @@ const activePageMap = new Map<string, PageDefinition>([
       title: 'Deck Archive',
       description: 'Browse live deck records and move into the URL-based editor flow from the current selection.',
       eyebrow: 'Deck Ledger',
-      tags: [{ label: 'Batch 2', tone: 'accent' }],
+      tags: [{ label: 'Deck Archive', tone: 'accent' }],
     },
   ],
   [
@@ -310,7 +303,7 @@ const activePageMap = new Map<string, PageDefinition>([
       title: 'Preset Archive',
       description: 'Browse live preset records and move into the URL-based editor flow from the current selection.',
       eyebrow: 'Preset Ledger',
-      tags: [{ label: 'Batch 3', tone: 'accent' }],
+      tags: [{ label: 'Loadouts', tone: 'accent' }],
     },
   ],
   [
@@ -323,7 +316,7 @@ const activePageMap = new Map<string, PageDefinition>([
       title: 'Card Detail',
       description: 'Review the selected card record from the live archive.',
       eyebrow: 'Card Record',
-      tags: [{ label: 'Content API', tone: 'accent' }],
+      tags: [{ label: 'Card Archive', tone: 'accent' }],
     },
   ],
   [
@@ -336,7 +329,7 @@ const activePageMap = new Map<string, PageDefinition>([
       title: 'Rules Reference',
       description: 'Review keywords, statuses, and passive definitions from the live content API.',
       eyebrow: 'Reference Archive',
-      tags: [{ label: 'Content API', tone: 'accent' }],
+      tags: [{ label: 'Reference', tone: 'accent' }],
     },
   ],
   [
@@ -347,9 +340,9 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.sessionEntry,
       area: 'app',
       title: 'Session Entry',
-      description: 'Enter by code or choose from open sessions before moving into the player lobby.',
+      description: 'Create or join a session, then move into the player or GM lobby flow.',
       eyebrow: 'Session Gate',
-      tags: [{ label: 'Batch 2', tone: 'accent' }],
+      tags: [{ label: 'Session Flow', tone: 'accent' }],
     },
   ],
   [
@@ -360,9 +353,9 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.characterDetail,
       area: 'app',
       title: 'Character Detail / Edit',
-      description: 'Read the selected adventurer record and prepare the next edit step.',
+      description: 'Review the selected adventurer record and update the current detail view.',
       eyebrow: 'Record Detail',
-      tags: [{ label: 'Batch 3', tone: 'accent' }],
+      tags: [{ label: 'Character Record', tone: 'accent' }],
     },
   ],
   [
@@ -373,9 +366,9 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.characterCreate,
       area: 'app',
       title: 'Character Create',
-      description: 'Create a new adventurer record before moving back into the roster flow.',
+      description: 'Create a new adventurer record and return to the roster flow.',
       eyebrow: 'Record Creation',
-      tags: [{ label: 'Batch 3', tone: 'accent' }],
+      tags: [{ label: 'Character Record', tone: 'accent' }],
     },
   ],
   [
@@ -386,9 +379,9 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.deckEditor,
       area: 'app',
       title: 'Deck Editor',
-      description: 'Review the selected deck structure before wiring the real editor actions.',
+      description: 'Review and update the selected deck structure from the archive.',
       eyebrow: 'Tactical Editor',
-      tags: [{ label: 'Batch 3', tone: 'accent' }],
+      tags: [{ label: 'Deck Editor', tone: 'accent' }],
     },
   ],
   [
@@ -399,9 +392,9 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.presetEditor,
       area: 'app',
       title: 'Preset Editor',
-      description: 'Review the selected preset entry before wiring the real editor actions.',
+      description: 'Review and update the selected preset entry from the archive.',
       eyebrow: 'Loadout Editor',
-      tags: [{ label: 'Batch 3', tone: 'accent' }],
+      tags: [{ label: 'Preset Editor', tone: 'accent' }],
     },
   ],
   [
@@ -414,7 +407,7 @@ const activePageMap = new Map<string, PageDefinition>([
       title: 'Player Lobby',
       description: 'Inspect session summary, participant slots, and readiness flow from the player side.',
       eyebrow: 'Session Lobby',
-      tags: [{ label: 'Batch 3', tone: 'accent' }],
+      tags: [{ label: 'Player View', tone: 'accent' }],
     },
   ],
   [
@@ -427,7 +420,7 @@ const activePageMap = new Map<string, PageDefinition>([
       title: 'GM Lobby',
       description: 'Manage participant readiness and session controls from the GM side.',
       eyebrow: 'Session Control',
-      tags: [{ label: 'Batch 4', tone: 'accent' }],
+      tags: [{ label: 'GM View', tone: 'accent' }],
     },
   ],
   [
@@ -440,7 +433,7 @@ const activePageMap = new Map<string, PageDefinition>([
       title: 'Combat Command',
       description: 'Review battle state, issue commands, and track the action log in one screen.',
       eyebrow: 'Battlefield Control',
-      tags: [{ label: 'Batch 4', tone: 'accent' }],
+      tags: [{ label: 'Battle View', tone: 'accent' }],
     },
   ],
 ])

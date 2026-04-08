@@ -33,8 +33,7 @@
       <p class="app-layout__eyebrow">Archive Node</p>
       <h1>Duel Tower</h1>
       <p class="app-layout__copy">
-        Archive shell for roster, decks, sessions, and upcoming battle flows. Later batches can
-        extend this structure without changing the routing model.
+        Central archive for roster, decks, presets, sessions, and live reference screens.
       </p>
 
       {#if currentUsername}

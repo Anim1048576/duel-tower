@@ -3,47 +3,52 @@
   import TagChip from '../lib/components/TagChip.svelte'
 
   const readiness = [
-    { label: '허브 셸', value: '준비', tone: 'success' as const },
-    { label: '인증 연동', value: '연결됨', tone: 'success' as const },
-    { label: '세션 실시간', value: '대기', tone: 'muted' as const },
+    { label: '허브 화면', value: '이용 가능', tone: 'success' as const },
+    { label: '계정 인증', value: '연결 완료', tone: 'success' as const },
+    { label: '세션 흐름', value: '진행 중', tone: 'accent' as const },
   ]
 
   const nextFronts = [
-    { title: '모험가 명부', note: '목록과 선택 흐름 우선 구현' },
-    { title: '전술 목록', note: '카드 목록과 필터 기본형 연결' },
-    { title: '세션 입장', note: '허브에서 로비로 이어지는 진입점 확보' },
+    { title: '캐릭터', note: '보유 캐릭터와 프로필 구성을 확인하고 정리하는 영역입니다.' },
+    { title: '덱', note: '카드 묶음과 편성 상태를 살펴보고 전투 준비를 이어갈 수 있습니다.' },
+    { title: '프리셋', note: '로드아웃 조합을 저장하고 세션에 적용할 준비를 하는 보관함입니다.' },
+    { title: '세션', note: '입장, 로비, 전투 흐름으로 이어지는 현재 운영 축입니다.' },
+    { title: '전투 · 룰 · 참고 정보', note: '전투 진행 화면과 규칙 참고 흐름을 같은 축에서 확인할 수 있습니다.' },
   ]
 
-  // TODO: Replace these placeholders with the hub overview API response.
+  const memos = [
+    '허브는 현재 사용 가능한 영역을 한 번에 훑고 다음 진입 지점을 고르기 위한 중앙 화면입니다.',
+    '일부 섹션은 정적인 개요를 우선 보여주며, 실제 데이터 연결이 끝난 영역부터 순차적으로 화면 밀도를 높입니다.',
+  ]
 </script>
 
 <div class="hub-page">
   <SectionFrame
     eyebrow="Central Ledger"
-    title="현재 전선"
-    description="Duel Tower Hub (Fixed)를 바탕으로, 내부 앱 진입 후 가장 먼저 보게 될 요약 패널 구조를 정리합니다."
+    title="운영 허브"
+    description="로그인 이후 가장 먼저 마주하는 화면으로, Duel Tower의 주요 영역과 현재 접근 흐름을 한눈에 정리합니다."
   >
     <div class="hub-page__hero">
       <div class="hub-page__hero-copy">
-        <p class="hub-page__hero-label">Batch 1 Scope</p>
-        <h3>로그인 이후 흐름을 받는 내부 공통 셸</h3>
+        <p class="hub-page__hero-label">Hub Overview</p>
+        <h3>기록, 준비, 세션 흐름을 한곳에서 이어가는 중앙 허브</h3>
         <p>
-          허브는 이후 명부, 전술, 세션, 전투 화면이 공통으로 기대는 진입점입니다. 이번 배치에서는
-          정보 구조와 시각적 톤만 우선 고정합니다.
+          허브는 캐릭터, 덱, 프리셋, 세션, 전투 관련 화면으로 이어지는 기준점입니다. 지금 사용할 수
+          있는 영역을 빠르게 확인하고 다음 작업으로 자연스럽게 이동할 수 있도록 구성했습니다.
         </p>
       </div>
 
       <div class="hub-page__hero-tags">
-        <TagChip label="Auth Ready" tone="success" />
-        <TagChip label="Shell First" tone="accent" />
+        <TagChip label="인증 연결" tone="success" />
+        <TagChip label="운영 허브" tone="accent" />
       </div>
     </div>
   </SectionFrame>
 
   <div class="hub-page__grid">
     <SectionFrame
-      title="준비 상태"
-      description="실제 서버 응답 대신 배치 진행 상태를 최소 mock 데이터로만 표시합니다."
+      title="현재 상태"
+      description="허브와 직접 맞닿아 있는 핵심 흐름을 짧게 정리한 개요입니다."
     >
       <ul class="hub-page__status-list">
         {#each readiness as item}
@@ -59,8 +64,8 @@
     </SectionFrame>
 
     <SectionFrame
-      title="다음 연결 대상"
-      description="다음 배치에서 실제 페이지 구현을 붙일 우선순위 후보입니다."
+      title="주요 영역"
+      description="현재 허브에서 자연스럽게 이어지는 화면 축을 기준으로 정리했습니다."
     >
       <ul class="hub-page__front-list">
         {#each nextFronts as item}
@@ -73,12 +78,13 @@
     </SectionFrame>
 
     <SectionFrame
-      title="통합 메모"
-      description="데이터 계약이 정리되면 이 섹션부터 허브 요약 API와 작업 큐 응답을 연결할 수 있습니다."
+      title="허브 메모"
+      description="이 화면은 상태 요약과 진입 안내를 중심으로 유지되며, 없는 기능을 과장하지 않습니다."
     >
       <div class="hub-page__memo">
-        <p>TODO: 허브 요약, 사용자 세션, 진행 중 원정 데이터를 한 번에 묶는 응답 모델 정의</p>
-        <p>TODO: 좌측 내비 활성 상태와 접근 권한을 실제 사용자 상태에 따라 계산</p>
+        {#each memos as memo}
+          <p>{memo}</p>
+        {/each}
       </div>
     </SectionFrame>
   </div>

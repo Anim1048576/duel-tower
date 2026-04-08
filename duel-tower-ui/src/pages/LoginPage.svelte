@@ -25,7 +25,7 @@
 
     const normalizedUsername = username.trim()
     if (!normalizedUsername || !password) {
-      localError = 'Enter both username and password to continue.'
+      localError = '아이디와 비밀번호를 모두 입력해 주세요.'
       feedbackVisible = true
       return
     }
@@ -50,69 +50,61 @@
 <section class="login-page">
   <header class="login-page__header">
     <div class="login-page__tags">
-      <TagChip label="MVP Access" tone="accent" />
-      <TagChip label="Session Auth" tone="success" />
+      <TagChip label="계정 인증" tone="accent" />
+      <TagChip label="보안 세션" tone="success" />
     </div>
 
     <div class="login-page__copy">
-      <h2>기록 보관소 접속</h2>
+      <h2>Duel Tower 입장</h2>
       <p>
-        이번 배치에서는 공개 진입 화면과 내부 앱 셸을 분리합니다. 실제 인증 연동은 하지 않고,
-        구조와 상태 자리만 우선 확보합니다.
+        계정 인증을 마치면 허브와 세션 화면으로 바로 이어집니다. 현재 계정으로 로그인해 Duel
+        Tower의 진행 상태를 이어서 확인하세요.
       </p>
     </div>
   </header>
 
   <form class="login-page__form" onsubmit={handleSubmit} aria-busy={authState.loading}>
     <fieldset class="login-page__fieldset" disabled={authState.loading}>
-    <label class="login-page__field">
-      <span>Username</span>
-      <input
-        bind:value={username}
-        name="username"
-        autocomplete="username"
-        placeholder="tower-keeper"
-        required
-        aria-invalid={shouldShowFeedback && Boolean(feedbackMessage)}
-        aria-describedby={shouldShowFeedback && feedbackMessage ? 'login-feedback' : undefined}
-        disabled={authState.loading}
-        oninput={handleInput}
-      />
-    </label>
+      <label class="login-page__field">
+        <span>Username</span>
+        <input
+          bind:value={username}
+          name="username"
+          autocomplete="username"
+          placeholder="tower-keeper"
+          required
+          aria-invalid={shouldShowFeedback && Boolean(feedbackMessage)}
+          aria-describedby={shouldShowFeedback && feedbackMessage ? 'login-feedback' : undefined}
+          disabled={authState.loading}
+          oninput={handleInput}
+        />
+      </label>
 
-    <label class="login-page__field">
-      <span>Password</span>
-      <input
-        bind:value={password}
-        name="password"
-        type="password"
-        autocomplete="current-password"
-        placeholder="********"
-        required
-        aria-invalid={shouldShowFeedback && Boolean(feedbackMessage)}
-        aria-describedby={shouldShowFeedback && feedbackMessage ? 'login-feedback' : undefined}
-        disabled={authState.loading}
-        oninput={handleInput}
-      />
-    </label>
+      <label class="login-page__field">
+        <span>Password</span>
+        <input
+          bind:value={password}
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          placeholder="********"
+          required
+          aria-invalid={shouldShowFeedback && Boolean(feedbackMessage)}
+          aria-describedby={shouldShowFeedback && feedbackMessage ? 'login-feedback' : undefined}
+          disabled={authState.loading}
+          oninput={handleInput}
+        />
+      </label>
 
-    <div class="login-page__actions">
-      <button type="submit">기록 보관소 열기</button>
-      <a class="login-page__preview" data-nav href={pathBuilders.hub()}>허브 미리보기</a>
-    </div>
+      <div class="login-page__actions">
+        <button type="submit" disabled={isSubmitDisabled}>로그인</button>
+      </div>
     </fieldset>
   </form>
 
   {#if shouldShowFeedback && feedbackMessage}
     <p id="login-feedback" class="login-page__feedback" role="alert" aria-live="polite">
       {feedbackMessage}
-    </p>
-  {/if}
-
-  {#if false}
-    <p class="login-page__feedback">
-      인증 API는 아직 연결되지 않았습니다. TODO 위치에 세션 부트스트랩 로직을 연결하면
-      됩니다.
     </p>
   {/if}
 </section>
@@ -192,8 +184,7 @@
     gap: 0.75rem;
   }
 
-  .login-page__actions button,
-  .login-page__preview {
+  .login-page__actions button {
     min-height: 3rem;
     padding: 0.75rem 1rem;
     border: 1px solid var(--color-border);
@@ -210,12 +201,6 @@
 
   .login-page__actions button:disabled {
     opacity: 0.76;
-  }
-
-  .login-page__preview {
-    display: none;
-    color: var(--color-text-soft);
-    background: rgba(255, 255, 255, 0.02);
   }
 
   .login-page__feedback {

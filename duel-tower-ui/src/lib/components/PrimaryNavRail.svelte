@@ -53,7 +53,7 @@
           <strong>{item.label}</strong>
           <span>{item.description}</span>
         </div>
-        <TagChip label="Soon" tone="muted" />
+        <TagChip label="Unavailable" tone="muted" />
       </div>
     {/if}
   {/each}
