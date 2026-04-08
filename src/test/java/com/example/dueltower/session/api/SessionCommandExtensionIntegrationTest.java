@@ -3,6 +3,7 @@ package com.example.dueltower.session.api;
 import com.example.dueltower.member.MemberRepository;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,6 +41,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 자신의 토큰이면 성공하고 인벤토리를 변경한다")
     void useItemSucceedsWithOwnTokenAndMutatesInventory() throws Exception {
         Fixture fx = createFixture();
 
@@ -68,6 +70,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 플레이어 토큰이 없으면 실패한다")
     void useItemFailsWithoutPlayerToken() throws Exception {
         Fixture fx = createFixture();
 
@@ -85,6 +88,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 토큰의 플레이어가 일치하지 않으면 실패한다")
     void useItemFailsWhenTokenPlayerMismatch() throws Exception {
         Fixture fx = createFixtureWithSecondPlayer();
 
@@ -103,6 +107,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 item ID가 없으면 실패한다")
     void useItemFailsWhenItemIdMissing() throws Exception {
         Fixture fx = createFixture();
 
@@ -120,6 +125,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 알 수 없는 item ID면 거부한다")
     void useItemRejectsWhenItemIdUnknown() throws Exception {
         Fixture fx = createFixture();
         JsonNode response = commandAsPlayer(
@@ -140,6 +146,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 수량이 부족하면 거부한다")
     void useItemRejectsWhenCountInsufficient() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
@@ -163,6 +170,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 해독제 대상이 없으면 거부한다")
     void useItemRejectsAntidoteWhenTargetMissing() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
@@ -186,6 +194,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 대상이 주어지면 해독제 사용에 성공한다")
     void useItemAntidoteSucceedsWhenTargetProvided() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
@@ -209,6 +218,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 전투가 시작되지 않았으면 거부한다")
     void useItemRejectsWhenCombatNotStarted() throws Exception {
         Fixture fx = createFixture();
 
@@ -230,6 +240,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 연막탄 사용에 성공하고 인벤토리를 소모한다")
     void useItemSmokeBombSucceedsAndConsumesInventory() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
@@ -255,6 +266,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 같은 턴 두 번째 소모품 사용을 거부한다")
     void useItemRejectsSecondConsumableInSameTurn() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
@@ -294,6 +306,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 expectedVersion이 일치하지 않으면 거부한다")
     void useItemRejectsWhenExpectedVersionMismatched() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
@@ -317,6 +330,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("전투 항복은 전투 중이면 성공하고 전투를 종료한다")
     void surrenderCombatSucceedsDuringCombatAndClosesCombat() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
@@ -343,6 +357,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("전투 항복은 플레이어 토큰이 없으면 실패한다")
     void surrenderCombatFailsWithoutPlayerToken() throws Exception {
         Fixture fx = createFixture();
 
@@ -359,6 +374,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("전투 항복은 토큰의 플레이어가 일치하지 않으면 실패한다")
     void surrenderCombatFailsWhenTokenPlayerMismatch() throws Exception {
         Fixture fx = createFixtureWithSecondPlayer();
 
@@ -376,6 +392,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("전투 항복은 전투 중이 아니면 거부한다")
     void surrenderCombatRejectedWhenNotInCombat() throws Exception {
         Fixture fx = createFixture();
 
@@ -396,6 +413,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("전투 항복은 expectedVersion이 일치하지 않으면 거부한다")
     void surrenderCombatRejectedWhenExpectedVersionMismatched() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
@@ -418,6 +436,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("인벤토리 아이템 판매는 인벤토리, 골드, 최근 결과를 변경한다")
     void sellInventoryItemMutatesInventoryGoldAndRecentResults() throws Exception {
         Fixture fx = createFixture();
         JsonNode state = snapshotState(fx);
@@ -447,6 +466,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("인벤토리 아이템 판매는 플레이어 토큰이 없으면 실패한다")
     void sellInventoryItemFailsWithoutPlayerToken() throws Exception {
         Fixture fx = createFixture();
         mockMvc.perform(post("/api/sessions/{code}/command", fx.code)
@@ -463,6 +483,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("전투 후퇴는 전투 중이면 성공하고 전투를 종료한다")
     void retreatCombatSucceedsDuringCombatAndClosesCombat() throws Exception {
         Fixture fx = createFixture();
         JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
@@ -486,6 +507,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("전투 후퇴는 전투 중이 아니면 거부한다")
     void retreatCombatRejectedWhenNotInCombat() throws Exception {
         Fixture fx = createFixture();
 
@@ -506,6 +528,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("draw rail은 플레이어 인증 커맨드로 여전히 동작한다")
     void drawRailStillWorksAsPlayerAuthCommand() throws Exception {
         Fixture fx = createFixture();
 
@@ -527,6 +550,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("커맨드 요청은 기존 JSON 필드와의 하위 호환성을 유지한다")
     void commandRequestBackwardCompatibilityForExistingJsonFields() throws Exception {
         Fixture fx = createFixture();
 
@@ -549,6 +573,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상점 아이템 구매는 이벤트 노드에서 성공하고 골드를 소모한다")
     void buyShopItemSucceedsOnEventNodeAndConsumesGold() throws Exception {
         Fixture fx = createFixture();
         JsonNode initialState = snapshotState(fx);
@@ -592,6 +617,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상점 아이템 구매는 플레이어 토큰이 없으면 실패한다")
     void buyShopItemFailsWithoutPlayerToken() throws Exception {
         Fixture fx = createFixture();
         JsonNode initialState = snapshotState(fx);
@@ -625,6 +651,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상점 아이템 구매는 토큰의 플레이어가 일치하지 않으면 실패한다")
     void buyShopItemFailsWhenTokenPlayerMismatch() throws Exception {
         Fixture fx = createFixtureWithSecondPlayer();
         JsonNode initialState = snapshotState(fx);
@@ -659,6 +686,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상점 아이템 구매는 offer ID가 없으면 실패한다")
     void buyShopItemFailsWhenOfferIdMissing() throws Exception {
         Fixture fx = createFixture();
         JsonNode initialState = snapshotState(fx);
@@ -691,6 +719,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상점 아이템 구매는 알 수 없는 offer ID면 거부한다")
     void buyShopItemRejectsWhenOfferIdUnknown() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectEventNode(fx);
@@ -713,6 +742,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상점 아이템 구매는 골드가 부족하면 거부한다")
     void buyShopItemRejectsWhenGoldInsufficient() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectEventNode(fx);
@@ -736,6 +766,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상점 아이템 구매는 상점이 없으면 거부한다")
     void buyShopItemRejectsWhenShopNotAvailable() throws Exception {
         Fixture fx = createFixture();
 
@@ -757,6 +788,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상점 아이템 구매는 expectedVersion이 일치하지 않으면 거부한다")
     void buyShopItemRejectsWhenExpectedVersionMismatched() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectEventNode(fx);
@@ -780,6 +812,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상자 열기는 상자를 소모하고 보상을 추가한다")
     void openChestConsumesChestAndAddsRewards() throws Exception {
         Fixture fx = createFixture();
         JsonNode initialState = snapshotState(fx);
@@ -807,6 +840,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상자 열기는 플레이어 토큰이 없으면 실패한다")
     void openChestFailsWithoutPlayerToken() throws Exception {
         Fixture fx = createFixture();
 
@@ -823,6 +857,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상자 열기는 토큰의 플레이어가 일치하지 않으면 실패한다")
     void openChestFailsWhenTokenPlayerMismatch() throws Exception {
         Fixture fx = createFixtureWithSecondPlayer();
 
@@ -840,6 +875,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상자 열기는 상자가 부족하면 거부한다")
     void openChestRejectsWhenChestInsufficient() throws Exception {
         Fixture fx = createFixture();
         JsonNode initial = snapshotState(fx);
@@ -862,6 +898,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상자 열기는 노드가 resolving 중이면 거부한다")
     void openChestRejectsWhenNodeResolving() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectJudgementNode(fx);
@@ -883,6 +920,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("상자 열기는 expectedVersion이 일치하지 않으면 거부한다")
     void openChestRejectsWhenExpectedVersionMismatched() throws Exception {
         Fixture fx = createFixture();
         JsonNode bumped = commandAsPlayer(
@@ -916,6 +954,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("판정 해결은 pending 상태가 필요하며 노드 결과를 해결한다")
     void resolveJudgementRequiresPendingAndResolvesNodeResult() throws Exception {
         Fixture fx = createFixture();
         JsonNode initialState = snapshotState(fx);
@@ -961,6 +1000,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("판정 해결 실패는 상태 약화 대신 owned card modifier를 적용한다")
     void resolveJudgementFailureAppliesOwnedCardModifierInsteadOfStatusWeakness() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectJudgementNode(fx);
@@ -1005,6 +1045,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("판정 해결은 플레이어 토큰이 없으면 실패한다")
     void resolveJudgementFailsWithoutPlayerToken() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectJudgementNode(fx);
@@ -1023,6 +1064,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("판정 해결은 토큰의 플레이어가 일치하지 않으면 실패한다")
     void resolveJudgementFailsWhenTokenPlayerMismatch() throws Exception {
         Fixture fx = createFixtureWithSecondPlayer();
         JsonNode selected = selectJudgementNode(fx);
@@ -1042,6 +1084,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("판정 해결은 pending decision이 없으면 거부한다")
     void resolveJudgementRejectsWhenNoPendingDecision() throws Exception {
         Fixture fx = createFixture();
 
@@ -1063,6 +1106,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("판정 해결은 선택이 유효하지 않으면 거부한다")
     void resolveJudgementRejectsWhenChoiceInvalid() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectJudgementNode(fx);
@@ -1085,6 +1129,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("판정 해결은 expectedVersion이 일치하지 않으면 거부한다")
     void resolveJudgementRejectsWhenExpectedVersionMismatched() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectJudgementNode(fx);
@@ -1108,6 +1153,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 사용과 턴 종료 rail은 HTTP 오류가 아니라 거부 응답으로 안정적으로 유지된다")
     void playCardAndEndTurnRailsRemainStableAsRejectedNotHttpError() throws Exception {
         Fixture fx = createFixture();
 
@@ -1145,6 +1191,7 @@ class SessionCommandExtensionIntegrationTest {
 
 
     @Test
+    @DisplayName("장비 오퍼 구매는 equip 엔트리 타입을 저장하고 장착/해제 흐름이 동작한다")
     void buyEquipOfferStoresEquipEntryTypeAndEquipUnequipFlowWorks() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectEventNode(fx);
@@ -1201,6 +1248,7 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    @DisplayName("탄환 묶음 구매는 item 타입을 노출하고 사용은 거부한다")
     void buyBulletBundleExposesItemTypeAndUseIsRejected() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectEventNode(fx);

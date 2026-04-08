@@ -8,6 +8,7 @@ import com.example.dueltower.preset.domain.Preset;
 import com.example.dueltower.preset.repository.PresetRepository;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -56,6 +57,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("세션 나가기는 플레이어 토큰이 없으면 실패한다")
     void leaveFailsWithoutPlayerToken() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm").code();
@@ -67,6 +69,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("세션 나가기는 성공 시 현재 플레이어를 상태에서 제거한다")
     void leaveSuccessRemovesCurrentPlayerFromState() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm").code();
@@ -80,6 +83,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("강퇴는 유효한 GM 토큰이 필요하다")
     void kickRequiresValidGmToken() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -100,6 +104,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("리셋은 기본값으로 플레이어를 유지하고 run state를 다시 초기화한다")
     void resetKeepsPlayersByDefaultAndReinitializesRunState() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -118,6 +123,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("리셋은 GM 토큰이 없으면 실패한다")
     void resetFailsWithoutGmToken() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -129,6 +135,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("keepPlayers=false 리셋은 플레이어를 비우고 세션 코드는 유지한다")
     void resetWithKeepPlayersFalseClearsPlayersAndKeepsSessionCode() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -151,6 +158,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("keepLoadouts=false 리셋은 덱, EX, 패시브를 초기화한다")
     void resetWithKeepLoadoutsFalseResetsDeckExAndPassives() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -185,6 +193,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("삭제는 GM 토큰이 없으면 실패한다")
     void deleteFailsWithoutGmToken() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -194,6 +203,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("GM 토큰으로 삭제하면 세션을 제거하고 204를 반환한다")
     void deleteWithGmTokenRemovesSessionAndReturns204() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -207,6 +217,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("로드아웃 수정은 플레이어 토큰으로 자신의 정보 수정만 허용한다")
     void updateLoadoutAllowsSelfUpdateWithPlayerToken() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -245,6 +256,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("로드아웃 수정은 경로의 player ID가 다르면 거부한다")
     void updateLoadoutRejectsDifferentPathPlayerId() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -265,6 +277,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("로드아웃 수정은 character ID, passive, deck을 검증한다")
     void updateLoadoutValidatesCharacterIdPassiveAndDeck() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -316,6 +329,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("로드아웃에 프리셋 적용은 플레이어 토큰으로 자신의 프리셋 적용만 허용한다")
     void applyPresetToLoadoutAllowsSelfApplyWithPlayerToken() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -369,6 +383,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("로드아웃에 프리셋 적용은 다른 플레이어의 프리셋이면 거부한다")
     void applyPresetToLoadoutRejectsOtherPlayersPreset() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -421,6 +436,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("로드아웃에 프리셋 적용은 경로의 player ID가 다르면 거부한다")
     void applyPresetToLoadoutRejectsDifferentPathPlayerId() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -441,6 +457,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("로드아웃에 프리셋 적용은 플레이어 토큰이 필요하다")
     void applyPresetToLoadoutRequiresPlayerToken() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");
@@ -458,6 +475,7 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("로드아웃에 프리셋 적용은 preset ID가 필요하다")
     void applyPresetToLoadoutRequiresPresetId() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo info = createSession(gmSession, "gm");

@@ -1,6 +1,11 @@
 <script lang="ts">
+  import ContentStatePanel from './ContentStatePanel.svelte'
   import TagChip from './TagChip.svelte'
-  import type { PageTag } from '../navigation'
+
+  export type EntityListTag = {
+    label: string
+    tone?: 'accent' | 'muted' | 'success' | 'warning'
+  }
 
   export type EntityListItem = {
     id: string
@@ -8,11 +13,11 @@
     subtitle?: string
     meta?: string
     note?: string
-    tags?: PageTag[]
+    tags?: readonly EntityListTag[]
   }
 
   type Props = {
-    items: EntityListItem[]
+    items: readonly EntityListItem[]
     selectedId?: string
     emptyMessage?: string
     onSelect?: (id: string) => void
@@ -66,7 +71,7 @@
       {/each}
     </ul>
   {:else}
-    <p class="entity-list-pane__empty">{emptyMessage}</p>
+    <ContentStatePanel message={emptyMessage} />
   {/if}
 </div>
 
@@ -126,8 +131,7 @@
   }
 
   .entity-list-pane__copy p,
-  .entity-list-pane button small,
-  .entity-list-pane__empty {
+  .entity-list-pane button small {
     margin: 0;
     color: var(--color-text-muted);
     line-height: 1.6;
@@ -138,12 +142,6 @@
     flex-wrap: wrap;
     gap: 0.45rem;
     justify-content: flex-end;
-  }
-
-  .entity-list-pane__empty {
-    padding: 1rem;
-    border: 1px solid var(--color-border);
-    background: rgba(12, 11, 10, 0.22);
   }
 
   @media (max-width: 720px) {

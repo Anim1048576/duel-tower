@@ -12,9 +12,14 @@
   let { items, currentPath, currentKey, onNavigate }: Props = $props()
 
   const SESSION_NAV_KEYS = new Set<PageKey>(['lobby', 'player-lobby', 'gm-lobby'])
+  const CARD_NAV_KEYS = new Set<PageKey>(['decks', 'card-detail', 'deck-editor'])
 
   function isSelected(item: AppNavItem) {
     if (item.key === 'lobby' && SESSION_NAV_KEYS.has(currentKey)) {
+      return true
+    }
+
+    if (item.key === 'decks' && CARD_NAV_KEYS.has(currentKey)) {
       return true
     }
 

@@ -5,6 +5,7 @@ import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.repository.DeckRepository;
 import com.example.dueltower.member.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,6 +44,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 교체는 전체 덱을 교체하고 덱 응답을 반환한다")
     void replaceCardsSuccessShouldReplaceWholeDeckAndReturnDeckResponse() throws Exception {
         MockHttpSession session = signUpAndLogin("deckReplace1");
         Deck deck = createDeck("deck-replace", DeckType.ENEMY, Map.of("C001", 1, "C002", 1));
@@ -70,6 +72,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 교체는 카드 추가 엔드포인트와 충돌 없이 동작한다")
     void replaceCardsShouldWorkWithoutConflictWithCardsAddEndpoint() throws Exception {
         MockHttpSession session = signUpAndLogin("deckReplace2");
         Deck deck = createDeck("deck-no-conflict", DeckType.ENEMY, Map.of("C001", 1));
@@ -107,6 +110,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 교체는 인증이 필요하다")
     void replaceCardsShouldRequireAuthentication() throws Exception {
         Deck deck = createDeck("deck-auth", DeckType.ENEMY, Map.of("C001", 1));
 
@@ -123,6 +127,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 교체는 덱이 없으면 실패한다")
     void replaceCardsShouldFailForMissingDeck() throws Exception {
         MockHttpSession session = signUpAndLogin("deckReplace3");
 
@@ -140,6 +145,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 교체는 알 수 없는 카드 ID면 실패한다")
     void replaceCardsShouldFailForUnknownCardId() throws Exception {
         MockHttpSession session = signUpAndLogin("deckReplace4");
         Deck deck = createDeck("deck-unknown-card", DeckType.ENEMY, Map.of("C001", 1));
@@ -158,6 +164,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 교체는 count가 양수가 아니면 실패한다")
     void replaceCardsShouldFailForNonPositiveCount() throws Exception {
         MockHttpSession session = signUpAndLogin("deckReplace5");
         Deck deck = createDeck("deck-bad-count", DeckType.ENEMY, Map.of("C001", 1));
@@ -176,6 +183,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 교체는 중복 카드 ID를 합산한다")
     void replaceCardsShouldSumDuplicateCardIds() throws Exception {
         MockHttpSession session = signUpAndLogin("deckReplace6");
         Deck deck = createDeck("deck-dup", DeckType.ENEMY, Map.of("C001", 1));
@@ -199,6 +207,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 제거는 요청한 수량만큼 차감한다")
     void removeCardsShouldSubtractRequestedCopies() throws Exception {
         MockHttpSession session = signUpAndLogin("deckRemove1");
         Deck deck = createDeck("deck-remove", DeckType.ENEMY, Map.of("C001", 3, "C002", 2));
@@ -219,6 +228,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 제거는 덱에 카드가 없으면 실패한다")
     void removeCardsShouldFailWhenCardMissingInDeck() throws Exception {
         MockHttpSession session = signUpAndLogin("deckRemove2");
         Deck deck = createDeck("deck-remove-missing", DeckType.ENEMY, Map.of("C001", 1));
@@ -237,6 +247,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 제거는 count가 양수가 아니면 실패한다")
     void removeCardsShouldFailWhenCountIsNotPositive() throws Exception {
         MockHttpSession session = signUpAndLogin("deckRemove3");
         Deck deck = createDeck("deck-remove-bad-count", DeckType.ENEMY, Map.of("C001", 1));
@@ -255,6 +266,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 검증은 유효한 플레이어 후보에 대해 valid=true를 반환한다")
     void validateShouldReturnValidTrueForValidPlayerCandidate() throws Exception {
         MockHttpSession session = signUpAndLogin("deckValidate1");
         Deck deck = createDeck("deck-player", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
@@ -280,6 +292,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 검증은 카드 교체와 동일하게 인증이 필요하다")
     void validateShouldRequireAuthenticationLikeReplace() throws Exception {
         Deck deck = createDeck("deck-validate-auth", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
 
@@ -299,6 +312,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 검증은 덱이 없으면 실패한다")
     void validateShouldFailForMissingDeck() throws Exception {
         MockHttpSession session = signUpAndLogin("deckValidate2");
 
@@ -319,6 +333,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 검증은 총 카드 수 제한 위반 사유를 반환한다")
     void validateShouldReturnReasonForTotalCardLimitViolation() throws Exception {
         MockHttpSession session = signUpAndLogin("deckValidate3");
         Deck deck = createDeck("deck-validate-reasons", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
@@ -346,6 +361,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 검증은 복제 수 제한 위반 사유를 반환한다")
     void validateShouldReturnReasonForCopyLimitViolation() throws Exception {
         MockHttpSession session = signUpAndLogin("deckValidateCopy");
         Deck deck = createDeck("deck-validate-copy", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
@@ -373,6 +389,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 검증은 EX 규칙 위반 사유를 반환한다")
     void validateShouldReturnReasonForExRuleViolation() throws Exception {
         MockHttpSession session = signUpAndLogin("deckValidateEx");
         Deck deck = createDeck("deck-validate-ex", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
@@ -399,6 +416,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 검증은 알 수 없는 카드 ID 사유를 반환한다")
     void validateShouldReturnReasonsForUnknownCardId() throws Exception {
         MockHttpSession session = signUpAndLogin("deckValidate4");
         Deck deck = createDeck("deck-validate-unknown", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
@@ -426,6 +444,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 검증은 요청 본문이 없으면 현재 덱 구성을 사용한다")
     void validateWithoutRequestBodyShouldUseCurrentDeckComposition() throws Exception {
         MockHttpSession session = signUpAndLogin("deckValidateCurrent");
         Deck deck = createDeck("deck-validate-current", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
@@ -439,6 +458,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 검증은 중복 카드 ID 병합 정책을 일관되게 적용한다")
     void validateShouldApplyDuplicateCardIdMergePolicyConsistently() throws Exception {
         MockHttpSession session = signUpAndLogin("deckValidateDupMerge");
         Deck deck = createDeck("deck-validate-dup-merge", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
@@ -464,6 +484,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("공개 덱 조회 엔드포인트는 계속 접근 가능해야 한다")
     void publicGetDeckEndpointsShouldRemainAccessible() throws Exception {
         Deck deck = createDeck("deck-public", DeckType.ENEMY, Map.of("C001", 1));
 
@@ -476,6 +497,7 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("기존 덱 PUT은 여전히 동작한다")
     void existingDeckPutShouldStillWork() throws Exception {
         MockHttpSession session = signUpAndLogin("deckUpdate1");
         Deck deck = createDeck("deck-update", DeckType.ENEMY, Map.of("C001", 1));

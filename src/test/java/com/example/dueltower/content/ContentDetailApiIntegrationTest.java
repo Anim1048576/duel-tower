@@ -10,6 +10,7 @@ import com.example.dueltower.engine.model.ItemDefinition;
 import com.example.dueltower.engine.model.KeywordDefinition;
 import com.example.dueltower.engine.model.PassiveDefinition;
 import com.example.dueltower.engine.model.StatusDefinition;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,6 +50,7 @@ class ContentDetailApiIntegrationTest {
     private ItemService itemService;
 
     @Test
+    @DisplayName("카드 상세는 로그인 없이 접근 가능하고 핵심 필드를 포함한다")
     void cardDetailShouldBeAccessibleWithoutLoginAndContainCoreFields() throws Exception {
         CardDefinition knownCard = cardService.list().stream().findFirst().orElseThrow();
         String cardId = knownCard.id().value();
@@ -70,6 +72,7 @@ class ContentDetailApiIntegrationTest {
 
 
     @Test
+    @DisplayName("카드 상세는 trim된 ID 조회를 허용한다")
     void cardDetailShouldAllowTrimmedIdLookup() throws Exception {
         CardDefinition knownCard = cardService.list().stream().findFirst().orElseThrow();
         String padded = " " + knownCard.id().value() + " ";
@@ -80,12 +83,14 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 상세는 알 수 없는 ID에 대해 NOT_FOUND를 반환한다")
     void cardDetailShouldReturnNotFoundForUnknownId() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "__UNKNOWN_CARD__"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
+    @DisplayName("카드 상세는 TIG discard 카드의 play spec 메타데이터를 노출한다")
     void cardDetailShouldExposePlaySpecMetadataForTigDiscardCards() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "Tig004_Card"))
                 .andExpect(status().isOk())
@@ -113,6 +118,7 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 상세는 TIG001의 installed selection play spec을 노출한다")
     void cardDetailShouldExposeInstalledSelectionPlaySpecForTig001() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "Tig001_Card"))
                 .andExpect(status().isOk())
@@ -128,6 +134,7 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 상세는 TIG006의 discard와 selection 요구사항을 모두 노출한다")
     void cardDetailShouldExposeBothDiscardAndSelectionRequirementsForTig006() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "Tig006_Card"))
                 .andExpect(status().isOk())
@@ -144,6 +151,7 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 상세는 기본 카드의 none play spec을 노출한다")
     void cardDetailShouldExposeNonePlaySpecForDefaultCard() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "C001"))
                 .andExpect(status().isOk())
@@ -153,6 +161,7 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("패시브 상세는 알려진 ID에 대해 정상 응답을 반환한다")
     void passiveDetailShouldReturnOkForKnownId() throws Exception {
         PassiveDefinition knownPassive = passiveService.list().stream().findFirst().orElseThrow();
 
@@ -164,6 +173,7 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("패시브 상세는 trim된 ID 조회를 허용한다")
     void passiveDetailShouldAllowTrimmedIdLookup() throws Exception {
         PassiveDefinition knownPassive = passiveService.list().stream().findFirst().orElseThrow();
 
@@ -173,12 +183,14 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("패시브 상세는 알 수 없는 ID에 대해 NOT_FOUND를 반환한다")
     void passiveDetailShouldReturnNotFoundForUnknownId() throws Exception {
         mockMvc.perform(get("/api/content/passives/{id}", "__UNKNOWN_PASSIVE__"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
+    @DisplayName("상태 상세는 알려진 ID에 대해 정상 응답을 반환한다")
     void statusDetailShouldReturnOkForKnownId() throws Exception {
         StatusDefinition knownStatus = statusService.list().stream().findFirst().orElseThrow();
 
@@ -190,6 +202,7 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("상태 상세는 trim된 ID 조회를 허용한다")
     void statusDetailShouldAllowTrimmedIdLookup() throws Exception {
         StatusDefinition knownStatus = statusService.list().stream().findFirst().orElseThrow();
 
@@ -199,12 +212,14 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("상태 상세는 알 수 없는 ID에 대해 NOT_FOUND를 반환한다")
     void statusDetailShouldReturnNotFoundForUnknownId() throws Exception {
         mockMvc.perform(get("/api/content/statuses/{id}", "__UNKNOWN_STATUS__"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
+    @DisplayName("키워드 상세는 알려진 ID에 대해 정상 응답을 반환한다")
     void keywordDetailShouldReturnOkForKnownId() throws Exception {
         KeywordDefinition knownKeyword = keywordService.list().stream().findFirst().orElseThrow();
 
@@ -216,6 +231,7 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("키워드 상세는 trim된 ID 조회를 허용한다")
     void keywordDetailShouldAllowTrimmedIdLookup() throws Exception {
         KeywordDefinition knownKeyword = keywordService.list().stream().findFirst().orElseThrow();
 
@@ -225,12 +241,14 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("키워드 상세는 알 수 없는 ID에 대해 NOT_FOUND를 반환한다")
     void keywordDetailShouldReturnNotFoundForUnknownId() throws Exception {
         mockMvc.perform(get("/api/content/keywords/{id}", "__UNKNOWN_KEYWORD__"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
+    @DisplayName("아이템 상세는 알려진 ID에 대해 정상 응답을 반환한다")
     void itemDetailShouldReturnOkForKnownId() throws Exception {
         ItemDefinition knownItem = itemService.list().stream().findFirst().orElseThrow();
 
@@ -245,6 +263,7 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 상세는 trim된 ID 조회를 허용한다")
     void itemDetailShouldAllowTrimmedIdLookup() throws Exception {
         ItemDefinition knownItem = itemService.list().stream().findFirst().orElseThrow();
 
@@ -254,12 +273,14 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("아이템 상세는 알 수 없는 ID에 대해 NOT_FOUND를 반환한다")
     void itemDetailShouldReturnNotFoundForUnknownId() throws Exception {
         mockMvc.perform(get("/api/content/items/{id}", "__UNKNOWN_ITEM__"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
+    @DisplayName("아이템 목록은 등록된 아이템을 반환한다")
     void itemListShouldReturnRegisteredItems() throws Exception {
         mockMvc.perform(get("/api/content/items"))
                 .andExpect(status().isOk())
@@ -269,6 +290,7 @@ class ContentDetailApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("콘텐츠 상세 엔드포인트와 카드 목록은 공개 접근을 유지한다")
     void contentDetailEndpointsAndCardListShouldRemainPublic() throws Exception {
         CardDefinition knownCard = cardService.list().stream().findFirst().orElseThrow();
         PassiveDefinition knownPassive = passiveService.list().stream().findFirst().orElseThrow();

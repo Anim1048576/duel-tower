@@ -7,6 +7,7 @@ import com.example.dueltower.member.MemberRepository;
 import com.example.dueltower.preset.repository.PresetRepository;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,6 +50,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("프리셋 엔드포인트는 인증이 필요하다")
     void presetEndpointsRequireAuthentication() throws Exception {
         mockMvc.perform(get("/api/me/presets"))
                 .andExpect(status().isUnauthorized());
@@ -63,6 +65,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("프리셋 목록 조회는 인증 시 내 것만 반환한다")
     void getPresetsReturnsOnlyMineWhenAuthenticated() throws Exception {
         MockHttpSession owner = signUpAndLogin("owner", "owner@example.com", "password123");
         MockHttpSession other = signUpAndLogin("other", "other@example.com", "password123");
@@ -80,6 +83,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("ID로 프리셋 조회는 소유자는 허용하고 금지된 경우는 거부한다")
     void getPresetByIdSupportsOwnerAndRejectsForbiddenCases() throws Exception {
         MockHttpSession owner = signUpAndLogin("owner", "owner@example.com", "password123");
         MockHttpSession other = signUpAndLogin("other", "other@example.com", "password123");
@@ -102,6 +106,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("소유자는 프리셋을 수정하고 삭제할 수 있다")
     void ownerCanUpdateAndDeletePreset() throws Exception {
         MockHttpSession session = signUpAndLogin("owner", "owner@example.com", "password123");
         long characterId = createCharacter();
@@ -133,6 +138,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("다른 사용자의 프리셋은 수정하거나 삭제할 수 없다")
     void cannotUpdateOrDeleteOtherUsersPreset() throws Exception {
         MockHttpSession owner = signUpAndLogin("owner", "owner@example.com", "password123");
         MockHttpSession other = signUpAndLogin("other", "other@example.com", "password123");
@@ -159,6 +165,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("프리셋 생성은 성공한다")
     void createPresetSuccess() throws Exception {
         MockHttpSession session = signUpAndLogin("owner", "owner@example.com", "password123");
         long characterId = createCharacter();
@@ -182,6 +189,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("프리셋 생성은 이름이 없으면 실패한다")
     void createFailsWhenNameMissing() throws Exception {
         MockHttpSession session = signUpAndLogin("owner", "owner@example.com", "password123");
         long characterId = createCharacter();
@@ -201,6 +209,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("프리셋 생성은 필수 로드아웃 필드가 없으면 실패한다")
     void createFailsWhenRequiredLoadoutFieldsMissing() throws Exception {
         MockHttpSession session = signUpAndLogin("owner", "owner@example.com", "password123");
         long characterId = createCharacter();
@@ -233,6 +242,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("프리셋 생성은 character ID가 유효하지 않으면 실패한다")
     void createFailsWhenCharacterIdInvalid() throws Exception {
         MockHttpSession session = signUpAndLogin("owner", "owner@example.com", "password123");
 
@@ -252,6 +262,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("프리셋 생성은 EX 카드 ID가 유효하지 않으면 실패한다")
     void createFailsWhenExCardIdInvalid() throws Exception {
         MockHttpSession session = signUpAndLogin("owner", "owner@example.com", "password123");
         long characterId = createCharacter();
@@ -272,6 +283,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("프리셋 생성은 deck card ID가 유효하지 않으면 실패한다")
     void createFailsWhenDeckCardIdsInvalid() throws Exception {
         MockHttpSession session = signUpAndLogin("owner", "owner@example.com", "password123");
         long characterId = createCharacter();
@@ -292,6 +304,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("프리셋 생성은 passive ID가 유효하지 않으면 실패한다")
     void createFailsWhenPassiveIdsInvalid() throws Exception {
         MockHttpSession session = signUpAndLogin("owner", "owner@example.com", "password123");
         long characterId = createCharacter();
@@ -312,6 +325,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("프리셋 수정은 참조 데이터가 유효하지 않으면 실패한다")
     void updateFailsWhenReferenceDataInvalid() throws Exception {
         MockHttpSession session = signUpAndLogin("owner", "owner@example.com", "password123");
         long characterId = createCharacter();
@@ -333,6 +347,7 @@ class PresetControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("소유자는 자신의 프리셋만 복제할 수 있다")
     void ownerCanCloneOnlyOwnPreset() throws Exception {
         MockHttpSession owner = signUpAndLogin("owner", "owner@example.com", "password123");
         MockHttpSession other = signUpAndLogin("other", "other@example.com", "password123");

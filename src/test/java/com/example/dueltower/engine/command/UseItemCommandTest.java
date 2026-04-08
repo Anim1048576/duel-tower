@@ -16,6 +16,7 @@ import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.engine.core.GameEngine;
 import com.example.dueltower.engine.model.*;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class UseItemCommandTest {
 
     @Test
+    @DisplayName("아이템 사용은 인벤토리를 소모하고 기본적으로 자신에게 소형 회복을 적용한다")
     void useItemConsumesInventoryAndAppliesCheapHealToSelfByDefault() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 123L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -56,6 +58,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 같은 턴 두 번째 소모품 사용을 거부한다")
     void useItemRejectsSecondConsumableInSameTurn() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1231L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -86,6 +89,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 전투당 소모품 3회 사용을 허용하고 4번째는 거부한다")
     void useItemAllowsThreeConsumablesPerCombatAndRejectsFourth() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1232L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -135,6 +139,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 count가 2인 소모품 사용을 거부한다")
     void useItemRejectsConsumableWhenCountIsTwo() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1233L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -157,6 +162,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 상급 포션으로 큰 회복을 적용한다")
     void useItemAdvancedPotionAppliesLargeHeal() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 124L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -183,6 +189,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 저가 배리어로 진영 배리어를 적용한다")
     void useItemCheapBarrierAppliesFactionBarrier() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 125L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -205,6 +212,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 배리어 생성기로 큰 진영 배리어를 적용한다")
     void useItemBarrierGeneratorAppliesLargeFactionBarrier() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 126L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -229,6 +237,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 해독제 대상이 없으면 거부한다")
     void useItemRejectsWhenAntidoteHasNoTarget() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 127L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -253,6 +262,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 대상이 주어지면 해독제가 디버프 1개만 제거한다")
     void useItemAntidoteRemovesExactlyOneDebuffWhenTargetProvided() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 128L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -279,6 +289,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 연막탄으로 회피 1을 적용한다")
     void useItemSmokeBombAppliesEvasionOne() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 129L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -306,6 +317,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 알 수 없는 인벤토리 아이템이면 거부한다")
     void useItemRejectsWhenInventoryItemIsUnknown() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 130L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -328,6 +340,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 전투 사용 아이템 effect가 없으면 거부한다")
     void useItemRejectsWhenBattleUsableItemEffectIsMissing() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 131L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -350,6 +363,7 @@ class UseItemCommandTest {
     }
 
     @Test
+    @DisplayName("아이템 사용은 아이템이 전투 사용 가능하지 않으면 거부한다")
     void useItemRejectsWhenItemIsNotBattleUsable() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 132L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");

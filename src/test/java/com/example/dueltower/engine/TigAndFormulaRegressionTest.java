@@ -28,6 +28,7 @@ import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.EnemyId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SessionId;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
@@ -37,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class TigAndFormulaRegressionTest {
 
     @Test
+    @DisplayName("버리기 조건 TIG 카드는 discard ID가 없으면 거부한다")
     void discardGatedTigCardRejectsWhenDiscardIdMissing() {
         TigFixture fx = new TigFixture();
         CardInstId tig005 = fx.addToHand("Tig005_Card");
@@ -48,6 +50,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("버리기 조건 TIG 카드는 선택한 버리기가 성공하면 payload를 실행한다")
     void discardGatedTigCardExecutesPayloadWhenSelectedDiscardSucceeds() {
         TigFixture fx = new TigFixture();
         CardInstId tig005 = fx.addToHand("Tig005_Card");
@@ -64,6 +67,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("버리기 조건 TIG 카드는 원본 카드를 선택하면 거부한다")
     void discardGatedTigCardRejectsWhenSourceCardIsSelected() {
         TigFixture fx = new TigFixture();
         CardInstId tig005 = fx.addToHand("Tig005_Card");
@@ -76,6 +80,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("버리기 조건 TIG 카드는 버릴 카드가 손패에 없으면 거부한다")
     void discardGatedTigCardRejectsWhenDiscardCardNotInHand() {
         TigFixture fx = new TigFixture();
         CardInstId tig005 = fx.addToHand("Tig005_Card");
@@ -89,6 +94,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("버리기 조건 TIG 카드는 선택한 카드를 effect로 버릴 수 없으면 거부한다")
     void discardGatedTigCardRejectsWhenSelectedCardCannotBeDiscardedByEffect() {
         TigFixture fx = new TigFixture();
         CardInstId tig005 = fx.addToHand("Tig005_Card");
@@ -101,6 +107,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig001 overcome3+는 선택하지 않은 installed 카드를 파괴하지 않는다")
     void tig001Overcome3PlusDoesNotDestroyInstalledCardUnlessSelected() {
         TigFixture fx = new TigFixture();
         fx.player.statusSet(Tig201_Status.ID, 3);
@@ -115,6 +122,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig001 overcome3+는 선택한 installed 카드만 파괴한다")
     void tig001Overcome3PlusDestroysOnlySelectedInstalledCard() {
         TigFixture fx = new TigFixture();
         fx.player.statusSet(Tig201_Status.ID, 3);
@@ -130,6 +138,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig001은 overcome이 3 미만이면 selected ID를 거부한다")
     void tig001RejectsSelectedIdsWhenOvercomeBelow3() {
         TigFixture fx = new TigFixture();
         fx.player.statusSet(Tig201_Status.ID, 2);
@@ -143,6 +152,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig006은 discard와 installed 0장 선택을 허용한다")
     void tig006AllowsDiscardAndZeroInstalledSelections() {
         TigFixture fx = new TigFixture();
         CardInstId tig006 = fx.addToHand("Tig006_Card");
@@ -157,6 +167,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig006은 최대 3장의 선택된 installed 카드만 파괴한다")
     void tig006DestroysOnlySelectedInstalledCardsUpToThree() {
         TigFixture fx = new TigFixture();
         CardInstId tig006 = fx.addToHand("Tig006_Card");
@@ -176,6 +187,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig006은 installed 카드 과다 선택을 거부한다")
     void tig006RejectsTooManyInstalledSelections() {
         TigFixture fx = new TigFixture();
         CardInstId tig006 = fx.addToHand("Tig006_Card");
@@ -192,6 +204,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig006은 installed가 아닌 선택을 거부한다")
     void tig006RejectsNonInstalledSelection() {
         TigFixture fx = new TigFixture();
         CardInstId tig006 = fx.addToHand("Tig006_Card");
@@ -205,6 +218,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig005 cost reduction은 검증과 지불 시 모두 적용된다")
     void tig005CostReductionAppliesDuringValidationAndPayment() {
         TigFixture fx = new TigFixture();
         fx.player.statusSet(Tig201_Status.ID, 3);
@@ -220,6 +234,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig005는 overcome3+여도 AP가 0이면 여전히 실패한다")
     void tig005StillFailsAtZeroApEvenWithOvercome3Plus() {
         TigFixture fx = new TigFixture();
         fx.player.statusSet(Tig201_Status.ID, 3);
@@ -235,6 +250,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig901 EX는 대상 1명일 때 2회 타격하고 overcome3+면 추가 타격을 준다")
     void tig901ExWithOneTargetDealsTwoHitsAndAddsBonusHitAtOvercome3Plus() {
         TigFixture base = new TigFixture();
         CardInstId exBase = base.addToEx("Tig901_EX");
@@ -259,6 +275,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig901 EX는 대상 2명일 때 각각 1회 타격하고 overcome3+면 추가 타격을 준다")
     void tig901ExWithTwoTargetsDealsOneHitEachAndAddsBonusHitAtOvercome3Plus() {
         TigFixture base = new TigFixture();
         CardInstId exBase = base.addToEx("Tig901_EX");
@@ -287,6 +304,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Tig901 EX의 드로우는 피해 분기 이후 발생한다")
     void tig901ExDrawHappensAfterDamageBranch() {
         TigFixture fx = new TigFixture();
         CardInstId ex = fx.addToEx("Tig901_EX");
@@ -309,6 +327,7 @@ class TigAndFormulaRegressionTest {
     }
 
     @Test
+    @DisplayName("Formula 회귀 카드들은 여전히 actor 스탯을 사용한다")
     void formulaRegressionCardsStillUseActorStats() {
         TigFixture c001Fx = new TigFixture();
         c001Fx.player.body(8);

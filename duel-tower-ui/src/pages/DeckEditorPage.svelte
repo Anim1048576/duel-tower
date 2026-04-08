@@ -149,7 +149,7 @@
   const deck = selectedDeckId !== null ? deckRecords[selectedDeckId] : null
   const slots = deck ? [...deck.slots] : []
 
-  let selectedId = $state(slots[0]?.id ?? '')
+  let selectedId = $state<string>(slots[0]?.id ?? '')
 
   const selectedSlot = $derived.by(() => slots.find((item) => item.id === selectedId) ?? slots[0] ?? null)
 

@@ -27,6 +27,7 @@ import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.*;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
@@ -36,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class RuleEngineRegressionTest {
 
     @Test
+    @DisplayName("전투 시작 시 덱 위 순서대로 시작 패를 뽑는다")
     void combatStartDrawsOpeningHandFromDeckTopOrder() {
         TestFixture fx = TestFixture.basic();
         List<CardInstId> orderedDeck = fx.addDeckCards(fx.player, "FILLER", 6);
@@ -49,6 +51,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("턴 시작 드로우는 손패가 4장 미만이면 2장, 아니면 1장을 뽑는다")
     void turnStartDrawFlowDrawsTwoBelowFourElseOne() {
         TestFixture fx = TestFixture.basic();
         fx.state.combat(new CombatState());
@@ -67,6 +70,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("손패 한도 초과 시 버리기 pending decision을 생성한다")
     void handLimitOverflowCreatesDiscardPendingDecision() {
         TestFixture fx = TestFixture.basic();
         fx.state.combat(new CombatState());
@@ -83,6 +87,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("턴 시작 시 이번 턴 소모품 사용 횟수만 초기화한다")
     void turnStartResetsOnlyConsumablesUsedThisTurn() {
         TestFixture fx = TestFixture.basic();
         fx.state.combat(new CombatState());
@@ -97,6 +102,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("전투 정리 시 소모품 카운터를 초기화한다")
     void combatCleanupResetsConsumableCounters() {
         TestFixture fx = TestFixture.basic();
         fx.player.consumablesUsedThisTurn(1);
@@ -109,6 +115,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("Tenacity AP debt는 기록되고 턴 종료 보충 시 적용된다")
     void tenacityApDebtIsRecordedAndAppliedAtTurnEndRefill() {
         TestFixture fx = TestFixture.basic();
         fx.addDeckCards(fx.player, "FILLER", 10);
@@ -132,6 +139,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("Sure hit은 회피를 무시한다")
     void sureHitIgnoresEvasion() {
         TestFixture fx = TestFixture.basic();
         CardInstId accurate = fx.addHandCard(fx.player, "ACCURATE_STRIKE");
@@ -151,6 +159,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("Pierce는 실드와 배리어 경감을 무시한다")
     void pierceIgnoresShieldAndBarrierMitigation() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -180,6 +189,7 @@ class RuleEngineRegressionTest {
 
 
     @Test
+    @DisplayName("치명타 확률은 keyword hook에서 결정된다")
     void criticalChanceComesFromKeywordHook() {
         TestFixture fx = TestFixture.basic();
         CardInstId critical = fx.addHandCard(fx.player, "CRITICAL_STRIKE");
@@ -208,6 +218,7 @@ class RuleEngineRegressionTest {
 
 
     @Test
+    @DisplayName("keyword 치명타 배수는 곱이 아니라 최댓값을 사용한다")
     void keywordCriticalMultiplierUsesMaxNotProduct() {
         TestFixture fx = TestFixture.basic();
         CardInstId dual = fx.addHandCard(fx.player, "DUAL_CRITICAL_STRIKE");
@@ -225,12 +236,14 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("Rational 치명타 반올림은 양수 값에서 기존 동작과 일치한다")
     void rationalCriticalRoundingMatchesPreviousBehaviorForPositiveValues() {
         assertEquals(8, invokeMultiplyAndRound(5, Rational.of(3, 2)));
         assertEquals(6, invokeMultiplyAndRound(4, Rational.of(3, 2)));
     }
 
     @Test
+    @DisplayName("치명타는 status/passive hook으로 수정될 수 있다")
     void criticalCanBeModifiedByStatusAndPassiveHooks() {
         TestFixture fx = TestFixture.basic();
         CardInstId critical = fx.addHandCard(fx.player, "CRITICAL_STRIKE");
@@ -251,6 +264,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("치명타 로그는 정확한 Rational 형식을 사용한다")
     void criticalLogUsesExactRationalFormatting() {
         TestFixture fx = TestFixture.basic();
         CardInstId critical = fx.addHandCard(fx.player, "CRITICAL_STRIKE");
@@ -269,6 +283,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("incoming critical hook은 받은 치명타 피해를 수정할 수 있다")
     void incomingCriticalHooksCanModifyReceivedCriticalDamage() {
         TestFixture fx = TestFixture.basic();
         CardInstId enemyCritical = fx.addEnemyHandCard("CRITICAL_STRIKE");
@@ -291,6 +306,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("턴 종료 시 regen과 pain을 stack decay와 함께 처리한다")
     void turnEndProcessesRegenAndPainWithStackDecay() {
         TestFixture fx = TestFixture.basic();
         fx.state.combat(new CombatState());
@@ -306,6 +322,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("상태 제약과 피해 modifier는 안정적으로 유지된다")
     void statusRestrictionsAndDamageModifiersRemainStable() {
         TestFixture fx = TestFixture.basic();
         CardInstId skill = fx.addHandCard(fx.player, "NORMAL_STRIKE");
@@ -355,6 +372,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("EX 쿨다운은 라운드 경계 이후 만료된다")
     void exCooldownExpiresAfterRoundBoundary() {
         TestFixture fx = TestFixture.basic();
         fx.player.exCard(fx.addExCard(fx.player, "EX_BLAST"));
@@ -381,6 +399,7 @@ class RuleEngineRegressionTest {
 
 
     @Test
+    @DisplayName("적 카드 사용은 적 턴이 아니면 실패한다")
     void enemyPlayCardFailsWhenNotEnemyTurn() {
         TestFixture fx = TestFixture.basic();
         CardInstId enemyCard = fx.addEnemyHandCard("NORMAL_STRIKE");
@@ -396,6 +415,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("적 EX 사용은 플레이어 턴이면 실패한다")
     void enemyUseExFailsOnPlayerTurn() {
         TestFixture fx = TestFixture.basic();
         fx.enemy.exCard(fx.addEnemyExCard("EX_BLAST"));
@@ -412,6 +432,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("적 EX 쿨다운 검증이 적용된다")
     void enemyExCooldownValidationApplies() {
         TestFixture fx = TestFixture.basic();
         fx.enemy.exCard(fx.addEnemyExCard("EX_BLAST"));
@@ -434,6 +455,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("적 카드 사용 성공 경로는 플레이어에게 피해를 준다")
     void enemyPlayCardSuccessPathDealsDamageToPlayer() {
         TestFixture fx = TestFixture.basic();
         CardInstId enemyCard = fx.addEnemyHandCard("NORMAL_STRIKE");
@@ -451,6 +473,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("승리 후 상태는 전투 컨텍스트를 비우고 run result를 생성한다")
     void victoryPostStateClearsCombatContextAndCreatesRunResult() {
         TestFixture fx = TestFixture.basic();
         CardInstId strike = fx.addHandCard(fx.player, "NORMAL_STRIKE");
@@ -485,6 +508,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("패배 후 상태는 전투 컨텍스트를 비우고 run result를 생성한다")
     void defeatPostStateClearsCombatContextAndCreatesRunResult() {
         TestFixture fx = TestFixture.basic();
         CardInstId enemyCard = fx.addEnemyHandCard("NORMAL_STRIKE");
@@ -508,6 +532,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("전투 승리 run loop는 result pending을 설정하고 clear 이후 다음 노드 선택을 허용한다")
     void combatVictoryRunLoopSetsResultPendingAndAllowsNextNodeSelectionAfterClear() {
         TestFixture fx = TestFixture.basic();
         CardInstId strike = fx.addHandCard(fx.player, "NORMAL_STRIKE");
@@ -574,6 +599,7 @@ class RuleEngineRegressionTest {
 
 
     @Test
+    @DisplayName("HP 0 전투 불능은 전투 재시작 후에도 유지된다")
     void hpZeroBattleIncapacitationPersistsAcrossCombatRestart() {
         TestFixture fx = TestFixture.basic();
         fx.addDeckCards(fx.player, "FILLER", 6);
@@ -601,6 +627,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("deck out 전투 불능은 전투 재시작 후 유지되지 않는다")
     void deckOutBattleIncapacitationDoesNotPersistAcrossCombatRestart() {
         TestFixture fx = TestFixture.basic();
         fx.addDeckCards(fx.player, "FILLER", 6);
@@ -627,6 +654,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("전투 재시작은 pending decision을 비운다")
     void combatRestartClearsPendingDecision() {
         TestFixture fx = TestFixture.basic();
         fx.state.combat(new CombatState());
@@ -640,6 +668,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("전투 재시작은 활성 소환수를 제거한다")
     void combatRestartRemovesActiveSummons() {
         TestFixture fx = TestFixture.basic();
         fx.state.combat(new CombatState());
@@ -662,6 +691,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("소환 액션 피해는 플레이어가 아니라 소환수 공격력을 사용한다")
     void summonActionDamageUsesSummonAttackPowerNotPlayerAttackPower() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -689,6 +719,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("소환 액션 회복은 플레이어가 아니라 소환수 회복력을 사용한다")
     void summonActionHealUsesSummonHealPowerNotPlayerHealPower() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -717,6 +748,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("소환 액션의 self status는 플레이어가 아니라 소환수를 대상으로 한다")
     void summonActionSelfStatusTargetsSummonNotPlayer() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -745,6 +777,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("소환 액션의 self heal은 플레이어가 아니라 소환수를 대상으로 한다")
     void summonActionSelfHealTargetsSummonNotPlayer() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -775,6 +808,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("소환 액션은 outgoing status hook의 source로 소환수를 사용한다")
     void summonActionUsesSummonAsSourceForOutgoingStatusHook() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -802,6 +836,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("소환수의 incoming damage status hook은 소환수 대상에 적용된다")
     void summonIncomingDamageStatusHooksApplyToSummonTarget() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -830,6 +865,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("플레이어 턴 종료 시 소환수 턴 상태를 처리한다")
     void playerTurnEndProcessesSummonTurnStatuses() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -852,6 +888,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("플레이어 incoming damage status hook 회귀 동작은 여전히 유지된다")
     void playerIncomingDamageStatusHookRegressionStillWorks() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -875,6 +912,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("카드 사용 self heal은 여전히 플레이어를 대상으로 한다")
     void playCardSelfHealStillTargetsPlayer() {
         TestFixture fx = TestFixture.basic();
         CardInstId cardId = fx.addHandCard(fx.player, "SUMMON_SELF_HEAL_FIXED");
@@ -896,6 +934,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("카드 사용은 actor scaling에 여전히 플레이어 스탯을 사용한다")
     void playCardStillUsesPlayerStatsForActorScaling() {
         TestFixture fx = TestFixture.basic();
         CardInstId cardId = fx.addHandCard(fx.player, "SUMMON_SCALE_ATTACK");
@@ -916,6 +955,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("소환 액션은 턴당 한 번만 사용할 수 있다")
     void summonActionCanOnlyBeUsedOncePerTurn() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -949,6 +989,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("ENEMY_ONE은 적 본체와 적 소환수 선택을 허용한다")
     void enemyOneAllowsEnemyBodyAndEnemySummonSelection() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -981,6 +1022,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("적 소환수의 taunt는 ENEMY_ONE 최종 대상을 소환수로 강제한다")
     void enemyOneTauntOnEnemySummonForcesSummonAsFinalTarget() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -1017,6 +1059,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("적 본체의 taunt는 ENEMY_ONE 대상을 여전히 적 본체로 강제한다")
     void enemyOneTauntOnEnemyBodyStillForcesEnemyBody() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -1044,6 +1087,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("ENEMY_ONE confusion은 taunt를 무시하고 전체 후보군으로 재지정할 수 있다")
     void enemyOneConfusionIgnoresTauntAndCanRedirectToFullCandidateSet() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -1081,6 +1125,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("ANY_ONE의 적/소환수 선택은 ENEMY_ONE 특수 규칙을 따르지만 플레이어 선택은 그렇지 않다")
     void anyOneEnemyOrSummonUsesEnemyOneSpecialRulesButPlayerSelectionDoesNot() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -1125,6 +1170,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("Clear Mind는 ENEMY_ONE과 ANY_ONE 적 선택에서 여전히 taunt를 무시한다")
     void clearMindStillIgnoresTauntForEnemyOneAndAnyOneEnemySelection() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -1159,6 +1205,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("ENEMY_ALL과 SIDE는 중복 없이 적 본체와 모든 적 소환수를 포함한다")
     void enemyAllAndSideIncludeEnemyBodyAndAllEnemySummonsWithoutDuplicates() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -1189,6 +1236,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("ALLY_ONE은 플레이어와 아군 소환수 선택을 허용한다")
     void allyOneAllowsSelectingPlayerAndAllySummon() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -1221,6 +1269,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("ALLY_ALL과 SIDE는 중복 없이 플레이어와 모든 아군 소환수를 포함한다")
     void allyAllAndSideIncludePlayerAndAllAllySummonsWithoutDuplicates() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -1252,6 +1301,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("소환수가 없을 때 ALL과 SIDE 타깃은 기존 동작을 유지한다")
     void allAndSideTargetsKeepPreviousBehaviorWhenNoSummonsExist() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();
@@ -1279,6 +1329,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("전투 재시작은 전투 영역의 non-EX owned card를 덱으로 회수한다")
     void combatRestartGathersNonExOwnedCardsFromCombatZonesToDeck() {
         TestFixture fx = TestFixture.basic();
         fx.state.combat(new CombatState());
@@ -1316,6 +1367,7 @@ class RuleEngineRegressionTest {
     }
 
     @Test
+    @DisplayName("빈 덱에서 드로우가 실패하면 grave가 전투 불능을 표시한다")
     void drawFailsWithEmptyDeckAndGraveMarksBattleIncapacitated() {
         TestFixture fx = TestFixture.basic();
         fx.startSimpleCombat();

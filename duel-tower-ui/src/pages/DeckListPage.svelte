@@ -1,172 +1,291 @@
-<script lang="ts">
+﻿<script lang="ts">
+  import { onMount } from 'svelte'
+  import { listCards, listKeywords } from '../lib/api/content'
+  import type {
+    CardDefinition,
+    CardListQueryParams,
+    CardType,
+    KeywordDefinition,
+  } from '../lib/api/contentTypes'
+  import { getApiErrorMessage } from '../lib/api/types'
+  import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import EntityListPane from '../lib/components/EntityListPane.svelte'
   import SearchFilterBar from '../lib/components/SearchFilterBar.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
+  import { buildCardArchiveMeta, buildCardDisplayTags, getCardTypeLabel } from '../lib/content/display'
   import { pathBuilders } from '../lib/navigation'
-  import { selectionHandoffKeys, setSelectionHandoff } from '../lib/selectionHandoff'
 
-  const decks = [
-    {
-      id: 'deck-vanguard',
-      title: 'Vanguard Ember',
-      subtitle: 'Frontline pressure deck',
-      meta: '12 cards · Aggro opener · Assigned to Ashen Knight',
-      note: 'Strong early pace with low recovery margin.',
-      tags: [
-        { label: 'Active', tone: 'success' },
-        { label: 'Aggro', tone: 'accent' },
-      ],
-    },
-    {
-      id: 'deck-siege',
-      title: 'Siege Ledger',
-      subtitle: 'Midrange control',
-      meta: '12 cards · Stable curve · Shared utility core',
-      note: 'Most balanced list for general expedition use.',
-      tags: [
-        { label: 'Ready', tone: 'success' },
-        { label: 'Control', tone: 'muted' },
-      ],
-    },
-    {
-      id: 'deck-frost',
-      title: 'Frost Seal Draft',
-      subtitle: 'Experimental build',
-      meta: '10 cards · Two slots open · Not assigned',
-      note: 'Reserved for the next editor pass.',
-      tags: [
-        { label: 'Draft', tone: 'warning' },
-        { label: 'Open', tone: 'accent' },
-      ],
-    },
-  ] satisfies Array<{
+  type CardArchiveItem = {
     id: string
     title: string
     subtitle?: string
     meta?: string
     note?: string
     tags?: { label: string; tone?: 'accent' | 'muted' | 'success' | 'warning' }[]
-  }>
+  }
+
+  type CardTypeFilter = CardType | ''
+
+  const typeOptions: { label: string; value: CardTypeFilter }[] = [
+    { label: 'All', value: '' },
+    { label: getCardTypeLabel('SKILL'), value: 'SKILL' },
+    { label: getCardTypeLabel('EX'), value: 'EX' },
+    { label: getCardTypeLabel('TOKEN'), value: 'TOKEN' },
+  ]
 
   let query = $state('')
-  let selectedId = $state(decks[0]?.id ?? '')
+  let selectedType = $state<CardTypeFilter>('')
+  let selectedKeywordId = $state('')
+  let selectedId = $state('')
+  let loading = $state(true)
+  let keywordLoading = $state(true)
+  let errorMessage = $state<string | null>(null)
+  let keywordErrorMessage = $state<string | null>(null)
+  let cards = $state<CardDefinition[]>([])
+  let keywords = $state<KeywordDefinition[]>([])
+  let requestSequence = 0
 
-  const filteredDecks = $derived.by(() => {
-    const normalized = query.trim().toLowerCase()
-    if (!normalized) return decks
+  function toCardArchiveItem(card: CardDefinition): CardArchiveItem {
+    return {
+      id: card.id,
+      title: card.name,
+      subtitle: card.description,
+      meta: buildCardArchiveMeta(card),
+      note: card.token ? `Token: ${card.token}` : undefined,
+      tags: buildCardDisplayTags(card),
+    }
+  }
 
-    return decks.filter((item) =>
-      [item.title, item.subtitle, item.meta, item.note].some((value) =>
-        value?.toLowerCase().includes(normalized),
-      ),
-    )
+  function getCurrentArchiveParams(): CardListQueryParams {
+    return {
+      q: query.trim() || null,
+      type: selectedType || null,
+      keywordId: selectedKeywordId || null,
+    }
+  }
+
+  function syncSelectedCard(nextCards: CardDefinition[]) {
+    const nextIds = nextCards.map((card) => card.id)
+    selectedId = nextIds.includes(selectedId) ? selectedId : nextIds[0] ?? ''
+  }
+
+  async function loadKeywordOptions() {
+    keywordLoading = true
+    keywordErrorMessage = null
+
+    try {
+      keywords = await listKeywords()
+    } catch (error) {
+      keywords = []
+      selectedKeywordId = ''
+      keywordErrorMessage = getApiErrorMessage(error, 'Keyword filters could not be loaded.')
+    } finally {
+      keywordLoading = false
+    }
+  }
+
+  async function loadCardArchive(params: CardListQueryParams) {
+    const requestId = ++requestSequence
+    loading = true
+    errorMessage = null
+
+    try {
+      const response = await listCards(params)
+
+      if (requestId !== requestSequence) {
+        return
+      }
+
+      cards = response
+      syncSelectedCard(response)
+    } catch (error) {
+      if (requestId !== requestSequence) {
+        return
+      }
+
+      cards = []
+      selectedId = ''
+      errorMessage = getApiErrorMessage(error, 'Unable to load the card archive.')
+    } finally {
+      if (requestId === requestSequence) {
+        loading = false
+      }
+    }
+  }
+
+  onMount(() => {
+    void loadKeywordOptions()
   })
 
-  const selectedDeck = $derived.by(
-    () => filteredDecks.find((item) => item.id === selectedId) ?? filteredDecks[0] ?? null,
+  $effect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const handle = window.setTimeout(() => {
+      void loadCardArchive(getCurrentArchiveParams())
+    }, 250)
+
+    return () => window.clearTimeout(handle)
+  })
+
+  const archiveItems = $derived.by(() => cards.map(toCardArchiveItem))
+  const selectedCard = $derived.by(() => cards.find((card) => card.id === selectedId) ?? cards[0] ?? null)
+  const selectedKeyword = $derived.by(
+    () => keywords.find((keyword) => keyword.id === selectedKeywordId) ?? null,
   )
-
-  function persistSelectedDeck(id: string) {
-    setSelectionHandoff(selectionHandoffKeys.deckId, id)
-  }
-
-  function handleSelectDeck(id: string) {
-    selectedId = id
-    persistSelectedDeck(id)
-  }
-
-  function handleOpenEditor() {
-    persistSelectedDeck(selectedDeck?.id ?? decks[0]?.id ?? '')
-  }
-
-  const selectedDeckEditorPath = $derived.by(() =>
-    pathBuilders.deckEditor(selectedDeck?.id ?? decks[0]?.id),
+  const skillCount = $derived.by(() => cards.filter((card) => card.type === 'SKILL').length)
+  const exCount = $derived.by(() => cards.filter((card) => card.type === 'EX').length)
+  const tokenCount = $derived.by(() => cards.filter((card) => card.type === 'TOKEN').length)
+  const emptyListMessage = $derived.by(() =>
+    query || selectedType || selectedKeywordId
+      ? 'No cards matched the current archive query.'
+      : 'No cards are currently available in the archive.',
+  )
+  const listSummary = $derived.by(() => {
+    if (loading) return 'Loading card archive...'
+    if (errorMessage) return 'Card archive could not be loaded.'
+    return `${cards.length} cards visible from the current archive query.`
+  })
+  const detailPath = $derived.by(() =>
+    selectedCard ? pathBuilders.cardDetail(selectedCard.id) : pathBuilders.cardDetail(),
   )
 </script>
 
 <div class="list-page">
   <SectionFrame
-    eyebrow="Deck Overview"
-    title="전술 보관소"
-    description="Deck List Stitch 화면을 따라, 목록 탐색과 다음 편집 대상으로 이어지는 흐름을 먼저 고정합니다."
+    eyebrow="Archive Overview"
+    title="카드 보관소"
+    description="The card archive now loads live content from the API while keeping the existing browse-and-select layout intact."
   >
     <div class="list-page__stats">
-      <StatBlock value={decks.length} label="Tracked decks" note="Current mock deck count" />
-      <StatBlock value="2" label="Ready decks" note="Available for assignment" />
-      <StatBlock value="1" label="Draft decks" note="Needs editor follow-up" />
+      <StatBlock value={cards.length} label="Visible cards" note="Current API query result" />
+      <StatBlock value={skillCount} label="Skill cards" note="Cards tagged as SKILL" />
+      <StatBlock value={exCount + tokenCount} label="Special cards" note="EX and TOKEN results combined" />
     </div>
+    {#if keywordErrorMessage}
+      <ContentStatePanel
+        title="Keyword filters are unavailable."
+        message={keywordErrorMessage}
+        tone="error"
+        actionLabel="Reload filters"
+        onAction={() => void loadKeywordOptions()}
+      />
+    {/if}
   </SectionFrame>
 
   <div class="list-page__content">
     <SectionFrame
-      title="전술 목록"
-      description="다음 배치의 편집기 이전 단계로서, 전술을 빠르게 비교하고 선택하는 목록 패턴에 집중합니다."
+      title="카드 목록"
+      description="Search, type, and keyword filters now query the live card archive."
     >
       <SearchFilterBar
         query={query}
-        queryPlaceholder="Search decks"
-        summary={`${filteredDecks.length}개의 전술 구성이 현재 목록에 표시됩니다.`}
+        queryPlaceholder="Search cards"
+        summary={listSummary}
         onQueryChange={(value) => (query = value)}
       >
         {#snippet filters()}
-          <TagChip label="All" tone="accent" />
-          <TagChip label="Ready" tone="success" />
-          <TagChip label="Draft" tone="warning" />
+          <div class="card-archive__filter-group" role="group" aria-label="Card type filter">
+            {#each typeOptions as option}
+              <button
+                type="button"
+                class="card-archive__filter-button"
+                class:card-archive__filter-button--active={selectedType === option.value}
+                onclick={() => (selectedType = option.value)}
+              >
+                {option.label}
+              </button>
+            {/each}
+          </div>
+
+          <label class="card-archive__keyword-filter">
+            <span class="visually-hidden">Keyword filter</span>
+            <select
+              bind:value={selectedKeywordId}
+              disabled={keywordLoading || Boolean(keywordErrorMessage)}
+            >
+              <option value="">All keywords</option>
+              {#each keywords as keyword}
+                <option value={keyword.id}>{keyword.name}</option>
+              {/each}
+            </select>
+          </label>
         {/snippet}
 
         {#snippet sort()}
-          <TagChip label="Updated" tone="muted" />
-          <TagChip label="Power" tone="muted" />
+          <TagChip label={selectedType ? getCardTypeLabel(selectedType) : 'All types'} tone="muted" />
+          <TagChip label={selectedKeyword?.name || 'All keywords'} tone="muted" />
         {/snippet}
       </SearchFilterBar>
 
-      <EntityListPane
-        items={filteredDecks}
-        selectedId={selectedId}
-        onSelect={handleSelectDeck}
-        emptyMessage="조건에 맞는 전술 구성이 없습니다."
-      />
+      {#if loading}
+        <ContentStatePanel
+          title="Loading card archive"
+          message="Refreshing the current card list from the content API."
+        />
+      {:else if errorMessage}
+        <ContentStatePanel
+          title="Unable to load the card archive"
+          message={errorMessage}
+          tone="error"
+          actionLabel="Retry load"
+          onAction={() => void loadCardArchive(getCurrentArchiveParams())}
+        />
+      {:else}
+        <EntityListPane
+          items={archiveItems}
+          selectedId={selectedId}
+          onSelect={(id) => (selectedId = id)}
+          emptyMessage={emptyListMessage}
+        />
+      {/if}
     </SectionFrame>
 
     <SectionFrame
-      title="선택된 전술"
-      description="현재 배치는 목록까지 구현하고, 실제 카드 편집기 연결은 다음 단계로 미룹니다."
+      title="선택된 카드"
+      description="Selection stays in this page shell and feeds the live card-detail route used by the next deck flows."
     >
-      {#if selectedDeck}
+      {#if loading}
+        <ContentStatePanel
+          title="Preparing selected card"
+          message="The current archive selection is being summarized."
+        />
+      {:else if errorMessage}
+        <ContentStatePanel
+          title="Selected card summary is unavailable"
+          message={errorMessage}
+          tone="error"
+        />
+      {:else if selectedCard}
         <div class="list-page__detail">
           <div>
-            <h3>{selectedDeck.title}</h3>
-            <p>{selectedDeck.subtitle}</p>
+            <h3>{selectedCard.name}</h3>
+            <p>{selectedCard.description || 'No card description is available for this record.'}</p>
           </div>
 
           <div class="list-page__detail-tags">
-            {#each selectedDeck.tags ?? [] as tag}
+            {#each buildCardDisplayTags(selectedCard) as tag}
               <TagChip label={tag.label} tone={tag.tone} />
             {/each}
           </div>
 
-          <p>{selectedDeck.meta}</p>
-          <p>{selectedDeck.note}</p>
+          <p>{buildCardArchiveMeta(selectedCard)}</p>
+          {#if selectedCard.token}
+            <p>Token: {selectedCard.token}</p>
+          {/if}
 
-          <a
-            class="list-page__link-action"
-            data-nav
-            href={selectedDeckEditorPath}
-            onclick={handleOpenEditor}
-          >
-            Open editor for {selectedDeck.title}
+          <a class="list-page__link-action" data-nav href={detailPath}>
+            Open detail for {selectedCard.name}
           </a>
-
-          <div class="list-page__todo">
-            <p>TODO: Remove the legacy fixed editor route fallback after URL-based entry is fully stable.</p>
-            <p>TODO: Connect deck selection and editor entry to the deck API contract.</p>
-            <p>TODO: Remove mock deck summary data after live deck state is available.</p>
-          </div>
         </div>
       {:else}
-        <p class="list-page__empty">표시할 전술 구성이 없습니다.</p>
+        <ContentStatePanel
+          title="No card is selected"
+          message={emptyListMessage}
+        />
       {/if}
     </SectionFrame>
   </div>
@@ -175,8 +294,7 @@
 <style>
   .list-page,
   .list-page__content,
-  .list-page__detail,
-  .list-page__todo {
+  .list-page__detail {
     display: grid;
     gap: 1.5rem;
   }
@@ -190,6 +308,40 @@
   .list-page__content {
     grid-template-columns: minmax(0, 1.25fr) minmax(19rem, 0.75fr);
     align-items: start;
+  }
+
+  .card-archive__filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .card-archive__filter-button {
+    min-height: 2.2rem;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--color-border);
+    background: rgba(12, 11, 10, 0.28);
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .card-archive__filter-button--active {
+    border-color: rgba(226, 193, 155, 0.38);
+    background: rgba(226, 193, 155, 0.08);
+    color: var(--color-accent);
+  }
+
+  .card-archive__keyword-filter select {
+    min-height: 2.2rem;
+    min-width: 11rem;
+    border: 1px solid var(--color-border);
+    background: rgba(12, 11, 10, 0.28);
+    color: var(--color-text);
+    font: inherit;
+    padding: 0.45rem 0.7rem;
   }
 
   .list-page__detail h3,
@@ -225,18 +377,6 @@
     color: var(--color-text);
   }
 
-  .list-page__todo {
-    border-top: 1px solid var(--color-border);
-    padding-top: 1rem;
-  }
-
-  .list-page__todo p,
-  .list-page__empty {
-    margin: 0;
-    color: var(--color-text-muted);
-    line-height: 1.6;
-  }
-
   @media (max-width: 960px) {
     .list-page__stats,
     .list-page__content {
@@ -244,3 +384,4 @@
     }
   }
 </style>
+

@@ -6,6 +6,7 @@ export type PageKey =
   | 'home'
   | 'lobby'
   | 'decks'
+  | 'card-detail'
   | 'character'
   | 'character-create'
   | 'character-detail'
@@ -47,6 +48,8 @@ export const routePaths = {
   characterCreate: '/characters/new',
   characterDetail: '/characters/detail',
   deckList: '/decks',
+  cardDetail: '/cards',
+  inventory: '/inventory',
   deckEditor: '/decks/editor',
   sessionEntry: '/lobby',
   sessionLobbyPlayer: '/lobby/player',
@@ -56,6 +59,7 @@ export const routePaths = {
 
 export const routePatterns = {
   characterDetail: '/characters/:id',
+  cardDetail: '/cards/:id',
   deckEditor: '/decks/:id/editor',
   sessionLobbyPlayer: '/sessions/:code/player',
   sessionLobbyGm: '/sessions/:code/gm',
@@ -93,6 +97,11 @@ export const pathBuilders = {
       ? buildPathFromPattern(routePatterns.characterDetail, { id })
       : routePaths.characterDetail,
   deckList: () => routePaths.deckList,
+  cardDetail: (id?: string) =>
+    hasRouteParam(id)
+      ? buildPathFromPattern(routePatterns.cardDetail, { id })
+      : routePaths.cardDetail,
+  inventory: () => routePaths.inventory,
   deckEditor: (id?: string) =>
     hasRouteParam(id)
       ? buildPathFromPattern(routePatterns.deckEditor, { id })
@@ -183,9 +192,16 @@ export const APP_NAV_ITEMS = [
   },
   {
     key: 'decks',
-    label: 'Decks',
+    label: 'Cards',
     path: routePaths.deckList,
-    description: 'List and editor flow',
+    description: 'Card archive and lookup flow',
+    enabled: true,
+  },
+  {
+    key: 'inventory',
+    label: 'Rules',
+    path: routePaths.inventory,
+    description: 'Keywords, statuses, and passive references',
     enabled: true,
   },
   {
@@ -258,13 +274,39 @@ const activePageMap = new Map<string, PageDefinition>([
     routePaths.deckList,
     {
       key: 'decks',
-      label: 'Decks',
+      label: 'Cards',
       path: routePaths.deckList,
       area: 'app',
-      title: 'Deck List',
-      description: 'Review deck summaries and move into the next editor step from the current selection.',
-      eyebrow: 'Tactical Archive',
+      title: 'Card Archive',
+      description: 'Browse the live card archive, search by name, and filter by type or keyword.',
+      eyebrow: 'Content Archive',
       tags: [{ label: 'Batch 2', tone: 'accent' }],
+    },
+  ],
+  [
+    routePaths.cardDetail,
+    {
+      key: 'card-detail',
+      label: 'Card Detail',
+      path: routePaths.cardDetail,
+      area: 'app',
+      title: 'Card Detail',
+      description: 'Review the selected card record from the live archive.',
+      eyebrow: 'Card Record',
+      tags: [{ label: 'Content API', tone: 'accent' }],
+    },
+  ],
+  [
+    routePaths.inventory,
+    {
+      key: 'inventory',
+      label: 'Rules Reference',
+      path: routePaths.inventory,
+      area: 'app',
+      title: 'Rules Reference',
+      description: 'Review keywords, statuses, and passive definitions from the live content API.',
+      eyebrow: 'Reference Archive',
+      tags: [{ label: 'Content API', tone: 'accent' }],
     },
   ],
   [
@@ -362,6 +404,7 @@ const activePageMap = new Map<string, PageDefinition>([
 
 const dynamicRouteEntries = [
   { pattern: routePatterns.characterDetail, page: activePageMap.get(routePaths.characterDetail) },
+  { pattern: routePatterns.cardDetail, page: activePageMap.get(routePaths.cardDetail) },
   { pattern: routePatterns.deckEditor, page: activePageMap.get(routePaths.deckEditor) },
   { pattern: routePatterns.sessionLobbyPlayer, page: activePageMap.get(routePaths.sessionLobbyPlayer) },
   { pattern: routePatterns.sessionLobbyGm, page: activePageMap.get(routePaths.sessionLobbyGm) },

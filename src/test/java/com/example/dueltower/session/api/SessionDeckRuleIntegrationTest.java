@@ -8,6 +8,7 @@ import com.example.dueltower.member.MemberRepository;
 import com.example.dueltower.session.service.SessionService;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -59,6 +60,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("비전투 상태에서는 덱 수정을 허용한다")
     void nonCombatStateAllowsDeckEdit() throws Exception {
         MockHttpSession session = signUpAndLogin("player1", "player1@example.com", "password123");
         String code = createSession(session);
@@ -80,6 +82,7 @@ class SessionDeckRuleIntegrationTest {
 
 
     @Test
+    @DisplayName("참가 시 프리셋 덱의 owned card ID canonical 형식을 허용한다")
     void joinAcceptsPresetDeckOwnedCardIdsCanonical() throws Exception {
         MockHttpSession session = signUpAndLogin("playerJoinOwned", "playerJoinOwned@example.com", "password123");
         String code = createSession(session);
@@ -136,6 +139,7 @@ class SessionDeckRuleIntegrationTest {
 
 
     @Test
+    @DisplayName("덱 수정은 legacy가 함께 와도 canonical deck owned card ID를 우선 사용한다")
     void updateDeckPrefersCanonicalDeckOwnedCardIdsWhenLegacyAlsoProvided() throws Exception {
         MockHttpSession session = signUpAndLogin("playerCanonicalWin", "playerCanonicalWin@example.com", "password123");
         String code = createSession(session);
@@ -166,6 +170,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 수정은 deck owned card ID를 허용한다")
     void updateDeckAcceptsDeckOwnedCardIds() throws Exception {
         MockHttpSession session = signUpAndLogin("playerOwned", "playerOwned@example.com", "password123");
         String code = createSession(session);
@@ -184,6 +189,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 수정은 legacy deck card ID도 여전히 동작한다")
     void updateDeckLegacyDeckCardIdsStillWorks() throws Exception {
         MockHttpSession session = signUpAndLogin("playerLegacy", "playerLegacy@example.com", "password123");
         String code = createSession(session);
@@ -202,6 +208,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱에 없는 owned copy는 잊기를 허용한다")
     void forgettingNonDeckOwnedCopyIsAllowed() throws Exception {
         MockHttpSession session = signUpAndLogin("playerForgetOk", "playerForgetOk@example.com", "password123");
         String code = createSession(session);
@@ -217,6 +224,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱에 포함된 정확한 owned copy는 잊기를 차단한다")
     void forgettingExactDeckOwnedCopyIsBlocked() throws Exception {
         MockHttpSession session = signUpAndLogin("playerForgetBlocked", "playerForgetBlocked@example.com", "password123");
         String code = createSession(session);
@@ -235,6 +243,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 수정 결과는 캐릭터 current skill deck에 반영된다")
     void deckEditPersistsToCharacterCurrentSkillDeck() throws Exception {
         MockHttpSession session = signUpAndLogin("playerPersist", "playerPersist@example.com", "password123");
 
@@ -357,6 +366,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("전투 상태에서는 명시적 오류와 함께 덱 수정을 차단한다")
     void combatStateBlocksDeckEditWithExplicitError() throws Exception {
         MockHttpSession session = signUpAndLogin("player2", "player2@example.com", "password123");
         String code = createSession(session);
@@ -383,6 +393,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("저주 상태에서는 명시적 오류와 함께 덱 수정을 차단한다")
     void curseStateBlocksDeckEditWithExplicitError() throws Exception {
         MockHttpSession session = signUpAndLogin("player3", "player3@example.com", "password123");
         String code = createSession(session);
@@ -409,6 +420,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 수정은 최대 두 장까지만 변경을 허용한다")
     void deckEditAllowsAtMostTwoCardChanges() throws Exception {
         MockHttpSession session = signUpAndLogin("player4", "player4@example.com", "password123");
         String code = createSession(session);
@@ -427,6 +439,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 수정은 세 장 이상 변경되면 실패한다")
     void deckEditFailsWhenMoreThanTwoCardsChanged() throws Exception {
         MockHttpSession session = signUpAndLogin("player5", "player5@example.com", "password123");
         String code = createSession(session);
@@ -448,6 +461,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("멀티셋 차이는 중복 카드 수량 변경도 계산한다")
     void multisetDifferenceCountsDuplicateQuantityChanges() throws Exception {
         MockHttpSession session = signUpAndLogin("player6", "player6@example.com", "password123");
         String code = createSession(session);
@@ -509,6 +523,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱에 고정된 카드는 덱 수정에서 제거할 수 없다")
     void lockedInDeckCardCannotBeRemovedOnDeckEdit() throws Exception {
         MockHttpSession session = signUpAndLogin("player7", "player7@example.com", "password123");
         String code = createSession(session);
@@ -583,6 +598,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("참가 시 owned card를 20장까지 허용하고 forgetting 플래그를 노출한다")
     void joinAllowsOwnedCardsUpToTwentyAndExposesForgettingFlags() throws Exception {
         MockHttpSession session = signUpAndLogin("player8", "player8@example.com", "password123");
         String code = createSession(session);
@@ -600,6 +616,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("owned card가 20장을 넘으면 forgetting required를 설정하고 덱 수정을 차단한다")
     void overTwentyOwnedCardsSetsForgettingRequiredAndBlocksDeckEdit() throws Exception {
         MockHttpSession session = signUpAndLogin("player9", "player9@example.com", "password123");
         String code = createSession(session);
@@ -641,6 +658,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("일반 카드는 잊을 수 있다")
     void normalCardCanBeForgotten() throws Exception {
         MockHttpSession session = signUpAndLogin("player10", "player10@example.com", "password123");
         String code = createSession(session);
@@ -660,6 +678,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("강화된 카드는 잊을 수 없다")
     void strengthenedCardCannotBeForgotten() throws Exception {
         MockHttpSession session = signUpAndLogin("player11", "player11@example.com", "password123");
         String code = createSession(session);
@@ -702,6 +721,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("약화된 카드는 잊을 수 없다")
     void weakenedCardCannotBeForgotten() throws Exception {
         MockHttpSession session = signUpAndLogin("player12", "player12@example.com", "password123");
         String code = createSession(session);
@@ -742,6 +762,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("구체적 약화 modifier 카드도 잊을 수 없다")
     void concreteWeakenedModifierCardCannotBeForgotten() throws Exception {
         MockHttpSession session = signUpAndLogin("player12b", "player12b@example.com", "password123");
         String code = createSession(session);
@@ -782,6 +803,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("잠긴 카드는 잊을 수 없다")
     void lockedCardCannotBeForgotten() throws Exception {
         MockHttpSession session = signUpAndLogin("player13", "player13@example.com", "password123");
         String code = createSession(session);
@@ -822,6 +844,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 일관성을 위해 필요한 카드는 잊을 수 없다")
     void cardRequiredByDeckCannotBeForgottenToKeepConsistency() throws Exception {
         MockHttpSession session = signUpAndLogin("player14", "player14@example.com", "password123");
         String code = createSession(session);
@@ -855,6 +878,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("잊기가 필요하지만 잊을 수 있는 카드가 없으면 검증 오류를 반환한다")
     void forgettingRequiredWithoutForgettableCardReturnsValidationError() throws Exception {
         MockHttpSession session = signUpAndLogin("player15", "player15@example.com", "password123");
         String code = createSession(session);
@@ -879,6 +903,7 @@ class SessionDeckRuleIntegrationTest {
 
 
     @Test
+    @DisplayName("덱 로드는 owned 슬롯을 결정적으로 배정하고 runtime 메타데이터를 보존한다")
     void loadDeckAssignsOwnedSlotsDeterministicallyAndPreservesRuntimeMetadata() throws Exception {
         MockHttpSession session = signUpAndLogin("playerMeta1", "playerMeta1@example.com", "password123");
         String code = createSession(session);
@@ -939,6 +964,7 @@ class SessionDeckRuleIntegrationTest {
     }
 
     @Test
+    @DisplayName("세션 상태 카드는 source owned card ID와 modifier를 노출한다")
     void sessionStateCardsExposeSourceOwnedCardIdAndModifiers() throws Exception {
         MockHttpSession session = signUpAndLogin("playerMeta2", "playerMeta2@example.com", "password123");
         String code = createSession(session);

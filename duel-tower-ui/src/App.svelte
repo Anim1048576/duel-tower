@@ -1,5 +1,6 @@
 <script lang="ts">
   import AppLayout from './layout/AppLayout.svelte'
+  import CardDetailPage from './pages/CardDetailPage.svelte'
   import CharacterDetailPage from './pages/CharacterDetailPage.svelte'
   import PublicEntryLayout from './layout/PublicEntryLayout.svelte'
   import CharacterListPage from './pages/CharacterListPage.svelte'
@@ -10,6 +11,7 @@
   import HubPage from './pages/HubPage.svelte'
   import LoginPage from './pages/LoginPage.svelte'
   import PlayerLobbyPage from './pages/PlayerLobbyPage.svelte'
+  import RulesReferencePage from './pages/RulesReferencePage.svelte'
   import SessionEntryPage from './pages/SessionEntryPage.svelte'
   import {
     APP_NAV_ITEMS,
@@ -30,6 +32,8 @@
     'character-create': CharacterDetailPage,
     'character-detail': CharacterDetailPage,
     decks: DeckListPage,
+    'card-detail': CardDetailPage,
+    inventory: RulesReferencePage,
     'deck-editor': DeckEditorPage,
     lobby: SessionEntryPage,
     'player-lobby': PlayerLobbyPage,

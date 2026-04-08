@@ -14,6 +14,7 @@ import com.example.dueltower.engine.model.RunState;
 import com.example.dueltower.engine.core.combat.VictoryOps;
 import com.example.dueltower.engine.model.CombatState;
 import com.example.dueltower.engine.event.GameEvent;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -25,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class SelectNodeChoiceCommandTest {
 
     @Test
+    @DisplayName("유효한 선택은 run state를 갱신하고 accepted를 반환한다")
     void validChoiceUpdatesRunStateAndReturnsAccepted() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 123L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -49,6 +51,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("유효하지 않은 선택은 거부된다")
     void invalidChoiceIsRejected() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 456L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -65,6 +68,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("판정 선택지는 20인 능력치를 제외한다")
     void judgementChoicesExcludeAbilitiesAtTwenty() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 456L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -99,6 +103,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("사용 가능한 능력치 선택지가 없으면 판정 노드는 자동으로 해결된다")
     void judgementNodeAutoResolvesWhenNoAvailableAbilityChoices() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 789L);
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -132,6 +137,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("강제 판정 노드는 pending decision 없이 즉시 해결된다")
     void forcedJudgementNodeResolvesImmediatelyWithoutPendingDecision() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 101L, forcedJudgementRunConfig());
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -168,6 +174,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("강제 판정 노드는 memory acceptance 단계를 만들지 않는다")
     void forcedJudgementNodeDoesNotCreateMemoryAcceptanceStep() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 102L, forcedJudgementRunConfig());
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -187,6 +194,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("전투 노드는 여전히 전투 시작 대기 흐름으로 전이한다")
     void combatNodeStillTransitionsToCombatStartWaitingFlow() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 201L, nodeTypeRunConfig("전투", null, List.of()));
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -208,6 +216,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("보스 노드는 결과와 로그에서 일반 전투와 구분된다")
     void bossNodeIsSeparatedFromNormalCombatInResultAndLogs() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 202L, nodeTypeRunConfig("보스", null, List.of()));
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -250,6 +259,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("일반 전투 승리는 층 클리어로 처리되지 않는다")
     void normalCombatWinDoesNotClearFloor() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 302L, nodeTypeRunConfig("전투", null, List.of()));
 
@@ -266,6 +276,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("보스 전투 패배는 층 클리어로 처리되지 않는다")
     void bossCombatLoseDoesNotClearFloor() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 303L, nodeTypeRunConfig("보스", null, List.of()));
         Ids.PlayerId playerId = new Ids.PlayerId("p1");
@@ -287,6 +298,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("시설 노드는 combat pending 없이 즉시 해결된다")
     void facilityNodeResolvesImmediatelyWithoutCombatPending() {
         RunConfig.NodeEffect effect = new RunConfig.NodeEffect(55, 0, 0, 4, "시설 보상", "시설에서 휴식하고 55G를 얻는다.");
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 203L, nodeTypeRunConfig("시설", effect, List.of()));
@@ -311,6 +323,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("저주 노드는 일반 노드와 다른 패널티를 적용한다")
     void curseNodeAppliesPenaltyDifferentFromNormalNode() {
         RunConfig.NodeEffect effect = new RunConfig.NodeEffect(-70, 0, 0, -3, "저주 패널티", "저주로 70G를 잃고 체력 3 감소.");
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 204L, nodeTypeRunConfig("저주", effect, List.of()));
@@ -334,6 +347,7 @@ class SelectNodeChoiceCommandTest {
     }
 
     @Test
+    @DisplayName("미스터리 노드는 설정된 시설 결과를 결정적으로 선택한다")
     void mysteryNodeChoosesConfiguredFacilityOutcomeDeterministically() {
         RunConfig.NodeEffect effect = new RunConfig.NodeEffect(30, 0, 0, 2, "???-시설", "??? 결과로 시설 보상.");
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 205L,

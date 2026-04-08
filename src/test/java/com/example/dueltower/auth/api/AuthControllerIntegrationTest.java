@@ -2,6 +2,7 @@ package com.example.dueltower.auth.api;
 
 import com.example.dueltower.member.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,6 +38,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("회원가입, 로그인, 내 정보 조회 흐름이 동작한다")
     void signupAndLoginAndMeFlow() throws Exception {
         String signupBody = """
                 {
@@ -76,6 +78,7 @@ class AuthControllerIntegrationTest {
 
 
     @Test
+    @DisplayName("보호된 인증 엔드포인트는 공개 접근되면 안 된다")
     void protectedAuthEndpointsShouldNotBePublic() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isUnauthorized());
@@ -84,6 +87,7 @@ class AuthControllerIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
     @Test
+    @DisplayName("중복 username이면 실패한다")
     void duplicateUsernameShouldFail() throws Exception {
         String signupBody = """
                 {
@@ -111,6 +115,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("회원가입은 요청 본문이 null이면 BAD_REQUEST를 반환한다")
     void signupWithNullBodyShouldReturnBadRequest() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON))
@@ -118,6 +123,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("회원가입은 username이 blank면 BAD_REQUEST를 반환한다")
     void signupWithBlankUsernameShouldReturnBadRequest() throws Exception {
         String signupBody = """
                 {
@@ -133,6 +139,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("회원가입은 password가 blank면 BAD_REQUEST를 반환한다")
     void signupWithBlankPasswordShouldReturnBadRequest() throws Exception {
         String signupBody = """
                 {
@@ -148,6 +155,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("로그인은 요청 본문이 null이면 BAD_REQUEST를 반환한다")
     void loginWithNullBodyShouldReturnBadRequest() throws Exception {
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON))
@@ -155,6 +163,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("로그인은 username이 blank면 BAD_REQUEST를 반환한다")
     void loginWithBlankUsernameShouldReturnBadRequest() throws Exception {
         String loginBody = """
                 {
@@ -170,6 +179,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("로그인은 password가 blank면 BAD_REQUEST를 반환한다")
     void loginWithBlankPasswordShouldReturnBadRequest() throws Exception {
         String loginBody = """
                 {
@@ -185,6 +195,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("로그인은 비밀번호가 틀리면 UNAUTHORIZED를 반환한다")
     void loginWithWrongPasswordShouldReturnUnauthorized() throws Exception {
         String signupBody = """
                 {
@@ -212,6 +223,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("로그아웃은 세션을 무효화한다")
     void logoutShouldInvalidateSession() throws Exception {
         String signupBody = """
                 {
@@ -250,6 +262,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("회원가입은 username을 trim해서 저장한다")
     void signupShouldTrimUsername() throws Exception {
         String signupBody = """
                 {
@@ -266,6 +279,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("로그인은 username을 trim해서 처리한다")
     void loginShouldTrimUsername() throws Exception {
         String signupBody = """
                 {

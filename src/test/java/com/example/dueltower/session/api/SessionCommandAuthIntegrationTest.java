@@ -3,6 +3,7 @@ package com.example.dueltower.session.api;
 import com.example.dueltower.member.MemberRepository;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -41,6 +42,7 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("플레이어 인증 커맨드는 플레이어 토큰이 없으면 401을 반환한다")
     void playerAuthCommandWithoutPlayerTokenReturns401() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
@@ -60,6 +62,7 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("플레이어 인증 커맨드는 다른 플레이어의 토큰이면 403을 반환한다")
     void playerAuthCommandWithDifferentPlayersTokenReturns403() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
@@ -83,6 +86,7 @@ class SessionCommandAuthIntegrationTest {
 
 
     @Test
+    @DisplayName("아이템 사용은 플레이어 토큰이 없으면 401을 반환한다")
     void useItemWithoutPlayerTokenReturns401() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
@@ -103,6 +107,7 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("전투 시작은 유효한 GM 토큰이 없으면 401을 반환한다")
     void startCombatWithoutValidGmTokenReturns401() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
@@ -122,6 +127,7 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("GM 전용 커맨드는 유효한 GM 토큰이 없으면 401을 반환한다")
     void gmOnlyCommandWithoutValidGmTokenReturns401() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
@@ -139,6 +145,7 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("알 수 없는 command type이면 400을 반환한다")
     void unknownCommandTypeReturns400() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
@@ -155,6 +162,7 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("잘못된 command ID UUID면 400과 사유를 반환한다")
     void invalidCommandIdUuidReturns400WithReason() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
@@ -177,6 +185,7 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 사용은 잘못된 card ID UUID면 400을 반환한다")
     void playCardWithInvalidCardIdUuidReturns400() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
@@ -198,6 +207,7 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("소환 액션 사용은 잘못된 summon ID UUID면 400을 반환한다")
     void useSummonActionWithInvalidSummonIdUuidReturns400() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
@@ -219,6 +229,7 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("Search pick과 resolve search pick은 unknown command type 경로를 타지 않는다")
     void searchPickAndResolveSearchPickAvoidUnknownCommandTypePath() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
@@ -253,6 +264,7 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 사용은 기존/신규 target payload 형식을 모두 허용한다")
     void playCardAcceptsLegacyAndNewTargetPayloadShapes() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         String code = createSession(gmSession, "gm");
