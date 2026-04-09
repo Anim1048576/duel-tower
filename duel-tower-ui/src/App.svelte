@@ -9,13 +9,15 @@
   import DeckEditorPage from './pages/DeckEditorPage.svelte'
   import DeckListPage from './pages/DeckListPage.svelte'
   import GmLobbyPage from './pages/GmLobbyPage.svelte'
-  import HubPage from './pages/HubPage.svelte'
+  import HubPage from './pages/HubLandingPage.svelte'
+  import InventoryPage from './pages/InventoryPage.svelte'
   import LoginPage from './pages/LoginPage.svelte'
   import PresetEditorPage from './pages/PresetEditorPage.svelte'
   import PresetListPage from './pages/PresetListPage.svelte'
   import PlayerLobbyPage from './pages/PlayerLobbyPage.svelte'
   import RulesReferencePage from './pages/RulesReferencePage.svelte'
   import SessionEntryPage from './pages/SessionEntryPage.svelte'
+  import ShopPage from './pages/ShopPage.svelte'
   import {
     APP_NAV_ITEMS,
     normalizePath,
@@ -37,8 +39,10 @@
     cards: CardLibraryPage,
     decks: DeckListPage,
     presets: PresetListPage,
+    inventory: InventoryPage,
+    shop: ShopPage,
     'card-detail': CardDetailPage,
-    inventory: RulesReferencePage,
+    reference: RulesReferencePage,
     'deck-editor': DeckEditorPage,
     'preset-editor': PresetEditorPage,
     lobby: SessionEntryPage,

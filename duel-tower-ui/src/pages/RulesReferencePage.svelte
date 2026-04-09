@@ -397,9 +397,9 @@
 
 <div class="rules-page">
   <SectionFrame
-    eyebrow="Reference Overview"
-    title="Rules Archive"
-    description="Keywords, statuses, and passive definitions now load from the live content API while keeping the current archive shell intact."
+    eyebrow="Rules Codex"
+    title="Tactical Reference"
+    description="Keywords, statuses, and passive definitions load from the live content API in a dedicated reference route, separate from the future inventory front."
   >
     <div class="rules-page__stats">
       <StatBlock value={keywords.length} label="Keywords" note="Live keyword definitions" />
@@ -423,8 +423,8 @@
 
   <div class="rules-page__content">
     <SectionFrame
-      title="Reference catalog"
-      description="Use the section switcher and local filter to inspect the live rules archive."
+      title="Codex catalog"
+      description="Use the section switcher and local filter to inspect the live tactical reference without mixing it with inventory terminology."
     >
       <SearchFilterBar
         query={query}
@@ -485,8 +485,8 @@
     </SectionFrame>
 
     <SectionFrame
-      title="Selected reference"
-      description="The same list-detail shell can absorb more encyclopedia sections, including items later, without replacing the page."
+      title="Selected codex entry"
+      description="The same list-detail shell can absorb more encyclopedia sections later while keeping the reference route focused on rules data."
     >
       {#if currentLoading}
         <ContentStatePanel

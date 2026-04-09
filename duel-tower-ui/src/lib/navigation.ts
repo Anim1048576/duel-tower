@@ -5,6 +5,8 @@ export type PageKey =
   | 'hub'
   | 'home'
   | 'lobby'
+  | 'inventory'
+  | 'shop'
   | 'cards'
   | 'decks'
   | 'presets'
@@ -12,7 +14,7 @@ export type PageKey =
   | 'character'
   | 'character-create'
   | 'character-detail'
-  | 'inventory'
+  | 'reference'
   | 'combat'
   | 'logs'
   | 'deck-editor'
@@ -54,6 +56,8 @@ export const routePaths = {
   deckList: '/decks',
   presetList: '/presets',
   inventory: '/inventory',
+  shop: '/shop',
+  reference: '/reference',
   deckEditor: '/decks/editor',
   presetEditor: '/presets/editor',
   sessionEntry: '/lobby',
@@ -105,11 +109,13 @@ export const pathBuilders = {
   cardLibrary: () => routePaths.cardLibrary,
   deckList: () => routePaths.deckList,
   presetList: () => routePaths.presetList,
+  inventory: () => routePaths.inventory,
+  shop: () => routePaths.shop,
   cardDetail: (id?: string) =>
     hasRouteParam(id)
       ? buildPathFromPattern(routePatterns.cardDetail, { id })
       : routePaths.cardLibrary,
-  inventory: () => routePaths.inventory,
+  reference: () => routePaths.reference,
   deckEditor: (id?: string) =>
     hasRouteParam(id)
       ? buildPathFromPattern(routePatterns.deckEditor, { id })
@@ -149,6 +155,20 @@ export const PAGES: PageDefinition[] = [
     description: 'Session entry and lobby flow for player and GM access.',
   },
   {
+    key: 'inventory',
+    label: 'Inventory',
+    path: routePaths.inventory,
+    title: 'Inventory',
+    description: 'Gold, keys, chests, and carried supplies for the current expedition.',
+  },
+  {
+    key: 'shop',
+    label: 'Shop',
+    path: routePaths.shop,
+    title: 'Shop',
+    description: 'Merchant offers and purchase flow for the current expedition.',
+  },
+  {
     key: 'cards',
     label: 'Cards',
     path: routePaths.cardLibrary,
@@ -170,11 +190,11 @@ export const PAGES: PageDefinition[] = [
     description: 'Character roster and profile access.',
   },
   {
-    key: 'inventory',
-    label: 'Inventory',
-    path: '/inventory',
-    title: 'Inventory',
-    description: 'Rules, statuses, and passive reference access.',
+    key: 'reference',
+    label: 'Reference',
+    path: routePaths.reference,
+    title: 'Reference',
+    description: 'Keyword, status, and passive rule reference.',
   },
   {
     key: 'combat',
@@ -207,7 +227,7 @@ export const APP_NAV_ITEMS = [
     key: 'hub',
     label: 'Hub',
     path: routePaths.hub,
-    description: 'Central overview and archive entry point',
+    description: 'Overview and quick links into the main archive areas',
     enabled: true,
   },
   {
@@ -215,6 +235,20 @@ export const APP_NAV_ITEMS = [
     label: 'Characters',
     path: routePaths.characterList,
     description: 'Roster, records, and profile access',
+    enabled: true,
+  },
+  {
+    key: 'inventory',
+    label: 'Inventory',
+    path: routePaths.inventory,
+    description: 'Supplies, gold, keys, and carried gear for the active expedition',
+    enabled: true,
+  },
+  {
+    key: 'shop',
+    label: 'Shop',
+    path: routePaths.shop,
+    description: 'Merchant catalog for the active expedition route',
     enabled: true,
   },
   {
@@ -239,10 +273,10 @@ export const APP_NAV_ITEMS = [
     enabled: true,
   },
   {
-    key: 'inventory',
-    label: 'Rules',
-    path: routePaths.inventory,
-    description: 'Keywords, statuses, and passive references',
+    key: 'reference',
+    label: 'Reference',
+    path: routePaths.reference,
+    description: 'Keywords, statuses, and passive rule reference',
     enabled: true,
   },
   {
@@ -323,6 +357,32 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
+    routePaths.inventory,
+    {
+      key: 'inventory',
+      label: 'Expedition Supply',
+      path: routePaths.inventory,
+      area: 'app',
+      title: 'Expedition Supply',
+      description: 'Review gold, keys, chests, and stored supplies for the active expedition.',
+      eyebrow: 'Supply Locker',
+      tags: [{ label: 'Inventory', tone: 'accent' }],
+    },
+  ],
+  [
+    routePaths.shop,
+    {
+      key: 'shop',
+      label: 'Expedition Shop',
+      path: routePaths.shop,
+      area: 'app',
+      title: 'Expedition Shop',
+      description: 'Browse merchant offers and buy supplies for the active expedition.',
+      eyebrow: 'Field Merchant',
+      tags: [{ label: 'Shop', tone: 'accent' }],
+    },
+  ],
+  [
     routePaths.cardLibrary,
     {
       key: 'cards',
@@ -349,16 +409,16 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    routePaths.inventory,
+    routePaths.reference,
     {
-      key: 'inventory',
-      label: 'Rules Reference',
-      path: routePaths.inventory,
+      key: 'reference',
+      label: 'Tactical Reference',
+      path: routePaths.reference,
       area: 'app',
-      title: 'Rules Reference',
-      description: 'Review keywords, statuses, and passive definitions from the live content API.',
-      eyebrow: 'Reference Archive',
-      tags: [{ label: 'Reference', tone: 'accent' }],
+      title: 'Tactical Reference',
+      description: 'Review keyword, status, and passive definitions from the live rules codex.',
+      eyebrow: 'Rules Codex',
+      tags: [{ label: 'Codex', tone: 'accent' }],
     },
   ],
   [
