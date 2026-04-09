@@ -18,6 +18,7 @@
   import RulesReferencePage from './pages/RulesReferencePage.svelte'
   import SessionEntryPage from './pages/SessionEntryPage.svelte'
   import ShopPage from './pages/ShopPage.svelte'
+  import SignupPage from './pages/SignupPage.svelte'
   import {
     APP_NAV_ITEMS,
     normalizePath,
@@ -29,6 +30,7 @@
 
   const PUBLIC_PAGE_COMPONENTS = {
     login: LoginPage,
+    signup: SignupPage,
   } as const
 
   const APP_PAGE_COMPONENTS = {
@@ -79,7 +81,7 @@
       }
     }
 
-    if (authState.isAuthenticated && requestedPage.path === pathBuilders.login()) {
+    if (authState.isAuthenticated && requestedPage.area === 'public') {
       return {
         requestedPage,
         finalPage: resolvePage(pathBuilders.hub()),

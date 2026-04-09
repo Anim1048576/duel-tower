@@ -1,7 +1,7 @@
-import { getCurrentUser, login as loginRequest, logout as logoutRequest } from '../api/auth'
+import { getCurrentUser, login as loginRequest, logout as logoutRequest, signup as signupRequest } from '../api/auth'
 import { setApiUnauthorizedHandler } from '../api/client'
 import { ApiError, getApiErrorMessage } from '../api/types'
-import type { AuthUser, LoginRequest } from './types'
+import type { AuthUser, LoginRequest, SignupRequest } from './types'
 
 function createAuthState() {
   let user = $state<AuthUser | null>(null)
@@ -77,6 +77,25 @@ function createAuthState() {
     }
   }
 
+  async function signup(credentials: SignupRequest) {
+    loading = true
+    clearError()
+
+    try {
+      await signupRequest(credentials)
+      const nextUser = await loginRequest(credentials)
+      user = nextUser
+      initialized = true
+      return nextUser
+    } catch (cause) {
+      error = getApiErrorMessage(cause, 'Unable to create the account.')
+      initialized = true
+      throw cause
+    } finally {
+      loading = false
+    }
+  }
+
   async function logout() {
     loading = true
     clearError()
@@ -114,6 +133,7 @@ function createAuthState() {
     bootstrap,
     handleUnauthorized,
     login,
+    signup,
     logout,
     clearError,
   }

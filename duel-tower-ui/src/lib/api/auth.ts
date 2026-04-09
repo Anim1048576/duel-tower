@@ -1,8 +1,14 @@
 import { apiGet, apiPost, apiPostVoid } from './client'
-import type { AuthUser, LoginRequest } from '../auth/types'
+import type { AuthUser, LoginRequest, SignupRequest } from '../auth/types'
 
 export function login(request: LoginRequest) {
   return apiPost<AuthUser, LoginRequest>('/api/auth/login', request, {
+    handleUnauthorized: false,
+  })
+}
+
+export function signup(request: SignupRequest) {
+  return apiPost<AuthUser, SignupRequest>('/api/auth/signup', request, {
     handleUnauthorized: false,
   })
 }

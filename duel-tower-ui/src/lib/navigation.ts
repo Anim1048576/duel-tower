@@ -2,6 +2,7 @@ export type PageArea = 'public' | 'app'
 
 export type PageKey =
   | 'login'
+  | 'signup'
   | 'hub'
   | 'home'
   | 'lobby'
@@ -48,6 +49,7 @@ export type RouteMatch = {
 export const routePaths = {
   home: '/',
   login: '/',
+  signup: '/signup',
   hub: '/hub',
   characterList: '/characters',
   characterCreate: '/characters/new',
@@ -99,6 +101,7 @@ function buildPathFromPattern(pattern: string, params: RouteParams) {
 export const pathBuilders = {
   home: () => routePaths.home,
   login: () => routePaths.login,
+  signup: () => routePaths.signup,
   hub: () => routePaths.hub,
   characterList: () => routePaths.characterList,
   characterCreate: () => routePaths.characterCreate,
@@ -215,7 +218,7 @@ export const PAGES: PageDefinition[] = [
 const pageMap = new Map(PAGES.map((page) => [page.path, page]))
 
 export type AppNavItem = {
-  key: Exclude<PageKey, 'login'>
+  key: Exclude<PageKey, 'login' | 'signup'>
   label: string
   path: string
   description: string
@@ -298,6 +301,18 @@ const activePageMap = new Map<string, PageDefinition>([
       area: 'public',
       title: 'Archive Access',
       description: 'Public entry screen for archive access.',
+      eyebrow: 'Public Entry',
+    },
+  ],
+  [
+    routePaths.signup,
+    {
+      key: 'signup',
+      label: 'Signup',
+      path: routePaths.signup,
+      area: 'public',
+      title: 'Create Archive Access',
+      description: 'Public entry screen for creating a new archive account.',
       eyebrow: 'Public Entry',
     },
   ],
