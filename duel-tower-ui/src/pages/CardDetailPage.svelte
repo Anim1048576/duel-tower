@@ -208,7 +208,7 @@
 
           <div class="card-detail-page__field">
             <h3>Token link</h3>
-            <p>{card.token ?? 'No linked token is registered for this card.'}</p>
+            <p>{card.token ? 'Registered' : 'No linked token is registered for this card.'}</p>
           </div>
 
           <div class="card-detail-page__field">

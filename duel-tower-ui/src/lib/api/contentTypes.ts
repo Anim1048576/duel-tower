@@ -24,14 +24,17 @@ export type CardListQueryParams = {
   keywordId?: string | null
 }
 
+export type CardKeywordValues = Record<string, number>
+
 export type CardDefinition = {
   id: ContentIdentifier
   name: string
   type: CardType
   cost: number | null
   keywords: string[]
+  keywordValues: CardKeywordValues
   resolveTo: Zone | null
-  token: string | null
+  token: boolean
   description: string
 }
 
