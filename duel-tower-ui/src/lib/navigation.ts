@@ -5,6 +5,7 @@ export type PageKey =
   | 'hub'
   | 'home'
   | 'lobby'
+  | 'cards'
   | 'decks'
   | 'presets'
   | 'card-detail'
@@ -49,9 +50,9 @@ export const routePaths = {
   characterList: '/characters',
   characterCreate: '/characters/new',
   characterDetail: '/characters/detail',
+  cardLibrary: '/cards',
   deckList: '/decks',
   presetList: '/presets',
-  cardDetail: '/cards',
   inventory: '/inventory',
   deckEditor: '/decks/editor',
   presetEditor: '/presets/editor',
@@ -101,12 +102,13 @@ export const pathBuilders = {
     hasRouteParam(id)
       ? buildPathFromPattern(routePatterns.characterDetail, { id })
       : routePaths.characterDetail,
+  cardLibrary: () => routePaths.cardLibrary,
   deckList: () => routePaths.deckList,
   presetList: () => routePaths.presetList,
   cardDetail: (id?: string) =>
     hasRouteParam(id)
       ? buildPathFromPattern(routePatterns.cardDetail, { id })
-      : routePaths.cardDetail,
+      : routePaths.cardLibrary,
   inventory: () => routePaths.inventory,
   deckEditor: (id?: string) =>
     hasRouteParam(id)
@@ -145,6 +147,13 @@ export const PAGES: PageDefinition[] = [
     path: routePaths.sessionEntry,
     title: 'Lobby / Session',
     description: 'Session entry and lobby flow for player and GM access.',
+  },
+  {
+    key: 'cards',
+    label: 'Cards',
+    path: routePaths.cardLibrary,
+    title: 'Cards',
+    description: 'Card library and detail reference access.',
   },
   {
     key: 'decks',
@@ -206,6 +215,13 @@ export const APP_NAV_ITEMS = [
     label: 'Characters',
     path: routePaths.characterList,
     description: 'Roster, records, and profile access',
+    enabled: true,
+  },
+  {
+    key: 'cards',
+    label: 'Cards',
+    path: routePaths.cardLibrary,
+    description: 'Card library and archive detail flow',
     enabled: true,
   },
   {
@@ -307,11 +323,24 @@ const activePageMap = new Map<string, PageDefinition>([
     },
   ],
   [
-    routePaths.cardDetail,
+    routePaths.cardLibrary,
+    {
+      key: 'cards',
+      label: 'Card Library',
+      path: routePaths.cardLibrary,
+      area: 'app',
+      title: 'Card Library',
+      description: 'Search the live card archive and move into detail records from the current result set.',
+      eyebrow: 'Content Library',
+      tags: [{ label: 'Card Archive', tone: 'accent' }],
+    },
+  ],
+  [
+    routePatterns.cardDetail,
     {
       key: 'card-detail',
       label: 'Card Detail',
-      path: routePaths.cardDetail,
+      path: routePatterns.cardDetail,
       area: 'app',
       title: 'Card Detail',
       description: 'Review the selected card record from the live archive.',
@@ -458,7 +487,7 @@ function createDynamicRouteEntries(entries: readonly DynamicRouteSourceEntry[]) 
 
 const dynamicRouteEntries = createDynamicRouteEntries([
   { pattern: routePatterns.characterDetail, page: activePageMap.get(routePaths.characterDetail) },
-  { pattern: routePatterns.cardDetail, page: activePageMap.get(routePaths.cardDetail) },
+  { pattern: routePatterns.cardDetail, page: activePageMap.get(routePatterns.cardDetail) },
   { pattern: routePatterns.deckEditor, page: activePageMap.get(routePaths.deckEditor) },
   { pattern: routePatterns.presetEditor, page: activePageMap.get(routePaths.presetEditor) },
   { pattern: routePatterns.sessionLobbyPlayer, page: activePageMap.get(routePaths.sessionLobbyPlayer) },

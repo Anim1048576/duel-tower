@@ -105,14 +105,14 @@
   })
   const stateMessage = $derived.by(() => {
     if (notFound) {
-      return 'The requested card could not be found in the current archive.'
+      return 'The requested card record is not available in the current archive.'
     }
 
     if (errorMessage) {
       return errorMessage
     }
 
-    return 'Open a card from the archive or use a valid card detail URL.'
+    return 'Open a card from the archive or use a valid /cards/:id route.'
   })
 </script>
 
@@ -232,8 +232,8 @@
       description="This read-only record keeps the same fields the next deck picker and card reference flows can reuse."
     >
       <div class="card-detail-page__actions">
-        <a class="card-detail-page__link-action" data-nav href={pathBuilders.deckList()}>
-          Back to card archive
+        <a class="card-detail-page__link-action" data-nav href={pathBuilders.cardLibrary()}>
+          Back to card library
         </a>
       </div>
 
@@ -256,16 +256,16 @@
       >
         {#if notFound}
           <p>Requested id: {invalidRouteId ?? cardId}</p>
-          <p>Check the card archive and open a valid card record.</p>
+          <p>Return to the card library and open a valid card record.</p>
         {:else if !errorMessage}
           <p>No card id was found in the current route.</p>
-          <p>Open a card from the archive to restore the expected detail context.</p>
+          <p>Open a card from the library to restore the expected detail context.</p>
         {/if}
       </ContentStatePanel>
 
       <div class="card-detail-page__actions">
-        <a class="card-detail-page__link-action" data-nav href={pathBuilders.deckList()}>
-          Back to card archive
+        <a class="card-detail-page__link-action" data-nav href={pathBuilders.cardLibrary()}>
+          Back to card library
         </a>
       </div>
     </SectionFrame>

@@ -12,7 +12,8 @@
   let { items, currentPath, currentKey, onNavigate }: Props = $props()
 
   const SESSION_NAV_KEYS = new Set<PageKey>(['lobby', 'player-lobby', 'gm-lobby'])
-  const CARD_NAV_KEYS = new Set<PageKey>(['decks', 'card-detail', 'deck-editor'])
+  const CARD_LIBRARY_NAV_KEYS = new Set<PageKey>(['cards', 'card-detail'])
+  const DECK_NAV_KEYS = new Set<PageKey>(['decks', 'deck-editor'])
   const PRESET_NAV_KEYS = new Set<PageKey>(['presets', 'preset-editor'])
 
   function isSelected(item: AppNavItem) {
@@ -20,7 +21,11 @@
       return true
     }
 
-    if (item.key === 'decks' && CARD_NAV_KEYS.has(currentKey)) {
+    if (item.key === 'cards' && CARD_LIBRARY_NAV_KEYS.has(currentKey)) {
+      return true
+    }
+
+    if (item.key === 'decks' && DECK_NAV_KEYS.has(currentKey)) {
       return true
     }
 

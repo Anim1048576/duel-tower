@@ -1,5 +1,6 @@
 <script lang="ts">
   import AppLayout from './layout/AppLayout.svelte'
+  import CardLibraryPage from './pages/CardLibraryPage.svelte'
   import CardDetailPage from './pages/CardDetailPage.svelte'
   import CharacterDetailPage from './pages/CharacterDetailPage.svelte'
   import PublicEntryLayout from './layout/PublicEntryLayout.svelte'
@@ -33,6 +34,7 @@
     character: CharacterListPage,
     'character-create': CharacterDetailPage,
     'character-detail': CharacterDetailPage,
+    cards: CardLibraryPage,
     decks: DeckListPage,
     presets: PresetListPage,
     'card-detail': CardDetailPage,
