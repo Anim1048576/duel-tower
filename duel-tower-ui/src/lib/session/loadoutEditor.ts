@@ -1,4 +1,4 @@
-import type { PlayerStateDto } from '../api/sessionTypes'
+import type { PlayerStateDto, SessionStateDto } from '../api/sessionTypes'
 import {
   normalizePresetIdentifier,
   normalizePresetIdentifierList,
@@ -31,6 +31,7 @@ export function cloneSessionLoadoutDraft(draft: SessionLoadoutDraft): SessionLoa
 
 export function createSessionLoadoutDraft(
   player: PlayerStateDto | null,
+  session: SessionStateDto | null,
   fallbackCharacterId: number | null = null,
 ): SessionLoadoutDraft {
   if (!player) {
@@ -43,9 +44,23 @@ export function createSessionLoadoutDraft(
         ? fallbackCharacterId
         : null,
     deckOwnedCardIds: normalizePresetIdentifierList(player.deckOwnedCardIds),
-    exCardId: normalizePresetIdentifier(player.exCard),
+    exCardId: resolveSessionLoadoutExCardId(player, session),
     passiveIds: normalizePresetIdentifierList(player.passiveIds),
   }
+}
+
+export function resolveSessionLoadoutExCardId(
+  player: PlayerStateDto | null,
+  session: SessionStateDto | null,
+) {
+  const currentExCard = player?.exCard?.trim()
+
+  if (!currentExCard) {
+    return ''
+  }
+
+  const resolvedExCardId = session?.cards[currentExCard]?.defId
+  return normalizePresetIdentifier(resolvedExCardId ?? currentExCard)
 }
 
 export function normalizeSessionLoadoutDraft(draft: SessionLoadoutDraft): SessionLoadoutDraft {

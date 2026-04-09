@@ -34,6 +34,7 @@
     isStoredPlayerSessionAccess,
     normalizeSessionCode,
     readStoredSessionAccess,
+    updateStoredSessionAccess,
     type StoredSessionAccess,
   } from '../lib/session/access'
   import {
@@ -42,6 +43,7 @@
     createSessionLoadoutDraft,
     isSessionLoadoutDraftDirty,
     normalizeSessionLoadoutDraft,
+    resolveSessionLoadoutExCardId,
     type SessionLoadoutDraft,
   } from '../lib/session/loadoutEditor'
   import {
@@ -73,6 +75,7 @@
   let invalidAccessMessage = $state<string | null>(null)
   let actionErrorTitle = $state('Player action failed')
   let actionErrorMessage = $state<string | null>(null)
+  let actionSuccessTitle = $state<string | null>(null)
   let actionSuccessMessage = $state<string | null>(null)
   let feedback = $state<SessionPageFeedback | null>(null)
   let session = $state<SessionStateDto | null>(null)
@@ -88,10 +91,14 @@
   let presetsErrorMessage = $state<string | null>(null)
   let presets = $state<PresetResponse[]>([])
   let selectedPresetId = $state('')
+  let lastAppliedPresetName = $state<string | null>(null)
   let loadoutDraft = $state<SessionLoadoutDraft>(createEmptySessionLoadoutDraft())
   let savedLoadoutDraft = $state<SessionLoadoutDraft>(createEmptySessionLoadoutDraft())
   let ownedCardCandidate = $state('')
   let passiveCandidate = $state('')
+  let exCardEdited = $state(false)
+  let deckOwnedCardIdsEdited = $state(false)
+  let passiveIdsEdited = $state(false)
 
   function getSessionCodeFromRoute() {
     if (typeof window === 'undefined') return null
@@ -157,9 +164,54 @@
     }
   }
 
-  function formatPlayerLoadoutSummary(player: PlayerStateDto) {
+  function formatCharacterLabel(characterId: number | null) {
+    const resolvedCharacter = getResolvedCharacter(characterId)
+
+    if (resolvedCharacter) {
+      return `${resolvedCharacter.name} #${resolvedCharacter.id}`
+    }
+
+    if (characterId !== null) {
+      return `Character #${characterId} (unresolved)`
+    }
+
+    return 'Not selected yet'
+  }
+
+  function formatExCardLabel(exCardId: string) {
+    const resolvedCard = exCardId ? getResolvedCard(exCardId) : null
+
+    if (resolvedCard) {
+      return `${resolvedCard.name} (${resolvedCard.id})`
+    }
+
+    return exCardId || 'Not selected yet'
+  }
+
+  function formatPresetOptionLabel(preset: PresetResponse) {
+    return `${preset.name} | Character #${preset.characterId} | ${preset.deckCardIds.length} cards | ${preset.passiveIds.length} passives`
+  }
+
+  function resetLoadoutEditState() {
+    exCardEdited = false
+    deckOwnedCardIdsEdited = false
+    passiveIdsEdited = false
+  }
+
+  function persistSyncedCharacterId(characterId: number | null) {
+    const nextAccess = updateStoredSessionAccess({
+      characterId: characterId ?? undefined,
+    })
+
+    if (nextAccess) {
+      runtimeAccess = nextAccess
+    }
+  }
+
+  function formatPlayerLoadoutSummary(player: PlayerStateDto, nextSession: SessionStateDto | null) {
     const passiveSummary = player.passiveIds.length > 0 ? `${player.passiveIds.length} passives` : 'No passives'
-    const exSummary = player.exCard ? `EX ${player.exCard}` : 'No EX card'
+    const resolvedExCardId = resolveSessionLoadoutExCardId(player, nextSession)
+    const exSummary = resolvedExCardId ? `EX ${resolvedExCardId}` : 'No EX card'
     return `Deck ${player.deckOwnedCardIds.length} cards | ${passiveSummary} | ${exSummary}`
   }
 
@@ -170,7 +222,7 @@
     return player.ready ? 'Ready' : 'Joined'
   }
 
-  function buildParticipantTone(player: PlayerStateDto, playerId: string) {
+  function buildParticipantTone(player: PlayerStateDto, playerId: string): LobbyParticipantItem['tone'] {
     if (playerId === currentPlayerId) {
       return player.ready ? 'success' : 'accent'
     }
@@ -192,15 +244,20 @@
         name: player.playerId === currentPlayerId ? `${player.playerId} (You)` : player.playerId,
         state: buildParticipantStateLabel(player, player.playerId),
         tone: buildParticipantTone(player, player.playerId),
-        note: formatPlayerLoadoutSummary(player),
+        note: formatPlayerLoadoutSummary(player, nextSession),
       }))
   }
 
   function syncLoadoutStateFromPlayer(
     player: PlayerStateDto | null,
+    nextSession: SessionStateDto | null,
     options: { preferredCharacterId?: number | null; force?: boolean } = {},
   ) {
-    const nextBase = createSessionLoadoutDraft(player, options.preferredCharacterId ?? loadoutDraft.characterId)
+    const nextBase = createSessionLoadoutDraft(
+      player,
+      nextSession,
+      options.preferredCharacterId ?? runtimeAccess?.characterId ?? loadoutDraft.characterId,
+    )
 
     if (options.force || !isSessionLoadoutDraftDirty(savedLoadoutDraft, loadoutDraft)) {
       loadoutDraft = cloneSessionLoadoutDraft(nextBase)
@@ -209,6 +266,7 @@
     savedLoadoutDraft = nextBase
     ownedCardCandidate = ''
     passiveCandidate = ''
+    resetLoadoutEditState()
   }
 
   async function loadReferenceCatalogs() {
@@ -249,13 +307,19 @@
   }
 
   async function loadAvailablePresets() {
+    const currentSelectedPresetId = selectedPresetId
     presetsLoading = true
     presetsErrorMessage = null
 
     try {
       const response = await listPresets()
       presets = response
-      selectedPresetId = response[0] ? String(response[0].id) : ''
+      selectedPresetId =
+        response.find((entry) => String(entry.id) === currentSelectedPresetId)
+          ? currentSelectedPresetId
+          : response[0]
+            ? String(response[0].id)
+            : ''
     } catch (error) {
       presets = []
       selectedPresetId = ''
@@ -277,6 +341,7 @@
     notFound = false
     errorMessage = null
     actionErrorMessage = null
+    actionSuccessTitle = null
     actionSuccessMessage = null
     session = null
 
@@ -293,7 +358,12 @@
       session = response
       setSelectionHandoff(selectionHandoffKeys.sessionCode, response.sessionCode)
       removeSelectionHandoff(selectionHandoffKeys.sessionId)
-      syncLoadoutStateFromPlayer(currentPlayerId ? response.players[currentPlayerId] ?? null : null, { force: true })
+      const nextPlayerId =
+        nextAccess?.role === 'player' && typeof nextAccess.playerId === 'string' ? nextAccess.playerId : null
+      syncLoadoutStateFromPlayer(nextPlayerId ? response.players[nextPlayerId] ?? null : null, response, {
+        preferredCharacterId: nextAccess?.characterId ?? null,
+        force: true,
+      })
     } catch (error) {
       if (requestId !== requestSequence) return
 
@@ -315,24 +385,45 @@
     removeSelectionHandoff(selectionHandoffKeys.sessionId)
   }
 
+  function clearPlayerLobbyRuntimeState() {
+    requestSequence += 1
+    session = null
+    runtimeAccess = null
+    invalidAccessMessage = null
+    loadoutDraft = createEmptySessionLoadoutDraft()
+    savedLoadoutDraft = createEmptySessionLoadoutDraft()
+    ownedCardCandidate = ''
+    passiveCandidate = ''
+    selectedPresetId = ''
+    lastAppliedPresetName = null
+    resetLoadoutEditState()
+  }
+
   async function handleReadyToggle() {
     if (loading || actionPending || !routeSessionCode || !currentPlayerId || !currentPlayer || !isStoredPlayerSessionAccess(runtimeAccess)) {
       return
     }
 
+    const requestedReady = !currentPlayer.ready
     actionPending = 'ready'
-    actionErrorTitle = 'Player action failed'
+    actionErrorTitle = 'Ready update failed'
     actionErrorMessage = null
+    actionSuccessTitle = null
     actionSuccessMessage = null
 
     try {
       const response = await updatePlayerReady(
         routeSessionCode,
         currentPlayerId,
-        { ready: !currentPlayer.ready },
+        { ready: requestedReady },
         runtimeAccess.playerToken,
       )
       syncLobbyState(response)
+      const updatedReady = response.players[currentPlayerId]?.ready ?? requestedReady
+      actionSuccessTitle = 'Ready updated'
+      actionSuccessMessage = updatedReady
+        ? 'You are marked ready in the current session.'
+        : 'You are no longer marked ready in the current session.'
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to update the current ready state.')
     } finally {
@@ -341,13 +432,14 @@
   }
 
   async function handleLeave() {
-    if (loading || actionPending || !routeSessionCode || !isStoredPlayerSessionAccess(runtimeAccess)) {
+    if (loading || actionPending || !routeSessionCode || !currentPlayer || !isStoredPlayerSessionAccess(runtimeAccess)) {
       return
     }
 
     actionPending = 'leave'
-    actionErrorTitle = 'Player action failed'
+    actionErrorTitle = 'Leave failed'
     actionErrorMessage = null
+    actionSuccessTitle = null
     actionSuccessMessage = null
 
     try {
@@ -355,6 +447,8 @@
       clearStoredSessionAccess()
       removeSelectionHandoff(selectionHandoffKeys.sessionId)
       removeSelectionHandoff(selectionHandoffKeys.sessionCode)
+      clearPlayerLobbyRuntimeState()
+      actionPending = null
       setSessionPageFeedback(sessionEntryStateCopy.leftFeedback)
       navigateTo(pathBuilders.sessionEntry(), true)
     } catch (error) {
@@ -364,23 +458,29 @@
   }
 
   async function handleSaveLoadout() {
-    if (loading || actionPending || !routeSessionCode || !currentPlayerId || !isStoredPlayerSessionAccess(runtimeAccess)) {
+    if (loading || actionPending || !routeSessionCode || !currentPlayerId || !currentPlayer || !isStoredPlayerSessionAccess(runtimeAccess)) {
       return
     }
 
     const normalizedDraft = normalizeSessionLoadoutDraft(loadoutDraft)
+    const characterChanged = normalizedDraft.characterId !== savedLoadoutDraft.characterId
+    const shouldSendExCard = !characterChanged || exCardEdited
+    const shouldSendPassiveIds = !characterChanged || passiveIdsEdited
+    const shouldSendDeckOwnedCardIds = !characterChanged || deckOwnedCardIdsEdited
     loadoutDraft = normalizedDraft
 
     if (normalizedDraft.characterId === null) {
       actionErrorTitle = 'Loadout save failed'
       actionErrorMessage = 'Character selection is required before saving the current loadout.'
+      actionSuccessTitle = null
       actionSuccessMessage = null
       return
     }
 
-    if (!normalizedDraft.exCardId) {
+    if (shouldSendExCard && !normalizedDraft.exCardId) {
       actionErrorTitle = 'Loadout save failed'
       actionErrorMessage = 'EX card selection is required before saving the current loadout.'
+      actionSuccessTitle = null
       actionSuccessMessage = null
       return
     }
@@ -388,26 +488,30 @@
     actionPending = 'save-loadout'
     actionErrorTitle = 'Loadout save failed'
     actionErrorMessage = null
+    actionSuccessTitle = null
     actionSuccessMessage = null
 
     try {
+      const payload = {
+        characterId: normalizedDraft.characterId,
+        ...(shouldSendPassiveIds ? { passiveIds: normalizedDraft.passiveIds } : {}),
+        ...(shouldSendDeckOwnedCardIds ? { deckOwnedCardIds: normalizedDraft.deckOwnedCardIds } : {}),
+        ...(shouldSendExCard ? { exCardId: normalizedDraft.exCardId } : {}),
+      }
       const response = await updateSessionLoadout(
         routeSessionCode,
         currentPlayerId,
-        {
-          characterId: normalizedDraft.characterId,
-          passiveIds: normalizedDraft.passiveIds,
-          deckOwnedCardIds: normalizedDraft.deckOwnedCardIds,
-          exCardId: normalizedDraft.exCardId,
-        },
+        payload,
         runtimeAccess.playerToken,
       )
 
       syncLobbyState(response)
-      syncLoadoutStateFromPlayer(response.players[currentPlayerId] ?? null, {
+      persistSyncedCharacterId(normalizedDraft.characterId)
+      syncLoadoutStateFromPlayer(response.players[currentPlayerId] ?? null, response, {
         preferredCharacterId: normalizedDraft.characterId,
         force: true,
       })
+      actionSuccessTitle = playerLobbyStateCopy.loadoutSavedFeedback.title
       actionSuccessMessage = playerLobbyStateCopy.loadoutSavedFeedback.message
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to save the current loadout.')
@@ -417,7 +521,7 @@
   }
 
   async function handleApplyPreset() {
-    if (loading || actionPending || !routeSessionCode || !currentPlayerId || !isStoredPlayerSessionAccess(runtimeAccess)) {
+    if (loading || actionPending || !routeSessionCode || !currentPlayerId || !currentPlayer || !isStoredPlayerSessionAccess(runtimeAccess)) {
       return
     }
 
@@ -427,6 +531,7 @@
     if (!Number.isInteger(presetId) || presetId <= 0 || !preset) {
       actionErrorTitle = 'Preset apply failed'
       actionErrorMessage = 'Choose a saved preset before applying it to the current session.'
+      actionSuccessTitle = null
       actionSuccessMessage = null
       return
     }
@@ -434,6 +539,7 @@
     actionPending = 'apply-preset'
     actionErrorTitle = 'Preset apply failed'
     actionErrorMessage = null
+    actionSuccessTitle = null
     actionSuccessMessage = null
 
     try {
@@ -445,10 +551,13 @@
       )
 
       syncLobbyState(response)
-      syncLoadoutStateFromPlayer(response.players[currentPlayerId] ?? null, {
+      persistSyncedCharacterId(preset.characterId)
+      syncLoadoutStateFromPlayer(response.players[currentPlayerId] ?? null, response, {
         preferredCharacterId: preset.characterId,
         force: true,
       })
+      lastAppliedPresetName = preset.name
+      actionSuccessTitle = playerLobbyStateCopy.presetAppliedFeedback.title
       actionSuccessMessage = `${playerLobbyStateCopy.presetAppliedFeedback.message} (${preset.name})`
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to apply the selected preset.')
@@ -460,10 +569,29 @@
   function updateCharacterId(value: string) {
     const normalized = value.trim()
     const nextValue = normalized ? Number(normalized) : null
-    loadoutDraft = {
-      ...loadoutDraft,
-      characterId: nextValue !== null && Number.isFinite(nextValue) ? nextValue : null,
+    const nextCharacterId = nextValue !== null && Number.isFinite(nextValue) ? nextValue : null
+
+    if (nextCharacterId === loadoutDraft.characterId) {
+      return
     }
+
+    if (nextCharacterId === savedLoadoutDraft.characterId) {
+      loadoutDraft = cloneSessionLoadoutDraft(savedLoadoutDraft)
+      ownedCardCandidate = ''
+      passiveCandidate = ''
+      resetLoadoutEditState()
+      return
+    }
+
+    loadoutDraft = {
+      characterId: nextCharacterId,
+      deckOwnedCardIds: [],
+      exCardId: '',
+      passiveIds: [],
+    }
+    ownedCardCandidate = ''
+    passiveCandidate = ''
+    resetLoadoutEditState()
   }
 
   function updateDeckOwnedCardIds(value: string) {
@@ -471,6 +599,7 @@
       ...loadoutDraft,
       deckOwnedCardIds: parseIdentifierText(value),
     }
+    deckOwnedCardIdsEdited = true
   }
 
   function updatePassiveIds(value: string) {
@@ -478,6 +607,15 @@
       ...loadoutDraft,
       passiveIds: parseIdentifierText(value),
     }
+    passiveIdsEdited = true
+  }
+
+  function updateExCardId(value: string) {
+    loadoutDraft = {
+      ...loadoutDraft,
+      exCardId: normalizePresetIdentifier(value),
+    }
+    exCardEdited = true
   }
 
   function addOwnedCardCandidate() {
@@ -488,6 +626,7 @@
       deckOwnedCardIds: addPresetIdentifier(loadoutDraft.deckOwnedCardIds, nextValue),
     }
     ownedCardCandidate = ''
+    deckOwnedCardIdsEdited = true
   }
 
   function addPassiveCandidate() {
@@ -498,6 +637,7 @@
       passiveIds: addPresetIdentifier(loadoutDraft.passiveIds, nextValue),
     }
     passiveCandidate = ''
+    passiveIdsEdited = true
   }
 
   function handleWindowStateChange() {
@@ -521,13 +661,66 @@
     currentPlayerId && session ? session.players[currentPlayerId] ?? null : null,
   )
   const currentPlayerSummary = $derived.by(() =>
-    currentPlayer ? formatPlayerLoadoutSummary(currentPlayer) : 'Current player information is not available yet.',
+    currentPlayer ? formatPlayerLoadoutSummary(currentPlayer, session) : 'Current player information is not available yet.',
   )
+  const canEditOwnLoadout = $derived.by(() =>
+    Boolean(
+      session &&
+        currentPlayer &&
+        currentPlayerId &&
+        isStoredPlayerSessionAccess(runtimeAccess) &&
+        currentPlayer.playerId === currentPlayerId,
+    ),
+  )
+  const loadoutEditGuardMessage = $derived.by(() => {
+    if (!session || loading) return null
+    if (!isStoredPlayerSessionAccess(runtimeAccess)) {
+      return 'Player runtime access is required before editing the current loadout.'
+    }
+    if (!currentPlayerId) {
+      return 'Current player information is unavailable in the saved player access.'
+    }
+    if (!currentPlayer) {
+      return 'The current player is not present in the latest session state, so this loadout cannot be edited.'
+    }
+    return null
+  })
   const participantItems = $derived.by(() => buildParticipantItems(session))
   const participantCount = $derived.by(() => (session ? Object.keys(session.players).length : 0))
   const readyCount = $derived.by(() =>
     session ? Object.values(session.players).filter((player) => player.ready).length : 0,
   )
+  const readyStatusLabel = $derived.by(() =>
+    currentPlayer?.ready ? 'Ready' : currentPlayer ? 'Not ready' : 'Unavailable',
+  )
+  const readyStatusTone = $derived.by(() =>
+    currentPlayer?.ready ? 'success' : currentPlayer ? 'muted' : 'warning',
+  )
+  const canToggleReady = $derived.by(() =>
+    Boolean(
+      currentPlayer &&
+        currentPlayerId &&
+        isStoredPlayerSessionAccess(runtimeAccess) &&
+        currentPlayer.playerId === currentPlayerId,
+    ),
+  )
+  const canLeaveSession = $derived.by(() =>
+    Boolean(
+      currentPlayer &&
+        currentPlayerId &&
+        isStoredPlayerSessionAccess(runtimeAccess) &&
+        runtimeAccess.playerId === currentPlayerId,
+    ),
+  )
+  const membershipActionSummary = $derived.by(() => {
+    if (!currentPlayer) {
+      return 'Current player actions are unavailable until the session state is restored.'
+    }
+
+    return currentPlayer.ready
+      ? 'You are marked ready. Clear ready if you need to adjust before the session proceeds.'
+      : 'You are not ready yet. Toggle ready when you are prepared to stay in the session.'
+  })
   const readyActionLabel = $derived.by(() =>
     actionPending === 'ready'
       ? currentPlayer?.ready ? 'Clearing ready...' : 'Setting ready...'
@@ -545,12 +738,26 @@
   const loadoutDirty = $derived.by(() =>
     isSessionLoadoutDraftDirty(savedLoadoutDraft, normalizeSessionLoadoutDraft(loadoutDraft)),
   )
+  const characterChangePending = $derived.by(() =>
+    loadoutDraft.characterId !== null && loadoutDraft.characterId !== savedLoadoutDraft.characterId,
+  )
+  const deckEditingLocked = $derived.by(() => characterChangePending)
   const resolvedDraftCharacter = $derived.by(() => getResolvedCharacter(loadoutDraft.characterId))
   const resolvedDraftExCard = $derived.by(() =>
     loadoutDraft.exCardId ? getResolvedCard(loadoutDraft.exCardId) : null,
   )
+  const syncedResolvedExCard = $derived.by(() =>
+    savedLoadoutDraft.exCardId ? getResolvedCard(savedLoadoutDraft.exCardId) : null,
+  )
   const selectedPreset = $derived.by(
     () => presets.find((preset) => String(preset.id) === selectedPresetId) ?? null,
+  )
+  const presetSummary = $derived.by(() =>
+    presetsLoading
+      ? 'Loading preset archive...'
+      : presets.length > 0
+        ? `${presets.length} saved presets are available for the current player.`
+        : 'No saved presets are available for this account yet.',
   )
   const selectedPresetPreviewState = $derived.by(() =>
     selectedPreset ? normalizePresetEditorState({
@@ -711,6 +918,7 @@
         <div class="player-lobby-page__summary-tags">
           <TagChip label="Player View" tone="accent" />
           <TagChip label={`Me: ${currentPlayerId ?? 'Unknown'}`} tone="success" />
+          <TagChip label={`Ready: ${readyStatusLabel}`} tone={readyStatusTone} />
         </div>
       </div>
       <div class="player-lobby-page__stats">
@@ -727,7 +935,7 @@
       {#if actionErrorMessage}
         <ContentStatePanel title={actionErrorTitle} message={actionErrorMessage} tone="error" />
       {:else if actionSuccessMessage}
-        <ContentStatePanel title="Player action completed" message={actionSuccessMessage} />
+        <ContentStatePanel title={actionSuccessTitle ?? 'Player action completed'} message={actionSuccessMessage} />
       {/if}
     </SectionFrame>
 
@@ -749,22 +957,54 @@
           <p>Current player id: {currentPlayerId ?? 'Unavailable'}</p>
           <p>Ready state: {currentPlayer?.ready ? 'Ready' : 'Not ready yet'}</p>
           <p>{currentPlayerSummary}</p>
-          <p>Character: {resolvedDraftCharacter ? `${resolvedDraftCharacter.name} #${resolvedDraftCharacter.id}` : loadoutDraft.characterId !== null ? `Character #${loadoutDraft.characterId} (unresolved)` : 'Not selected yet'}</p>
-          <p>EX: {resolvedDraftExCard ? `${resolvedDraftExCard.name} (${resolvedDraftExCard.id})` : loadoutDraft.exCardId || 'Not selected yet'}</p>
+        </div>
+        <div class="player-lobby-page__reference-summary">
+          <div>
+            <strong>Last synced</strong>
+            <p>Character: {formatCharacterLabel(savedLoadoutDraft.characterId)}</p>
+            <p>EX: {syncedResolvedExCard ? `${syncedResolvedExCard.name} (${syncedResolvedExCard.id})` : formatExCardLabel(savedLoadoutDraft.exCardId)}</p>
+            <p>Deck: {savedLoadoutDraft.deckOwnedCardIds.length} owned cards</p>
+            <p>Passives: {savedLoadoutDraft.passiveIds.length}</p>
+          </div>
+          <div>
+            <strong>Draft to save</strong>
+            <p>Character: {resolvedDraftCharacter ? `${resolvedDraftCharacter.name} #${resolvedDraftCharacter.id}` : formatCharacterLabel(loadoutDraft.characterId)}</p>
+            <p>EX: {resolvedDraftExCard ? `${resolvedDraftExCard.name} (${resolvedDraftExCard.id})` : formatExCardLabel(loadoutDraft.exCardId)}</p>
+            <p>Deck: {loadoutDraft.deckOwnedCardIds.length} owned cards</p>
+            <p>Passives: {loadoutDraft.passiveIds.length}</p>
+          </div>
         </div>
         <div class="player-lobby-page__todo">
           <p>{loadoutDirty ? 'Current draft has unsaved loadout changes.' : 'Current draft matches the last synced loadout state.'}</p>
-          <p>Preset apply keeps a separate preview so the current draft and the preset source do not get mixed.</p>
+          <p>
+            {#if characterChangePending}
+              Save the new character first to refresh server-owned cards and character defaults before editing the deck again.
+            {:else}
+              Preset apply keeps a separate preview so the current draft and the preset source do not get mixed.
+            {/if}
+          </p>
+          {#if lastAppliedPresetName}
+            <p>Last preset applied to this live session: {lastAppliedPresetName}</p>
+          {/if}
         </div>
       </SectionFrame>
     </div>
 
     <div class="player-lobby-page__main">
       <SectionFrame title="Direct loadout save" description="Edit the current player loadout directly and save it with the player session token.">
+        {#if loadoutEditGuardMessage}
+          <ContentStatePanel title="Loadout editing unavailable" message={loadoutEditGuardMessage} tone="error" />
+        {/if}
+        {#if characterChangePending}
+          <ContentStatePanel
+            title="Character change pending"
+            message="Save this character selection first. The session response will refresh owned cards, deck defaults, and the synced loadout summary."
+          />
+        {/if}
         <div class="player-lobby-page__form-grid">
           <label class="player-lobby-page__field">
             <span>Character</span>
-            <select value={loadoutDraft.characterId === null ? '' : String(loadoutDraft.characterId)} disabled={loading || actionPending !== null || referenceLoading} onchange={(event) => updateCharacterId((event.currentTarget as HTMLSelectElement).value)}>
+            <select value={loadoutDraft.characterId === null ? '' : String(loadoutDraft.characterId)} disabled={loading || actionPending !== null || referenceLoading || !canEditOwnLoadout} onchange={(event) => updateCharacterId((event.currentTarget as HTMLSelectElement).value)}>
               <option value="">Select character</option>
               {#if loadoutDraft.characterId !== null && !resolvedDraftCharacter}
                 <option value={String(loadoutDraft.characterId)}>Character #{loadoutDraft.characterId} (unresolved)</option>
@@ -777,7 +1017,7 @@
 
           <label class="player-lobby-page__field">
             <span>EX card</span>
-            <select value={loadoutDraft.exCardId} disabled={loading || actionPending !== null || referenceLoading} onchange={(event) => (loadoutDraft = { ...loadoutDraft, exCardId: normalizePresetIdentifier((event.currentTarget as HTMLSelectElement).value) })}>
+            <select value={loadoutDraft.exCardId} disabled={loading || actionPending !== null || referenceLoading || !canEditOwnLoadout} onchange={(event) => updateExCardId((event.currentTarget as HTMLSelectElement).value)}>
               <option value="">Select EX card</option>
               {#if loadoutDraft.exCardId && !resolvedDraftExCard}
                 <option value={loadoutDraft.exCardId}>{loadoutDraft.exCardId} (unresolved)</option>
@@ -791,34 +1031,34 @@
           <label class="player-lobby-page__field player-lobby-page__field--span-2">
             <span>Deck owned card ids</span>
             <div class="player-lobby-page__picker-row">
-              <select bind:value={ownedCardCandidate} disabled={loading || actionPending !== null}>
+              <select bind:value={ownedCardCandidate} disabled={loading || actionPending !== null || !canEditOwnLoadout || deckEditingLocked}>
                 <option value="">Quick add owned card</option>
                 {#each ownedCardOptions as option}
                   <option value={option.id}>{option.label}</option>
                 {/each}
               </select>
-              <button type="button" disabled={loading || actionPending !== null || !ownedCardCandidate} onclick={addOwnedCardCandidate}>Add card</button>
+              <button type="button" disabled={loading || actionPending !== null || !canEditOwnLoadout || deckEditingLocked || !ownedCardCandidate} onclick={addOwnedCardCandidate}>Add card</button>
             </div>
-            <textarea rows="6" value={formatIdentifierText(loadoutDraft.deckOwnedCardIds)} placeholder="One owned card id per line" disabled={loading || actionPending !== null} oninput={(event) => updateDeckOwnedCardIds((event.currentTarget as HTMLTextAreaElement).value)}></textarea>
+            <textarea rows="6" value={formatIdentifierText(loadoutDraft.deckOwnedCardIds)} placeholder={deckEditingLocked ? 'Save the selected character first to refresh owned card ids.' : 'One owned card id per line'} disabled={loading || actionPending !== null || !canEditOwnLoadout || deckEditingLocked} oninput={(event) => updateDeckOwnedCardIds((event.currentTarget as HTMLTextAreaElement).value)}></textarea>
           </label>
 
           <label class="player-lobby-page__field player-lobby-page__field--span-2">
             <span>Passive ids</span>
             <div class="player-lobby-page__picker-row">
-              <select bind:value={passiveCandidate} disabled={loading || actionPending !== null || referenceLoading}>
+              <select bind:value={passiveCandidate} disabled={loading || actionPending !== null || referenceLoading || !canEditOwnLoadout}>
                 <option value="">Quick add passive</option>
                 {#each passives as passive}
                   <option value={passive.id}>{passive.name} ({passive.id})</option>
                 {/each}
               </select>
-              <button type="button" disabled={loading || actionPending !== null || !passiveCandidate} onclick={addPassiveCandidate}>Add passive</button>
+              <button type="button" disabled={loading || actionPending !== null || !canEditOwnLoadout || !passiveCandidate} onclick={addPassiveCandidate}>Add passive</button>
             </div>
-            <textarea rows="4" value={formatIdentifierText(loadoutDraft.passiveIds)} placeholder="One passive id per line" disabled={loading || actionPending !== null} oninput={(event) => updatePassiveIds((event.currentTarget as HTMLTextAreaElement).value)}></textarea>
+            <textarea rows="4" value={formatIdentifierText(loadoutDraft.passiveIds)} placeholder="One passive id per line" disabled={loading || actionPending !== null || !canEditOwnLoadout} oninput={(event) => updatePassiveIds((event.currentTarget as HTMLTextAreaElement).value)}></textarea>
           </label>
         </div>
 
         <div class="player-lobby-page__actions">
-          <button type="button" onclick={() => void handleSaveLoadout()} disabled={loading || actionPending !== null || !isStoredPlayerSessionAccess(runtimeAccess) || !loadoutDirty}>{saveLoadoutLabel}</button>
+          <button type="button" onclick={() => void handleSaveLoadout()} disabled={loading || actionPending !== null || !canEditOwnLoadout || !loadoutDirty}>{saveLoadoutLabel}</button>
         </div>
 
         <div class="player-lobby-page__grid">
@@ -828,27 +1068,47 @@
       </SectionFrame>
 
       <SectionFrame title="Apply saved preset" description="Choose a saved preset, review its resolved references, and apply it to the live session loadout.">
+        <div class="player-lobby-page__guide">
+          <p>{presetSummary}</p>
+          {#if lastAppliedPresetName}
+            <p>Current live session was last updated from preset: {lastAppliedPresetName}</p>
+          {/if}
+        </div>
+        <div class="player-lobby-page__actions">
+          <button type="button" onclick={() => void loadAvailablePresets()} disabled={loading || actionPending !== null || presetsLoading}>
+            {presetsLoading ? 'Refreshing presets...' : 'Reload presets'}
+          </button>
+          <a class="player-lobby-page__link-action" data-nav href={pathBuilders.presetList()}>Open preset archive</a>
+        </div>
         {#if presetsErrorMessage}
           <ContentStatePanel title="Preset archive unavailable" message={presetsErrorMessage} tone="error" actionLabel="Retry presets" onAction={() => void loadAvailablePresets()} />
         {:else}
+          {#if loadoutDirty}
+            <ContentStatePanel
+              title="Preset apply replaces the current draft"
+              message="Applying a preset updates the live session loadout and replaces the current unsaved draft with the server response."
+            />
+          {/if}
           <label class="player-lobby-page__field">
             <span>Preset</span>
             <select bind:value={selectedPresetId} disabled={loading || actionPending !== null || presetsLoading}>
               <option value="">Select preset</option>
               {#each presets as preset}
-                <option value={String(preset.id)}>{preset.name} #{preset.id}</option>
+                <option value={String(preset.id)}>{formatPresetOptionLabel(preset)}</option>
               {/each}
             </select>
           </label>
 
           {#if selectedPreset}
             <div class="player-lobby-page__guide">
+              <p>Preset id: {selectedPreset.id}</p>
               <p>Preset owner: {selectedPreset.owner}</p>
               <p>Character: {resolvedPresetCharacter ? `${resolvedPresetCharacter.name} #${resolvedPresetCharacter.id}` : `#${selectedPreset.characterId}`}</p>
               <p>EX: {resolvedPresetExCard ? `${resolvedPresetExCard.name} (${resolvedPresetExCard.id})` : selectedPreset.exCardId}</p>
+              <p>Deck: {selectedPreset.deckCardIds.length} cards | Passives: {selectedPreset.passiveIds.length}</p>
             </div>
             <div class="player-lobby-page__actions">
-              <button type="button" onclick={() => void handleApplyPreset()} disabled={loading || actionPending !== null || !isStoredPlayerSessionAccess(runtimeAccess)}>{applyPresetLabel}</button>
+              <button type="button" onclick={() => void handleApplyPreset()} disabled={loading || actionPending !== null || !canEditOwnLoadout}>{applyPresetLabel}</button>
             </div>
             <div class="player-lobby-page__grid">
               <EntityListPane items={presetDeckPreviewItems} emptyMessage="This preset has no saved deck card entries." />
@@ -857,7 +1117,7 @@
           {:else if presetsLoading}
             <ContentStatePanel title="Loading preset archive" message="Restoring the saved preset list for the current player." />
           {:else if presets.length === 0}
-            <ContentStatePanel title="No saved presets yet" message="Create a preset from the preset editor first, then apply it here." />
+            <ContentStatePanel title="No saved presets yet" message="Create a preset from the preset archive first, then return here to apply it to the current session." />
           {:else}
             <ContentStatePanel message="No saved preset is currently selected." />
           {/if}
@@ -866,10 +1126,14 @@
     </div>
 
     <SectionFrame title="Action zone" description="Bottom action strip keeps the ready and leave lifecycle separate from loadout editing.">
+      <div class="player-lobby-page__guide">
+        <p>Current ready state: {readyStatusLabel}</p>
+        <p>{membershipActionSummary}</p>
+      </div>
       <div class="player-lobby-page__actions">
         <a class="player-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Back to session entry</a>
-        <button type="button" onclick={() => void handleReadyToggle()} disabled={loading || actionPending !== null || !currentPlayer || !isStoredPlayerSessionAccess(runtimeAccess)}>{readyActionLabel}</button>
-        <button type="button" onclick={() => void handleLeave()} disabled={loading || actionPending !== null || !isStoredPlayerSessionAccess(runtimeAccess)}>{leaveActionLabel}</button>
+        <button type="button" onclick={() => void handleReadyToggle()} disabled={loading || actionPending !== null || !canToggleReady}>{readyActionLabel}</button>
+        <button type="button" onclick={() => void handleLeave()} disabled={loading || actionPending !== null || !canLeaveSession}>{leaveActionLabel}</button>
       </div>
     </SectionFrame>
   {/if}
@@ -900,7 +1164,8 @@
   .player-lobby-page__summary-copy p,
   .player-lobby-page__summary-copy h3,
   .player-lobby-page__guide p,
-  .player-lobby-page__todo p {
+  .player-lobby-page__todo p,
+  .player-lobby-page__reference-summary p {
     margin: 0;
   }
 
@@ -976,9 +1241,28 @@
   }
 
   .player-lobby-page__guide p,
-  .player-lobby-page__todo p {
+  .player-lobby-page__todo p,
+  .player-lobby-page__reference-summary p {
     color: var(--color-text-soft);
     line-height: 1.65;
+  }
+
+  .player-lobby-page__reference-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--color-border);
+    background: rgba(12, 11, 10, 0.18);
+  }
+
+  .player-lobby-page__reference-summary strong {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
   .player-lobby-page__todo {
@@ -1025,7 +1309,8 @@
     .player-lobby-page__main,
     .player-lobby-page__slots,
     .player-lobby-page__grid,
-    .player-lobby-page__form-grid {
+    .player-lobby-page__form-grid,
+    .player-lobby-page__reference-summary {
       grid-template-columns: 1fr;
     }
 

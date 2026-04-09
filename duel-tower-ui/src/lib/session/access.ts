@@ -6,6 +6,7 @@ export type StoredSessionAccess = {
   gmToken?: string
   playerToken?: string
   playerId?: string
+  characterId?: number
 }
 
 export type StoredSessionAccessPatch = Partial<StoredSessionAccess>
@@ -29,6 +30,10 @@ function normalizeOptionalText(value: string | undefined) {
   return normalized ? normalized : undefined
 }
 
+function normalizeOptionalCharacterId(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined
+}
+
 function sanitizeStoredSessionAccess(access: StoredSessionAccess): StoredSessionAccess {
   return {
     code: normalizeSessionCode(access.code),
@@ -36,6 +41,7 @@ function sanitizeStoredSessionAccess(access: StoredSessionAccess): StoredSession
     gmToken: normalizeOptionalText(access.gmToken),
     playerToken: normalizeOptionalText(access.playerToken),
     playerId: normalizeOptionalText(access.playerId),
+    characterId: normalizeOptionalCharacterId(access.characterId),
   }
 }
 

@@ -232,10 +232,10 @@ export type JoinSessionResponse = {
 }
 
 export type UpdateSessionLoadoutRequest = {
-  characterId: number | null
-  passiveIds: readonly string[]
-  deckOwnedCardIds: readonly string[]
-  exCardId: string
+  characterId?: number | null
+  passiveIds?: readonly string[] | null
+  deckOwnedCardIds?: readonly string[] | null
+  exCardId?: string | null
 }
 
 export type ApplyPresetToSessionRequest = {
