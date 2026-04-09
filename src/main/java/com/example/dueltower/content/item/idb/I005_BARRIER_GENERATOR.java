@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-public class I005_EnhancementShard implements ItemBlueprint {
+public class I005_BARRIER_GENERATOR implements ItemBlueprint {
     public static final String ID = ItemIds.BARRIER_GENERATOR;
 
     @Override

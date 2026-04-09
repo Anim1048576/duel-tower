@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-public class I004_EmergencySmokeBomb implements ItemBlueprint {
+public class I004_CHEAP_BARRIER_GENERATOR implements ItemBlueprint {
     public static final String ID = ItemIds.CHEAP_BARRIER_GENERATOR;
 
     @Override

@@ -11,8 +11,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-public class I002_Antidote implements ItemBlueprint {
-    public static final String ID = ItemIds.HEALING_POTION;
+public class I003_ADVANCED_HEALING_POTION implements ItemBlueprint {
+    public static final String ID = ItemIds.ADVANCED_HEALING_POTION;
 
     @Override
     public String id() {
@@ -23,10 +23,10 @@ public class I002_Antidote implements ItemBlueprint {
     public ItemDefinition definition() {
         return new ItemDefinition(
                 id(),
-                "회복물약",
+                "상급 회복물약",
                 true,
-                "전투 중 사용 가능 · 아군 1명 체력 30 회복",
-                "아군 1명의 체력을 30 회복합니다.",
+                "전투 중 사용 가능 · 아군 1명 체력 50 회복",
+                "아군 1명의 체력을 50 회복합니다.",
                 List.of("소모품", "회복")
         );
     }
@@ -43,7 +43,7 @@ public class I002_Antidote implements ItemBlueprint {
                 ctx.out(),
                 "item:" + id(),
                 TargetRef.ofPlayer(targetId),
-                30 * ctx.useCount()
+                50 * ctx.useCount()
         );
     }
 }

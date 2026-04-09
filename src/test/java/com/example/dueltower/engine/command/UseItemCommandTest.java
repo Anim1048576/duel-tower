@@ -1,10 +1,10 @@
 package com.example.dueltower.engine.command;
 
-import com.example.dueltower.content.item.idb.I001_SmallPotion;
-import com.example.dueltower.content.item.idb.I002_Antidote;
-import com.example.dueltower.content.item.idb.I003_LeatherStrap;
-import com.example.dueltower.content.item.idb.I004_EmergencySmokeBomb;
-import com.example.dueltower.content.item.idb.I005_EnhancementShard;
+import com.example.dueltower.content.item.idb.I001_CHEAP_HEALING_POTION;
+import com.example.dueltower.content.item.idb.I002_HEALING_POTION;
+import com.example.dueltower.content.item.idb.I003_ADVANCED_HEALING_POTION;
+import com.example.dueltower.content.item.idb.I004_CHEAP_BARRIER_GENERATOR;
+import com.example.dueltower.content.item.idb.I005_BARRIER_GENERATOR;
 import com.example.dueltower.content.item.idb.I006_Antidote;
 import com.example.dueltower.content.item.idb.I007_EmergencySmokeBomb;
 import com.example.dueltower.content.item.idb.I008_BulletBundle;
@@ -411,11 +411,11 @@ class UseItemCommandTest {
     }
 
     private static EngineContext defaultItemCtx() {
-        I001_SmallPotion i1 = new I001_SmallPotion();
-        I002_Antidote i2 = new I002_Antidote();
-        I003_LeatherStrap i3 = new I003_LeatherStrap();
-        I004_EmergencySmokeBomb i4 = new I004_EmergencySmokeBomb();
-        I005_EnhancementShard i5 = new I005_EnhancementShard();
+        I001_CHEAP_HEALING_POTION i1 = new I001_CHEAP_HEALING_POTION();
+        I002_HEALING_POTION i2 = new I002_HEALING_POTION();
+        I003_ADVANCED_HEALING_POTION i3 = new I003_ADVANCED_HEALING_POTION();
+        I004_CHEAP_BARRIER_GENERATOR i4 = new I004_CHEAP_BARRIER_GENERATOR();
+        I005_BARRIER_GENERATOR i5 = new I005_BARRIER_GENERATOR();
         I006_Antidote i6 = new I006_Antidote();
         I007_EmergencySmokeBomb i7 = new I007_EmergencySmokeBomb();
         I008_BulletBundle i8 = new I008_BulletBundle();
@@ -454,11 +454,11 @@ class UseItemCommandTest {
     }
 
     private static EngineContext itemCtxMissingI1Effect() {
-        I001_SmallPotion i1 = new I001_SmallPotion();
-        I002_Antidote i2 = new I002_Antidote();
-        I003_LeatherStrap i3 = new I003_LeatherStrap();
-        I004_EmergencySmokeBomb i4 = new I004_EmergencySmokeBomb();
-        I005_EnhancementShard i5 = new I005_EnhancementShard();
+        I001_CHEAP_HEALING_POTION i1 = new I001_CHEAP_HEALING_POTION();
+        I002_HEALING_POTION i2 = new I002_HEALING_POTION();
+        I003_ADVANCED_HEALING_POTION i3 = new I003_ADVANCED_HEALING_POTION();
+        I004_CHEAP_BARRIER_GENERATOR i4 = new I004_CHEAP_BARRIER_GENERATOR();
+        I005_BARRIER_GENERATOR i5 = new I005_BARRIER_GENERATOR();
         I006_Antidote i6 = new I006_Antidote();
         I007_EmergencySmokeBomb i7 = new I007_EmergencySmokeBomb();
         I008_BulletBundle i8 = new I008_BulletBundle();

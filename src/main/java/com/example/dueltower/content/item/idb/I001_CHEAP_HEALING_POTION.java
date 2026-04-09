@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-public class I001_SmallPotion implements ItemBlueprint {
+public class I001_CHEAP_HEALING_POTION implements ItemBlueprint {
     public static final String ID = ItemIds.CHEAP_HEALING_POTION;
 
     @Override
