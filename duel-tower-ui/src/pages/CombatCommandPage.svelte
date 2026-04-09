@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { listCards } from '../lib/api/content'
-  import type { CardDefinition } from '../lib/api/contentTypes'
+  import { getCard, listCards } from '../lib/api/content'
+  import type { CardDefinition, CardDetailResponse } from '../lib/api/contentTypes'
   import {
     executeSessionCommand,
     getSessionEvents,
@@ -52,12 +52,40 @@
     setSelectionHandoff,
   } from '../lib/selectionHandoff'
 
+  type CombatTone = 'accent' | 'muted' | 'success' | 'warning'
+
+  type CombatMetric = {
+    label: string
+    value: string | number
+    note: string
+  }
+
+  type CombatTag = {
+    label: string
+    tone?: CombatTone
+  }
+
+  type CombatActorSummary = {
+    raw: string | null
+    kind: 'player' | 'enemy' | 'unknown' | 'none'
+    id: string | null
+    label: string
+    note: string
+    tone: CombatTone
+  }
+
   type CombatStatusViewModel = {
     sessionCode: string
     version: number
     round: number | null
     currentTurnPlayer: string | null
     phase: string | null
+    currentTurnLabel: string
+    currentTurnTone: CombatTone
+    currentTurnNote: string
+    turnOrderSummary: string
+    battlefieldSummary: string
+    runSummary: string
     initiativeSummary: string
     tieGroupSummary: string
   }
@@ -70,15 +98,77 @@
     meta: string
     description: string
     unresolved: boolean
-    tags: { label: string; tone?: 'accent' | 'muted' | 'success' | 'warning' }[]
+    tags: CombatTag[]
+  }
+
+  type CombatPlayTargetType =
+    | 'NONE'
+    | 'SELF'
+    | 'ALLY_ONE'
+    | 'ALLY_ALL'
+    | 'ALLY_SIDE'
+    | 'ENEMY_ONE'
+    | 'ENEMY_ALL'
+    | 'ENEMY_SIDE'
+    | 'ANY_ONE'
+    | string
+
+  type CombatPlayTargetSpec = {
+    target: CombatPlayTargetType
+    requiredSelection: boolean
+  }
+
+  type CombatChoiceOption = {
+    id: string
+    label: string
+    description: string | null
+  }
+
+  type CombatExtraPlayRequirement =
+    | {
+        type: 'discard_from_hand'
+        count: number
+        excludeSourceCard: boolean
+        filter: string
+      }
+    | {
+        type: 'select_field_cards'
+        minSelections: number
+        maxSelections: number
+        scope: string
+        filter: string
+        excludeSourceCard: boolean
+      }
+    | {
+        type: 'choice'
+        id: string
+        label: string
+        minSelections: number
+        maxSelections: number
+        options: CombatChoiceOption[]
+      }
+
+  type CombatResolvedPlaySpec = {
+    target: CombatPlayTargetSpec
+    extraRequirements: CombatExtraPlayRequirement[]
+  }
+
+  type CombatCommandRequirementViewModel = {
+    sourceLabel: string
+    targetSummary: string
+    discardSummary: string
+    fieldSelectionSummary: string
+    choiceSummary: string
   }
 
   type CombatPlayerViewModel = {
     playerId: string
     ready: boolean
     stateLabel: string
-    stateTone: 'accent' | 'muted' | 'success' | 'warning'
+    stateTone: CombatTone
+    metrics: CombatMetric[]
     summaryLines: string[]
+    statusTags: CombatTag[]
     passives: string[]
     handCards: ResolvedCombatCardViewModel[]
     fieldCards: ResolvedCombatCardViewModel[]
@@ -89,7 +179,8 @@
   type CombatEnemyViewModel = {
     enemyId: string
     stateLabel: string
-    stateTone: 'accent' | 'muted' | 'success' | 'warning'
+    stateTone: CombatTone
+    metrics: CombatMetric[]
     summaryLines: string[]
     statusEntries: string[]
   }
@@ -98,7 +189,8 @@
     summonId: string
     owner: string
     stateLabel: string
-    stateTone: 'accent' | 'muted' | 'success' | 'warning'
+    stateTone: CombatTone
+    metrics: CombatMetric[]
     summaryLines: string[]
   }
 
@@ -121,6 +213,9 @@
   let session = $state<SessionStateDto | null>(null)
   let runtimeAccess = $state<StoredSessionAccess | null>(null)
   let cardCatalog = $state<CardDefinition[]>([])
+  let cardDetails = $state<Record<string, CardDetailResponse>>({})
+  let cardDetailLoadingIds = $state<string[]>([])
+  let cardDetailErrors = $state<Record<string, string>>({})
   let commandDraft = $state<CombatCommandDraft>(createEmptyCombatCommandDraft())
   let commandPending = $state<CombatCommandType | null>(null)
   let commandErrorMessage = $state<string | null>(null)
@@ -337,6 +432,373 @@
     return cardCatalog.find((card) => card.id === defId) ?? null
   }
 
+  function getCardDetail(defId: string | null) {
+    return defId ? cardDetails[defId] ?? null : null
+  }
+
+  function deleteRecordEntry<T>(record: Record<string, T>, key: string) {
+    const nextRecord = { ...record }
+    delete nextRecord[key]
+    return nextRecord
+  }
+
+  async function ensureCardDetail(defId: string | null) {
+    const normalizedDefId = defId?.trim() ?? ''
+
+    if (!normalizedDefId) {
+      return null
+    }
+
+    const cached = cardDetails[normalizedDefId] ?? null
+
+    if (cached) {
+      return cached
+    }
+
+    if (cardDetailLoadingIds.includes(normalizedDefId)) {
+      return null
+    }
+
+    cardDetailLoadingIds = [...cardDetailLoadingIds, normalizedDefId]
+    cardDetailErrors = deleteRecordEntry(cardDetailErrors, normalizedDefId)
+
+    try {
+      const detail = await getCard(normalizedDefId)
+      cardDetails = {
+        ...cardDetails,
+        [normalizedDefId]: detail,
+      }
+      return detail
+    } catch (error) {
+      cardDetailErrors = {
+        ...cardDetailErrors,
+        [normalizedDefId]: getApiErrorMessage(error, `Unable to load card detail for ${normalizedDefId}.`),
+      }
+      return null
+    } finally {
+      cardDetailLoadingIds = cardDetailLoadingIds.filter((id) => id !== normalizedDefId)
+    }
+  }
+
+  function asRecord(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null
+    }
+
+    return value as Record<string, unknown>
+  }
+
+  function readString(value: unknown) {
+    return typeof value === 'string' ? value.trim() : ''
+  }
+
+  function readBoolean(value: unknown, fallback = false) {
+    return typeof value === 'boolean' ? value : fallback
+  }
+
+  function readInteger(value: unknown, fallback = 0) {
+    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback
+  }
+
+  function normalizePlaySpec(playSpec: unknown): CombatResolvedPlaySpec {
+    const playSpecRecord = asRecord(playSpec)
+    const targetRecord = asRecord(playSpecRecord?.target)
+    const target = readString(targetRecord?.target) || 'NONE'
+    const requiredSelection = readBoolean(targetRecord?.requiredSelection)
+    const extraRequirementValues = Array.isArray(playSpecRecord?.extraRequirements)
+      ? playSpecRecord.extraRequirements
+      : []
+
+    const extraRequirements = extraRequirementValues
+      .map((value) => {
+        const record = asRecord(value)
+        const type = readString(record?.type)
+
+        if (type === 'discard_from_hand') {
+          return {
+            type,
+            count: readInteger(record?.count, 1),
+            excludeSourceCard: readBoolean(record?.excludeSourceCard, true),
+            filter: readString(record?.filter) || 'ANY',
+          } satisfies CombatExtraPlayRequirement
+        }
+
+        if (type === 'select_field_cards') {
+          return {
+            type,
+            minSelections: readInteger(record?.minSelections),
+            maxSelections: readInteger(record?.maxSelections),
+            scope: readString(record?.scope) || 'ALL_PLAYER_FIELDS',
+            filter: readString(record?.filter) || 'INSTALLED_ONLY',
+            excludeSourceCard: readBoolean(record?.excludeSourceCard),
+          } satisfies CombatExtraPlayRequirement
+        }
+
+        if (type === 'choice') {
+          const options = Array.isArray(record?.options)
+            ? record.options
+                .map((optionValue) => {
+                  const optionRecord = asRecord(optionValue)
+                  const id = readString(optionRecord?.id)
+
+                  if (!id) {
+                    return null
+                  }
+
+                  return {
+                    id,
+                    label: readString(optionRecord?.label) || id,
+                    description: readString(optionRecord?.description) || null,
+                  } satisfies CombatChoiceOption
+                })
+                .filter((option): option is CombatChoiceOption => option !== null)
+            : []
+
+          return {
+            type,
+            id: readString(record?.id) || 'choice',
+            label: readString(record?.label) || 'Choice input',
+            minSelections: readInteger(record?.minSelections),
+            maxSelections: readInteger(record?.maxSelections),
+            options,
+          } satisfies CombatExtraPlayRequirement
+        }
+
+        return null
+      })
+      .filter((requirement): requirement is CombatExtraPlayRequirement => requirement !== null)
+
+    return {
+      target: {
+        target,
+        requiredSelection,
+      },
+      extraRequirements,
+    } satisfies CombatResolvedPlaySpec
+  }
+
+  function getCardDefIdFromInstanceId(instanceId: string | null | undefined) {
+    const normalizedId = instanceId?.trim() ?? ''
+
+    if (!normalizedId) {
+      return null
+    }
+
+    return session?.cards[normalizedId]?.defId ?? null
+  }
+
+  function getSelectedDiscardIdsFromHand(player: PlayerStateDto | null) {
+    const handIds = new Set(player?.hand ?? [])
+    return commandDraft.selectedDiscardIds.filter((instanceId) => handIds.has(instanceId))
+  }
+
+  function getSelectedFieldIds(player: PlayerStateDto | null) {
+    const fieldIds = new Set(player?.field ?? [])
+    return commandDraft.selectedIds.filter((instanceId) => fieldIds.has(instanceId))
+  }
+
+  function getPendingCandidateIds(pendingDecision: PendingDecisionDto | null) {
+    const candidateIds = new Set(pendingDecision?.candidateIds ?? [])
+    return commandDraft.selectedIds.filter((value) => candidateIds.has(value))
+  }
+
+  function getOrderedTieActorKeys(pendingDecision: PendingDecisionDto | null) {
+    const actorKeys = new Set(pendingDecision?.actorKeys ?? [])
+    return commandDraft.orderedActorKeys.filter((actorKey) => actorKeys.has(actorKey))
+  }
+
+  function formatTargetSelectionLabel(target: CombatCommandDraft['selectedTargets'][number]) {
+    if (target.enemyId) {
+      return `Enemy ${target.enemyId}`
+    }
+
+    if (target.playerId) {
+      return `Player ${target.playerId}`
+    }
+
+    if (target.summonOwnerPlayerId && target.summonInstanceId) {
+      return `Summon ${target.summonInstanceId}`
+    }
+
+    return 'Unknown target'
+  }
+
+  function describeTargetRequirement(targetSpec: CombatPlayTargetSpec) {
+    if (!targetSpec.requiredSelection || targetSpec.target === 'NONE') {
+      return 'No manual target required'
+    }
+
+    switch (targetSpec.target) {
+      case 'ENEMY_ONE':
+        return 'Select exactly one enemy or summon target'
+      case 'ALLY_ONE':
+        return 'Select exactly one ally player or summon target'
+      case 'ANY_ONE':
+        return 'Select exactly one target'
+      case 'SELF':
+        return 'Self-targeted automatically'
+      case 'ENEMY_ALL':
+      case 'ENEMY_SIDE':
+        return 'Enemy-side target is resolved automatically'
+      case 'ALLY_ALL':
+      case 'ALLY_SIDE':
+        return 'Ally-side target is resolved automatically'
+      default:
+        return `Target rule: ${targetSpec.target}`
+    }
+  }
+
+  function getPlaySpecRequirement(
+    playSpec: CombatResolvedPlaySpec,
+    type: CombatExtraPlayRequirement['type'],
+  ) {
+    return playSpec.extraRequirements.find((requirement) => requirement.type === type) ?? null
+  }
+
+  function buildCommandRequirementViewModel(
+    sourceLabel: string,
+    playSpec: CombatResolvedPlaySpec,
+  ): CombatCommandRequirementViewModel {
+    const discardRequirement = getPlaySpecRequirement(playSpec, 'discard_from_hand')
+    const fieldRequirement = getPlaySpecRequirement(playSpec, 'select_field_cards')
+    const choiceRequirement = getPlaySpecRequirement(playSpec, 'choice')
+
+    return {
+      sourceLabel,
+      targetSummary: describeTargetRequirement(playSpec.target),
+      discardSummary:
+        discardRequirement?.type === 'discard_from_hand'
+          ? `Select ${discardRequirement.count} hand discard${discardRequirement.count > 1 ? 's' : ''}${discardRequirement.excludeSourceCard ? ' excluding the source card' : ''}`
+          : 'No extra hand discard required',
+      fieldSelectionSummary:
+        fieldRequirement?.type === 'select_field_cards'
+          ? `Select ${fieldRequirement.minSelections}-${fieldRequirement.maxSelections} field card ids`
+          : 'No extra field selection required',
+      choiceSummary:
+        choiceRequirement?.type === 'choice'
+          ? `${choiceRequirement.label} (${choiceRequirement.options.map((option) => option.label).join(', ') || 'choice options'})`
+          : 'No explicit choice requirement',
+    }
+  }
+
+  function getTargetSelectionError(
+    commandLabel: string,
+    targetSpec: CombatPlayTargetSpec,
+    selectedTargets: CombatCommandDraft['selectedTargets'],
+  ) {
+    if (!targetSpec.requiredSelection || targetSpec.target === 'NONE') {
+      return null
+    }
+
+    if (targetSpec.target === 'SELF') {
+      return null
+    }
+
+    if (targetSpec.target === 'ALLY_ALL' || targetSpec.target === 'ALLY_SIDE' || targetSpec.target === 'ENEMY_ALL' || targetSpec.target === 'ENEMY_SIDE') {
+      return null
+    }
+
+    if (selectedTargets.length !== 1) {
+      return `${commandLabel} requires exactly one target selection.`
+    }
+
+    const [target] = selectedTargets
+
+    switch (targetSpec.target) {
+      case 'ENEMY_ONE':
+        return target.enemyId || target.summonInstanceId
+          ? null
+          : `${commandLabel} requires one enemy or summon target.`
+      case 'ALLY_ONE':
+        return target.playerId || target.summonInstanceId
+          ? null
+          : `${commandLabel} requires one ally player or summon target.`
+      case 'ANY_ONE':
+        return target.enemyId || target.playerId || target.summonInstanceId
+          ? null
+          : `${commandLabel} requires one target.`
+      default:
+        return selectedTargets.length > 0 ? null : `${commandLabel} requires a target selection.`
+    }
+  }
+
+  function getPlayCardRequirementError(
+    commandLabel: string,
+    playSpec: CombatResolvedPlaySpec | null,
+    sourceCardId: string,
+    selectedTargets: CombatCommandDraft['selectedTargets'],
+    selectedDiscardIds: string[],
+    selectedFieldIds: string[],
+  ) {
+    if (!playSpec) {
+      return null
+    }
+
+    const targetError = getTargetSelectionError(commandLabel, playSpec.target, selectedTargets)
+
+    if (targetError) {
+      return targetError
+    }
+
+    const discardRequirement = getPlaySpecRequirement(playSpec, 'discard_from_hand')
+
+    if (discardRequirement?.type === 'discard_from_hand') {
+      if (selectedDiscardIds.length !== discardRequirement.count) {
+        return `${commandLabel} requires ${discardRequirement.count} hand discard selection${discardRequirement.count > 1 ? 's' : ''}.`
+      }
+
+      if (discardRequirement.excludeSourceCard && selectedDiscardIds.includes(sourceCardId)) {
+        return 'The source card cannot be selected as an extra discard.'
+      }
+    }
+
+    const fieldRequirement = getPlaySpecRequirement(playSpec, 'select_field_cards')
+
+    if (fieldRequirement?.type === 'select_field_cards') {
+      if (
+        selectedFieldIds.length < fieldRequirement.minSelections ||
+        selectedFieldIds.length > fieldRequirement.maxSelections
+      ) {
+        return `${commandLabel} requires ${fieldRequirement.minSelections}-${fieldRequirement.maxSelections} selected field ids.`
+      }
+
+      if (fieldRequirement.excludeSourceCard && selectedFieldIds.includes(sourceCardId)) {
+        return 'The source card cannot be selected as a field helper id.'
+      }
+    }
+
+    if (getPlaySpecRequirement(playSpec, 'choice')) {
+      return `${commandLabel} has a choice-based follow-up that is not wired in this combat step yet.`
+    }
+
+    return null
+  }
+
+  function handleClearSelectedTargets() {
+    commandDraft = syncCombatCommandDraft(
+      {
+        ...commandDraft,
+        selectedEnemyId: null,
+        selectedTargets: [],
+      },
+      session,
+      runtimeAccess,
+    )
+  }
+
+  function handleClearSelectionInputs() {
+    commandDraft = syncCombatCommandDraft(
+      {
+        ...commandDraft,
+        selectedDiscardIds: [],
+        selectedIds: [],
+        orderedActorKeys: [],
+      },
+      session,
+      runtimeAccess,
+    )
+  }
+
   function createUnresolvedCardView(instanceId: string, defId: string | null) {
     return {
       instanceId,
@@ -377,6 +839,80 @@
     } satisfies ResolvedCombatCardViewModel
   }
 
+  function parseCombatActor(rawActor: string | null | undefined): CombatActorSummary {
+    const normalized = rawActor?.trim() ?? ''
+
+    if (!normalized) {
+      return {
+        raw: null,
+        kind: 'none',
+        id: null,
+        label: 'No active turn',
+        note: 'Combat turn owner is not available in the current state.',
+        tone: 'muted',
+      }
+    }
+
+    if (normalized.startsWith('P:')) {
+      const playerId = normalized.slice(2).trim()
+
+      return {
+        raw: normalized,
+        kind: 'player',
+        id: playerId || null,
+        label: playerId || normalized,
+        note: playerId
+          ? `${playerId} is the current acting player.`
+          : 'A player turn is active, but the actor id is incomplete.',
+        tone: 'success',
+      }
+    }
+
+    if (normalized.startsWith('E:')) {
+      const enemyId = normalized.slice(2).trim()
+
+      return {
+        raw: normalized,
+        kind: 'enemy',
+        id: enemyId || null,
+        label: enemyId || normalized,
+        note: enemyId
+          ? `${enemyId} is the current acting enemy.`
+          : 'An enemy turn is active, but the actor id is incomplete.',
+        tone: 'warning',
+      }
+    }
+
+    return {
+      raw: normalized,
+      kind: 'unknown',
+      id: normalized,
+      label: normalized,
+      note: 'Current actor format is not recognized, so the raw value is shown.',
+      tone: 'accent',
+    }
+  }
+
+  function buildTurnOrderSummary(combat: SessionStateDto['combat']) {
+    if (!combat?.turnOrder.length) {
+      return 'Turn order is not available yet.'
+    }
+
+    const preview = combat.turnOrder.slice(0, 6).map((actorKey) => parseCombatActor(actorKey).label)
+    const hiddenCount = combat.turnOrder.length - preview.length
+    const summary = preview.join(' -> ')
+
+    return hiddenCount > 0 ? `${summary} +${hiddenCount} more` : summary
+  }
+
+  function formatTargetRefSummary(targets: CombatCommandDraft['selectedTargets']) {
+    const labels = targets
+      .map((target) => target.enemyId ?? target.playerId ?? target.summonInstanceId ?? null)
+      .filter(Boolean)
+
+    return labels.length > 0 ? labels.join(', ') : 'None'
+  }
+
   function getPlayerStateLabel(player: PlayerStateDto) {
     if (player.pendingDecision?.type) {
       return player.pendingDecision.type
@@ -394,15 +930,58 @@
   }
 
   function buildPlayerViewModel(player: PlayerStateDto) {
+    const pendingLabel = player.pendingDecision?.type ?? 'None'
+    const exLabel = player.exCard ?? 'None'
+
     return {
       playerId: player.playerId,
       ready: player.ready,
       stateLabel: getPlayerStateLabel(player),
       stateTone: getPlayerStateTone(player),
+      metrics: [
+        {
+          label: 'Hand',
+          value: player.hand.length,
+          note: `Limit ${player.handLimit}`,
+        },
+        {
+          label: 'Field',
+          value: player.field.length,
+          note: `Limit ${player.fieldLimit}`,
+        },
+        {
+          label: 'Deck',
+          value: player.deck.length,
+          note: 'Cards remaining',
+        },
+        {
+          label: 'Owned',
+          value: `${player.ownedCardCount}/${player.maxOwnedCardCount}`,
+          note: 'Owned pool',
+        },
+      ],
       summaryLines: [
-        `Hand ${player.hand.length} | Grave ${player.grave.length} | Field ${player.field.length} | Excluded ${player.excluded.length}`,
-        `EX ${player.exCard ?? 'None'} | Cooldown ${player.exOnCooldown ? 'Yes' : 'No'} | Passives ${player.passiveIds.length}`,
-        `Pending decision ${player.pendingDecision ? 'Present' : 'None'} | Ready ${player.ready ? 'Yes' : 'No'}`,
+        `EX ${exLabel} | Cooldown ${player.exOnCooldown ? 'Yes' : 'No'} | Passives ${player.passiveIds.length}`,
+        `Pending ${pendingLabel} | Ready ${player.ready ? 'Yes' : 'No'} | Cards played ${player.cardsPlayedThisTurn}`,
+        `Grave ${player.grave.length} | Excluded ${player.excluded.length} | Forgetting required ${player.forgettingRequired ? 'Yes' : 'No'}`,
+      ],
+      statusTags: [
+        {
+          label: player.exCard ? (player.exOnCooldown ? 'EX cooldown' : 'EX ready') : 'No EX',
+          tone: player.exCard ? (player.exOnCooldown ? 'muted' : 'warning') : 'muted',
+        },
+        {
+          label: player.pendingDecision?.type ?? 'No pending decision',
+          tone: player.pendingDecision ? 'warning' : 'muted',
+        },
+        {
+          label: `${player.grave.length} grave`,
+          tone: player.grave.length > 0 ? 'accent' : 'muted',
+        },
+        {
+          label: `${player.excluded.length} excluded`,
+          tone: player.excluded.length > 0 ? 'accent' : 'muted',
+        },
       ],
       passives: player.passiveIds,
       handCards: player.hand.map((instanceId) => resolveCombatCard(instanceId)),
@@ -413,18 +992,41 @@
   }
 
   function buildEnemyViewModel(enemy: CombatEnemyDto) {
+    const statusEntries = Object.entries(enemy.statuses).map(
+      ([statusId, amount]) => `${statusId}: ${amount}`,
+    )
+
     return {
       enemyId: enemy.enemyId,
       stateLabel: enemy.exActivatable ? 'EX ready' : enemy.exOnCooldown ? 'Cooldown' : 'Active',
       stateTone: enemy.exActivatable ? 'warning' : enemy.exOnCooldown ? 'muted' : 'accent',
-      summaryLines: [
-        `HP ${enemy.hp} / ${enemy.maxHp} | AP ${enemy.ap}`,
-        `ATK ${enemy.attackPower} | HEAL ${enemy.healPower}`,
-        `EX ${enemy.exCardId ?? 'None'} | EX ready ${enemy.exActivatable ? 'Yes' : 'No'}`,
+      metrics: [
+        {
+          label: 'HP',
+          value: `${enemy.hp}/${enemy.maxHp}`,
+          note: 'Current / max',
+        },
+        {
+          label: 'AP',
+          value: enemy.ap,
+          note: 'Current AP',
+        },
+        {
+          label: 'ATK',
+          value: enemy.attackPower,
+          note: 'Attack power',
+        },
+        {
+          label: 'HEAL',
+          value: enemy.healPower,
+          note: 'Heal power',
+        },
       ],
-      statusEntries: Object.entries(enemy.statuses).map(
-        ([statusId, amount]) => `${statusId}: ${amount}`,
-      ),
+      summaryLines: [
+        `EX ${enemy.exCardId ?? 'None'} | EX ready ${enemy.exActivatable ? 'Yes' : 'No'} | Cooldown ${enemy.exOnCooldown ? 'Yes' : 'No'}`,
+        `Statuses ${statusEntries.length > 0 ? statusEntries.length : 'None'} | Enemy id ${enemy.enemyId}`,
+      ],
+      statusEntries,
     } satisfies CombatEnemyViewModel
   }
 
@@ -434,9 +1036,26 @@
       owner: summon.owner,
       stateLabel: summon.actionAvailable ? 'Action ready' : 'Tapped',
       stateTone: summon.actionAvailable ? 'success' : 'muted',
+      metrics: [
+        {
+          label: 'HP',
+          value: summon.hp,
+          note: 'Current HP',
+        },
+        {
+          label: 'ATK',
+          value: summon.atk,
+          note: 'Attack power',
+        },
+        {
+          label: 'HEAL',
+          value: summon.heal,
+          note: 'Heal power',
+        },
+      ],
       summaryLines: [
         `Owner ${summon.owner}`,
-        `HP ${summon.hp} | ATK ${summon.atk} | HEAL ${summon.heal}`,
+        `Action available ${summon.actionAvailable ? 'Yes' : 'No'}`,
       ],
     } satisfies CombatSummonViewModel
   }
@@ -447,6 +1066,7 @@
     }
 
     const combat = nextSession.combat
+    const currentActor = parseCombatActor(combat?.currentTurnPlayer ?? null)
     const tieGroupCount = combat?.initiativeTieGroups.filter((group) => group.length > 1).length ?? 0
 
     return {
@@ -455,6 +1075,16 @@
       round: combat?.round ?? null,
       currentTurnPlayer: combat?.currentTurnPlayer ?? null,
       phase: combat?.phase ?? null,
+      currentTurnLabel: currentActor.label,
+      currentTurnTone: currentActor.tone,
+      currentTurnNote: currentActor.note,
+      turnOrderSummary: buildTurnOrderSummary(combat),
+      battlefieldSummary: `${Object.keys(nextSession.players).length} players | ${combat?.enemies.length ?? 0} enemies | ${combat?.summons.length ?? 0} summons`,
+      runSummary: nextSession.run?.currentNode
+        ? `${nextSession.run.currentNode.name} | ${nextSession.run.currentNode.typeLabel}`
+        : nextSession.run?.resultPending
+          ? 'A run result is pending resolution.'
+          : 'Run node unavailable',
       initiativeSummary: combat ? `${Object.keys(combat.initiatives).length} initiative entries` : 'No initiative state',
       tieGroupSummary: tieGroupCount > 0 ? `${tieGroupCount} tie groups` : 'No tie groups',
     } satisfies CombatStatusViewModel
@@ -500,6 +1130,10 @@
       {
         ...commandDraft,
         selectedCommandType: commandType,
+        selectedDiscardIds:
+          commandType === 'PLAY_CARD' ? commandDraft.selectedDiscardIds : [],
+        selectedIds:
+          commandType === 'PLAY_CARD' ? commandDraft.selectedIds : [],
       },
       session,
       runtimeAccess,
@@ -576,6 +1210,8 @@
         ...commandDraft,
         selectedCommandType: 'PLAY_CARD',
         selectedCardId: instanceId,
+        selectedDiscardIds: [],
+        selectedIds: [],
       },
       session,
       runtimeAccess,
@@ -679,6 +1315,18 @@
     }
 
     return null
+  }
+
+  function getPlayerCommandAccess() {
+    if (!isStoredPlayerSessionAccess(runtimeAccess)) {
+      return null
+    }
+
+    return {
+      role: 'player' as const,
+      playerToken: runtimeAccess.playerToken,
+      playerId: runtimeAccess.playerId,
+    }
   }
 
   async function loadCombatEvents() {
@@ -834,68 +1482,95 @@
     void loadCombatRecentResults()
   }
 
+  function handleRejectedCommandResponse(
+    commandType: CombatCommandType,
+    fallbackMessage: string,
+    errors: readonly string[],
+    nextSession: SessionStateDto | null,
+    nextEvents: SessionEventItemDto[],
+  ) {
+    const normalizedErrors = errors
+      .map((error) => error.trim())
+      .filter((error) => error.length > 0)
+    const sawVersionMismatch = normalizedErrors.some((error) =>
+      error.toLowerCase().includes('version mismatch'),
+    )
+
+    if (nextSession) {
+      syncCombatState(nextSession)
+    }
+
+    recentCommandEvents = nextEvents
+    commandRejectedMessage =
+      normalizedErrors.length > 0 ? normalizedErrors.join(', ') : fallbackMessage
+
+    if (sawVersionMismatch && nextSession) {
+      commandRejectedMessage = `${commandRejectedMessage} Synced to the latest session state. Try again.`
+    }
+
+    void loadCombatEvents()
+    void loadCombatLogs()
+    void loadCombatRecentResults()
+  }
+
   async function handleSimpleCommand(commandType: 'END_TURN' | 'DRAW' | 'CLEAR_RECENT_RESULTS') {
     if (!requestedSessionCode || !session || commandPending) {
       return
     }
 
-    const access = getSessionReadAccess()
+    clearCommandMessages()
 
-    if (!access) {
-      commandErrorMessage = 'Session access token is required before a command can be sent.'
+    const playerAccess = getPlayerCommandAccess()
+
+    if (!playerAccess) {
+      commandErrorMessage = 'Player token access is required before a command can be sent.'
       return
     }
 
     if (commandType === 'CLEAR_RECENT_RESULTS') {
-      if (!isStoredPlayerSessionAccess(runtimeAccess) || !commandGuards.canClearRecentResultsCommand) {
+      if (!commandGuards.canClearRecentResultsCommand) {
         commandErrorMessage = 'Player token access is required before clearing recent results.'
         return
       }
+    } else if (!commandGuards.canIssuePlayerCommand) {
+      commandErrorMessage = 'The runtime player must own the current turn before issuing this command.'
+      return
     }
 
-    clearCommandMessages()
     commandPending = commandType
     commandDraft = {
       ...commandDraft,
       selectedCommandType: commandType,
-      selectedPlayerId:
-        commandType === 'CLEAR_RECENT_RESULTS'
-          ? isStoredPlayerSessionAccess(runtimeAccess)
-            ? runtimeAccess.playerId
-            : commandDraft.selectedPlayerId
-          : access.role === 'player'
-            ? access.playerId
-            : commandDraft.selectedPlayerId,
+      selectedPlayerId: playerAccess.playerId,
     }
 
     try {
+      const payload: CommandRequest = {
+        type: commandType,
+        expectedVersion: session.version,
+        playerId: playerAccess.playerId,
+        count:
+          commandType === 'DRAW'
+            ? typeof commandDraft.selectedCount === 'number' && commandDraft.selectedCount > 0
+              ? commandDraft.selectedCount
+              : 1
+            : undefined,
+      }
+
       const response = await executeSessionCommand(
         requestedSessionCode,
-        {
-          type: commandType,
-          expectedVersion: session.version,
-          playerId:
-            commandType === 'CLEAR_RECENT_RESULTS'
-              ? isStoredPlayerSessionAccess(runtimeAccess)
-                ? runtimeAccess.playerId
-                : null
-              : access.role === 'player'
-                ? access.playerId
-                : commandDraft.selectedPlayerId,
-        },
-        commandType === 'CLEAR_RECENT_RESULTS' && isStoredPlayerSessionAccess(runtimeAccess)
-          ? {
-              role: 'player',
-              playerToken: runtimeAccess.playerToken,
-              playerId: runtimeAccess.playerId,
-            }
-          : access,
+        payload,
+        playerAccess,
       )
 
       if (!response.accepted) {
-        const errorParts = response.errors.length > 0 ? response.errors.join(', ') : 'The command was rejected by the engine.'
-        commandRejectedMessage = errorParts
-        recentCommandEvents = response.events
+        handleRejectedCommandResponse(
+          commandType,
+          `${commandType} was rejected by the engine.`,
+          response.errors,
+          response.state,
+          response.events,
+        )
         return
       }
 
@@ -908,14 +1583,6 @@
   }
 
   function getUnsupportedCardCommandMessage() {
-    if (commandDraft.selectedDiscardIds.length > 0) {
-      return 'Cards that require discardIds are not supported in this step yet.'
-    }
-
-    if (commandDraft.selectedIds.length > 0) {
-      return 'Cards that require selectedIds are not supported in this step yet.'
-    }
-
     return null
   }
 
@@ -941,7 +1608,11 @@
       return
     }
 
-    if (!isStoredPlayerSessionAccess(runtimeAccess)) {
+    clearCommandMessages()
+
+    const playerAccess = getPlayerCommandAccess()
+
+    if (!playerAccess) {
       commandErrorMessage = 'Player token access is required before this command can be sent.'
       return
     }
@@ -963,7 +1634,7 @@
     const cardId =
       commandType === 'PLAY_CARD'
         ? commandDraft.selectedCardId
-        : session.players[runtimeAccess.playerId]?.exCard ?? null
+        : session.players[playerAccess.playerId]?.exCard ?? null
 
     if (!cardId) {
       commandErrorMessage =
@@ -973,47 +1644,75 @@
       return
     }
 
-    clearCommandMessages()
+    const runtimePlayer = session.players[playerAccess.playerId] ?? null
+
+    if (commandType === 'PLAY_CARD' && !runtimePlayer?.hand.includes(cardId)) {
+      commandErrorMessage = 'Select a card from the runtime player hand before issuing PLAY_CARD.'
+      return
+    }
+
+    const commandDefId = getCardDefIdFromInstanceId(cardId)
+    const commandDetail = commandDefId
+      ? getCardDetail(commandDefId) ?? (await ensureCardDetail(commandDefId))
+      : null
+    const playSpec = normalizePlaySpec(commandDetail?.playSpec ?? null)
+    const filteredTargets = commandDraft.selectedTargets
+    const filteredDiscardIds = getSelectedDiscardIdsFromHand(runtimePlayer)
+    const filteredSelectedIds = getSelectedFieldIds(runtimePlayer)
+    const requirementError = getPlayCardRequirementError(
+      commandType === 'PLAY_CARD' ? 'PLAY_CARD' : 'USE_EX',
+      playSpec,
+      cardId,
+      filteredTargets,
+      filteredDiscardIds,
+      filteredSelectedIds,
+    )
+
+    if (requirementError) {
+      commandErrorMessage = requirementError
+      return
+    }
+
     commandPending = commandType
     commandDraft = {
       ...commandDraft,
       selectedCommandType: commandType,
-      selectedPlayerId: runtimeAccess.playerId,
+      selectedPlayerId: playerAccess.playerId,
     }
 
     try {
-      const payload =
+      const payload: CommandRequest =
         commandType === 'PLAY_CARD'
           ? {
               type: commandType,
               expectedVersion: session.version,
-              playerId: runtimeAccess.playerId,
+              playerId: playerAccess.playerId,
               cardId,
-              targets: commandDraft.selectedTargets,
+              targets: filteredTargets.length > 0 ? filteredTargets : undefined,
+              discardIds: filteredDiscardIds.length > 0 ? filteredDiscardIds : undefined,
+              selectedIds: filteredSelectedIds.length > 0 ? filteredSelectedIds : undefined,
             }
           : {
               type: commandType,
               expectedVersion: session.version,
-              playerId: runtimeAccess.playerId,
-              targets: commandDraft.selectedTargets,
+              playerId: playerAccess.playerId,
+              targets: filteredTargets.length > 0 ? filteredTargets : undefined,
             }
 
       const response = await executeSessionCommand(
         requestedSessionCode,
         payload,
-        {
-          role: 'player',
-          playerToken: runtimeAccess.playerToken,
-          playerId: runtimeAccess.playerId,
-        },
+        playerAccess,
       )
 
       if (!response.accepted) {
-        commandRejectedMessage =
-          response.errors.length > 0
-            ? response.errors.join(', ')
-            : `${commandType} was rejected by the engine.`
-        recentCommandEvents = response.events
+        handleRejectedCommandResponse(
+          commandType,
+          `${commandType} was rejected by the engine.`,
+          response.errors,
+          response.state,
+          response.events,
+        )
         return
       }
 
@@ -1059,36 +1758,59 @@
     let payload: CommandRequest | null = null
 
     switch (runtimePendingDecision.type) {
-      case 'HAND_SWAP':
-      case 'DISCARD_TO_HAND_LIMIT':
-        if (commandDraft.selectedDiscardIds.length === 0) {
-          commandErrorMessage = 'Select at least one discard card before resolving this decision.'
+      case 'HAND_SWAP': {
+        const discardIds = getSelectedDiscardIdsFromHand(runtimePlayerState)
+
+        if (discardIds.length !== 1) {
+          commandErrorMessage = 'Select exactly one hand card before resolving HAND_SWAP.'
           return
         }
         payload = {
           ...payloadBase,
-          discardIds: commandDraft.selectedDiscardIds,
+          discardIds,
         }
         break
-      case 'SEARCH_PICK':
-      case 'RESOLVE_SEARCH_PICK':
-        if (commandDraft.selectedIds.length === 0) {
-          commandErrorMessage = 'Select at least one candidate id before resolving this decision.'
+      }
+      case 'DISCARD_TO_HAND_LIMIT': {
+        const discardIds = getSelectedDiscardIdsFromHand(runtimePlayerState)
+
+        if (discardIds.length === 0) {
+          commandErrorMessage = 'Select hand cards to discard before resolving DISCARD_TO_HAND_LIMIT.'
           return
         }
         payload = {
           ...payloadBase,
-          selectedIds: commandDraft.selectedIds,
+          discardIds,
+        }
+        break
+      }
+      case 'SEARCH_PICK':
+      case 'RESOLVE_SEARCH_PICK':
+        if (pendingCandidateIds.length === 0) {
+          commandErrorMessage = 'Select candidate ids before resolving this decision.'
+          return
+        }
+        if (
+          typeof runtimePendingDecision.pickCount === 'number' &&
+          runtimePendingDecision.pickCount > 0 &&
+          pendingCandidateIds.length !== runtimePendingDecision.pickCount
+        ) {
+          commandErrorMessage = `Select exactly ${runtimePendingDecision.pickCount} candidate ids before resolving this decision.`
+          return
+        }
+        payload = {
+          ...payloadBase,
+          selectedIds: pendingCandidateIds,
         }
         break
       case 'RESOLVE_INITIATIVE_TIE': {
         const orderedActorKeys =
-          commandDraft.orderedActorKeys.length > 0
-            ? commandDraft.orderedActorKeys
+          orderedTieActorKeys.length > 0
+            ? orderedTieActorKeys
             : runtimePendingDecision.actorKeys
 
-        if (orderedActorKeys.length === 0) {
-          commandErrorMessage = 'Actor order is required before resolving the initiative tie.'
+        if (orderedActorKeys.length !== runtimePendingDecision.actorKeys.length) {
+          commandErrorMessage = 'Order all actor keys in the tie group before resolving the initiative tie.'
           return
         }
 
@@ -1129,11 +1851,13 @@
       )
 
       if (!response.accepted) {
-        commandRejectedMessage =
-          response.errors.length > 0
-            ? response.errors.join(', ')
-            : `${runtimePendingDecision.type} was rejected by the engine.`
-        recentCommandEvents = response.events
+        handleRejectedCommandResponse(
+          runtimePendingDecision.type,
+          `${runtimePendingDecision.type} was rejected by the engine.`,
+          response.errors,
+          response.state,
+          response.events,
+        )
         return
       }
 
@@ -1204,11 +1928,13 @@
   const unsupportedPendingDecisionMessage = $derived.by(() =>
     getUnsupportedPendingDecisionMessage(runtimePendingDecision),
   )
-  const currentActorView = $derived.by(() =>
-    commandGuards.currentActorPlayerId
-      ? playerViews.find((player) => player.playerId === commandGuards.currentActorPlayerId) ?? null
+  const currentTurnActor = $derived.by(() => parseCombatActor(combatState?.currentTurnPlayer ?? null))
+  const currentEnemyView = $derived.by(() =>
+    currentTurnActor.kind === 'enemy' && currentTurnActor.id
+      ? enemyViews.find((enemy) => enemy.enemyId === currentTurnActor.id) ?? null
       : null,
   )
+  const latestRecentResult = $derived.by(() => recentResults?.recentResults[0] ?? null)
   const selectedEnemyView = $derived.by(() =>
     commandDraft.selectedEnemyId
       ? enemyViews.find((enemy) => enemy.enemyId === commandDraft.selectedEnemyId) ?? null
@@ -1219,6 +1945,62 @@
       ? visiblePlayerView.handCards.find((card) => card.instanceId === commandDraft.selectedCardId) ?? null
       : null,
   )
+  const runtimePlayerState = $derived.by(() => {
+    if (isStoredPlayerSessionAccess(runtimeAccess) && session) {
+      return session.players[runtimeAccess.playerId] ?? null
+    }
+
+    return null
+  })
+  const runtimeExCardView = $derived.by(() =>
+    runtimePlayerState?.exCard ? resolveCombatCard(runtimePlayerState.exCard) : null,
+  )
+  const selectedCommandDefId = $derived.by(() => {
+    if (commandDraft.selectedCommandType === 'PLAY_CARD') {
+      return getCardDefIdFromInstanceId(commandDraft.selectedCardId)
+    }
+
+    if (commandDraft.selectedCommandType === 'USE_EX') {
+      return getCardDefIdFromInstanceId(runtimePlayerState?.exCard ?? null)
+    }
+
+    return null
+  })
+  const selectedCommandDetail = $derived.by(() => getCardDetail(selectedCommandDefId))
+  const selectedCommandDetailLoading = $derived.by(() =>
+    selectedCommandDefId ? cardDetailLoadingIds.includes(selectedCommandDefId) : false,
+  )
+  const selectedCommandDetailError = $derived.by(() =>
+    selectedCommandDefId ? cardDetailErrors[selectedCommandDefId] ?? null : null,
+  )
+  const selectedCommandPlaySpec = $derived.by(() =>
+    normalizePlaySpec(selectedCommandDetail?.playSpec ?? null),
+  )
+  const selectedCommandSourceLabel = $derived.by(() => {
+    if (commandDraft.selectedCommandType === 'PLAY_CARD') {
+      return selectedCardView?.title ?? null
+    }
+
+    if (commandDraft.selectedCommandType === 'USE_EX') {
+      return runtimeExCardView?.title ?? null
+    }
+
+    return null
+  })
+  const selectedDiscardIdsFromHand = $derived.by(() => getSelectedDiscardIdsFromHand(runtimePlayerState))
+  const selectedFieldIds = $derived.by(() => getSelectedFieldIds(runtimePlayerState))
+  const pendingCandidateIds = $derived.by(() => getPendingCandidateIds(runtimePendingDecision))
+  const orderedTieActorKeys = $derived.by(() => getOrderedTieActorKeys(runtimePendingDecision))
+  const selectedCommandRequirementView = $derived.by(() => {
+    if (!commandDraft.selectedCommandType || !selectedCommandSourceLabel) {
+      return null
+    }
+
+    return buildCommandRequirementViewModel(
+      selectedCommandSourceLabel,
+      selectedCommandPlaySpec,
+    )
+  })
   const mergedEventItems = $derived.by(() => mergeEventItems(recentCommandEvents, eventItems))
   const commandOptions = $derived.by(
     () =>
@@ -1279,6 +2061,12 @@
         },
       ] satisfies CommandOptionViewModel[],
   )
+
+  $effect(() => {
+    if (selectedCommandDefId) {
+      void ensureCardDetail(selectedCommandDefId)
+    }
+  })
 </script>
 
 <div class="combat-page">
@@ -1351,7 +2139,7 @@
     <SectionFrame
       eyebrow="Combat Status"
       title="Combat Command"
-      description="Battle state, command planning, and action review now use live combat and card state while command execution stays for the next step."
+      description="The combat shell now emphasizes the current turn owner, battlefield pressure, and recent combat feedback before deeper command controls."
     >
       <div class="combat-page__status-bar">
         <div class="combat-page__status-stats">
@@ -1361,14 +2149,19 @@
             note={statusView.round !== null ? 'Current combat round' : 'Combat state not active yet'}
           />
           <StatBlock
-            value={statusView.currentTurnPlayer ?? 'Unavailable'}
-            label="Turn"
-            note={statusView.phase ?? 'Waiting for combat phase'}
+            value={statusView.currentTurnLabel}
+            label="Current Turn"
+            note={statusView.currentTurnNote}
+          />
+          <StatBlock
+            value={statusView.phase ?? 'Pending'}
+            label="Phase"
+            note={statusView.turnOrderSummary}
           />
           <StatBlock
             value={statusView.version}
             label="Version"
-            note={`${statusView.initiativeSummary} | ${statusView.tieGroupSummary}`}
+            note={statusView.battlefieldSummary}
           />
         </div>
 
@@ -1379,7 +2172,42 @@
             label={combatState ? 'Combat state live' : 'Pre-combat state'}
             tone={combatState ? 'warning' : 'muted'}
           />
+          <TagChip label={currentTurnActor.kind === 'enemy' ? 'Enemy acting' : currentTurnActor.kind === 'player' ? 'Player acting' : 'Turn pending'} tone={currentTurnActor.tone} />
         </div>
+      </div>
+
+      <div class="combat-page__overview-grid">
+        <article class={`combat-page__spotlight-card combat-page__spotlight-card--${statusView.currentTurnTone}`}>
+          <strong>Current turn</strong>
+          <h3>{statusView.currentTurnLabel}</h3>
+          <p>{statusView.currentTurnNote}</p>
+          <p>Turn order: {statusView.turnOrderSummary}</p>
+        </article>
+
+        <article class="combat-page__spotlight-card">
+          <strong>Battlefield</strong>
+          <h3>{statusView.battlefieldSummary}</h3>
+          <p>{statusView.initiativeSummary} | {statusView.tieGroupSummary}</p>
+          <p>{statusView.runSummary}</p>
+        </article>
+
+        <article class="combat-page__spotlight-card">
+          <strong>Recent feedback</strong>
+          {#if recentResultsLoading}
+            <h3>Loading recent results</h3>
+            <p>Restoring the latest combat-facing result summary.</p>
+          {:else if recentResultsErrorMessage}
+            <h3>Recent result unavailable</h3>
+            <p>{recentResultsErrorMessage}</p>
+          {:else if latestRecentResult}
+            <h3>{latestRecentResult.title}</h3>
+            <p>{latestRecentResult.summary}</p>
+            <p>{latestRecentResult.type} | {latestRecentResult.at ?? 'Time unavailable'}</p>
+          {:else}
+            <h3>No recent result yet</h3>
+            <p>The current combat flow has not produced a recent-result summary yet.</p>
+          {/if}
+        </article>
       </div>
 
       {#if accessNoticeMessage}
@@ -1403,23 +2231,50 @@
       <div class="combat-page__field">
         <SectionFrame
           title="Player side"
-          description="Player units now derive from live player state, including zones, EX state, passives, and pending decisions."
+          description="Player cards highlight live zones, EX state, passives, and pending decisions. Player HP/AP is not exposed in the current player session payload."
         >
           {#if playerViews.length > 0}
             <div class="combat-page__unit-list">
               {#each playerViews as player}
-                <article class="combat-page__unit-card">
+                <article
+                  class="combat-page__unit-card"
+                  class:combat-page__unit-card--active-turn={currentTurnActor.kind === 'player' && currentTurnActor.id === player.playerId}
+                >
                   <div class="combat-page__unit-head">
                     <div>
                       <h3>{player.playerId}</h3>
-                      <p>{player.ready ? 'Ready participant' : 'Joined participant'}</p>
+                      <p>{player.ready ? 'Ready participant' : 'Joined participant'} | Hand and zone state</p>
                     </div>
-                    <TagChip label={player.stateLabel} tone={player.stateTone} />
+                    <div class="combat-page__tag-row">
+                      {#if currentTurnActor.kind === 'player' && currentTurnActor.id === player.playerId}
+                        <TagChip label="Current turn" tone="success" />
+                      {/if}
+                      {#if visiblePlayerView?.playerId === player.playerId}
+                        <TagChip label="Visible hand" tone="accent" />
+                      {/if}
+                      <TagChip label={player.stateLabel} tone={player.stateTone} />
+                    </div>
+                  </div>
+
+                  <div class="combat-page__metric-grid">
+                    {#each player.metrics as metric}
+                      <div class="combat-page__metric-card">
+                        <strong>{metric.value}</strong>
+                        <span>{metric.label}</span>
+                        <p>{metric.note}</p>
+                      </div>
+                    {/each}
                   </div>
 
                   {#each player.summaryLines as line}
-                    <p>{line}</p>
+                    <p class="combat-page__unit-note">{line}</p>
                   {/each}
+
+                  <div class="combat-page__tag-row">
+                    {#each player.statusTags as tag}
+                      <TagChip label={tag.label} tone={tag.tone} />
+                    {/each}
+                  </div>
 
                   <div class="combat-page__tag-row">
                     {#if player.passives.length > 0}
@@ -1462,22 +2317,40 @@
 
         <SectionFrame
           title="Enemy side"
-          description="Enemy units and summons now come from the live combat state instead of mock battlefield data."
+          description="Enemy cards surface combat HP/AP and status pressure first, with summons grouped below the main enemy roster."
         >
           {#if enemyViews.length > 0}
             <div class="combat-page__unit-list">
               {#each enemyViews as enemy}
-                <article class="combat-page__unit-card combat-page__unit-card--enemy">
+                <article
+                  class="combat-page__unit-card combat-page__unit-card--enemy"
+                  class:combat-page__unit-card--active-turn={currentEnemyView?.enemyId === enemy.enemyId}
+                >
                   <div class="combat-page__unit-head">
                     <div>
                       <h3>{enemy.enemyId}</h3>
-                      <p>Combat enemy</p>
+                      <p>Combat enemy | Live battlefield unit</p>
                     </div>
-                    <TagChip label={enemy.stateLabel} tone={enemy.stateTone} />
+                    <div class="combat-page__tag-row">
+                      {#if currentEnemyView?.enemyId === enemy.enemyId}
+                        <TagChip label="Current turn" tone="warning" />
+                      {/if}
+                      <TagChip label={enemy.stateLabel} tone={enemy.stateTone} />
+                    </div>
+                  </div>
+
+                  <div class="combat-page__metric-grid">
+                    {#each enemy.metrics as metric}
+                      <div class="combat-page__metric-card">
+                        <strong>{metric.value}</strong>
+                        <span>{metric.label}</span>
+                        <p>{metric.note}</p>
+                      </div>
+                    {/each}
                   </div>
 
                   {#each enemy.summaryLines as line}
-                    <p>{line}</p>
+                    <p class="combat-page__unit-note">{line}</p>
                   {/each}
 
                   <div class="combat-page__tag-row">
@@ -1515,18 +2388,28 @@
             <div class="combat-page__summon-section">
               <strong>Summons</strong>
               <div class="combat-page__unit-list">
-                {#each summonViews as summon}
+              {#each summonViews as summon}
                   <article class="combat-page__unit-card">
                     <div class="combat-page__unit-head">
                       <div>
                         <h3>{summon.summonId}</h3>
-                        <p>{summon.owner}</p>
+                        <p>{summon.owner} | Support unit</p>
                       </div>
                       <TagChip label={summon.stateLabel} tone={summon.stateTone} />
                     </div>
 
+                    <div class="combat-page__metric-grid combat-page__metric-grid--compact">
+                      {#each summon.metrics as metric}
+                        <div class="combat-page__metric-card">
+                          <strong>{metric.value}</strong>
+                          <span>{metric.label}</span>
+                          <p>{metric.note}</p>
+                        </div>
+                      {/each}
+                    </div>
+
                     {#each summon.summaryLines as line}
-                      <p>{line}</p>
+                      <p class="combat-page__unit-note">{line}</p>
                     {/each}
 
                     <div class="combat-page__action-buttons">
@@ -1549,8 +2432,8 @@
       </div>
 
       <SectionFrame
-        title="Command and log"
-        description="The sidebar now uses live state summaries so command and event panels can replace these blocks without moving the layout."
+        title="Combat context and command"
+        description="The sidebar keeps pending decisions, visible zones, and combat history close to the live battlefield summary without changing the command flow."
       >
         <div class="combat-page__sidebar">
           <div class="combat-page__command-panel">
@@ -1587,13 +2470,66 @@
 
             <ContentStatePanel
               title="Current command guards"
-              message={`Expected version ${commandGuards.expectedVersion ?? 'N/A'} | Current actor ${commandGuards.currentActorPlayerId ?? 'Unavailable'} | Runtime role ${commandGuards.role}`}
+              message={`Expected version ${commandGuards.expectedVersion ?? 'N/A'} | Current actor ${statusView.currentTurnLabel} | Runtime role ${commandGuards.role}`}
             >
               <p>Current turn matches runtime player: {commandGuards.isCurrentTurnPlayer ? 'Yes' : 'No'}</p>
               <p>Pending decision: {commandGuards.hasPendingDecision ? 'Present' : 'None'}</p>
               <p>EX available: {commandGuards.exAvailable ? 'Yes' : 'No'}</p>
               <p>Recent command events buffered: {recentCommandEvents.length}</p>
             </ContentStatePanel>
+
+            <div class="combat-page__zone-panel">
+              <strong>Selected command input</strong>
+              <p>Command source: {selectedCommandRequirementView?.sourceLabel ?? selectedCommandSourceLabel ?? 'Select a card or EX first'}</p>
+              <p>Target rule: {selectedCommandRequirementView?.targetSummary ?? 'No command-specific target rule loaded yet.'}</p>
+              <p>Discard rule: {selectedCommandRequirementView?.discardSummary ?? 'No extra hand discard required'}</p>
+              <p>Field selection rule: {selectedCommandRequirementView?.fieldSelectionSummary ?? 'No extra field selection required'}</p>
+              <p>Choice rule: {selectedCommandRequirementView?.choiceSummary ?? 'No explicit choice requirement'}</p>
+              {#if selectedCommandDetailLoading}
+                <p>Loading card detail for the selected command source.</p>
+              {:else if selectedCommandDetailError}
+                <p>{selectedCommandDetailError}</p>
+              {/if}
+
+              <div class="combat-page__tag-row">
+                {#if commandDraft.selectedTargets.length > 0}
+                  {#each commandDraft.selectedTargets as target}
+                    <TagChip label={formatTargetSelectionLabel(target)} tone="warning" />
+                  {/each}
+                {:else}
+                  <TagChip label="No manual target" tone="muted" />
+                {/if}
+              </div>
+
+              <div class="combat-page__tag-row">
+                {#if selectedDiscardIdsFromHand.length > 0}
+                  {#each selectedDiscardIdsFromHand as discardId}
+                    <TagChip label={`Discard ${discardId}`} tone="accent" />
+                  {/each}
+                {:else}
+                  <TagChip label="No discard ids" tone="muted" />
+                {/if}
+              </div>
+
+              <div class="combat-page__tag-row">
+                {#if selectedFieldIds.length > 0}
+                  {#each selectedFieldIds as selectedId}
+                    <TagChip label={`Field ${selectedId}`} tone="accent" />
+                  {/each}
+                {:else}
+                  <TagChip label="No field ids" tone="muted" />
+                {/if}
+              </div>
+
+              <div class="combat-page__action-buttons">
+                <button type="button" onclick={() => handleClearSelectedTargets()}>
+                  Clear targets
+                </button>
+                <button type="button" onclick={() => handleClearSelectionInputs()}>
+                  Clear follow-up inputs
+                </button>
+              </div>
+            </div>
 
             {#if runtimePendingDecision}
               <div class="combat-page__zone-panel">
@@ -1604,6 +2540,7 @@
                 <p>Destination: {runtimePendingDecision.destination ?? 'N/A'} | Shuffle after pick: {runtimePendingDecision.shuffleAfterPick ? 'Yes' : 'No'}</p>
                 <p>Group index: {runtimePendingDecision.groupIndex ?? 'N/A'}</p>
                 <p>Actor keys: {runtimePendingDecision.actorKeys.join(', ') || 'None'}</p>
+                <p>Selected hand discards: {selectedDiscardIdsFromHand.length} | Selected candidate ids: {pendingCandidateIds.length} | Ordered tie actors: {orderedTieActorKeys.length}</p>
 
                 {#if unsupportedPendingDecisionMessage}
                   <ContentStatePanel
@@ -1665,12 +2602,20 @@
                   <strong>Field</strong>
                   {#if visiblePlayerView.fieldCards.length > 0}
                     {#each visiblePlayerView.fieldCards as card}
-                      <article class="combat-page__card-row">
+                      <article
+                        class="combat-page__card-row"
+                        class:selected={selectedFieldIds.includes(card.instanceId)}
+                      >
                         <div>
                           <span>{card.title}</span>
                           <small>{card.subtitle}</small>
                         </div>
-                        <TagChip label={card.unresolved ? 'Unresolved' : 'Field'} tone={card.unresolved ? 'warning' : 'success'} />
+                        <div class="combat-page__tag-row">
+                          <TagChip label={card.unresolved ? 'Unresolved' : 'Field'} tone={card.unresolved ? 'warning' : 'success'} />
+                          <button type="button" class="combat-page__inline-button" onclick={() => handleToggleSelectedId(card.instanceId)}>
+                            {selectedFieldIds.includes(card.instanceId) ? 'Unmark field id' : 'Select field id'}
+                          </button>
+                        </div>
                       </article>
                     {/each}
                   {:else}
@@ -1682,39 +2627,23 @@
                   <strong>Grave and excluded</strong>
                   {#if visiblePlayerView.graveCards.length > 0}
                     {#each visiblePlayerView.graveCards as card}
-                      <article
-                        class="combat-page__card-row"
-                        class:selected={commandDraft.selectedDiscardIds.includes(card.instanceId)}
-                      >
+                      <article class="combat-page__card-row">
                         <div>
                           <span>{card.title}</span>
                           <small>Grave | {card.subtitle}</small>
                         </div>
-                        <div class="combat-page__tag-row">
-                          <TagChip label={card.unresolved ? 'Unresolved' : 'Grave'} tone={card.unresolved ? 'warning' : 'muted'} />
-                          <button type="button" class="combat-page__inline-button" onclick={() => handleToggleDiscard(card.instanceId)}>
-                            {commandDraft.selectedDiscardIds.includes(card.instanceId) ? 'Unmark discard' : 'Mark discard'}
-                          </button>
-                        </div>
+                        <TagChip label={card.unresolved ? 'Unresolved' : 'Grave'} tone={card.unresolved ? 'warning' : 'muted'} />
                       </article>
                     {/each}
                   {/if}
                   {#if visiblePlayerView.excludedCards.length > 0}
                     {#each visiblePlayerView.excludedCards as card}
-                      <article
-                        class="combat-page__card-row"
-                        class:selected={commandDraft.selectedIds.includes(card.instanceId)}
-                      >
+                      <article class="combat-page__card-row">
                         <div>
                           <span>{card.title}</span>
                           <small>Excluded | {card.subtitle}</small>
                         </div>
-                        <div class="combat-page__tag-row">
-                          <TagChip label={card.unresolved ? 'Unresolved' : 'Excluded'} tone={card.unresolved ? 'warning' : 'muted'} />
-                          <button type="button" class="combat-page__inline-button" onclick={() => handleToggleSelectedId(card.instanceId)}>
-                            {commandDraft.selectedIds.includes(card.instanceId) ? 'Unmark' : 'Select'}
-                          </button>
-                        </div>
+                        <TagChip label={card.unresolved ? 'Unresolved' : 'Excluded'} tone={card.unresolved ? 'warning' : 'muted'} />
                       </article>
                     {/each}
                   {/if}
@@ -1820,7 +2749,7 @@
 
     <SectionFrame
       title="Hand and action bar"
-      description="The bottom strip now renders the current player hand from live card instances and the card catalog while keeping the same layout."
+      description="The bottom strip keeps the visible hand and action context readable while command wiring stays otherwise unchanged."
     >
       <div class="combat-page__hand-bar">
         <div class="combat-page__hand-cards">
@@ -1828,7 +2757,7 @@
             {#each visiblePlayerView.handCards as card}
               <article
                 class="combat-page__hand-card"
-                class:selected={commandDraft.selectedCardId === card.instanceId}
+                class:selected={commandDraft.selectedCardId === card.instanceId || selectedDiscardIdsFromHand.includes(card.instanceId)}
               >
                 <p>{card.subtitle}</p>
                 <h4>{card.title}</h4>
@@ -1837,14 +2766,17 @@
                   {#each card.tags as tag}
                     <TagChip label={tag.label} tone={tag.tone} />
                   {/each}
+                  {#if selectedDiscardIdsFromHand.includes(card.instanceId)}
+                    <TagChip label="Discard selected" tone="warning" />
+                  {/if}
                 </div>
                 <p>{card.description}</p>
                 <div class="combat-page__action-buttons">
                   <button type="button" onclick={() => handleSelectHandCard(card.instanceId)}>
                     {commandDraft.selectedCardId === card.instanceId ? 'Selected card' : 'Select card'}
                   </button>
-                  <button type="button" onclick={() => handleToggleSelectedId(card.instanceId)}>
-                    {commandDraft.selectedIds.includes(card.instanceId) ? 'Unmark' : 'Select id'}
+                  <button type="button" class:selected={selectedDiscardIdsFromHand.includes(card.instanceId)} onclick={() => handleToggleDiscard(card.instanceId)}>
+                    {selectedDiscardIdsFromHand.includes(card.instanceId) ? 'Marked discard' : 'Mark discard'}
                   </button>
                 </div>
               </article>
@@ -1863,15 +2795,17 @@
           <strong>Selected action</strong>
           <p>Command: {commandDraft.selectedCommandType ?? 'Not selected'}</p>
           <p>Expected version: {commandGuards.expectedVersion ?? 'Unavailable'}</p>
-          <p>Current actor: {currentActorView?.playerId ?? commandGuards.currentActorPlayerId ?? 'Unavailable'}</p>
+          <p>Current actor: {statusView.currentTurnLabel}</p>
+          <p>Visible hand owner: {visiblePlayerView?.playerId ?? 'Unavailable'}</p>
           <p>Selected actor: {commandDraft.selectedPlayerId ?? 'Not selected'}</p>
           <p>Selected target: {selectedEnemyView?.enemyId ?? 'Target refs below'}</p>
           <p>Selected card: {selectedCardView?.title ?? commandDraft.selectedCardId ?? 'Not selected'}</p>
           <p>Pending decision: {runtimePendingDecision?.type ?? 'None'}</p>
           <p>Selected targets: {commandDraft.selectedTargets.length} | Selected ids: {commandDraft.selectedIds.length}</p>
           <p>Ordered actor keys: {commandDraft.orderedActorKeys.join(', ') || 'None'}</p>
-          <p>Target refs: {commandDraft.selectedTargets.map((target) => target.enemyId ?? target.playerId ?? target.summonInstanceId ?? 'Unknown').join(', ') || 'None'}</p>
-          <p>Discard ids: {commandDraft.selectedDiscardIds.length} | Count: {commandDraft.selectedCount ?? 'N/A'}</p>
+          <p>Target refs: {formatTargetRefSummary(commandDraft.selectedTargets)}</p>
+          <p>Discard ids from hand: {selectedDiscardIdsFromHand.length} | Field ids: {selectedFieldIds.length}</p>
+          <p>Count: {commandDraft.selectedCount ?? 'N/A'} | Pending candidate ids: {pendingCandidateIds.length}</p>
           <p>Buffered events after command: {recentCommandEvents.length}</p>
           <p>Run node: {runState?.currentNode?.name ?? 'Unavailable'} | Result pending: {runState?.resultPending ? 'Yes' : 'No'}</p>
           <label class="combat-page__field-control">
@@ -1892,10 +2826,12 @@
             ></textarea>
           </label>
           <div class="combat-page__action-buttons">
-            <button type="button" disabled={!commandGuards.canIssuePlayerCommand && !commandGuards.canIssueGmCommand}>
-              Command execution pending
+            <button type="button" onclick={() => handleClearSelectedTargets()}>
+              Clear targets
             </button>
-            <button type="button" disabled>Payload build pending</button>
+            <button type="button" onclick={() => handleClearSelectionInputs()}>
+              Clear helper inputs
+            </button>
           </div>
         </div>
       </div>
@@ -1910,11 +2846,14 @@
   .combat-page__unit-list,
   .combat-page__hand-bar,
   .combat-page__action-summary,
+  .combat-page__overview-grid,
   .combat-page__zone-grid,
   .combat-page__zone-panel,
   .combat-page__summon-section,
   .combat-page__field-control,
-  .combat-page__feed-list {
+  .combat-page__feed-list,
+  .combat-page__command-list,
+  .combat-page__metric-grid {
     display: grid;
     gap: 1.5rem;
   }
@@ -1929,9 +2868,13 @@
 
   .combat-page__status-stats {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1rem;
     flex: 1 1 38rem;
+  }
+
+  .combat-page__overview-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .combat-page__status-tags,
@@ -1951,12 +2894,15 @@
 
   .combat-page__unit-card,
   .combat-page__hand-card,
+  .combat-page__spotlight-card,
   .combat-page__zone-panel,
   .combat-page__card-row,
+  .combat-page__metric-card,
   .combat-page__field-control input,
   .combat-page__field-control textarea,
   .combat-page__inline-button,
-  .combat-page__feed-card {
+  .combat-page__feed-card,
+  .combat-page__command-list button {
     border: 1px solid var(--color-border);
     background: rgba(12, 11, 10, 0.28);
     padding: 1rem;
@@ -1964,13 +2910,80 @@
 
   .combat-page__unit-card,
   .combat-page__hand-card,
-  .combat-page__zone-panel {
+  .combat-page__zone-panel,
+  .combat-page__spotlight-card {
     display: grid;
     gap: 0.75rem;
   }
 
   .combat-page__unit-card--enemy {
     border-color: rgba(199, 167, 125, 0.28);
+  }
+
+  .combat-page__unit-card--active-turn {
+    border-color: rgba(226, 193, 155, 0.48);
+    box-shadow: inset 0 0 0 1px rgba(226, 193, 155, 0.24);
+  }
+
+  .combat-page__spotlight-card--accent {
+    border-color: rgba(113, 196, 255, 0.32);
+  }
+
+  .combat-page__spotlight-card--success {
+    border-color: rgba(126, 214, 158, 0.36);
+  }
+
+  .combat-page__spotlight-card--warning {
+    border-color: rgba(226, 193, 155, 0.48);
+  }
+
+  .combat-page__metric-grid {
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  .combat-page__metric-grid--compact {
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  }
+
+  .combat-page__metric-card {
+    display: grid;
+    gap: 0.25rem;
+    align-content: start;
+  }
+
+  .combat-page__metric-card strong,
+  .combat-page__metric-card span,
+  .combat-page__metric-card p,
+  .combat-page__spotlight-card strong,
+  .combat-page__spotlight-card h3,
+  .combat-page__spotlight-card p {
+    margin: 0;
+  }
+
+  .combat-page__metric-card strong,
+  .combat-page__spotlight-card h3 {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+  }
+
+  .combat-page__metric-card span,
+  .combat-page__spotlight-card strong {
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .combat-page__metric-card p,
+  .combat-page__spotlight-card p,
+  .combat-page__unit-note {
+    color: var(--color-text-soft);
+    line-height: 1.6;
+  }
+
+  .combat-page__unit-note {
+    margin: 0;
   }
 
   .combat-page__unit-head,
@@ -2026,6 +3039,27 @@
   .combat-page__log-panel {
     display: grid;
     gap: 1rem;
+  }
+
+  .combat-page__command-list {
+    gap: 0.75rem;
+  }
+
+  .combat-page__command-list button {
+    display: grid;
+    gap: 0.35rem;
+    text-align: left;
+    color: var(--color-text);
+  }
+
+  .combat-page__command-list button span,
+  .combat-page__command-list button small {
+    margin: 0;
+  }
+
+  .combat-page__command-list button small {
+    color: var(--color-text-soft);
+    line-height: 1.5;
   }
 
   .combat-page__command-panel strong,
@@ -2084,7 +3118,8 @@
 
   @media (max-width: 1080px) {
     .combat-page__main,
-    .combat-page__hand-bar {
+    .combat-page__hand-bar,
+    .combat-page__overview-grid {
       grid-template-columns: 1fr;
     }
   }
@@ -2092,7 +3127,9 @@
   @media (max-width: 960px) {
     .combat-page__status-stats,
     .combat-page__hand-cards,
-    .combat-page__zone-grid {
+    .combat-page__zone-grid,
+    .combat-page__metric-grid,
+    .combat-page__metric-grid--compact {
       grid-template-columns: 1fr;
     }
   }

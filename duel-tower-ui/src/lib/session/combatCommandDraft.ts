@@ -49,6 +49,25 @@ export type CombatCommandGuards = {
   canIssueGmCommand: boolean
 }
 
+function resolveCurrentTurnPlayerId(rawActor: string | null | undefined) {
+  const normalized = rawActor?.trim()
+
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized.startsWith('P:')) {
+    const playerId = normalized.slice(2).trim()
+    return playerId || null
+  }
+
+  if (normalized.startsWith('E:')) {
+    return null
+  }
+
+  return normalized
+}
+
 function dedupeIdentifiers(values: readonly string[]) {
   const seen = new Set<string>()
   const result: string[] = []
@@ -169,7 +188,7 @@ export function buildCombatCommandGuards(
 ) {
   const runtimePlayerId =
     runtimeAccess?.role === 'player' && runtimeAccess.playerId ? runtimeAccess.playerId : null
-  const currentActorPlayerId = session?.combat?.currentTurnPlayer ?? null
+  const currentActorPlayerId = resolveCurrentTurnPlayerId(session?.combat?.currentTurnPlayer ?? null)
   const runtimePlayer = runtimePlayerId && session ? session.players[runtimePlayerId] ?? null : null
 
   return {
