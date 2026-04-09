@@ -101,7 +101,7 @@
       return 'Unable to load card detail'
     }
 
-    return 'Card selection unavailable'
+    return 'Card detail unavailable'
   })
   const stateMessage = $derived.by(() => {
     if (notFound) {
@@ -121,18 +121,18 @@
     <SectionFrame
       eyebrow="Card Record"
       title="Card detail"
-      description="View the selected live card record."
+      description="View the selected card record."
     >
       <ContentStatePanel
         title="Loading card detail"
-        message="Restoring the requested card record from the content API."
+        message="Restoring the requested card record."
       />
     </SectionFrame>
   {:else if card}
     <SectionFrame
       eyebrow="Selected Card"
       title={card.name}
-      description="Card detail is resolved from the URL id and loaded from the live content API."
+      description="Review the selected card and its registered play information."
     >
       <div class="card-detail-page__hero">
         <div class="card-detail-page__hero-copy">
@@ -245,7 +245,7 @@
     <SectionFrame
       eyebrow="Card Record"
       title="Card detail"
-      description="View the selected live card record."
+      description="View the selected card record."
     >
       <ContentStatePanel
         title={stateTitle}

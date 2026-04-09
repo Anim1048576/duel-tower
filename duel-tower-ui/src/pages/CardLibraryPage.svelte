@@ -220,7 +220,7 @@
   const selectedCard = $derived.by(() => cards.find((card) => card.id === selectedCardId) ?? cards[0] ?? null)
   const listSummary = $derived.by(() => {
     if (cardsLoading) {
-      return 'Refreshing the current card archive from the content API.'
+      return 'Refreshing the current card archive.'
     }
 
     if (cardsErrorMessage) {
@@ -245,7 +245,7 @@
   const emptyStateMessage = $derived.by(() =>
     activeFilterCount > 0
       ? 'Try a broader query, clear the selected keyword, or switch back to all card types.'
-      : 'The live content API returned an empty card collection.',
+      : 'No cards are currently registered in the archive.',
   )
 </script>
 
@@ -253,7 +253,7 @@
   <SectionFrame
     eyebrow="Content Library"
     title="카드 보관소"
-    description="Stitch 시안의 카드 보관소 밀도를 현재 아카이브 셸에 맞춰 흡수한 목록 화면입니다. 검색과 필터를 유지한 채 카드 상세로 자연스럽게 이동할 수 있습니다."
+    description="등록된 카드를 탐색하고, 검색과 필터를 유지한 채 상세 기록으로 이동할 수 있습니다."
   >
     <div class="card-library-page__hero">
       <div class="card-library-page__hero-copy">
@@ -279,7 +279,7 @@
       <StatBlock
         value={cardsLoading ? '...' : cardsErrorMessage ? '-' : visibleCardCount}
         label="Visible cards"
-        note="Current GET /api/content/cards result"
+        note="Current archive result count"
       />
       <StatBlock
         value={keywordsLoading ? '...' : keywordsErrorMessage ? '-' : keywords.length}
@@ -367,7 +367,7 @@
       {#if cardsLoading}
         <ContentStatePanel
           title="Loading card archive"
-          message="Pulling the latest card collection from GET /api/content/cards."
+          message="Pulling the latest card collection into the archive."
         />
       {:else if cardsErrorMessage}
         <ContentStatePanel
@@ -456,7 +456,7 @@
             <TagChip label={getCardTypeLabel(selectedCard.type)} tone={getCardTypeTone(selectedCard.type)} />
             <TagChip label={`Cost ${selectedCard.cost ?? 'N/A'}`} tone="muted" />
             {#if selectedCard.resolveTo}
-              <TagChip label={`Resolve ${selectedCard.resolveTo}`} tone="warning" />
+              <TagChip label={`Resolve ${formatContentEnumLabel(selectedCard.resolveTo)}`} tone="warning" />
             {/if}
           </div>
 
