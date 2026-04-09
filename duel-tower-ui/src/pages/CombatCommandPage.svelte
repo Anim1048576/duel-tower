@@ -13,6 +13,7 @@
     CardInstanceDto,
     CombatEnemyDto,
     CombatSummonDto,
+    CommandRequest,
     PendingDecisionDto,
     RecentResultsResponse,
     SessionEventItemDto,
@@ -1055,7 +1056,7 @@
       reason: commandDraft.selectedReason || runtimePendingDecision.reason,
     } as const
 
-    let payload: Record<string, unknown> | null = null
+    let payload: CommandRequest | null = null
 
     switch (runtimePendingDecision.type) {
       case 'HAND_SWAP':
@@ -1112,6 +1113,11 @@
     }
 
     try {
+      if (!payload) {
+        commandErrorMessage = 'Pending decision payload could not be built.'
+        return
+      }
+
       const response = await executeSessionCommand(
         requestedSessionCode,
         payload,
@@ -1180,8 +1186,10 @@
     combatState ? combatState.summons.map((summon) => buildSummonViewModel(summon)) : [],
   )
   const visiblePlayerView = $derived.by(() => {
-    if (isStoredPlayerSessionAccess(runtimeAccess)) {
-      return playerViews.find((player) => player.playerId === runtimeAccess.playerId) ?? playerViews[0] ?? null
+    const playerAccess = isStoredPlayerSessionAccess(runtimeAccess) ? runtimeAccess : null
+
+    if (playerAccess) {
+      return playerViews.find((player) => player.playerId === playerAccess.playerId) ?? playerViews[0] ?? null
     }
 
     return playerViews[0] ?? null
@@ -1881,7 +1889,7 @@
               rows="3"
               bind:value={commandDraft.selectedReason}
               placeholder="Reason for the next command or pending resolution"
-            />
+            ></textarea>
           </label>
           <div class="combat-page__action-buttons">
             <button type="button" disabled={!commandGuards.canIssuePlayerCommand && !commandGuards.canIssueGmCommand}>

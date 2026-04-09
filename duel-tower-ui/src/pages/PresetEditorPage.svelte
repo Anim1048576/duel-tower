@@ -411,7 +411,8 @@
 
     const requestId = ++saveRequestSequence
     const payload = toPresetEditorPayload(normalizedState)
-    const nextSaveMode = isCreateMode || !preset ? 'create' : 'edit'
+    const presetToUpdate = preset
+    const nextSaveMode = isCreateMode || !presetToUpdate ? 'create' : 'edit'
 
     saving = true
     saveErrorMessage = null
@@ -422,10 +423,18 @@
     deleteConfirmOpen = false
 
     try {
-      const response =
-        nextSaveMode === 'create'
-          ? await createPreset(payload)
-          : await updatePreset(preset.id, payload)
+      let response: PresetResponse
+
+      if (nextSaveMode === 'create') {
+        response = await createPreset(payload)
+      } else {
+        if (!presetToUpdate) {
+          saveErrorMessage = 'The preset record is unavailable. Reload the preset and try again.'
+          return
+        }
+
+        response = await updatePreset(presetToUpdate.id, payload)
+      }
 
       if (requestId !== saveRequestSequence) {
         return
