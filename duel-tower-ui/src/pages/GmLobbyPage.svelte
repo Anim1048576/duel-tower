@@ -1,10 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { getSessionState, kickPlayer, resetSession } from '../lib/api/sessions'
+  import { listCharacters } from '../lib/api/characters'
+  import type { CharacterProfileResponse } from '../lib/api/characterTypes'
+  import { listCards, listPassives } from '../lib/api/content'
+  import type { CardDefinition, PassiveDefinition } from '../lib/api/contentTypes'
+  import { executeSessionCommand, getSessionState, kickPlayer, resetSession } from '../lib/api/sessions'
   import type { PlayerStateDto, SessionStateDto } from '../lib/api/sessionTypes'
   import { getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
-  import ParticipantSlot from '../lib/components/ParticipantSlot.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
@@ -27,14 +30,24 @@
     selectionHandoffKeys,
     setSelectionHandoff,
   } from '../lib/selectionHandoff'
+  import { resolveSessionLoadoutExCardId } from '../lib/session/loadoutEditor'
+
+  type TagTone = 'accent' | 'muted' | 'success' | 'warning'
 
   type LobbyParticipantItem = {
     id: string
     slot: string
     name: string
-    state: string
-    tone: 'accent' | 'muted' | 'success' | 'warning'
-    note: string
+    readyLabel: string
+    readyTone: TagTone
+    characterSummary: string
+    exSummary: string
+    passiveSummary: string
+    deckSummary: string
+    detailTags: {
+      label: string
+      tone: TagTone
+    }[]
   }
 
   let loading = $state(true)
@@ -48,9 +61,15 @@
   let session = $state<SessionStateDto | null>(null)
   let runtimeAccess = $state<StoredSessionAccess | null>(null)
   let requestSequence = 0
-  let actionPending = $state<'kick' | 'reset' | null>(null)
+  let actionPending = $state<'kick' | 'reset' | 'start' | null>(null)
+  let referenceLoading = $state(true)
+  let referenceErrorMessage = $state<string | null>(null)
+  let characters = $state<CharacterProfileResponse[]>([])
+  let cards = $state<CardDefinition[]>([])
+  let passives = $state<PassiveDefinition[]>([])
   let kickReason = $state('')
   let selectedKickPlayerId = $state('')
+  let selectedStartPlayerId = $state('')
   let resetKeepPlayers = $state(true)
   let resetKeepLoadouts = $state(true)
   let resetSeedInput = $state('')
@@ -84,23 +103,250 @@
     return null
   }
 
-  function buildParticipantStateLabel(player: PlayerStateDto) {
-    return player.ready ? 'Ready' : 'Joined'
+  function navigateTo(path: string, replace = false) {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    window.history[replace ? 'replaceState' : 'pushState']({}, '', path)
+    window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
-  function buildParticipantTone(player: PlayerStateDto) {
+  async function loadReferenceCatalogs() {
+    referenceLoading = true
+    referenceErrorMessage = null
+
+    const [characterResult, cardResult, passiveResult] = await Promise.allSettled([
+      listCharacters(),
+      listCards(),
+      listPassives(),
+    ])
+
+    const errors: string[] = []
+
+    if (characterResult.status === 'fulfilled') {
+      characters = characterResult.value
+    } else {
+      characters = []
+      errors.push('character roster')
+    }
+
+    if (cardResult.status === 'fulfilled') {
+      cards = cardResult.value
+    } else {
+      cards = []
+      errors.push('card archive')
+    }
+
+    if (passiveResult.status === 'fulfilled') {
+      passives = passiveResult.value
+    } else {
+      passives = []
+      errors.push('passive archive')
+    }
+
+    referenceErrorMessage =
+      errors.length > 0
+        ? `Some reference data could not be restored: ${errors.join(', ')}. Participant summaries will fall back to ids.`
+        : null
+
+    referenceLoading = false
+  }
+
+  function normalizeContentId(value: string | null | undefined) {
+    const normalized = value?.trim()
+    return normalized ? normalized : ''
+  }
+
+  function getResolvedCard(cardId: string | null | undefined) {
+    const normalized = normalizeContentId(cardId)
+    return normalized ? cards.find((card) => card.id === normalized) ?? null : null
+  }
+
+  function getResolvedPassive(passiveId: string | null | undefined) {
+    const normalized = normalizeContentId(passiveId)
+    return normalized ? passives.find((passive) => passive.id === normalized) ?? null : null
+  }
+
+  function getDeckCardEntries(player: PlayerStateDto) {
+    return player.deckOwnedCardIds.map((ownedCardId) => {
+      const ownedCard = player.ownedCards.find((entry) => entry.ownedCardId === ownedCardId) ?? null
+      const cardId = normalizeContentId(ownedCard?.cardId)
+      const resolvedCard = cardId ? getResolvedCard(cardId) : null
+
+      return {
+        key: cardId || ownedCardId,
+        cardId,
+        label: resolvedCard?.name ?? (cardId || ownedCardId),
+      }
+    })
+  }
+
+  function getPlayerDeckCardIds(player: PlayerStateDto) {
+    return getDeckCardEntries(player)
+      .map((entry) => entry.cardId)
+      .filter(Boolean)
+  }
+
+  function formatPreviewList(values: readonly string[], totalCount = values.length) {
+    const preview = values.filter(Boolean)
+
+    if (preview.length === 0) {
+      return ''
+    }
+
+    const hiddenCount = totalCount - preview.length
+    return hiddenCount > 0 ? `${preview.join(', ')} +${hiddenCount} more` : preview.join(', ')
+  }
+
+  function buildParticipantStateLabel(player: PlayerStateDto) {
+    return player.ready ? 'Ready' : 'Not ready'
+  }
+
+  function buildParticipantTone(player: PlayerStateDto): TagTone {
     return player.ready ? 'success' : 'muted'
   }
 
-  function buildParticipantNote(player: PlayerStateDto) {
-    const passiveSummary =
-      player.passiveIds.length > 0
-        ? `${player.passiveIds.length} passives`
-        : 'No passives'
+  function buildCharacterSummary(player: PlayerStateDto, nextSession: SessionStateDto | null) {
+    if (referenceLoading) {
+      return 'Loading character summary...'
+    }
 
-    const exSummary = player.exCard ? `EX ${player.exCard}` : 'No EX card'
+    const resolvedExCardId = resolveSessionLoadoutExCardId(player, nextSession)
+    const deckCardIds = new Set(getPlayerDeckCardIds(player))
+    let bestMatch:
+      | {
+          character: CharacterProfileResponse
+          score: number
+          exMatched: boolean
+        }
+      | null = null
+    let ambiguous = false
 
-    return `Deck ${player.deckOwnedCardIds.length} cards | ${passiveSummary} | ${exSummary}`
+    for (const character of characters) {
+      const exMatched =
+        !!resolvedExCardId && normalizeContentId(character.exCard) === normalizeContentId(resolvedExCardId)
+      const deckOverlap = (character.currentSkillDeck ?? []).reduce(
+        (count, cardId) => count + (deckCardIds.has(normalizeContentId(cardId)) ? 1 : 0),
+        0,
+      )
+      const score = (exMatched ? 100 : 0) + deckOverlap
+
+      if (score <= 0) {
+        continue
+      }
+
+      if (!bestMatch || score > bestMatch.score) {
+        bestMatch = { character, score, exMatched }
+        ambiguous = false
+        continue
+      }
+
+      if (score === bestMatch.score) {
+        ambiguous = true
+      }
+    }
+
+    if (!bestMatch) {
+      return 'Unavailable from current session data'
+    }
+
+    if (bestMatch.exMatched && !ambiguous) {
+      return `${bestMatch.character.name} #${bestMatch.character.id}`
+    }
+
+    if (!ambiguous) {
+      return `Likely ${bestMatch.character.name} #${bestMatch.character.id}`
+    }
+
+    return 'Multiple character candidates'
+  }
+
+  function buildExSummary(player: PlayerStateDto, nextSession: SessionStateDto | null) {
+    const resolvedExCardId = resolveSessionLoadoutExCardId(player, nextSession)
+
+    if (!resolvedExCardId) {
+      return 'No EX configured'
+    }
+
+    const resolvedCard = getResolvedCard(resolvedExCardId)
+    return resolvedCard ? `${resolvedCard.name} (${resolvedCard.id})` : resolvedExCardId
+  }
+
+  function buildPassiveSummary(player: PlayerStateDto) {
+    if (player.passiveIds.length === 0) {
+      return 'No passives equipped'
+    }
+
+    const labels = [...new Set(
+      player.passiveIds
+        .map((passiveId) => getResolvedPassive(passiveId)?.name ?? normalizeContentId(passiveId))
+        .filter(Boolean),
+    )]
+
+    return `${player.passiveIds.length} equipped | ${formatPreviewList(labels.slice(0, 3), labels.length)}`
+  }
+
+  function buildDeckSummary(player: PlayerStateDto) {
+    const deckEntries = getDeckCardEntries(player)
+
+    if (deckEntries.length === 0) {
+      return 'No deck cards selected'
+    }
+
+    const uniqueEntries = deckEntries.filter((entry, index, entries) => {
+      return entries.findIndex((candidate) => candidate.key === entry.key) === index
+    })
+    const previewLabels = uniqueEntries.slice(0, 3).map((entry) => entry.label)
+
+    return [
+      `${deckEntries.length} cards`,
+      `${uniqueEntries.length} unique`,
+      formatPreviewList(previewLabels, uniqueEntries.length),
+    ]
+      .filter(Boolean)
+      .join(' | ')
+  }
+
+  function buildParticipantTags(
+    player: PlayerStateDto,
+    nextSession: SessionStateDto | null,
+  ): LobbyParticipantItem['detailTags'] {
+    const resolvedExCardId = resolveSessionLoadoutExCardId(player, nextSession)
+
+    return [
+      {
+        label: `${player.deckOwnedCardIds.length} deck cards`,
+        tone: player.deckOwnedCardIds.length > 0 ? 'accent' : 'muted',
+      },
+      {
+        label: `${player.passiveIds.length} passives`,
+        tone: player.passiveIds.length > 0 ? 'success' : 'muted',
+      },
+      {
+        label: resolvedExCardId ? 'EX linked' : 'No EX',
+        tone: resolvedExCardId ? 'warning' : 'muted',
+      },
+    ]
+  }
+
+  function getSortedPlayers(nextSession: SessionStateDto | null) {
+    if (!nextSession) {
+      return [] as PlayerStateDto[]
+    }
+
+    return Object.values(nextSession.players).sort((left, right) => {
+      if (left.ready !== right.ready) {
+        return left.ready ? -1 : 1
+      }
+
+      return left.playerId.localeCompare(right.playerId)
+    })
+  }
+
+  function getPreferredStartPlayerId(nextSession: SessionStateDto | null) {
+    const players = getSortedPlayers(nextSession)
+    return players.find((player) => player.ready)?.playerId ?? players[0]?.playerId ?? ''
   }
 
   function buildParticipantItems(nextSession: SessionStateDto | null) {
@@ -108,15 +354,18 @@
       return [] as LobbyParticipantItem[]
     }
 
-    return Object.values(nextSession.players)
-      .sort((left, right) => left.playerId.localeCompare(right.playerId))
+    return getSortedPlayers(nextSession)
       .map((player, index) => ({
         id: player.playerId,
         slot: `P${index + 1}`,
         name: player.playerId,
-        state: buildParticipantStateLabel(player),
-        tone: buildParticipantTone(player),
-        note: buildParticipantNote(player),
+        readyLabel: buildParticipantStateLabel(player),
+        readyTone: buildParticipantTone(player),
+        characterSummary: buildCharacterSummary(player, nextSession),
+        exSummary: buildExSummary(player, nextSession),
+        passiveSummary: buildPassiveSummary(player),
+        deckSummary: buildDeckSummary(player),
+        detailTags: buildParticipantTags(player, nextSession),
       }))
   }
 
@@ -126,9 +375,14 @@
     removeSelectionHandoff(selectionHandoffKeys.sessionId)
 
     const remainingPlayerIds = Object.keys(nextSession.players)
+    const preferredStartPlayerId = getPreferredStartPlayerId(nextSession)
 
     if (!remainingPlayerIds.includes(selectedKickPlayerId)) {
       selectedKickPlayerId = remainingPlayerIds[0] ?? ''
+    }
+
+    if (!remainingPlayerIds.includes(selectedStartPlayerId)) {
+      selectedStartPlayerId = preferredStartPlayerId
     }
   }
 
@@ -253,12 +507,76 @@
     }
   }
 
+  async function handleStartCombat() {
+    if (
+      loading ||
+      actionPending ||
+      !routeSessionCode ||
+      !session ||
+      !selectedStartPlayerId ||
+      !isStoredGmSessionAccess(runtimeAccess)
+    ) {
+      return
+    }
+
+    if (session.combat && session.combat.phase !== 'END') {
+      actionErrorTitle = 'Combat start unavailable'
+      actionErrorMessage = 'Combat is already active for this session.'
+      actionSuccessMessage = null
+      return
+    }
+
+    actionPending = 'start'
+    actionErrorTitle = 'Combat start failed'
+    actionErrorMessage = null
+    actionSuccessMessage = null
+
+    try {
+      const response = await executeSessionCommand(
+        routeSessionCode,
+        {
+          type: 'START_COMBAT',
+          playerId: selectedStartPlayerId,
+          expectedVersion: session.version,
+        },
+        {
+          role: 'gm',
+          gmToken: runtimeAccess.gmToken,
+        },
+      )
+
+      if (response.state) {
+        syncLobbyState(response.state)
+      }
+
+      if (!response.accepted) {
+        const rejectionMessage =
+          response.errors.length > 0
+            ? response.errors.join(', ')
+            : 'START_COMBAT was rejected by the engine.'
+
+        actionErrorTitle = 'Combat start rejected'
+        actionErrorMessage = rejectionMessage.includes('version mismatch')
+          ? `${rejectionMessage}. The GM lobby was synced to the latest session version. Try again.`
+          : rejectionMessage
+        return
+      }
+
+      navigateTo(pathBuilders.combat(response.state?.sessionCode ?? routeSessionCode))
+    } catch (error) {
+      actionErrorMessage = getApiErrorMessage(error, 'Unable to start combat from the current GM lobby.')
+    } finally {
+      actionPending = null
+    }
+  }
+
   function handleWindowStateChange() {
     void loadGmLobbyState()
   }
 
   onMount(() => {
     feedback = readSessionPageFeedback()
+    void loadReferenceCatalogs()
     void loadGmLobbyState()
     window.addEventListener('popstate', handleWindowStateChange)
 
@@ -282,6 +600,32 @@
   const resetActionLabel = $derived.by(() =>
     actionPending === 'reset' ? 'Resetting session...' : 'Reset session',
   )
+  const startActionLabel = $derived.by(() =>
+    actionPending === 'start' ? 'Starting combat...' : 'Start combat',
+  )
+  const startBlockedMessage = $derived.by(() => {
+    if (!session) {
+      return 'Session state is unavailable.'
+    }
+
+    if (!isStoredGmSessionAccess(runtimeAccess)) {
+      return 'GM token access is required before START_COMBAT can be sent.'
+    }
+
+    if (participantCount === 0) {
+      return 'At least one participant must join before combat can start.'
+    }
+
+    if (!selectedStartPlayerId) {
+      return 'Select the playerId to attach to START_COMBAT.'
+    }
+
+    if (session.combat && session.combat.phase !== 'END') {
+      return 'Combat is already active for this session.'
+    }
+
+    return null
+  })
 </script>
 
 <div class="gm-lobby-page">
@@ -368,11 +712,15 @@
         <div class="gm-lobby-page__summary-copy">
           <p>GM lobby</p>
           <h3>Code: {session.sessionCode}</h3>
+          <span class="gm-lobby-page__summary-meta">
+            Session ID {session.sessionId} | Seed {session.seed}
+          </span>
         </div>
 
         <div class="gm-lobby-page__summary-tags">
           <TagChip label="GM View" tone="warning" />
           <TagChip label={gmAccessLabel} tone="success" />
+          <TagChip label={`${readyCount} / ${participantCount} ready`} tone="accent" />
         </div>
       </div>
 
@@ -403,24 +751,67 @@
     <div class="gm-lobby-page__main">
       <SectionFrame
         title="Participant slots"
-        description="The GM slot grid now reflects the live participant list and ready states from the session API."
+        description="The live participant list now keeps ready state and loadout context readable without changing the surrounding GM lobby shell."
       >
+        {#if referenceLoading}
+          <ContentStatePanel
+            title="Loading participant summaries"
+            message="Restoring character, EX, and passive labels from the content catalog."
+          />
+        {:else if referenceErrorMessage}
+          <ContentStatePanel
+            title="Participant labels are partially restored"
+            message={referenceErrorMessage}
+          />
+        {/if}
+
         {#if participantItems.length > 0}
           <div class="gm-lobby-page__slots">
             {#each participantItems as participant}
-              <ParticipantSlot
-                slot={participant.slot}
-                name={participant.name}
-                state={participant.state}
-                tone={participant.tone}
-                note={participant.note}
-              />
+              <article class={`gm-lobby-page__participant-card gm-lobby-page__participant-card--${participant.readyTone}`}>
+                <div class="gm-lobby-page__participant-head">
+                  <div class="gm-lobby-page__participant-copy">
+                    <p>{participant.slot}</p>
+                    <h4>{participant.name}</h4>
+                  </div>
+
+                  <TagChip label={participant.readyLabel} tone={participant.readyTone} />
+                </div>
+
+                <div class="gm-lobby-page__participant-tags">
+                  {#each participant.detailTags as tag}
+                    <TagChip label={tag.label} tone={tag.tone} />
+                  {/each}
+                </div>
+
+                <dl class="gm-lobby-page__participant-details">
+                  <div>
+                    <dt>Character</dt>
+                    <dd>{participant.characterSummary}</dd>
+                  </div>
+
+                  <div>
+                    <dt>EX</dt>
+                    <dd>{participant.exSummary}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Passives</dt>
+                    <dd>{participant.passiveSummary}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Deck</dt>
+                    <dd>{participant.deckSummary}</dd>
+                  </div>
+                </dl>
+              </article>
             {/each}
           </div>
         {:else}
           <ContentStatePanel
             title="No participants yet"
-            message="No players have joined this live session yet."
+            message="This live session is waiting for its first player. Keep the lobby open and share the session code to collect joins."
           />
         {/if}
       </SectionFrame>
@@ -516,8 +907,35 @@
 
     <SectionFrame
       title="Action zone"
-      description="Bottom action strip keeps navigation ready for the next combat step while GM state management stays in this page."
+      description="Bottom action strip keeps navigation and live combat start in the GM lobby without changing the surrounding route structure."
     >
+      <div class="gm-lobby-page__action-stack">
+        <label class="gm-lobby-page__field">
+          <span>Start as player</span>
+          <select
+            bind:value={selectedStartPlayerId}
+            disabled={loading || actionPending !== null || participantCount === 0}
+          >
+            <option value="">Select player</option>
+            {#each getSortedPlayers(session) as player}
+              <option value={player.playerId}>
+                {player.playerId}{player.ready ? ' | ready' : ' | not ready'}
+              </option>
+            {/each}
+          </select>
+        </label>
+
+        <p class="gm-lobby-page__action-note">
+          START_COMBAT sends `expectedVersion` {session.version} with playerId `{selectedStartPlayerId || 'unselected'}`.
+        </p>
+
+        {#if startBlockedMessage}
+          <p class="gm-lobby-page__action-note gm-lobby-page__action-note--warning">
+            {startBlockedMessage}
+          </p>
+        {/if}
+      </div>
+
       <div class="gm-lobby-page__actions">
         <a
           class="gm-lobby-page__link-action gm-lobby-page__link-action--muted"
@@ -529,7 +947,13 @@
         <a class="gm-lobby-page__link-action" data-nav href={pathBuilders.combat(session.sessionCode)}>
           Open combat command
         </a>
-        <button type="button" disabled>Start session (TODO)</button>
+        <button
+          type="button"
+          disabled={loading || actionPending !== null || !!startBlockedMessage}
+          onclick={() => void handleStartCombat()}
+        >
+          {startActionLabel}
+        </button>
       </div>
     </SectionFrame>
   {/if}
@@ -539,7 +963,8 @@
   .gm-lobby-page,
   .gm-lobby-page__main,
   .gm-lobby-page__guide,
-  .gm-lobby-page__control-group {
+  .gm-lobby-page__control-group,
+  .gm-lobby-page__action-stack {
     display: grid;
     gap: 1.5rem;
   }
@@ -559,6 +984,7 @@
 
   .gm-lobby-page__summary-copy p,
   .gm-lobby-page__summary-copy h3,
+  .gm-lobby-page__summary-meta,
   .gm-lobby-page__guide p {
     margin: 0;
   }
@@ -576,9 +1002,15 @@
     line-height: 1.1;
   }
 
+  .gm-lobby-page__summary-meta {
+    color: var(--color-text-soft);
+    line-height: 1.6;
+  }
+
   .gm-lobby-page__summary-tags,
   .gm-lobby-page__controls,
-  .gm-lobby-page__actions {
+  .gm-lobby-page__actions,
+  .gm-lobby-page__participant-tags {
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
@@ -601,9 +1033,77 @@
     gap: 1rem;
   }
 
+  .gm-lobby-page__participant-card {
+    border: 1px solid var(--color-border);
+    background: rgba(12, 11, 10, 0.28);
+    padding: 1rem;
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .gm-lobby-page__participant-card--success {
+    border-color: rgba(188, 204, 173, 0.32);
+  }
+
+  .gm-lobby-page__participant-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .gm-lobby-page__participant-copy {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .gm-lobby-page__participant-copy p,
+  .gm-lobby-page__participant-copy h4,
+  .gm-lobby-page__participant-details dt,
+  .gm-lobby-page__participant-details dd {
+    margin: 0;
+  }
+
+  .gm-lobby-page__participant-copy p,
+  .gm-lobby-page__participant-details dt {
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.76rem;
+  }
+
+  .gm-lobby-page__participant-copy h4 {
+    font-size: 1rem;
+  }
+
+  .gm-lobby-page__participant-details {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .gm-lobby-page__participant-details > div {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .gm-lobby-page__participant-details dd {
+    color: var(--color-text-soft);
+    line-height: 1.55;
+  }
+
   .gm-lobby-page__guide p {
     color: var(--color-text-soft);
     line-height: 1.65;
+  }
+
+  .gm-lobby-page__action-note {
+    margin: 0;
+    color: var(--color-text-soft);
+    line-height: 1.6;
+  }
+
+  .gm-lobby-page__action-note--warning {
+    color: var(--color-warning);
   }
 
   .gm-lobby-page__control-group--bordered {
