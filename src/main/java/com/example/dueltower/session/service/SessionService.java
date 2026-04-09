@@ -894,10 +894,17 @@ public class SessionService {
         }
 
         if (requestedPresetDeckOwnedCardIdsRaw != null) {
-            return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(requestedPresetDeckOwnedCardIdsRaw, ownedCards);
+            return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(
+                    requestedPresetDeckOwnedCardIdsRaw,
+                    ownedCards
+            );
         }
 
-        return List.of();
+        return resolveCardIdsToOwnedCardIds(
+                starterLoadoutConfig.defaultPresetDeckCardIds(),
+                ownedCards,
+                "starter defaultPresetDeckCardIds must not contain blank values"
+        );
     }
 
     private List<String> resolveRequestedDeckOwnedCardIds(List<String> deckOwnedCardIdsRaw, List<OwnedCard> ownedCards) {
