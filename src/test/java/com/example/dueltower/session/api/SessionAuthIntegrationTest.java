@@ -337,6 +337,136 @@ class SessionAuthIntegrationTest {
                 .andExpect(jsonPath("$.players.bob.ready").value(false));
     }
 
+    @Test
+    void leaveEndpointRequiresOwnValidPlayerToken() throws Exception {
+        MockHttpSession alice = signUpAndLogin("alice", "alice@example.com", "password123");
+        MockHttpSession bob = signUpAndLogin("bob", "bob@example.com", "password123");
+
+        MvcResult createResult = mockMvc.perform(post("/api/sessions")
+                        .session(alice)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"gmId\":\"alice\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String code = extractJsonStringValue(createResult.getResponse().getContentAsString(), "code");
+
+        String aliceToken = extractJsonStringValue(mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(alice)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "alice",
+                                  "ownedCards": [
+                                    {"ownedCardId":"oc1","cardId":"C001"},
+                                    {"ownedCardId":"oc2","cardId":"C001"},
+                                    {"ownedCardId":"oc3","cardId":"C001"},
+                                    {"ownedCardId":"oc4","cardId":"C002"},
+                                    {"ownedCardId":"oc5","cardId":"C002"},
+                                    {"ownedCardId":"oc6","cardId":"C002"},
+                                    {"ownedCardId":"oc7","cardId":"C003"},
+                                    {"ownedCardId":"oc8","cardId":"C003"},
+                                    {"ownedCardId":"oc9","cardId":"C003"},
+                                    {"ownedCardId":"oc10","cardId":"C004"},
+                                    {"ownedCardId":"oc11","cardId":"C004"},
+                                    {"ownedCardId":"oc12","cardId":"C004"}
+                                  ],
+                                  "presetDeckOwnedCardIds": [
+                                    "oc1","oc2","oc3",
+                                    "oc4","oc5","oc6",
+                                    "oc7","oc8","oc9",
+                                    "oc10","oc11","oc12"
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "playerToken");
+
+        String bobToken = extractJsonStringValue(mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(bob)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "bob",
+                                  "ownedCards": [
+                                    {"ownedCardId":"oc1","cardId":"C001"},
+                                    {"ownedCardId":"oc2","cardId":"C001"},
+                                    {"ownedCardId":"oc3","cardId":"C001"},
+                                    {"ownedCardId":"oc4","cardId":"C002"},
+                                    {"ownedCardId":"oc5","cardId":"C002"},
+                                    {"ownedCardId":"oc6","cardId":"C002"},
+                                    {"ownedCardId":"oc7","cardId":"C003"},
+                                    {"ownedCardId":"oc8","cardId":"C003"},
+                                    {"ownedCardId":"oc9","cardId":"C003"},
+                                    {"ownedCardId":"oc10","cardId":"C004"},
+                                    {"ownedCardId":"oc11","cardId":"C004"},
+                                    {"ownedCardId":"oc12","cardId":"C004"}
+                                  ],
+                                  "presetDeckOwnedCardIds": [
+                                    "oc1","oc2","oc3",
+                                    "oc4","oc5","oc6",
+                                    "oc7","oc8","oc9",
+                                    "oc10","oc11","oc12"
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "playerToken");
+
+        mockMvc.perform(post("/api/sessions/{code}/leave", code))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/sessions/{code}/leave", code)
+                        .header("X-Player-Token", "not-a-valid-token"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, "alice")
+                        .header("X-Player-Token", bobToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/sessions/{code}/leave", code)
+                        .header("X-Player-Token", aliceToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.alice").doesNotExist())
+                .andExpect(jsonPath("$.players.bob").exists());
+    }
+
+    @Test
+    void gmOnlyEndpointsRequireValidGmToken() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        MvcResult createResult = mockMvc.perform(post("/api/sessions")
+                        .session(gmSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"gmId\":\"gm\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String code = extractJsonStringValue(createResult.getResponse().getContentAsString(), "code");
+        String gmToken = extractJsonStringValue(createResult.getResponse().getContentAsString(), "gmToken");
+
+        mockMvc.perform(post("/api/sessions/{code}/reset", code)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/sessions/{code}/reset", code)
+                        .header("X-GM-Token", "not-a-valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/sessions/{code}/reset", code)
+                        .header("X-GM-Token", gmToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionCode").value(code));
+    }
+
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)

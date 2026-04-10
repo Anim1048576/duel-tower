@@ -44,7 +44,7 @@ public class SessionLogService {
         long minVersion = normalizeAfterVersion(afterVersion);
         int requestedLimit = normalizeLimit(limit, DEFAULT_EVENT_LIMIT, MAX_EVENT_LIMIT);
 
-        return withAuthorizedRead(code, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/events", rt -> {
+        return withSessionReadableAccess(code, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/events", rt -> {
             List<SessionRuntime.StoredEvent> history = rt.eventHistorySnapshot();
             List<SessionEventItemDto> items = new ArrayList<>(requestedLimit);
 
@@ -82,7 +82,7 @@ public class SessionLogService {
         long beforeCursor = normalizeBefore(before);
         int requestedLimit = normalizeLimit(limit, DEFAULT_LOG_LIMIT, MAX_LOG_LIMIT);
 
-        return withAuthorizedRead(code, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/logs", rt -> {
+        return withSessionReadableAccess(code, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/logs", rt -> {
             List<SessionRuntime.StoredEvent> history = rt.eventHistorySnapshot();
             List<SessionLogItemDto> items = new ArrayList<>(requestedLimit);
 
@@ -111,16 +111,17 @@ public class SessionLogService {
     }
 
     /**
-     * Common read entry for events/logs. SESSION_READABLE policy is shared with SessionController.
+     * Common SESSION_READABLE entry for events/logs.
+     * Public state 조회는 제외하고, read 권한 성립 경로를 동일한 형식으로 로깅한다.
      */
-    private <T> T withAuthorizedRead(String code,
-                                     String gmTokenHeader,
-                                     String playerTokenHeader,
-                                     Authentication authentication,
-                                     String endpoint,
-                                     Function<SessionRuntime, T> reader) {
+    private <T> T withSessionReadableAccess(String code,
+                                            String gmTokenHeader,
+                                            String playerTokenHeader,
+                                            Authentication authentication,
+                                            String endpoint,
+                                            Function<SessionRuntime, T> reader) {
         SessionRuntime rt = sessionService.get(code);
-        SessionAccessDecision decision = sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+        SessionAccessDecision decision = sessionAccessResolver.requireSessionReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
         log.info("session read granted code={} endpoint={} source={} tokenBased={} loginBased={} username={} playerId={}",
                 decision.sessionCode(),
                 endpoint,

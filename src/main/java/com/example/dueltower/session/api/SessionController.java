@@ -67,6 +67,7 @@ public class SessionController {
 
     @GetMapping({"/{code}", "/{code}/state"})
     public SessionStateDto state(@PathVariable String code) {
+        // PUBLIC_SESSION_STATE: 공개 상태 조회는 익명 접근을 유지한다.
         return sessionService.withSessionLock(code, rt -> {
             log.debug("session state requested code={} version={}", code, rt.state().version());
             return StateMapper.toDto(rt.code(), rt.state());
@@ -79,7 +80,7 @@ public class SessionController {
                                                @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                                Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        requireReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/recent-results");
+        requireSessionReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/recent-results");
         return rt.withLock(() -> new RecentResultsResponse(
                 rt.state().version(),
                 rt.state().runState().resultPending(),
@@ -94,7 +95,7 @@ public class SessionController {
                            @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                            Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        requireReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/run");
+        requireSessionReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/run");
         return rt.withLock(() -> StateMapper.toRunDto(rt.state().runState()));
     }
 
@@ -104,7 +105,7 @@ public class SessionController {
                                                  @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                                  Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        requireReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/inventory");
+        requireSessionReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/inventory");
         return rt.withLock(() -> new SessionRunInventoryResponse(
                 rt.state().version(),
                 StateMapper.toInventoryDto(rt.state().runState())
@@ -117,7 +118,7 @@ public class SessionController {
                                          @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                          Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        requireReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/results");
+        requireSessionReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/results");
         return rt.withLock(() -> new RecentResultsResponse(
                 rt.state().version(),
                 rt.state().runState().resultPending(),
@@ -132,7 +133,7 @@ public class SessionController {
                                              @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                              Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        requireReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/choices");
+        requireSessionReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/choices");
         return rt.withLock(() -> new SessionRunChoicesResponse(
                 rt.state().version(),
                 rt.state().runState().resultPending(),
@@ -392,12 +393,13 @@ public class SessionController {
         return authentication.getName();
     }
 
-    private void requireReadableAndLog(SessionRuntime rt,
-                                       String gmTokenHeader,
-                                       String playerTokenHeader,
-                                       Authentication authentication,
-                                       String endpoint) {
-        SessionAccessDecision decision = sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+    // SESSION_READABLE: read 허용 판단과 접근 로그를 같은 진입점에서 처리한다.
+    private void requireSessionReadableAndLog(SessionRuntime rt,
+                                              String gmTokenHeader,
+                                              String playerTokenHeader,
+                                              Authentication authentication,
+                                              String endpoint) {
+        SessionAccessDecision decision = sessionAccessResolver.requireSessionReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
         log.info("session read granted code={} endpoint={} source={} tokenBased={} loginBased={} username={} playerId={}",
                 decision.sessionCode(),
                 endpoint,

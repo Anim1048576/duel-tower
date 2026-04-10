@@ -26,16 +26,29 @@ public final class SecurityPaths {
             "/api/me/presets/**"
     };
 
-    public static final String[] SESSION_LOGIN_REQUIRED = {
+    /**
+     * AUTHENTICATED_SESSION_ENTRY:
+     * session 생성/참여 진입은 로그인 사용자만 허용한다.
+     */
+    public static final String[] AUTHENTICATED_SESSION_ENTRY = {
             "/api/sessions",
             "/api/sessions/*/join"
     };
 
-    public static final String[] SESSION_PUBLIC = {
+    /**
+     * PUBLIC_SESSION_STATE:
+     * 공개 상태 조회는 익명 접근을 허용한다.
+     */
+    public static final String[] PUBLIC_SESSION_STATE = {
             "/api/sessions/*",
             "/api/sessions/*/state"
     };
 
+    /**
+     * SESSION_READABLE:
+     * 세션 read API는 토큰 또는 조건부 로그인 fallback 으로만 허용한다.
+     * 실제 세부 정책은 SessionAccessResolver 에서 판정한다.
+     */
     public static final String[] SESSION_READABLE = {
             "/api/sessions/*/events",
             "/api/sessions/*/logs",
@@ -48,7 +61,11 @@ public final class SecurityPaths {
 
     public static final String SESSION_COMMAND = "/api/sessions/*/command";
 
-    public static final String[] SESSION_PLAYER_SELF_POST = {
+    /**
+     * PLAYER_SELF:
+     * 플레이어 본인 토큰으로만 허용되는 변경 API.
+     */
+    public static final String[] PLAYER_SELF_POST = {
             "/api/sessions/*/leave",
             "/api/sessions/*/players/*/forget",
             "/api/sessions/*/players/*/deck",
@@ -56,16 +73,20 @@ public final class SecurityPaths {
             "/api/sessions/*/players/*/loadout/from-preset"
     };
 
-    public static final String[] SESSION_PLAYER_SELF_PUT = {
+    public static final String[] PLAYER_SELF_PUT = {
             "/api/sessions/*/players/*/ready"
     };
 
-    public static final String[] SESSION_GM_ONLY_POST = {
+    /**
+     * GM_ONLY:
+     * GM 토큰으로만 허용되는 관리 API.
+     */
+    public static final String[] GM_ONLY_POST = {
             "/api/sessions/*/players/*/kick",
             "/api/sessions/*/reset"
     };
 
-    public static final String[] SESSION_GM_ONLY_DELETE = {
+    public static final String[] GM_ONLY_DELETE = {
             "/api/sessions/*"
     };
 

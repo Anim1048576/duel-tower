@@ -14,20 +14,36 @@ import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @Service
+/**
+ * Session authorization policy summary:
+ * - PUBLIC_SESSION_STATE: handled outside this resolver and always public.
+ * - AUTHENTICATED_SESSION_ENTRY: handled by Spring Security and requires login.
+ * - SESSION_READABLE: valid GM/player token wins; login fallback is allowed only when both token headers are absent.
+ *   If a non-blank token header is present but invalid, login fallback is blocked and 401 is returned.
+ * - PLAYER_SELF: requires a valid player token that matches the target playerId.
+ * - GM_ONLY: requires a valid GM token.
+ */
 public class SessionAccessResolver {
 
-    public SessionAccessDecision requireReadable(SessionRuntime rt,
-                                                 String gmTokenHeader,
-                                                 String playerTokenHeader,
-                                                 Authentication authentication) {
+    public SessionAccessDecision requireSessionReadable(SessionRuntime rt,
+                                                        String gmTokenHeader,
+                                                        String playerTokenHeader,
+                                                        Authentication authentication) {
         String gmToken = normalizeToken(gmTokenHeader);
-        if (!gmToken.isEmpty() && rt.gmToken().equals(gmToken)) {
+        boolean hasGmTokenHeader = hasTokenHeader(gmTokenHeader);
+        if (hasGmTokenHeader && rt.gmToken().equals(gmToken)) {
             return new SessionAccessDecision(GM_TOKEN, rt.code(), rt.gmId(), null);
         }
 
-        String playerId = resolvePlayerIdByToken(rt, playerTokenHeader);
+        String normalizedPlayerToken = normalizeToken(playerTokenHeader);
+        boolean hasPlayerTokenHeader = hasTokenHeader(playerTokenHeader);
+        String playerId = resolvePlayerIdByToken(rt, normalizedPlayerToken);
         if (playerId != null && hasParticipant(rt, playerId)) {
             return new SessionAccessDecision(PLAYER_TOKEN, rt.code(), null, playerId);
+        }
+
+        if (hasGmTokenHeader || hasPlayerTokenHeader) {
+            throw new ResponseStatusException(UNAUTHORIZED, "invalid session read token");
         }
 
         String username = authenticatedUsername(authentication);
@@ -98,6 +114,10 @@ public class SessionAccessResolver {
             throw new ResponseStatusException(UNAUTHORIZED, "player authorization required");
         }
         return playerId.trim();
+    }
+
+    private boolean hasTokenHeader(String tokenHeader) {
+        return !normalizeToken(tokenHeader).isEmpty();
     }
 
     private boolean hasParticipant(SessionRuntime rt, String playerId) {

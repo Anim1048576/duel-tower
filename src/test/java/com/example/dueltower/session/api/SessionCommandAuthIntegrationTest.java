@@ -104,6 +104,28 @@ class SessionCommandAuthIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void playerAuthCommandRequiresBodyPlayerIdToMatchTokenOwner() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        String code = createSession(gmSession, "gm");
+        MockHttpSession player1Session = signUpAndLogin("player1", "player1@example.com", "password123");
+        MockHttpSession player2Session = signUpAndLogin("player2", "player2@example.com", "password123");
+        String player1Token = joinAsPlayer(player1Session, code, "player1");
+        joinAsPlayer(player2Session, code, "player2");
+
+        mockMvc.perform(post("/api/sessions/{code}/command", code)
+                        .header("X-Player-Token", player1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "END_TURN",
+                                  "playerId": "player2",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
 
     @Test
     @DisplayName("아이템 사용은 플레이어 토큰이 없으면 401을 반환한다")

@@ -243,6 +243,16 @@ class SessionLogControllerIntegrationTest {
     }
 
     @Test
+    void eventsRejectInvalidGmTokenEvenForLoggedInGm() throws Exception {
+        SessionFixture fixture = createFixture("gm", "player1");
+
+        mockMvc.perform(get("/api/sessions/{code}/events", fixture.code())
+                        .header("X-GM-Token", "not-a-valid-token")
+                        .session(fixture.gmSession()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void eventsAndLogsFailWhenSessionCodeDoesNotExist() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
 

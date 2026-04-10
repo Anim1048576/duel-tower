@@ -6,14 +6,6 @@ public record SessionAccessDecision(
         String username,
         String playerId
 ) {
-    public boolean gmAccess() {
-        return source == SessionAccessSource.GM_TOKEN || source == SessionAccessSource.AUTHENTICATED_GM;
-    }
-
-    public boolean playerAccess() {
-        return source == SessionAccessSource.PLAYER_TOKEN || source == SessionAccessSource.AUTHENTICATED_PLAYER;
-    }
-
     public boolean tokenBased() {
         return source.tokenBased();
     }

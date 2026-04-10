@@ -84,6 +84,16 @@ class SessionRecentResultsIntegrationTest {
     }
 
     @Test
+    void recentResultsRejectsInvalidPlayerTokenEvenForLoggedInParticipant() throws Exception {
+        SessionFixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/sessions/{code}/recent-results", fixture.code)
+                        .header("X-Player-Token", "not-a-valid-token")
+                        .session(fixture.playerSession))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void recentResultsAllowsAuthenticatedParticipantOrGmWithoutTokenHeader() throws Exception {
         SessionFixture fixture = createFixture();
 

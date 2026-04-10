@@ -37,19 +37,19 @@ public class SecurityConfig {
                         .requestMatchers(SecurityPaths.AUTH_PUBLIC).permitAll()
                         .requestMatchers(SecurityPaths.AUTH_REQUIRED).authenticated()
 
-                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.SESSION_LOGIN_REQUIRED).authenticated()
+                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.AUTHENTICATED_SESSION_ENTRY).authenticated()
                         .requestMatchers(
                                 SecurityPaths.SESSION_READ_METHOD,
-                                SecurityPaths.SESSION_PUBLIC
+                                SecurityPaths.PUBLIC_SESSION_STATE
                         ).permitAll()
                         .requestMatchers(
                                 SecurityPaths.SESSION_READ_METHOD,
                                 SecurityPaths.SESSION_READABLE
                         ).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.SESSION_PLAYER_SELF_POST).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_UPDATE_METHOD, SecurityPaths.SESSION_PLAYER_SELF_PUT).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.SESSION_GM_ONLY_POST).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_DELETE_METHOD, SecurityPaths.SESSION_GM_ONLY_DELETE).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.PLAYER_SELF_POST).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_UPDATE_METHOD, SecurityPaths.PLAYER_SELF_PUT).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.GM_ONLY_POST).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_DELETE_METHOD, SecurityPaths.GM_ONLY_DELETE).permitAll()
                         .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.SESSION_COMMAND).permitAll()
                         .requestMatchers(SecurityPaths.API_ALL).authenticated()
 
