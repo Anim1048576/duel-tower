@@ -17,12 +17,17 @@
     type ShopCatalogOffer,
   } from '../lib/session/shopCatalog'
   import {
+    hasStoredSessionCode,
     isStoredGmSessionAccess,
     isStoredPlayerSessionAccess,
     normalizeSessionCode,
     readStoredSessionAccess,
     type StoredSessionAccess,
   } from '../lib/session/access'
+  import {
+    startLiveSessionPolling,
+    type LiveSessionPollingHandle,
+  } from '../lib/session/liveSessionPolling'
   import { readSelectionHandoff, selectionHandoffKeys, setSelectionHandoff } from '../lib/selectionHandoff'
 
   type ShopFilterKey = 'all' | 'consumable' | 'equipment' | 'special'
@@ -64,6 +69,7 @@
   let selectedOfferId = $state('')
   let purchasePendingOfferId = $state<string | null>(null)
   let requestSequence = 0
+  let shopPolling: LiveSessionPollingHandle | null = null
 
   const goldFormatter = new Intl.NumberFormat('en-US')
 
@@ -158,11 +164,78 @@
     }
   }
 
+  function isShopOpenState(nextState: SessionStateDto | null) {
+    const nextRun = nextState?.run ?? null
+    const nextNode = nextRun?.currentNode ?? null
+    return Boolean(nextNode && nextNode.phase === 'EVENT' && !nextRun?.resultPending)
+  }
+
+  function stopShopPolling() {
+    shopPolling?.stop()
+    shopPolling = null
+  }
+
+  function updateShopPollingVersion(nextState: SessionStateDto) {
+    shopPolling?.updateVersion(nextState.version)
+  }
+
+  function syncPolledShopState(nextState: SessionStateDto) {
+    const nextCode = requestedSessionCode
+    const nextAccess = readStoredSessionAccess()
+
+    if (
+      !nextCode ||
+      nextState.sessionCode !== nextCode ||
+      !nextAccess ||
+      !hasStoredSessionCode(nextAccess, nextCode) ||
+      !getSessionCommandAccess(nextAccess)
+    ) {
+      stopShopPolling()
+      return
+    }
+
+    runtimeAccess = nextAccess
+    syncShopState(nextState)
+
+    if (!isShopOpenState(nextState)) {
+      stopShopPolling()
+    }
+  }
+
+  function startShopPolling(
+    nextCode: string | null,
+    nextAccess: StoredSessionAccess | null,
+    nextState: SessionStateDto | null,
+  ) {
+    stopShopPolling()
+
+    const access = getSessionCommandAccess(nextAccess)
+
+    if (
+      !nextCode ||
+      !nextAccess ||
+      !nextState ||
+      !access ||
+      !hasStoredSessionCode(nextAccess, nextCode) ||
+      !isShopOpenState(nextState)
+    ) {
+      return
+    }
+
+    shopPolling = startLiveSessionPolling({
+      code: nextCode,
+      access,
+      initialVersion: nextState.version,
+      onState: syncPolledShopState,
+    })
+  }
+
   async function loadShop() {
     const nextAccess = readStoredSessionAccess()
     const nextCode = getRequestedShopCode(nextAccess)
     const requestId = ++requestSequence
 
+    stopShopPolling()
     runtimeAccess = nextAccess
     requestedSessionCode = nextCode
     contextMessage = !nextCode
@@ -196,6 +269,7 @@
       if (requestId !== requestSequence) return
       if (nextState.status === 'rejected') throw nextState.reason
       syncShopState(nextState.value)
+      startShopPolling(nextCode, nextAccess, nextState.value)
       if (nextItems.status === 'fulfilled') {
         itemCatalog = nextItems.value
       } else {
@@ -252,7 +326,14 @@
         access,
       )
 
-      if (response.state) syncShopState(response.state)
+      if (response.state) {
+        syncShopState(response.state)
+        updateShopPollingVersion(response.state)
+
+        if (!isShopOpenState(response.state)) {
+          stopShopPolling()
+        }
+      }
 
       if (!response.accepted) {
         const message = response.errors.filter(Boolean).join(' ') || 'The expedition shop rejected the purchase command.'
@@ -271,8 +352,19 @@
     }
   }
 
+  function handleWindowStateChange() {
+    void loadShop()
+  }
+
   onMount(() => {
     void loadShop()
+    window.addEventListener('popstate', handleWindowStateChange)
+
+    return () => {
+      requestSequence += 1
+      stopShopPolling()
+      window.removeEventListener('popstate', handleWindowStateChange)
+    }
   })
 
   const runState = $derived(sessionState?.run ?? null)

@@ -5,7 +5,7 @@
   import { listCards, listPassives } from '../lib/api/content'
   import type { CardDefinition, PassiveDefinition } from '../lib/api/contentTypes'
   import { executeSessionCommand, getSessionState, kickPlayer, resetSession } from '../lib/api/sessions'
-  import type { PlayerStateDto, SessionStateDto } from '../lib/api/sessionTypes'
+  import type { PlayerStateDto, SessionRequestAccess, SessionStateDto } from '../lib/api/sessionTypes'
   import { getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
@@ -25,6 +25,10 @@
     sessionPageStateCopy,
     type SessionPageFeedback,
   } from '../lib/session/pageState'
+  import {
+    startLiveSessionPolling,
+    type LiveSessionPollingHandle,
+  } from '../lib/session/liveSessionPolling'
   import {
     removeSelectionHandoff,
     selectionHandoffKeys,
@@ -61,6 +65,7 @@
   let session = $state<SessionStateDto | null>(null)
   let runtimeAccess = $state<StoredSessionAccess | null>(null)
   let requestSequence = 0
+  let lobbyPolling: LiveSessionPollingHandle | null = null
   let actionPending = $state<'kick' | 'reset' | 'start' | null>(null)
   let referenceLoading = $state(true)
   let referenceErrorMessage = $state<string | null>(null)
@@ -386,12 +391,72 @@
     }
   }
 
+  function getGmSessionReadAccess(nextAccess: StoredSessionAccess | null): SessionRequestAccess | null {
+    if (!isStoredGmSessionAccess(nextAccess)) {
+      return null
+    }
+
+    return {
+      role: 'gm',
+      gmToken: nextAccess.gmToken,
+    }
+  }
+
+  function stopGmLobbyPolling() {
+    lobbyPolling?.stop()
+    lobbyPolling = null
+  }
+
+  function updateGmLobbyPollingVersion(nextSession: SessionStateDto) {
+    lobbyPolling?.updateVersion(nextSession.version)
+  }
+
+  function syncPolledGmLobbyState(nextSession: SessionStateDto) {
+    const nextRouteCode = routeSessionCode
+    const nextAccess = readStoredSessionAccess()
+
+    if (
+      !nextRouteCode ||
+      nextSession.sessionCode !== nextRouteCode ||
+      !isStoredGmSessionAccess(nextAccess) ||
+      !hasStoredSessionCode(nextAccess, nextRouteCode)
+    ) {
+      stopGmLobbyPolling()
+      return
+    }
+
+    runtimeAccess = nextAccess
+    syncLobbyState(nextSession)
+  }
+
+  function startGmLobbyPolling(
+    nextCode: string | null,
+    nextAccess: StoredSessionAccess | null,
+    nextSession: SessionStateDto,
+  ) {
+    stopGmLobbyPolling()
+
+    const access = getGmSessionReadAccess(nextAccess)
+
+    if (!nextCode || !access || !hasStoredSessionCode(nextAccess, nextCode)) {
+      return
+    }
+
+    lobbyPolling = startLiveSessionPolling({
+      code: nextCode,
+      access,
+      initialVersion: nextSession.version,
+      onState: syncPolledGmLobbyState,
+    })
+  }
+
   async function loadGmLobbyState() {
     const nextRouteCode = routeSessionCode
     const nextAccess = readStoredSessionAccess()
     const nextInvalidAccessMessage = getInvalidAccessMessage(nextRouteCode, nextAccess)
     const requestId = ++requestSequence
 
+    stopGmLobbyPolling()
     runtimeAccess = nextAccess
     invalidAccessMessage = nextInvalidAccessMessage
     loading = true
@@ -414,6 +479,7 @@
       }
 
       syncLobbyState(response)
+      startGmLobbyPolling(nextRouteCode, nextAccess, response)
     } catch (error) {
       if (requestId !== requestSequence) {
         return
@@ -458,6 +524,7 @@
       )
 
       syncLobbyState(response)
+      updateGmLobbyPollingVersion(response)
       kickReason = ''
       actionSuccessMessage = `${gmLobbyStateCopy.playerRemovedFeedback.message} (${selectedKickPlayerId})`
     } catch (error) {
@@ -499,6 +566,7 @@
       )
 
       syncLobbyState(response)
+      updateGmLobbyPollingVersion(response)
       actionSuccessMessage = gmLobbyStateCopy.sessionResetFeedback.message
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to reset the current session.')
@@ -547,6 +615,7 @@
 
       if (response.state) {
         syncLobbyState(response.state)
+        updateGmLobbyPollingVersion(response.state)
       }
 
       if (!response.accepted) {
@@ -581,6 +650,7 @@
     window.addEventListener('popstate', handleWindowStateChange)
 
     return () => {
+      stopGmLobbyPolling()
       window.removeEventListener('popstate', handleWindowStateChange)
     }
   })
