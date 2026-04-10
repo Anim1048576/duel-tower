@@ -53,3 +53,6 @@ out/
 
 ## logs ##
 /logs/**
+
+## codex-temp ##
+/.codex-temp/**
