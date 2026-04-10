@@ -13,12 +13,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
-import static org.springframework.http.HttpStatus.FORBIDDEN;
-import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @Service
 public class SessionLogService {
@@ -29,9 +26,11 @@ public class SessionLogService {
     private static final int MAX_LOG_LIMIT = 200;
 
     private final SessionService sessionService;
+    private final SessionAccessResolver sessionAccessResolver;
 
-    public SessionLogService(SessionService sessionService) {
+    public SessionLogService(SessionService sessionService, SessionAccessResolver sessionAccessResolver) {
         this.sessionService = sessionService;
+        this.sessionAccessResolver = sessionAccessResolver;
     }
 
     public SessionEventPageResponse getEvents(String code,
@@ -110,8 +109,7 @@ public class SessionLogService {
     }
 
     /**
-     * 공통 조회 입구: 세션 접근 + 권한 검증 + read 함수 실행.
-     * 이후 recent-results / results / run / inventory alias 조회도 이 경로를 재사용한다.
+     * Common read entry for events/logs. SESSION_READABLE policy is shared with SessionController.
      */
     private <T> T withAuthorizedRead(String code,
                                      String gmTokenHeader,
@@ -119,7 +117,7 @@ public class SessionLogService {
                                      Authentication authentication,
                                      Function<SessionRuntime, T> reader) {
         SessionRuntime rt = sessionService.get(code);
-        ensureReadable(rt, code, gmTokenHeader, playerTokenHeader, authentication);
+        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
         return reader.apply(rt);
     }
 
@@ -149,43 +147,4 @@ public class SessionLogService {
         return Math.min(v, maxLimit);
     }
 
-    private void ensureReadable(SessionRuntime rt,
-                                String code,
-                                String gmTokenHeader,
-                                String playerTokenHeader,
-                                Authentication authentication) {
-        String gmToken = normalizeToken(gmTokenHeader);
-        if (rt.gmToken().equals(gmToken)) {
-            return;
-        }
-
-        String resolvedPlayerId = sessionService.resolvePlayerIdByToken(code, playerTokenHeader);
-        if (resolvedPlayerId != null && rt.state().players().containsKey(new com.example.dueltower.engine.model.Ids.PlayerId(resolvedPlayerId))) {
-            return;
-        }
-
-        String username = authenticatedUsername(authentication);
-        if (username != null) {
-            if (username.equals(rt.gmId())) {
-                return;
-            }
-            if (rt.state().players().containsKey(new com.example.dueltower.engine.model.Ids.PlayerId(username))) {
-                return;
-            }
-            throw new ResponseStatusException(FORBIDDEN, "session read forbidden");
-        }
-
-        throw new ResponseStatusException(UNAUTHORIZED, "session read authorization required");
-    }
-
-    private static String normalizeToken(String token) {
-        return token == null ? "" : token.trim();
-    }
-
-    private static String authenticatedUsername(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
-            return null;
-        }
-        return authentication.getName();
-    }
 }

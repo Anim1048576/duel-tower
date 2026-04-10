@@ -3,9 +3,9 @@ package com.example.dueltower.session.api;
 import com.example.dueltower.common.api.ApiErrorResolver;
 import com.example.dueltower.engine.command.*;
 import com.example.dueltower.engine.core.EngineResult;
-import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.content.equip.service.EquipService;
 import com.example.dueltower.content.item.service.ItemService;
+import com.example.dueltower.session.service.SessionAccessResolver;
 import com.example.dueltower.session.service.SessionService;
 import com.example.dueltower.session.dto.*;
 import com.example.dueltower.session.runtime.SessionRuntime;
@@ -29,9 +29,17 @@ import static org.springframework.http.HttpStatus.NO_CONTENT;
 public class SessionController {
 
     private final SessionService sessionService;
+    private final SessionAccessResolver sessionAccessResolver;
+    private final SessionCommandAuthorization sessionCommandAuthorization;
 
-    public SessionController(SessionService sessionService, ItemService itemService, EquipService equipService) {
+    public SessionController(SessionService sessionService,
+                             SessionAccessResolver sessionAccessResolver,
+                             SessionCommandAuthorization sessionCommandAuthorization,
+                             ItemService itemService,
+                             EquipService equipService) {
         this.sessionService = sessionService;
+        this.sessionAccessResolver = sessionAccessResolver;
+        this.sessionCommandAuthorization = sessionCommandAuthorization;
         StateMapper.configureContentServices(itemService, equipService);
     }
 
@@ -70,7 +78,7 @@ public class SessionController {
                                                @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                                Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        validateSessionReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
         return rt.withLock(() -> new RecentResultsResponse(
                 rt.state().version(),
                 rt.state().runState().resultPending(),
@@ -85,7 +93,7 @@ public class SessionController {
                            @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                            Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        validateSessionReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
         return rt.withLock(() -> StateMapper.toRunDto(rt.state().runState()));
     }
 
@@ -95,7 +103,7 @@ public class SessionController {
                                                  @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                                  Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        validateSessionReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
         return rt.withLock(() -> new SessionRunInventoryResponse(
                 rt.state().version(),
                 StateMapper.toInventoryDto(rt.state().runState())
@@ -108,7 +116,7 @@ public class SessionController {
                                          @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                          Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        validateSessionReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
         return rt.withLock(() -> new RecentResultsResponse(
                 rt.state().version(),
                 rt.state().runState().resultPending(),
@@ -123,7 +131,7 @@ public class SessionController {
                                              @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                              Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        validateSessionReadAccess(rt, gmTokenHeader, playerTokenHeader, authentication);
+        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
         return rt.withLock(() -> new SessionRunChoicesResponse(
                 rt.state().version(),
                 rt.state().runState().resultPending(),
@@ -173,10 +181,13 @@ public class SessionController {
             throw new ResponseStatusException(BAD_REQUEST, "ownedCardIndex is required");
         }
 
-        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
-        if (!playerId.equals(actorPlayerId)) {
-            throw new ResponseStatusException(FORBIDDEN, "players may only forget their own cards");
-        }
+        SessionRuntime runtime = sessionService.get(code);
+        String actorPlayerId = sessionAccessResolver.requirePlayerSelf(
+                runtime,
+                playerTokenHeader,
+                playerId,
+                "players may only forget their own cards"
+        );
 
         sessionService.forgetOwnedCard(code, actorPlayerId, playerId, req.ownedCardIndex());
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
@@ -191,10 +202,13 @@ public class SessionController {
             throw new ResponseStatusException(BAD_REQUEST, "deckOwnedCardIds is required");
         }
 
-        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
-        if (!playerId.equals(actorPlayerId)) {
-            throw new ResponseStatusException(FORBIDDEN, "players may only edit their own deck");
-        }
+        SessionRuntime runtime = sessionService.get(code);
+        String actorPlayerId = sessionAccessResolver.requirePlayerSelf(
+                runtime,
+                playerTokenHeader,
+                playerId,
+                "players may only edit their own deck"
+        );
         sessionService.updateDeck(code, actorPlayerId, playerId, req.requestedDeckOwnedCardIds());
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
@@ -207,10 +221,13 @@ public class SessionController {
         if (req == null) {
             throw new ResponseStatusException(BAD_REQUEST, "request body is required");
         }
-        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
-        if (!playerId.equals(actorPlayerId)) {
-            throw new ResponseStatusException(FORBIDDEN, "players may only edit their own loadout");
-        }
+        SessionRuntime runtime = sessionService.get(code);
+        String actorPlayerId = sessionAccessResolver.requirePlayerSelf(
+                runtime,
+                playerTokenHeader,
+                playerId,
+                "players may only edit their own loadout"
+        );
         sessionService.updateLoadout(
                 code,
                 actorPlayerId,
@@ -231,10 +248,13 @@ public class SessionController {
         if (req == null || req.presetId() == null) {
             throw new ResponseStatusException(BAD_REQUEST, "presetId is required");
         }
-        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
-        if (!playerId.equals(actorPlayerId)) {
-            throw new ResponseStatusException(FORBIDDEN, "players may only edit their own loadout");
-        }
+        SessionRuntime runtime = sessionService.get(code);
+        String actorPlayerId = sessionAccessResolver.requirePlayerSelf(
+                runtime,
+                playerTokenHeader,
+                playerId,
+                "players may only edit their own loadout"
+        );
         sessionService.applyPresetToLoadout(code, actorPlayerId, playerId, req.presetId());
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
@@ -247,10 +267,13 @@ public class SessionController {
         if (req == null || req.ready() == null) {
             throw new ResponseStatusException(BAD_REQUEST, "ready is required");
         }
-        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
-        if (!playerId.equals(actorPlayerId)) {
-            throw new ResponseStatusException(FORBIDDEN, "players may only update their own ready state");
-        }
+        SessionRuntime runtime = sessionService.get(code);
+        String actorPlayerId = sessionAccessResolver.requirePlayerSelf(
+                runtime,
+                playerTokenHeader,
+                playerId,
+                "players may only update their own ready state"
+        );
         sessionService.setPlayerReady(code, actorPlayerId, playerId, req.ready());
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
@@ -258,7 +281,8 @@ public class SessionController {
     @PostMapping("/{code}/leave")
     public SessionStateDto leave(@PathVariable String code,
                                  @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader) {
-        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
+        SessionRuntime runtime = sessionService.get(code);
+        String actorPlayerId = sessionAccessResolver.requirePlayerToken(runtime, playerTokenHeader);
         sessionService.leaveSession(code, actorPlayerId);
         return sessionService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
@@ -268,7 +292,8 @@ public class SessionController {
                                 @PathVariable String playerId,
                                 @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
                                 @RequestBody(required = false) KickPlayerRequest req) {
-        SessionRuntime rt = requireGmSession(code, gmTokenHeader);
+        SessionRuntime rt = sessionService.get(code);
+        sessionAccessResolver.requireGm(rt, gmTokenHeader);
         if (req != null && req.reason() != null && !req.reason().isBlank()) {
             log.info("session kick code={} playerId={} reason={}", code, playerId, req.reason().trim());
         }
@@ -280,7 +305,8 @@ public class SessionController {
     public SessionStateDto reset(@PathVariable String code,
                                  @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
                                  @RequestBody(required = false) ResetSessionRequest req) {
-        SessionRuntime rt = requireGmSession(code, gmTokenHeader);
+        SessionRuntime rt = sessionService.get(code);
+        sessionAccessResolver.requireGm(rt, gmTokenHeader);
         ResetSessionRequest resetReq = (req == null) ? new ResetSessionRequest(null, null, null) : req;
         sessionService.resetSession(rt.code(), resetReq.keepPlayersOrDefault(), resetReq.keepLoadoutsOrDefault(), resetReq.newSeed());
         return sessionService.withSessionLock(code, lockedRt -> StateMapper.toDto(lockedRt.code(), lockedRt.state()));
@@ -290,7 +316,8 @@ public class SessionController {
     @ResponseStatus(NO_CONTENT)
     public void delete(@PathVariable String code,
                        @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader) {
-        requireGmSession(code, gmTokenHeader);
+        SessionRuntime rt = sessionService.get(code);
+        sessionAccessResolver.requireGm(rt, gmTokenHeader);
         sessionService.deleteSession(code);
     }
 
@@ -311,16 +338,7 @@ public class SessionController {
         UUID commandId = parseOrNewUuid(req.commandId());
         SessionCommandType commandType = SessionCommandType.from(req.type());
 
-        if (commandType.requiresPlayerId()) {
-            requirePlayer(req.trimmedPlayerId());
-            validateStartCombatAuthority(rt, gmTokenHeader);
-        }
-
-        validatePlayerAuthorityIfRequired(code, playerTokenHeader, req, commandType);
-
-        if (commandType.requiresGmAuthorization()) {
-            validateStartCombatAuthority(rt, gmTokenHeader);
-        }
+        sessionCommandAuthorization.authorize(rt, commandType, req, gmTokenHeader, playerTokenHeader);
 
         log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} summonId={} itemId={} count={} reason={} discardIds={} targetPlayers={} targetEnemies={} targets={}",
                 code,
@@ -373,64 +391,6 @@ public class SessionController {
         return authentication.getName();
     }
 
-    private String resolveActorPlayerId(String code, String playerTokenHeader) {
-        String mappedPlayerId = sessionService.resolvePlayerIdByToken(code, playerTokenHeader);
-        if (mappedPlayerId != null && !mappedPlayerId.isBlank()) {
-            return mappedPlayerId;
-        }
-
-        throw new ResponseStatusException(UNAUTHORIZED, "player authorization required");
-    }
-
-    private static void validateStartCombatAuthority(SessionRuntime rt, String gmTokenHeader) {
-        String token = (gmTokenHeader == null) ? "" : gmTokenHeader.trim();
-        if (!token.isEmpty() && rt.gmToken().equals(token)) {
-            return;
-        }
-
-        log.warn("START_COMBAT unauthorized: invalid GM token for code={}", rt.code());
-        throw new ResponseStatusException(UNAUTHORIZED, "gm authorization required");
-    }
-
-    private void validateSessionReadAccess(SessionRuntime rt,
-                                           String gmTokenHeader,
-                                           String playerTokenHeader,
-                                           Authentication authentication) {
-        String gmToken = (gmTokenHeader == null) ? "" : gmTokenHeader.trim();
-        if (!gmToken.isEmpty() && rt.gmToken().equals(gmToken)) {
-            return;
-        }
-
-        String actorPlayerId = rt.withLock(() -> {
-            String token = (playerTokenHeader == null) ? "" : playerTokenHeader.trim();
-            if (token.isEmpty()) {
-                return null;
-            }
-            return rt.findPlayerIdByToken(token);
-        });
-        if (actorPlayerId != null) {
-            return;
-        }
-
-        if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())) {
-            String username = authentication.getName();
-            if (rt.gmId().equals(username)) {
-                return;
-            }
-            if (rt.state().players().containsKey(new PlayerId(username))) {
-                return;
-            }
-        }
-
-        throw new ResponseStatusException(UNAUTHORIZED, "participant or gm authorization required");
-    }
-
-    private SessionRuntime requireGmSession(String code, String gmTokenHeader) {
-        SessionRuntime rt = sessionService.get(code);
-        validateStartCombatAuthority(rt, gmTokenHeader);
-        return rt;
-    }
-
     private static UUID parseOrNewUuid(String v) {
         if (v == null || v.isBlank()) return UUID.randomUUID();
         try {
@@ -438,32 +398,5 @@ public class SessionController {
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(BAD_REQUEST, "invalid commandId uuid");
         }
-    }
-
-    private static PlayerId parsePlayerId(String playerId) {
-        requirePlayer(playerId);
-        return new PlayerId(playerId.trim());
-    }
-
-    private static String requireText(String value, String fieldName) {
-        if (value == null || value.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, fieldName + " is required");
-        }
-        return value.trim();
-    }
-
-    private void validatePlayerAuthorityIfRequired(String code, String playerTokenHeader, CommandRequest req, SessionCommandType commandType) {
-        if (!commandType.requiresPlayerAuthorization()) {
-            return;
-        }
-        String requestPlayerId = requireText(req.trimmedPlayerId(), "playerId");
-        String actorPlayerId = resolveActorPlayerId(code, playerTokenHeader);
-        if (!requestPlayerId.equals(actorPlayerId)) {
-            throw new ResponseStatusException(FORBIDDEN, "playerId mismatch");
-        }
-    }
-
-    private static void requirePlayer(String playerId) {
-        requireText(playerId, "playerId");
     }
 }

@@ -62,6 +62,26 @@ class SessionCommandAuthIntegrationTest {
     }
 
     @Test
+    void playerAuthCommandWithInvalidPlayerTokenReturns401() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        String code = createSession(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
+        joinAsPlayer(playerSession, code, "player1");
+
+        mockMvc.perform(post("/api/sessions/{code}/command", code)
+                        .header("X-Player-Token", "not-a-valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "DRAW",
+                                  "playerId": "player1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("플레이어 인증 커맨드는 다른 플레이어의 토큰이면 403을 반환한다")
     void playerAuthCommandWithDifferentPlayersTokenReturns403() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
@@ -124,6 +144,38 @@ class SessionCommandAuthIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void startCombatRequiresGmTokenAndAllowsValidGmToken() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSessionInfo(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, info.code(), "player1");
+
+        mockMvc.perform(post("/api/sessions/{code}/command", info.code())
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "START_COMBAT",
+                                  "playerId": "player1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/sessions/{code}/command", info.code())
+                        .header("X-GM-Token", info.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "START_COMBAT",
+                                  "playerId": "player1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -335,6 +387,10 @@ class SessionCommandAuthIntegrationTest {
     }
 
     private String createSession(MockHttpSession session, String gmId) throws Exception {
+        return createSessionInfo(session, gmId).code();
+    }
+
+    private SessionInfo createSessionInfo(MockHttpSession session, String gmId) throws Exception {
         MvcResult create = mockMvc.perform(post("/api/sessions")
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -347,7 +403,7 @@ class SessionCommandAuthIntegrationTest {
                 .andReturn();
 
         JsonNode node = JSON.readTree(create.getResponse().getContentAsString());
-        return node.get("code").asText();
+        return new SessionInfo(node.get("code").asText(), node.get("gmToken").asText());
     }
 
     private String joinAsPlayer(MockHttpSession session, String code, String playerId) throws Exception {
@@ -387,4 +443,6 @@ class SessionCommandAuthIntegrationTest {
         JsonNode node = JSON.readTree(join.getResponse().getContentAsString());
         return node.get("playerToken").asText();
     }
+
+    private record SessionInfo(String code, String gmToken) {}
 }

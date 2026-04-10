@@ -67,6 +67,42 @@ class SessionRecentResultsIntegrationTest {
     }
 
     @Test
+    void recentResultsWithInvalidTokenReturns401() throws Exception {
+        SessionFixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/sessions/{code}/recent-results", fixture.code)
+                        .header("X-Player-Token", "not-a-valid-token"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/sessions/{code}/recent-results", fixture.code)
+                        .header("X-GM-Token", "not-a-valid-token"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void recentResultsAllowsAuthenticatedParticipantOrGmWithoutTokenHeader() throws Exception {
+        SessionFixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/sessions/{code}/recent-results", fixture.code)
+                        .session(fixture.gmSession))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/sessions/{code}/recent-results", fixture.code)
+                        .session(fixture.playerSession))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void recentResultsReturns403ForAuthenticatedNonParticipant() throws Exception {
+        SessionFixture fixture = createFixture();
+        MockHttpSession otherSession = signUpAndLogin("other", "other@example.com", "password123");
+
+        mockMvc.perform(get("/api/sessions/{code}/recent-results", fixture.code)
+                        .session(otherSession))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void runAliasEndpointsRequireParticipantOrGmAuth() throws Exception {
         SessionFixture fixture = createFixture();
 
@@ -107,6 +143,22 @@ class SessionRecentResultsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.availableChoices").isArray())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.inventory").doesNotExist());
+    }
+
+    @Test
+    void runAliasEndpointsAllowGmTokenAndAuthenticatedParticipant() throws Exception {
+        SessionFixture fixture = createFixture();
+        String[] endpoints = {"/run", "/inventory", "/results", "/choices"};
+
+        for (String endpoint : endpoints) {
+            mockMvc.perform(get("/api/sessions/{code}" + endpoint, fixture.code)
+                            .header("X-GM-Token", fixture.gmToken))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(get("/api/sessions/{code}" + endpoint, fixture.code)
+                            .session(fixture.playerSession))
+                    .andExpect(status().isOk());
+        }
     }
 
     @Test
@@ -178,7 +230,9 @@ class SessionRecentResultsIntegrationTest {
         return new SessionFixture(
                 createNode.get("code").asText(),
                 createNode.get("gmToken").asText(),
-                joinNode.get("playerToken").asText()
+                joinNode.get("playerToken").asText(),
+                gmSession,
+                playerSession
         );
     }
 
@@ -266,6 +320,8 @@ class SessionRecentResultsIntegrationTest {
     private record SessionFixture(
             String code,
             String gmToken,
-            String playerToken
+            String playerToken,
+            MockHttpSession gmSession,
+            MockHttpSession playerSession
     ) {}
 }

@@ -104,6 +104,36 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    void gmOnlyEndpointsRejectPlayerTokenAndInvalidGmToken() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, info.code(), "player1");
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/kick", info.code(), "player1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/sessions/{code}/reset", info.code())
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/sessions/{code}/reset", info.code())
+                        .header("X-GM-Token", "not-a-valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(delete("/api/sessions/{code}", info.code())
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("리셋은 기본값으로 플레이어를 유지하고 run state를 다시 초기화한다")
     void resetKeepsPlayersByDefaultAndReinitializesRunState() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");

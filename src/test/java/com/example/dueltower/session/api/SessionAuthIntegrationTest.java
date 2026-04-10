@@ -80,6 +80,27 @@ class SessionAuthIntegrationTest {
     }
 
     @Test
+    void publicStateEndpointsAllowAnonymousAccess() throws Exception {
+        MockHttpSession session = signUpAndLogin("tester", "tester@example.com", "password123");
+
+        MvcResult createResult = mockMvc.perform(post("/api/sessions")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"gmId\":\"tester\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String code = extractJsonStringValue(createResult.getResponse().getContentAsString(), "code");
+
+        mockMvc.perform(get("/api/sessions/{code}", code))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionCode").value(code));
+
+        mockMvc.perform(get("/api/sessions/{code}/state", code))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionCode").value(code));
+    }
+
+    @Test
     void joinSessionAcceptsCharacterIdAndUsesServerCharacterData() throws Exception {
         MockHttpSession session = signUpAndLogin("tester", "tester@example.com", "password123");
 
@@ -214,8 +235,7 @@ class SessionAuthIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state.players.tester.deck.length()").value(0));
 
-        mockMvc.perform(get("/api/sessions/{code}/state", code)
-                        .session(session))
+        mockMvc.perform(get("/api/sessions/{code}/state", code))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.players.tester.deck.length()").value(0));
     }
@@ -276,7 +296,6 @@ class SessionAuthIntegrationTest {
                 .andReturn().getResponse().getContentAsString(), "playerToken");
 
         mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, "alice")
-                        .session(alice)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -286,7 +305,16 @@ class SessionAuthIntegrationTest {
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, "alice")
-                        .session(alice)
+                        .header("X-Player-Token", "not-a-valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, "alice")
                         .header("X-Player-Token", bobToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -297,7 +325,6 @@ class SessionAuthIntegrationTest {
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, "alice")
-                        .session(alice)
                         .header("X-Player-Token", aliceToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

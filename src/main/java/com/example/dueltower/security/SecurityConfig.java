@@ -37,20 +37,20 @@ public class SecurityConfig {
                         .requestMatchers(SecurityPaths.AUTH_PUBLIC).permitAll()
                         .requestMatchers(SecurityPaths.AUTH_REQUIRED).authenticated()
 
-                        .requestMatchers(SecurityPaths.SESSION_JOIN_METHOD, SecurityPaths.SESSION_AUTH_REQUIRED).authenticated()
+                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.SESSION_LOGIN_REQUIRED).authenticated()
                         .requestMatchers(
                                 SecurityPaths.SESSION_READ_METHOD,
-                                SecurityPaths.SESSION_READ_PUBLIC
+                                SecurityPaths.SESSION_PUBLIC
                         ).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_COMMAND).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_LEAVE).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_RESET).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_DELETE_METHOD, SecurityPaths.SESSION_DELETE).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_KICK).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_DECK).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_LOADOUT).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_LOADOUT_PRESET).permitAll()
-                        .requestMatchers(SecurityPaths.SESSION_FORGET).permitAll()
+                        .requestMatchers(
+                                SecurityPaths.SESSION_READ_METHOD,
+                                SecurityPaths.SESSION_READABLE
+                        ).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.SESSION_PLAYER_SELF_POST).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_UPDATE_METHOD, SecurityPaths.SESSION_PLAYER_SELF_PUT).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.SESSION_GM_ONLY_POST).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_DELETE_METHOD, SecurityPaths.SESSION_GM_ONLY_DELETE).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.SESSION_COMMAND).permitAll()
                         .requestMatchers(SecurityPaths.API_ALL).authenticated()
 
                         .anyRequest().permitAll()
