@@ -22,10 +22,28 @@
     SessionStateDto,
   } from '../lib/api/sessionTypes'
   import { getApiErrorMessage } from '../lib/api/types'
+  import BattlefieldPanel from '../lib/components/combat/BattlefieldPanel.svelte'
+  import CombatHeader from '../lib/components/combat/CombatHeader.svelte'
+  import CombatLayout from '../lib/components/combat/CombatLayout.svelte'
+  import CombatSidebar from '../lib/components/combat/CombatSidebar.svelte'
+  import HandBar from '../lib/components/combat/HandBar.svelte'
+  import type {
+    CombatActorSummary,
+    CombatCommandRequirementViewModel,
+    CombatEnemyViewModel,
+    CombatFeedEntry,
+    CombatPlayerViewModel,
+    CombatRecentResultEntry,
+    CombatStatusViewModel,
+    CombatSummonViewModel,
+    CombatTag,
+    CombatTone,
+    CombatMetric,
+    CommandOptionViewModel,
+    ResolvedCombatCardViewModel,
+  } from '../lib/components/combat/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
-  import StatBlock from '../lib/components/StatBlock.svelte'
-  import TagChip from '../lib/components/TagChip.svelte'
   import { buildCardArchiveMeta, buildCardDisplayTags, getCardTypeLabel } from '../lib/content/display'
   import { pathBuilders, resolveRouteMatch } from '../lib/navigation'
   import {
@@ -51,55 +69,6 @@
     selectionHandoffKeys,
     setSelectionHandoff,
   } from '../lib/selectionHandoff'
-
-  type CombatTone = 'accent' | 'muted' | 'success' | 'warning'
-
-  type CombatMetric = {
-    label: string
-    value: string | number
-    note: string
-  }
-
-  type CombatTag = {
-    label: string
-    tone?: CombatTone
-  }
-
-  type CombatActorSummary = {
-    raw: string | null
-    kind: 'player' | 'enemy' | 'unknown' | 'none'
-    id: string | null
-    label: string
-    note: string
-    tone: CombatTone
-  }
-
-  type CombatStatusViewModel = {
-    sessionCode: string
-    version: number
-    round: number | null
-    currentTurnPlayer: string | null
-    phase: string | null
-    currentTurnLabel: string
-    currentTurnTone: CombatTone
-    currentTurnNote: string
-    turnOrderSummary: string
-    battlefieldSummary: string
-    runSummary: string
-    initiativeSummary: string
-    tieGroupSummary: string
-  }
-
-  type ResolvedCombatCardViewModel = {
-    instanceId: string
-    defId: string | null
-    title: string
-    subtitle: string
-    meta: string
-    description: string
-    unresolved: boolean
-    tags: CombatTag[]
-  }
 
   type CombatPlayTargetType =
     | 'NONE'
@@ -151,54 +120,6 @@
   type CombatResolvedPlaySpec = {
     target: CombatPlayTargetSpec
     extraRequirements: CombatExtraPlayRequirement[]
-  }
-
-  type CombatCommandRequirementViewModel = {
-    sourceLabel: string
-    targetSummary: string
-    discardSummary: string
-    fieldSelectionSummary: string
-    choiceSummary: string
-  }
-
-  type CombatPlayerViewModel = {
-    playerId: string
-    ready: boolean
-    stateLabel: string
-    stateTone: CombatTone
-    metrics: CombatMetric[]
-    summaryLines: string[]
-    statusTags: CombatTag[]
-    passives: string[]
-    handCards: ResolvedCombatCardViewModel[]
-    fieldCards: ResolvedCombatCardViewModel[]
-    graveCards: ResolvedCombatCardViewModel[]
-    excludedCards: ResolvedCombatCardViewModel[]
-  }
-
-  type CombatEnemyViewModel = {
-    enemyId: string
-    stateLabel: string
-    stateTone: CombatTone
-    metrics: CombatMetric[]
-    summaryLines: string[]
-    statusEntries: string[]
-  }
-
-  type CombatSummonViewModel = {
-    summonId: string
-    owner: string
-    stateLabel: string
-    stateTone: CombatTone
-    metrics: CombatMetric[]
-    summaryLines: string[]
-  }
-
-  type CommandOptionViewModel = {
-    id: CombatCommandType
-    title: string
-    note: string
-    disabled: boolean
   }
 
   const combatSidebarEventLimit = 12
@@ -1275,6 +1196,13 @@
     )
   }
 
+  function handleSelectedReasonChange(value: string) {
+    commandDraft = {
+      ...commandDraft,
+      selectedReason: value,
+    }
+  }
+
   function clearCommandMessages() {
     commandErrorMessage = null
     commandRejectedMessage = null
@@ -2062,6 +1990,66 @@
       ] satisfies CommandOptionViewModel[],
   )
 
+  const currentTurnStateLabel = $derived.by(() =>
+    currentTurnActor.kind === 'enemy'
+      ? 'Enemy acting'
+      : currentTurnActor.kind === 'player'
+        ? 'Player acting'
+        : 'Turn pending',
+  )
+  const selectedTargetLabels = $derived.by(() =>
+    commandDraft.selectedTargets.map((target) => formatTargetSelectionLabel(target)),
+  )
+  const commandGuardMessage = $derived.by(
+    () =>
+      `Expected version ${commandGuards.expectedVersion ?? 'N/A'} | Current actor ${statusView?.currentTurnLabel ?? 'Unavailable'} | Runtime role ${commandGuards.role}`,
+  )
+  const eventFeedEntries = $derived.by(
+    () =>
+      mergedEventItems.map((event) => ({
+        title: event.type,
+        lines: [
+          `Version ${event.version} | Cursor ${event.cursor}`,
+          formatSidebarTimestamp(event.timestamp),
+        ],
+      })) satisfies CombatFeedEntry[],
+  )
+  const logFeedEntries = $derived.by(
+    () =>
+      logItems.map((log) => ({
+        title: log.type,
+        lines: [log.message, `Version ${log.version} | ${formatSidebarTimestamp(log.timestamp)}`],
+      })) satisfies CombatFeedEntry[],
+  )
+  const recentResultEntries = $derived.by(
+    () =>
+      (recentResults?.recentResults ?? []).map((result) => ({
+        title: result.title,
+        summary: result.summary,
+        meta: `${result.type} | ${result.at ?? 'Time unavailable'}`,
+      })) satisfies CombatRecentResultEntry[],
+  )
+  const runNodeSummary = $derived.by(
+    () =>
+      `Run node: ${runState?.currentNode?.name ?? 'Unavailable'} | Result pending: ${runState?.resultPending ? 'Yes' : 'No'}`,
+  )
+
+  function handleCommandButtonClick(commandType: string) {
+    const nextCommandType = commandType as CombatCommandType
+
+    handleSelectCommand(nextCommandType)
+
+    if (
+      nextCommandType === 'END_TURN' ||
+      nextCommandType === 'DRAW' ||
+      nextCommandType === 'CLEAR_RECENT_RESULTS'
+    ) {
+      void handleSimpleCommand(nextCommandType)
+    } else if (nextCommandType === 'PLAY_CARD' || nextCommandType === 'USE_EX') {
+      void handlePlayerCardCommand(nextCommandType)
+    }
+  }
+
   $effect(() => {
     if (selectedCommandDefId) {
       void ensureCardDetail(selectedCommandDefId)
@@ -2136,1001 +2124,144 @@
       </div>
     </SectionFrame>
   {:else if session && statusView}
-    <SectionFrame
-      eyebrow="Combat Status"
-      title="Combat Command"
-      description="The combat shell now emphasizes the current turn owner, battlefield pressure, and recent combat feedback before deeper command controls."
-    >
-      <div class="combat-page__status-bar">
-        <div class="combat-page__status-stats">
-          <StatBlock
-            value={statusView.round ?? 'Pending'}
-            label="Round"
-            note={statusView.round !== null ? 'Current combat round' : 'Combat state not active yet'}
-          />
-          <StatBlock
-            value={statusView.currentTurnLabel}
-            label="Current Turn"
-            note={statusView.currentTurnNote}
-          />
-          <StatBlock
-            value={statusView.phase ?? 'Pending'}
-            label="Phase"
-            note={statusView.turnOrderSummary}
-          />
-          <StatBlock
-            value={statusView.version}
-            label="Version"
-            note={statusView.battlefieldSummary}
-          />
-        </div>
+    <CombatLayout>
+      {#snippet header()}
+        <CombatHeader
+          {statusView}
+          {accessRoleLabel}
+          combatStateLive={Boolean(combatState)}
+          currentTurnStateLabel={currentTurnStateLabel}
+          {recentResultsLoading}
+          {recentResultsErrorMessage}
+          {latestRecentResult}
+          {accessNoticeMessage}
+          {catalogErrorMessage}
+          {commandErrorMessage}
+          {commandRejectedMessage}
+          {commandSuccessMessage}
+        />
+      {/snippet}
 
-        <div class="combat-page__status-tags">
-          <TagChip label={statusView.sessionCode} tone="accent" />
-          <TagChip label={accessRoleLabel} tone="success" />
-          <TagChip
-            label={combatState ? 'Combat state live' : 'Pre-combat state'}
-            tone={combatState ? 'warning' : 'muted'}
-          />
-          <TagChip label={currentTurnActor.kind === 'enemy' ? 'Enemy acting' : currentTurnActor.kind === 'player' ? 'Player acting' : 'Turn pending'} tone={currentTurnActor.tone} />
-        </div>
-      </div>
+      {#snippet field()}
+        <BattlefieldPanel
+          {playerViews}
+          {enemyViews}
+          {summonViews}
+          currentTurnPlayerId={currentTurnActor.kind === 'player' ? currentTurnActor.id : null}
+          currentEnemyId={currentEnemyView?.enemyId ?? null}
+          visiblePlayerId={visiblePlayerView?.playerId ?? null}
+          selectedPlayerId={commandDraft.selectedPlayerId}
+          selectedTargets={commandDraft.selectedTargets}
+          onSelectPlayer={handleSelectPlayer}
+          onToggleTargetPlayer={handleToggleTargetPlayer}
+          onToggleTargetEnemy={handleSelectEnemy}
+          onToggleTargetSummon={handleToggleTargetSummon}
+        />
+      {/snippet}
 
-      <div class="combat-page__overview-grid">
-        <article class={`combat-page__spotlight-card combat-page__spotlight-card--${statusView.currentTurnTone}`}>
-          <strong>Current turn</strong>
-          <h3>{statusView.currentTurnLabel}</h3>
-          <p>{statusView.currentTurnNote}</p>
-          <p>Turn order: {statusView.turnOrderSummary}</p>
-        </article>
+      {#snippet sidebar()}
+        <CombatSidebar
+          {commandOptions}
+          commandPending={commandPending}
+          selectedCommandType={commandDraft.selectedCommandType}
+          commandGuardMessage={commandGuardMessage}
+          isCurrentTurnPlayer={commandGuards.isCurrentTurnPlayer}
+          hasPendingDecision={commandGuards.hasPendingDecision}
+          exAvailable={commandGuards.exAvailable}
+          recentCommandEventCount={recentCommandEvents.length}
+          requirementView={selectedCommandRequirementView}
+          sourceLabel={selectedCommandSourceLabel}
+          detailLoading={selectedCommandDetailLoading}
+          detailError={selectedCommandDetailError}
+          selectedTargetLabels={selectedTargetLabels}
+          selectedDiscardIds={selectedDiscardIdsFromHand}
+          selectedFieldIds={selectedFieldIds}
+          pendingDecision={runtimePendingDecision}
+          unsupportedPendingDecisionMessage={unsupportedPendingDecisionMessage}
+          {pendingCandidateIds}
+          {orderedTieActorKeys}
+          canResolvePendingCommand={commandGuards.canResolvePendingCommand}
+          {visiblePlayerView}
+          eventEntries={eventFeedEntries}
+          {eventsLoading}
+          {eventsErrorMessage}
+          logEntries={logFeedEntries}
+          {logsLoading}
+          {logsErrorMessage}
+          recentResultEntries={recentResultEntries}
+          {recentResultsLoading}
+          {recentResultsErrorMessage}
+          onCommandButtonClick={handleCommandButtonClick}
+          onClearTargets={handleClearSelectedTargets}
+          onClearSelectionInputs={handleClearSelectionInputs}
+          onTogglePendingSelectedId={handleTogglePendingSelectedId}
+          onToggleOrderedActorKey={handleToggleOrderedActorKey}
+          onResolvePendingDecision={() => void handlePendingDecisionCommand()}
+          onToggleSelectedId={handleToggleSelectedId}
+          onRetryEvents={() => void loadCombatEvents()}
+          onRetryLogs={() => void loadCombatLogs()}
+          onRetryResults={() => void loadCombatRecentResults()}
+        />
+      {/snippet}
 
-        <article class="combat-page__spotlight-card">
-          <strong>Battlefield</strong>
-          <h3>{statusView.battlefieldSummary}</h3>
-          <p>{statusView.initiativeSummary} | {statusView.tieGroupSummary}</p>
-          <p>{statusView.runSummary}</p>
-        </article>
-
-        <article class="combat-page__spotlight-card">
-          <strong>Recent feedback</strong>
-          {#if recentResultsLoading}
-            <h3>Loading recent results</h3>
-            <p>Restoring the latest combat-facing result summary.</p>
-          {:else if recentResultsErrorMessage}
-            <h3>Recent result unavailable</h3>
-            <p>{recentResultsErrorMessage}</p>
-          {:else if latestRecentResult}
-            <h3>{latestRecentResult.title}</h3>
-            <p>{latestRecentResult.summary}</p>
-            <p>{latestRecentResult.type} | {latestRecentResult.at ?? 'Time unavailable'}</p>
-          {:else}
-            <h3>No recent result yet</h3>
-            <p>The current combat flow has not produced a recent-result summary yet.</p>
-          {/if}
-        </article>
-      </div>
-
-      {#if accessNoticeMessage}
-        <ContentStatePanel title="Combat access status" message={accessNoticeMessage} />
-      {/if}
-
-      {#if catalogErrorMessage}
-        <ContentStatePanel title="Card archive unavailable" message={catalogErrorMessage} />
-      {/if}
-
-      {#if commandErrorMessage}
-        <ContentStatePanel title="Command request failed" message={commandErrorMessage} tone="error" />
-      {:else if commandRejectedMessage}
-        <ContentStatePanel title="Command rejected" message={commandRejectedMessage} tone="error" />
-      {:else if commandSuccessMessage}
-        <ContentStatePanel title="Command accepted" message={commandSuccessMessage} />
-      {/if}
-    </SectionFrame>
-
-    <div class="combat-page__main">
-      <div class="combat-page__field">
-        <SectionFrame
-          title="Player side"
-          description="Player cards highlight live zones, EX state, passives, and pending decisions. Player HP/AP is not exposed in the current player session payload."
-        >
-          {#if playerViews.length > 0}
-            <div class="combat-page__unit-list">
-              {#each playerViews as player}
-                <article
-                  class="combat-page__unit-card"
-                  class:combat-page__unit-card--active-turn={currentTurnActor.kind === 'player' && currentTurnActor.id === player.playerId}
-                >
-                  <div class="combat-page__unit-head">
-                    <div>
-                      <h3>{player.playerId}</h3>
-                      <p>{player.ready ? 'Ready participant' : 'Joined participant'} | Hand and zone state</p>
-                    </div>
-                    <div class="combat-page__tag-row">
-                      {#if currentTurnActor.kind === 'player' && currentTurnActor.id === player.playerId}
-                        <TagChip label="Current turn" tone="success" />
-                      {/if}
-                      {#if visiblePlayerView?.playerId === player.playerId}
-                        <TagChip label="Visible hand" tone="accent" />
-                      {/if}
-                      <TagChip label={player.stateLabel} tone={player.stateTone} />
-                    </div>
-                  </div>
-
-                  <div class="combat-page__metric-grid">
-                    {#each player.metrics as metric}
-                      <div class="combat-page__metric-card">
-                        <strong>{metric.value}</strong>
-                        <span>{metric.label}</span>
-                        <p>{metric.note}</p>
-                      </div>
-                    {/each}
-                  </div>
-
-                  {#each player.summaryLines as line}
-                    <p class="combat-page__unit-note">{line}</p>
-                  {/each}
-
-                  <div class="combat-page__tag-row">
-                    {#each player.statusTags as tag}
-                      <TagChip label={tag.label} tone={tag.tone} />
-                    {/each}
-                  </div>
-
-                  <div class="combat-page__tag-row">
-                    {#if player.passives.length > 0}
-                      {#each player.passives as passiveId}
-                        <TagChip label={passiveId} tone="accent" />
-                      {/each}
-                    {:else}
-                      <TagChip label="No passives" tone="muted" />
-                    {/if}
-                  </div>
-
-                  <div class="combat-page__action-buttons">
-                    <button
-                      type="button"
-                      class:selected={commandDraft.selectedPlayerId === player.playerId}
-                      onclick={() => handleSelectPlayer(player.playerId)}
-                    >
-                      {commandDraft.selectedPlayerId === player.playerId ? 'Selected actor' : 'Select actor'}
-                    </button>
-                    <button
-                      type="button"
-                      class:selected={commandDraft.selectedTargets.some((target) => target.playerId === player.playerId)}
-                      onclick={() => handleToggleTargetPlayer(player.playerId)}
-                    >
-                      {commandDraft.selectedTargets.some((target) => target.playerId === player.playerId)
-                        ? 'Targeted player'
-                        : 'Target player'}
-                    </button>
-                  </div>
-                </article>
-              {/each}
-            </div>
-          {:else}
-            <ContentStatePanel
-              title="No player roster yet"
-              message="No player state is available for this session yet."
-            />
-          {/if}
-        </SectionFrame>
-
-        <SectionFrame
-          title="Enemy side"
-          description="Enemy cards surface combat HP/AP and status pressure first, with summons grouped below the main enemy roster."
-        >
-          {#if enemyViews.length > 0}
-            <div class="combat-page__unit-list">
-              {#each enemyViews as enemy}
-                <article
-                  class="combat-page__unit-card combat-page__unit-card--enemy"
-                  class:combat-page__unit-card--active-turn={currentEnemyView?.enemyId === enemy.enemyId}
-                >
-                  <div class="combat-page__unit-head">
-                    <div>
-                      <h3>{enemy.enemyId}</h3>
-                      <p>Combat enemy | Live battlefield unit</p>
-                    </div>
-                    <div class="combat-page__tag-row">
-                      {#if currentEnemyView?.enemyId === enemy.enemyId}
-                        <TagChip label="Current turn" tone="warning" />
-                      {/if}
-                      <TagChip label={enemy.stateLabel} tone={enemy.stateTone} />
-                    </div>
-                  </div>
-
-                  <div class="combat-page__metric-grid">
-                    {#each enemy.metrics as metric}
-                      <div class="combat-page__metric-card">
-                        <strong>{metric.value}</strong>
-                        <span>{metric.label}</span>
-                        <p>{metric.note}</p>
-                      </div>
-                    {/each}
-                  </div>
-
-                  {#each enemy.summaryLines as line}
-                    <p class="combat-page__unit-note">{line}</p>
-                  {/each}
-
-                  <div class="combat-page__tag-row">
-                    {#if enemy.statusEntries.length > 0}
-                      {#each enemy.statusEntries as status}
-                        <TagChip label={status} tone="warning" />
-                      {/each}
-                    {:else}
-                      <TagChip label="No statuses" tone="muted" />
-                    {/if}
-                  </div>
-
-                  <div class="combat-page__action-buttons">
-                    <button
-                      type="button"
-                      class:selected={commandDraft.selectedTargets.some((target) => target.enemyId === enemy.enemyId)}
-                      onclick={() => handleSelectEnemy(enemy.enemyId)}
-                    >
-                      {commandDraft.selectedTargets.some((target) => target.enemyId === enemy.enemyId)
-                        ? 'Targeted enemy'
-                        : 'Target enemy'}
-                    </button>
-                  </div>
-                </article>
-              {/each}
-            </div>
-          {:else}
-            <ContentStatePanel
-              title="Enemy state not active yet"
-              message="Combat enemies are not present in the current session state yet."
-            />
-          {/if}
-
-          {#if summonViews.length > 0}
-            <div class="combat-page__summon-section">
-              <strong>Summons</strong>
-              <div class="combat-page__unit-list">
-              {#each summonViews as summon}
-                  <article class="combat-page__unit-card">
-                    <div class="combat-page__unit-head">
-                      <div>
-                        <h3>{summon.summonId}</h3>
-                        <p>{summon.owner} | Support unit</p>
-                      </div>
-                      <TagChip label={summon.stateLabel} tone={summon.stateTone} />
-                    </div>
-
-                    <div class="combat-page__metric-grid combat-page__metric-grid--compact">
-                      {#each summon.metrics as metric}
-                        <div class="combat-page__metric-card">
-                          <strong>{metric.value}</strong>
-                          <span>{metric.label}</span>
-                          <p>{metric.note}</p>
-                        </div>
-                      {/each}
-                    </div>
-
-                    {#each summon.summaryLines as line}
-                      <p class="combat-page__unit-note">{line}</p>
-                    {/each}
-
-                    <div class="combat-page__action-buttons">
-                      <button
-                        type="button"
-                        class:selected={commandDraft.selectedTargets.some((target) => target.summonOwnerPlayerId === summon.owner && target.summonInstanceId === summon.summonId)}
-                        onclick={() => handleToggleTargetSummon(summon.owner, summon.summonId)}
-                      >
-                        {commandDraft.selectedTargets.some((target) => target.summonOwnerPlayerId === summon.owner && target.summonInstanceId === summon.summonId)
-                          ? 'Targeted summon'
-                          : 'Target summon'}
-                      </button>
-                    </div>
-                  </article>
-                {/each}
-              </div>
-            </div>
-          {/if}
-        </SectionFrame>
-      </div>
-
-      <SectionFrame
-        title="Combat context and command"
-        description="The sidebar keeps pending decisions, visible zones, and combat history close to the live battlefield summary without changing the command flow."
-      >
-        <div class="combat-page__sidebar">
-          <div class="combat-page__command-panel">
-            <strong>Command foundation</strong>
-            <div class="combat-page__command-list">
-              {#each commandOptions as option}
-                <button
-                  type="button"
-                  disabled={option.disabled || commandPending !== null}
-                  class:selected={commandDraft.selectedCommandType === option.id}
-                  onclick={() => {
-                    handleSelectCommand(option.id)
-
-                    if (
-                      option.id === 'END_TURN' ||
-                      option.id === 'DRAW' ||
-                      option.id === 'CLEAR_RECENT_RESULTS'
-                    ) {
-                      void handleSimpleCommand(option.id)
-                    } else if (option.id === 'PLAY_CARD' || option.id === 'USE_EX') {
-                      void handlePlayerCardCommand(option.id)
-                    }
-                  }}
-                >
-                  <span>
-                    {commandPending === option.id
-                      ? `${option.title}...`
-                      : option.title}
-                  </span>
-                  <small>{option.note}</small>
-                </button>
-              {/each}
-            </div>
-
-            <ContentStatePanel
-              title="Current command guards"
-              message={`Expected version ${commandGuards.expectedVersion ?? 'N/A'} | Current actor ${statusView.currentTurnLabel} | Runtime role ${commandGuards.role}`}
-            >
-              <p>Current turn matches runtime player: {commandGuards.isCurrentTurnPlayer ? 'Yes' : 'No'}</p>
-              <p>Pending decision: {commandGuards.hasPendingDecision ? 'Present' : 'None'}</p>
-              <p>EX available: {commandGuards.exAvailable ? 'Yes' : 'No'}</p>
-              <p>Recent command events buffered: {recentCommandEvents.length}</p>
-            </ContentStatePanel>
-
-            <div class="combat-page__zone-panel">
-              <strong>Selected command input</strong>
-              <p>Command source: {selectedCommandRequirementView?.sourceLabel ?? selectedCommandSourceLabel ?? 'Select a card or EX first'}</p>
-              <p>Target rule: {selectedCommandRequirementView?.targetSummary ?? 'No command-specific target rule loaded yet.'}</p>
-              <p>Discard rule: {selectedCommandRequirementView?.discardSummary ?? 'No extra hand discard required'}</p>
-              <p>Field selection rule: {selectedCommandRequirementView?.fieldSelectionSummary ?? 'No extra field selection required'}</p>
-              <p>Choice rule: {selectedCommandRequirementView?.choiceSummary ?? 'No explicit choice requirement'}</p>
-              {#if selectedCommandDetailLoading}
-                <p>Loading card detail for the selected command source.</p>
-              {:else if selectedCommandDetailError}
-                <p>{selectedCommandDetailError}</p>
-              {/if}
-
-              <div class="combat-page__tag-row">
-                {#if commandDraft.selectedTargets.length > 0}
-                  {#each commandDraft.selectedTargets as target}
-                    <TagChip label={formatTargetSelectionLabel(target)} tone="warning" />
-                  {/each}
-                {:else}
-                  <TagChip label="No manual target" tone="muted" />
-                {/if}
-              </div>
-
-              <div class="combat-page__tag-row">
-                {#if selectedDiscardIdsFromHand.length > 0}
-                  {#each selectedDiscardIdsFromHand as discardId}
-                    <TagChip label={`Discard ${discardId}`} tone="accent" />
-                  {/each}
-                {:else}
-                  <TagChip label="No discard ids" tone="muted" />
-                {/if}
-              </div>
-
-              <div class="combat-page__tag-row">
-                {#if selectedFieldIds.length > 0}
-                  {#each selectedFieldIds as selectedId}
-                    <TagChip label={`Field ${selectedId}`} tone="accent" />
-                  {/each}
-                {:else}
-                  <TagChip label="No field ids" tone="muted" />
-                {/if}
-              </div>
-
-              <div class="combat-page__action-buttons">
-                <button type="button" onclick={() => handleClearSelectedTargets()}>
-                  Clear targets
-                </button>
-                <button type="button" onclick={() => handleClearSelectionInputs()}>
-                  Clear follow-up inputs
-                </button>
-              </div>
-            </div>
-
-            {#if runtimePendingDecision}
-              <div class="combat-page__zone-panel">
-                <strong>Pending decision</strong>
-                <p>Type: {runtimePendingDecision.type ?? 'Unavailable'}</p>
-                <p>Reason: {runtimePendingDecision.reason ?? 'None'}</p>
-                <p>Limit: {runtimePendingDecision.limit ?? 'N/A'} | Pick count: {runtimePendingDecision.pickCount ?? 'N/A'}</p>
-                <p>Destination: {runtimePendingDecision.destination ?? 'N/A'} | Shuffle after pick: {runtimePendingDecision.shuffleAfterPick ? 'Yes' : 'No'}</p>
-                <p>Group index: {runtimePendingDecision.groupIndex ?? 'N/A'}</p>
-                <p>Actor keys: {runtimePendingDecision.actorKeys.join(', ') || 'None'}</p>
-                <p>Selected hand discards: {selectedDiscardIdsFromHand.length} | Selected candidate ids: {pendingCandidateIds.length} | Ordered tie actors: {orderedTieActorKeys.length}</p>
-
-                {#if unsupportedPendingDecisionMessage}
-                  <ContentStatePanel
-                    title="Pending decision is read-only"
-                    message={unsupportedPendingDecisionMessage}
-                  />
-                {:else}
-                  {#if runtimePendingDecision.candidateIds.length > 0}
-                    <div class="combat-page__tag-row">
-                      {#each runtimePendingDecision.candidateIds as candidateId}
-                        <button
-                          type="button"
-                          class="combat-page__inline-button"
-                          class:selected={commandDraft.selectedIds.includes(candidateId)}
-                          onclick={() => handleTogglePendingSelectedId(candidateId)}
-                        >
-                          {commandDraft.selectedIds.includes(candidateId) ? `Selected ${candidateId}` : candidateId}
-                        </button>
-                      {/each}
-                    </div>
-                  {/if}
-
-                  {#if runtimePendingDecision.actorKeys.length > 0}
-                    <div class="combat-page__tag-row">
-                      {#each runtimePendingDecision.actorKeys as actorKey}
-                        <button
-                          type="button"
-                          class="combat-page__inline-button"
-                          class:selected={commandDraft.orderedActorKeys.includes(actorKey)}
-                          onclick={() => handleToggleOrderedActorKey(actorKey)}
-                        >
-                          {commandDraft.orderedActorKeys.includes(actorKey) ? `Ordered ${actorKey}` : actorKey}
-                        </button>
-                      {/each}
-                    </div>
-                  {/if}
-
-                  <div class="combat-page__action-buttons">
-                    <button
-                      type="button"
-                      disabled={!commandGuards.canResolvePendingCommand || commandPending !== null}
-                      onclick={() => void handlePendingDecisionCommand()}
-                    >
-                      {commandPending && commandDraft.selectedCommandType === runtimePendingDecision.type
-                        ? 'Resolving pending decision...'
-                        : 'Resolve pending decision'}
-                    </button>
-                  </div>
-                {/if}
-              </div>
-            {/if}
-          </div>
-
-          <div class="combat-page__log-panel">
-            <strong>Current player zones</strong>
-            {#if visiblePlayerView}
-              <div class="combat-page__zone-grid">
-                <div class="combat-page__zone-panel">
-                  <strong>Field</strong>
-                  {#if visiblePlayerView.fieldCards.length > 0}
-                    {#each visiblePlayerView.fieldCards as card}
-                      <article
-                        class="combat-page__card-row"
-                        class:selected={selectedFieldIds.includes(card.instanceId)}
-                      >
-                        <div>
-                          <span>{card.title}</span>
-                          <small>{card.subtitle}</small>
-                        </div>
-                        <div class="combat-page__tag-row">
-                          <TagChip label={card.unresolved ? 'Unresolved' : 'Field'} tone={card.unresolved ? 'warning' : 'success'} />
-                          <button type="button" class="combat-page__inline-button" onclick={() => handleToggleSelectedId(card.instanceId)}>
-                            {selectedFieldIds.includes(card.instanceId) ? 'Unmark field id' : 'Select field id'}
-                          </button>
-                        </div>
-                      </article>
-                    {/each}
-                  {:else}
-                    <p>No field cards are active for this player.</p>
-                  {/if}
-                </div>
-
-                <div class="combat-page__zone-panel">
-                  <strong>Grave and excluded</strong>
-                  {#if visiblePlayerView.graveCards.length > 0}
-                    {#each visiblePlayerView.graveCards as card}
-                      <article class="combat-page__card-row">
-                        <div>
-                          <span>{card.title}</span>
-                          <small>Grave | {card.subtitle}</small>
-                        </div>
-                        <TagChip label={card.unresolved ? 'Unresolved' : 'Grave'} tone={card.unresolved ? 'warning' : 'muted'} />
-                      </article>
-                    {/each}
-                  {/if}
-                  {#if visiblePlayerView.excludedCards.length > 0}
-                    {#each visiblePlayerView.excludedCards as card}
-                      <article class="combat-page__card-row">
-                        <div>
-                          <span>{card.title}</span>
-                          <small>Excluded | {card.subtitle}</small>
-                        </div>
-                        <TagChip label={card.unresolved ? 'Unresolved' : 'Excluded'} tone={card.unresolved ? 'warning' : 'muted'} />
-                      </article>
-                    {/each}
-                  {/if}
-                  {#if visiblePlayerView.graveCards.length === 0 && visiblePlayerView.excludedCards.length === 0}
-                    <p>No grave or excluded cards are present for this player.</p>
-                  {/if}
-                </div>
-              </div>
-            {:else}
-              <ContentStatePanel
-                title="Zone summary unavailable"
-                message="A current player zone summary will render here once a player state is present."
-              />
-            {/if}
-          </div>
-
-          <div class="combat-page__log-panel">
-            <strong>Recent events</strong>
-            {#if eventsLoading}
-              <ContentStatePanel title="Loading events" message="Restoring recent combat events for the current session." />
-            {:else if eventsErrorMessage}
-              <ContentStatePanel
-                title="Events unavailable"
-                message={eventsErrorMessage}
-                tone="error"
-                actionLabel="Retry events"
-                onAction={() => void loadCombatEvents()}
-              />
-            {:else if mergedEventItems.length > 0}
-              <div class="combat-page__feed-list">
-                {#each mergedEventItems as event}
-                  <article class="combat-page__feed-card">
-                    <strong>{event.type}</strong>
-                    <p>Version {event.version} | Cursor {event.cursor}</p>
-                    <p>{formatSidebarTimestamp(event.timestamp)}</p>
-                  </article>
-                {/each}
-              </div>
-            {:else}
-              <ContentStatePanel title="No recent events" message="No combat events have been restored for this session yet." />
-            {/if}
-          </div>
-
-          <div class="combat-page__log-panel">
-            <strong>Recent logs</strong>
-            {#if logsLoading}
-              <ContentStatePanel title="Loading logs" message="Restoring recent combat logs for the current session." />
-            {:else if logsErrorMessage}
-              <ContentStatePanel
-                title="Logs unavailable"
-                message={logsErrorMessage}
-                tone="error"
-                actionLabel="Retry logs"
-                onAction={() => void loadCombatLogs()}
-              />
-            {:else if logItems.length > 0}
-              <div class="combat-page__feed-list">
-                {#each logItems as log}
-                  <article class="combat-page__feed-card">
-                    <strong>{log.type}</strong>
-                    <p>{log.message}</p>
-                    <p>Version {log.version} | {formatSidebarTimestamp(log.timestamp)}</p>
-                  </article>
-                {/each}
-              </div>
-            {:else}
-              <ContentStatePanel title="No recent logs" message="No combat log messages have been restored for this session yet." />
-            {/if}
-          </div>
-
-          <div class="combat-page__log-panel">
-            <strong>Recent results</strong>
-            {#if recentResultsLoading}
-              <ContentStatePanel title="Loading recent results" message="Restoring the latest recent-result summary for this session." />
-            {:else if recentResultsErrorMessage}
-              <ContentStatePanel
-                title="Recent results unavailable"
-                message={recentResultsErrorMessage}
-                tone="error"
-                actionLabel="Retry results"
-                onAction={() => void loadCombatRecentResults()}
-              />
-            {:else if recentResults && recentResults.recentResults.length > 0}
-              <div class="combat-page__feed-list">
-                {#each recentResults.recentResults as result}
-                  <article class="combat-page__feed-card">
-                    <strong>{result.title}</strong>
-                    <p>{result.summary}</p>
-                    <p>{result.type} | {result.at ?? 'Time unavailable'}</p>
-                  </article>
-                {/each}
-              </div>
-            {:else}
-              <ContentStatePanel
-                title="No recent results"
-                message="No recent result summary is available for this session yet."
-              />
-            {/if}
-          </div>
-        </div>
-      </SectionFrame>
-    </div>
-
-    <SectionFrame
-      title="Hand and action bar"
-      description="The bottom strip keeps the visible hand and action context readable while command wiring stays otherwise unchanged."
-    >
-      <div class="combat-page__hand-bar">
-        <div class="combat-page__hand-cards">
-          {#if visiblePlayerView && visiblePlayerView.handCards.length > 0}
-            {#each visiblePlayerView.handCards as card}
-              <article
-                class="combat-page__hand-card"
-                class:selected={commandDraft.selectedCardId === card.instanceId || selectedDiscardIdsFromHand.includes(card.instanceId)}
-              >
-                <p>{card.subtitle}</p>
-                <h4>{card.title}</h4>
-                <span>{card.meta}</span>
-                <div class="combat-page__tag-row">
-                  {#each card.tags as tag}
-                    <TagChip label={tag.label} tone={tag.tone} />
-                  {/each}
-                  {#if selectedDiscardIdsFromHand.includes(card.instanceId)}
-                    <TagChip label="Discard selected" tone="warning" />
-                  {/if}
-                </div>
-                <p>{card.description}</p>
-                <div class="combat-page__action-buttons">
-                  <button type="button" onclick={() => handleSelectHandCard(card.instanceId)}>
-                    {commandDraft.selectedCardId === card.instanceId ? 'Selected card' : 'Select card'}
-                  </button>
-                  <button type="button" class:selected={selectedDiscardIdsFromHand.includes(card.instanceId)} onclick={() => handleToggleDiscard(card.instanceId)}>
-                    {selectedDiscardIdsFromHand.includes(card.instanceId) ? 'Marked discard' : 'Mark discard'}
-                  </button>
-                </div>
-              </article>
-            {/each}
-          {:else}
-            <ContentStatePanel
-              title="No visible hand yet"
-              message={catalogLoading
-                ? 'Loading the card archive before resolving live hand cards.'
-                : 'Visible hand cards will render here once the current player has hand instances in the live state.'}
-            />
-          {/if}
-        </div>
-
-        <div class="combat-page__action-summary">
-          <strong>Selected action</strong>
-          <p>Command: {commandDraft.selectedCommandType ?? 'Not selected'}</p>
-          <p>Expected version: {commandGuards.expectedVersion ?? 'Unavailable'}</p>
-          <p>Current actor: {statusView.currentTurnLabel}</p>
-          <p>Visible hand owner: {visiblePlayerView?.playerId ?? 'Unavailable'}</p>
-          <p>Selected actor: {commandDraft.selectedPlayerId ?? 'Not selected'}</p>
-          <p>Selected target: {selectedEnemyView?.enemyId ?? 'Target refs below'}</p>
-          <p>Selected card: {selectedCardView?.title ?? commandDraft.selectedCardId ?? 'Not selected'}</p>
-          <p>Pending decision: {runtimePendingDecision?.type ?? 'None'}</p>
-          <p>Selected targets: {commandDraft.selectedTargets.length} | Selected ids: {commandDraft.selectedIds.length}</p>
-          <p>Ordered actor keys: {commandDraft.orderedActorKeys.join(', ') || 'None'}</p>
-          <p>Target refs: {formatTargetRefSummary(commandDraft.selectedTargets)}</p>
-          <p>Discard ids from hand: {selectedDiscardIdsFromHand.length} | Field ids: {selectedFieldIds.length}</p>
-          <p>Count: {commandDraft.selectedCount ?? 'N/A'} | Pending candidate ids: {pendingCandidateIds.length}</p>
-          <p>Buffered events after command: {recentCommandEvents.length}</p>
-          <p>Run node: {runState?.currentNode?.name ?? 'Unavailable'} | Result pending: {runState?.resultPending ? 'Yes' : 'No'}</p>
-          <label class="combat-page__field-control">
-            <span>Selected count</span>
-            <input
-              type="number"
-              min="1"
-              value={commandDraft.selectedCount ?? 1}
-              oninput={(event) => handleSelectedCountChange((event.currentTarget as HTMLInputElement).value)}
-            />
-          </label>
-          <label class="combat-page__field-control">
-            <span>Selected reason</span>
-            <textarea
-              rows="3"
-              bind:value={commandDraft.selectedReason}
-              placeholder="Reason for the next command or pending resolution"
-            ></textarea>
-          </label>
-          <div class="combat-page__action-buttons">
-            <button type="button" onclick={() => handleClearSelectedTargets()}>
-              Clear targets
-            </button>
-            <button type="button" onclick={() => handleClearSelectionInputs()}>
-              Clear helper inputs
-            </button>
-          </div>
-        </div>
-      </div>
-    </SectionFrame>
+      {#snippet hand()}
+        <HandBar
+          handCards={visiblePlayerView?.handCards ?? []}
+          selectedCardId={commandDraft.selectedCardId}
+          selectedDiscardIds={selectedDiscardIdsFromHand}
+          selectedCommandType={commandDraft.selectedCommandType}
+          expectedVersion={commandGuards.expectedVersion}
+          currentActorLabel={statusView.currentTurnLabel}
+          visibleHandOwner={visiblePlayerView?.playerId ?? null}
+          selectedActor={commandDraft.selectedPlayerId}
+          selectedEnemyId={selectedEnemyView?.enemyId ?? null}
+          selectedCardLabel={selectedCardView?.title ?? commandDraft.selectedCardId ?? null}
+          pendingDecisionType={runtimePendingDecision?.type ?? null}
+          selectedTargetCount={commandDraft.selectedTargets.length}
+          selectedIdCount={commandDraft.selectedIds.length}
+          orderedActorKeysSummary={commandDraft.orderedActorKeys.join(', ') || 'None'}
+          targetRefSummary={formatTargetRefSummary(commandDraft.selectedTargets)}
+          selectedDiscardCount={selectedDiscardIdsFromHand.length}
+          selectedFieldCount={selectedFieldIds.length}
+          selectedCount={commandDraft.selectedCount}
+          pendingCandidateCount={pendingCandidateIds.length}
+          bufferedEventCount={recentCommandEvents.length}
+          runNodeSummary={runNodeSummary}
+          selectedReason={commandDraft.selectedReason}
+          {catalogLoading}
+          emptyMessage="Visible hand cards will render here once the current player has hand instances in the live state."
+          onSelectHandCard={handleSelectHandCard}
+          onToggleDiscard={handleToggleDiscard}
+          onSelectedCountChange={handleSelectedCountChange}
+          onSelectedReasonChange={handleSelectedReasonChange}
+          onClearTargets={handleClearSelectedTargets}
+          onClearSelectionInputs={handleClearSelectionInputs}
+        />
+      {/snippet}
+    </CombatLayout>
   {/if}
 </div>
 
 <style>
-  .combat-page,
-  .combat-page__field,
-  .combat-page__sidebar,
-  .combat-page__unit-list,
-  .combat-page__hand-bar,
-  .combat-page__action-summary,
-  .combat-page__overview-grid,
-  .combat-page__zone-grid,
-  .combat-page__zone-panel,
-  .combat-page__summon-section,
-  .combat-page__field-control,
-  .combat-page__feed-list,
-  .combat-page__command-list,
-  .combat-page__metric-grid {
+  .combat-page {
     display: grid;
-    gap: 1.5rem;
+    gap: 1rem;
   }
 
-  .combat-page__status-bar {
+  .combat-page__action-buttons {
     display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: flex-start;
     flex-wrap: wrap;
-  }
-
-  .combat-page__status-stats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1rem;
-    flex: 1 1 38rem;
-  }
-
-  .combat-page__overview-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .combat-page__status-tags,
-  .combat-page__action-buttons,
-  .combat-page__tag-row {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .combat-page__main {
-    display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 0.65fr);
-    gap: 1.5rem;
-    align-items: start;
-  }
-
-  .combat-page__unit-card,
-  .combat-page__hand-card,
-  .combat-page__spotlight-card,
-  .combat-page__zone-panel,
-  .combat-page__card-row,
-  .combat-page__metric-card,
-  .combat-page__field-control input,
-  .combat-page__field-control textarea,
-  .combat-page__inline-button,
-  .combat-page__feed-card,
-  .combat-page__command-list button {
-    border: 1px solid var(--color-border);
-    background: rgba(12, 11, 10, 0.28);
-    padding: 1rem;
-  }
-
-  .combat-page__unit-card,
-  .combat-page__hand-card,
-  .combat-page__zone-panel,
-  .combat-page__spotlight-card {
-    display: grid;
     gap: 0.75rem;
   }
 
-  .combat-page__unit-card--enemy {
-    border-color: rgba(199, 167, 125, 0.28);
-  }
-
-  .combat-page__unit-card--active-turn {
-    border-color: rgba(226, 193, 155, 0.48);
-    box-shadow: inset 0 0 0 1px rgba(226, 193, 155, 0.24);
-  }
-
-  .combat-page__spotlight-card--accent {
-    border-color: rgba(113, 196, 255, 0.32);
-  }
-
-  .combat-page__spotlight-card--success {
-    border-color: rgba(126, 214, 158, 0.36);
-  }
-
-  .combat-page__spotlight-card--warning {
-    border-color: rgba(226, 193, 155, 0.48);
-  }
-
-  .combat-page__metric-grid {
-    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-    gap: 0.75rem;
-  }
-
-  .combat-page__metric-grid--compact {
-    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-  }
-
-  .combat-page__metric-card {
-    display: grid;
-    gap: 0.25rem;
-    align-content: start;
-  }
-
-  .combat-page__metric-card strong,
-  .combat-page__metric-card span,
-  .combat-page__metric-card p,
-  .combat-page__spotlight-card strong,
-  .combat-page__spotlight-card h3,
-  .combat-page__spotlight-card p {
-    margin: 0;
-  }
-
-  .combat-page__metric-card strong,
-  .combat-page__spotlight-card h3 {
-    font-family: var(--font-display);
-    font-size: 1.05rem;
-  }
-
-  .combat-page__metric-card span,
-  .combat-page__spotlight-card strong {
-    font-size: 0.78rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-  }
-
-  .combat-page__metric-card p,
-  .combat-page__spotlight-card p,
-  .combat-page__unit-note {
-    color: var(--color-text-soft);
-    line-height: 1.6;
-  }
-
-  .combat-page__unit-note {
-    margin: 0;
-  }
-
-  .combat-page__unit-head,
-  .combat-page__card-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    align-items: flex-start;
-  }
-
-  .combat-page__unit-head h3,
-  .combat-page__unit-head p,
-  .combat-page__unit-card > p,
-  .combat-page__action-summary p,
-  .combat-page__hand-card p,
-  .combat-page__hand-card h4,
-  .combat-page__hand-card span,
-  .combat-page__zone-panel p,
-  .combat-page__card-row span,
-  .combat-page__card-row small {
-    margin: 0;
-  }
-
-  .combat-page__unit-head h3,
-  .combat-page__hand-card h4 {
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-  }
-
-  .combat-page__unit-head p,
-  .combat-page__unit-card > p,
-  .combat-page__action-summary p,
-  .combat-page__hand-card p,
-  .combat-page__hand-card span,
-  .combat-page__zone-panel p,
-  .combat-page__card-row small,
-  .combat-page__feed-card p {
-    color: var(--color-text-soft);
-    line-height: 1.65;
-  }
-
-  .combat-page__feed-card {
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  .combat-page__feed-card strong,
-  .combat-page__feed-card p {
-    margin: 0;
-  }
-
-  .combat-page__command-panel,
-  .combat-page__log-panel {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .combat-page__command-list {
-    gap: 0.75rem;
-  }
-
-  .combat-page__command-list button {
-    display: grid;
-    gap: 0.35rem;
-    text-align: left;
-    color: var(--color-text);
-  }
-
-  .combat-page__command-list button span,
-  .combat-page__command-list button small {
-    margin: 0;
-  }
-
-  .combat-page__command-list button small {
-    color: var(--color-text-soft);
-    line-height: 1.5;
-  }
-
-  .combat-page__command-panel strong,
-  .combat-page__log-panel strong,
-  .combat-page__action-summary strong,
-  .combat-page__zone-panel strong,
-  .combat-page__summon-section > strong,
-  .combat-page__field-control span {
-    font-size: 0.82rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-  }
-
-  .combat-page__hand-bar {
-    grid-template-columns: minmax(0, 1.3fr) minmax(19rem, 0.7fr);
-    align-items: start;
-  }
-
-  .combat-page__hand-cards {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
-  .combat-page__nav-link,
-  .combat-page__action-buttons button,
-  .combat-page__inline-button {
+  .combat-page__nav-link {
     min-height: 3rem;
     padding: 0.75rem 1rem;
     border: 1px solid rgba(226, 193, 155, 0.42);
     background: linear-gradient(180deg, rgba(226, 193, 155, 0.18), rgba(226, 193, 155, 0.08));
     color: var(--color-text);
-  }
-
-  .combat-page__field-control {
-    gap: 0.5rem;
-  }
-
-  .combat-page__field-control input,
-  .combat-page__field-control textarea {
-    width: 100%;
-    color: var(--color-text);
-    font: inherit;
-  }
-
-  .combat-page :global(.selected) {
-    box-shadow: inset 0 0 0 1px rgba(226, 193, 155, 0.48);
-  }
-
-  .combat-page__nav-link {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-  }
-
-  @media (max-width: 1080px) {
-    .combat-page__main,
-    .combat-page__hand-bar,
-    .combat-page__overview-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 960px) {
-    .combat-page__status-stats,
-    .combat-page__hand-cards,
-    .combat-page__zone-grid,
-    .combat-page__metric-grid,
-    .combat-page__metric-grid--compact {
-      grid-template-columns: 1fr;
-    }
   }
 </style>
