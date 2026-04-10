@@ -7,8 +7,11 @@ import com.example.dueltower.member.MemberRepository;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
@@ -31,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension.class)
 class SessionLogControllerIntegrationTest {
 
     @Autowired
@@ -180,6 +184,22 @@ class SessionLogControllerIntegrationTest {
                         .session(fixture.playerSession()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray());
+    }
+
+    @Test
+    void eventsLogsReadableAccessDecision(CapturedOutput output) throws Exception {
+        SessionFixture fixture = createFixture("gm", "player1");
+        commandClearRecentResults(fixture.code(), fixture.playerToken(), 0);
+
+        mockMvc.perform(get("/api/sessions/{code}/events", fixture.code())
+                        .session(fixture.gmSession()))
+                .andExpect(status().isOk());
+
+        assertTrue(output.getOut().contains("session read granted"));
+        assertTrue(output.getOut().contains("endpoint=GET /api/sessions/{code}/events"));
+        assertTrue(output.getOut().contains("source=AUTHENTICATED_GM"));
+        assertTrue(output.getOut().contains("code=" + fixture.code()));
+        assertTrue(output.getOut().contains("username=gm"));
     }
 
     @Test

@@ -22,21 +22,21 @@ public class SessionAccessResolver {
                                                  Authentication authentication) {
         String gmToken = normalizeToken(gmTokenHeader);
         if (!gmToken.isEmpty() && rt.gmToken().equals(gmToken)) {
-            return new SessionAccessDecision(GM_TOKEN, null, null);
+            return new SessionAccessDecision(GM_TOKEN, rt.code(), rt.gmId(), null);
         }
 
         String playerId = resolvePlayerIdByToken(rt, playerTokenHeader);
         if (playerId != null && hasParticipant(rt, playerId)) {
-            return new SessionAccessDecision(PLAYER_TOKEN, null, playerId);
+            return new SessionAccessDecision(PLAYER_TOKEN, rt.code(), null, playerId);
         }
 
         String username = authenticatedUsername(authentication);
         if (username != null) {
             if (rt.gmId().equals(username)) {
-                return new SessionAccessDecision(AUTHENTICATED_GM, username, null);
+                return new SessionAccessDecision(AUTHENTICATED_GM, rt.code(), username, null);
             }
             if (hasParticipant(rt, username)) {
-                return new SessionAccessDecision(AUTHENTICATED_PLAYER, username, username);
+                return new SessionAccessDecision(AUTHENTICATED_PLAYER, rt.code(), username, username);
             }
             throw new ResponseStatusException(FORBIDDEN, "session read forbidden");
         }

@@ -5,6 +5,7 @@ import com.example.dueltower.engine.command.*;
 import com.example.dueltower.engine.core.EngineResult;
 import com.example.dueltower.content.equip.service.EquipService;
 import com.example.dueltower.content.item.service.ItemService;
+import com.example.dueltower.session.service.SessionAccessDecision;
 import com.example.dueltower.session.service.SessionAccessResolver;
 import com.example.dueltower.session.service.SessionService;
 import com.example.dueltower.session.dto.*;
@@ -78,7 +79,7 @@ public class SessionController {
                                                @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                                Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+        requireReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/recent-results");
         return rt.withLock(() -> new RecentResultsResponse(
                 rt.state().version(),
                 rt.state().runState().resultPending(),
@@ -93,7 +94,7 @@ public class SessionController {
                            @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                            Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+        requireReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/run");
         return rt.withLock(() -> StateMapper.toRunDto(rt.state().runState()));
     }
 
@@ -103,7 +104,7 @@ public class SessionController {
                                                  @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                                  Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+        requireReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/inventory");
         return rt.withLock(() -> new SessionRunInventoryResponse(
                 rt.state().version(),
                 StateMapper.toInventoryDto(rt.state().runState())
@@ -116,7 +117,7 @@ public class SessionController {
                                          @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                          Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+        requireReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/results");
         return rt.withLock(() -> new RecentResultsResponse(
                 rt.state().version(),
                 rt.state().runState().resultPending(),
@@ -131,7 +132,7 @@ public class SessionController {
                                              @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                              Authentication authentication) {
         SessionRuntime rt = sessionService.get(code);
-        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+        requireReadableAndLog(rt, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/choices");
         return rt.withLock(() -> new SessionRunChoicesResponse(
                 rt.state().version(),
                 rt.state().runState().resultPending(),
@@ -389,6 +390,23 @@ public class SessionController {
             throw new ResponseStatusException(UNAUTHORIZED, "authentication required");
         }
         return authentication.getName();
+    }
+
+    private void requireReadableAndLog(SessionRuntime rt,
+                                       String gmTokenHeader,
+                                       String playerTokenHeader,
+                                       Authentication authentication,
+                                       String endpoint) {
+        SessionAccessDecision decision = sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+        log.info("session read granted code={} endpoint={} source={} tokenBased={} loginBased={} username={} playerId={}",
+                decision.sessionCode(),
+                endpoint,
+                decision.source(),
+                decision.tokenBased(),
+                decision.loginBased(),
+                decision.username(),
+                decision.playerId()
+        );
     }
 
     private static UUID parseOrNewUuid(String v) {

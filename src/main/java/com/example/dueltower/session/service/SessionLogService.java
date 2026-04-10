@@ -7,6 +7,7 @@ import com.example.dueltower.session.dto.SessionLogItemDto;
 import com.example.dueltower.session.dto.SessionLogPageResponse;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import com.example.dueltower.session.runtime.StateMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,6 +19,7 @@ import java.util.function.Function;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @Service
+@Slf4j
 public class SessionLogService {
 
     private static final int DEFAULT_EVENT_LIMIT = 50;
@@ -42,7 +44,7 @@ public class SessionLogService {
         long minVersion = normalizeAfterVersion(afterVersion);
         int requestedLimit = normalizeLimit(limit, DEFAULT_EVENT_LIMIT, MAX_EVENT_LIMIT);
 
-        return withAuthorizedRead(code, gmTokenHeader, playerTokenHeader, authentication, rt -> {
+        return withAuthorizedRead(code, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/events", rt -> {
             List<SessionRuntime.StoredEvent> history = rt.eventHistorySnapshot();
             List<SessionEventItemDto> items = new ArrayList<>(requestedLimit);
 
@@ -80,7 +82,7 @@ public class SessionLogService {
         long beforeCursor = normalizeBefore(before);
         int requestedLimit = normalizeLimit(limit, DEFAULT_LOG_LIMIT, MAX_LOG_LIMIT);
 
-        return withAuthorizedRead(code, gmTokenHeader, playerTokenHeader, authentication, rt -> {
+        return withAuthorizedRead(code, gmTokenHeader, playerTokenHeader, authentication, "GET /api/sessions/{code}/logs", rt -> {
             List<SessionRuntime.StoredEvent> history = rt.eventHistorySnapshot();
             List<SessionLogItemDto> items = new ArrayList<>(requestedLimit);
 
@@ -115,9 +117,19 @@ public class SessionLogService {
                                      String gmTokenHeader,
                                      String playerTokenHeader,
                                      Authentication authentication,
+                                     String endpoint,
                                      Function<SessionRuntime, T> reader) {
         SessionRuntime rt = sessionService.get(code);
-        sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+        SessionAccessDecision decision = sessionAccessResolver.requireReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+        log.info("session read granted code={} endpoint={} source={} tokenBased={} loginBased={} username={} playerId={}",
+                decision.sessionCode(),
+                endpoint,
+                decision.source(),
+                decision.tokenBased(),
+                decision.loginBased(),
+                decision.username(),
+                decision.playerId()
+        );
         return reader.apply(rt);
     }
 
