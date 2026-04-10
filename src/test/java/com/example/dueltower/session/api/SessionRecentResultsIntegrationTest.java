@@ -94,6 +94,26 @@ class SessionRecentResultsIntegrationTest {
     }
 
     @Test
+    void recentResultsAllowsValidGmTokenEvenWhenPlayerTokenIsInvalid() throws Exception {
+        SessionFixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/sessions/{code}/recent-results", fixture.code)
+                        .header("X-GM-Token", fixture.gmToken)
+                        .header("X-Player-Token", "not-a-valid-token"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void recentResultsAllowsValidPlayerTokenEvenWhenGmTokenIsInvalid() throws Exception {
+        SessionFixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/sessions/{code}/recent-results", fixture.code)
+                        .header("X-GM-Token", "not-a-valid-token")
+                        .header("X-Player-Token", fixture.playerToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void recentResultsAllowsAuthenticatedParticipantOrGmWithoutTokenHeader() throws Exception {
         SessionFixture fixture = createFixture();
 

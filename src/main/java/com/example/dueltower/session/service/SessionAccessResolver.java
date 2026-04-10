@@ -18,8 +18,8 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
  * Session authorization policy summary:
  * - PUBLIC_SESSION_STATE: handled outside this resolver and always public.
  * - AUTHENTICATED_SESSION_ENTRY: handled by Spring Security and requires login.
- * - SESSION_READABLE: valid GM/player token wins; login fallback is allowed only when both token headers are absent.
- *   If a non-blank token header is present but invalid, login fallback is blocked and 401 is returned.
+ * - SESSION_READABLE: any valid GM/player token wins; login fallback is allowed only when both token headers are absent.
+ *   If a non-blank token header is present but no valid GM/player token succeeds, login fallback is blocked and 401 is returned.
  * - PLAYER_SELF: requires a valid player token that matches the target playerId.
  * - GM_ONLY: requires a valid GM token.
  */
@@ -42,6 +42,8 @@ public class SessionAccessResolver {
             return new SessionAccessDecision(PLAYER_TOKEN, rt.code(), null, playerId);
         }
 
+        // Mixed-token rule: any valid GM/player token already returned above.
+        // Reaching this branch means token headers may exist, but none authorized the read.
         if (hasGmTokenHeader || hasPlayerTokenHeader) {
             throw new ResponseStatusException(UNAUTHORIZED, "invalid session read token");
         }

@@ -1,79 +1,63 @@
-# Session authorization policy draft
+# Session Authorization Policy
 
-This note documents the current `/api/sessions/**` authorization behavior and the target policy used by the session authorization refactor.
+This note documents the current `/api/sessions/**` authorization behavior implemented in code.
 
-## Target policy
+## Policy Groups
 
 | Policy | Endpoints | Allowed access |
 | --- | --- | --- |
-| Public | `GET /api/sessions/{code}`, `GET /api/sessions/{code}/state` | No login or session token required. |
-| Login required | `POST /api/sessions`, `POST /api/sessions/{code}/join` | Authenticated web user. Request `gmId` or `playerId` must match the authenticated username. |
-| `SESSION_READABLE` | `recent-results`, `run`, `inventory`, `results`, `choices`, `events`, `logs` | Valid `X-GM-Token`, valid `X-Player-Token`, or authenticated user who is the session GM or a session participant. |
-| `PLAYER_SELF` | `forget`, `deck`, `loadout`, `loadout/from-preset`, `ready`, `leave`, player command | Valid `X-Player-Token`; path/body `playerId` must match the token owner when a player id is present. |
-| `GM_ONLY` | `kick`, `reset`, `delete`, GM command, `START_COMBAT` | Valid `X-GM-Token`. |
+| `PUBLIC_SESSION_STATE` | `GET /api/sessions/{code}`, `GET /api/sessions/{code}/state` | Public. No login or session token required. |
+| `AUTHENTICATED_SESSION_ENTRY` | `POST /api/sessions`, `POST /api/sessions/{code}/join` | Authenticated web user. Request `gmId` or `playerId` must match the authenticated username. |
+| `SESSION_READABLE` | `GET /api/sessions/{code}/recent-results`, `GET /api/sessions/{code}/run`, `GET /api/sessions/{code}/inventory`, `GET /api/sessions/{code}/results`, `GET /api/sessions/{code}/choices`, `GET /api/sessions/{code}/events`, `GET /api/sessions/{code}/logs` | Valid `X-GM-Token`, valid `X-Player-Token`, or login fallback when both token headers are absent and the authenticated user is the session GM or a session participant. |
+| `PLAYER_SELF` | `POST /api/sessions/{code}/leave`, `POST /api/sessions/{code}/players/{playerId}/forget`, `POST /api/sessions/{code}/players/{playerId}/deck`, `POST /api/sessions/{code}/players/{playerId}/loadout`, `POST /api/sessions/{code}/players/{playerId}/loadout/from-preset`, `PUT /api/sessions/{code}/players/{playerId}/ready`, player-owned commands | Valid `X-Player-Token`. When a path/body `playerId` exists, it must match the token owner. |
+| `GM_ONLY` | `POST /api/sessions/{code}/players/{playerId}/kick`, `POST /api/sessions/{code}/reset`, `DELETE /api/sessions/{code}`, GM commands, `START_COMBAT` | Valid `X-GM-Token`. |
 
-Status code rule:
+## Status Codes
 
 - `401`: required token/authentication is missing or invalid.
-- `403`: authentication is valid, but the authenticated user/token is not allowed for that session or player.
+- `403`: authentication is valid, but the authenticated user is not allowed for that session or player.
 
-## Current behavior snapshot
+## SESSION_READABLE Rules
 
-### Security filter layer
+The `SESSION_READABLE` decision is centralized in `SessionAccessResolver.requireSessionReadable(...)`.
 
-- `POST /api/sessions` and `POST /api/sessions/{code}/join` require login in `SecurityConfig` via `SecurityPaths.SESSION_LOGIN_REQUIRED`.
-- `GET /api/sessions/{code}` and `GET /api/sessions/{code}/state` are public through `SecurityPaths.SESSION_PUBLIC`.
-- Read endpoints such as `events`, `logs`, `recent-results`, `run`, `inventory`, `results`, and `choices` are `permitAll` at the filter layer, then checked inside controller/service code.
-- `command`, `leave`, `reset`, `delete`, `kick`, `deck`, `loadout`, `loadout/from-preset`, `forget`, and `ready` are `permitAll` at the filter layer, then checked inside controller/service policy code.
+1. Valid `X-GM-Token` allows the request.
+2. Valid `X-Player-Token` allows the request.
+3. Login fallback is allowed only when both token headers are absent.
+4. Authenticated but unrelated users receive `403`.
+5. No token and no authenticated user receives `401`.
+6. A present but invalid token header blocks login fallback and returns `401`.
 
-### Controller/service layer
+Header presence rule:
 
-- `SessionController.create` and `SessionController.join` require an authenticated username and reject mismatched `gmId`/`playerId` with `403`.
-- `SessionController.state` has no internal authorization check.
-- `SessionAccessResolver.requireReadable` allows a valid GM token, valid player token, authenticated session GM, or authenticated participant for `recent-results`, `run`, `inventory`, `results`, `choices`, `events`, and `logs`.
-- Player self endpoints use `SessionAccessResolver.requirePlayerSelf`; missing or invalid player token returns `401`, and path/request `playerId` mismatch returns `403`.
-- GM endpoints use `SessionAccessResolver.requireGm`; missing or invalid GM token returns `401`.
-- `SessionController.command` uses `SessionCommandType`:
-  - `SessionCommandAuth.PLAYER` commands require a valid player token and matching request `playerId`.
-  - `SessionCommandAuth.GM` commands require a valid GM token.
-  - `START_COMBAT` is GM-authorized and also requires a `playerId` for the command payload.
-  - `SessionCommandAuthorization` owns the command authorization decision.
+- `null` or blank after `trim()` is treated as no token header.
+- Non-blank after `trim()` is treated as a present token header.
 
-## Refactor status
+Mixed token rule:
 
-| Area | Current | Target |
-| --- | --- | --- |
-| `GET /api/sessions/{code}/state` | Listed in `SecurityPaths.SESSION_PUBLIC`. | Public. |
-| `PUT /ready` | Listed in `SecurityPaths.SESSION_PLAYER_SELF_PUT`. | `PLAYER_SELF` with valid player token and matching path player id. |
-| `SESSION_READABLE` status codes | Centralized in `SessionAccessResolver.requireReadable`. | Consistent `401` for missing/invalid credentials, `403` for authenticated non-participants. |
-| Read authorization helpers | Shared by `SessionController` and `SessionLogService`. | Single reusable authorization component. |
-| GM helper naming | `SessionAccessResolver.requireGm`. | Generic GM-only helper. |
-| Player self helper | `SessionAccessResolver.requirePlayerSelf`. | Single self-action helper. |
-| Security path ownership | `SecurityPaths` mirrors public/login/readable/player-self/GM-only groups. | Explicit policy groups at the filter layer. |
+- A valid token is enough to allow read access even if the other token header is present and invalid.
+- Example: valid `X-GM-Token` + invalid `X-Player-Token` => allowed.
+- Example: valid `X-Player-Token` + invalid `X-GM-Token` => allowed.
+- Invalid-token blocking applies only when no valid GM or player token succeeds.
 
-## Implemented refactor shape
+## Filter Layer Mapping
 
-- `SessionAccessResolver` centralizes:
-  - `authenticatedUsername(Authentication)` for optional login identity lookup.
-  - `requireReadable(SessionRuntime, gmToken, playerToken, Authentication)` for `SESSION_READABLE`.
-  - `requirePlayerSelf(SessionRuntime, playerToken, pathPlayerId, mismatchMessage)` for player-owned endpoints.
-  - `requirePlayerToken(SessionRuntime, playerToken)` for player-token actions without a path player id, such as `leave`.
-  - `requireGm(SessionRuntime, gmToken)` for GM-only endpoints and GM commands.
-  - `401` vs `403` decisions for token/login policy failures.
-- `SessionCommandAuthorization` owns `/api/sessions/{code}/command` authorization using `SessionCommandType` and `SessionCommandAuth`.
-- Keep controller methods thin: fetch session, call the policy method, then call service/domain logic.
-- Event/log read checks use the same helper as `recent-results`, `run`, `inventory`, `results`, and `choices`.
-- `SecurityPaths` names match policy groups:
-  - `SESSION_PUBLIC`
-  - `SESSION_LOGIN_REQUIRED`
-  - `SESSION_READABLE`
-  - `SESSION_PLAYER_SELF_POST`
-  - `SESSION_PLAYER_SELF_PUT`
-  - `SESSION_GM_ONLY_POST`
-  - `SESSION_GM_ONLY_DELETE`
-- Focused integration tests cover:
-  - `/state` anonymous access.
-  - `/ready` with valid player token and no login.
-  - `SESSION_READABLE` with invalid token, no auth, authenticated non-participant, GM login, participant login, GM token, player token.
-  - `GM_ONLY` rejects player token and accepts GM token.
-  - Player command rejects mismatched request `playerId`.
+- `SecurityPaths.PUBLIC_SESSION_STATE` is public at the Spring Security filter layer.
+- `SecurityPaths.AUTHENTICATED_SESSION_ENTRY` requires login at the filter layer.
+- `SecurityPaths.SESSION_READABLE`, `SecurityPaths.PLAYER_SELF_POST`, `SecurityPaths.PLAYER_SELF_PUT`, `SecurityPaths.GM_ONLY_POST`, `SecurityPaths.GM_ONLY_DELETE`, and `SecurityPaths.SESSION_COMMAND` are `permitAll` at the filter layer and are enforced inside controller/service authorization code.
+
+## Controller And Service Ownership
+
+- `SessionController.create` and `SessionController.join` enforce `AUTHENTICATED_SESSION_ENTRY`.
+- `SessionController.state` serves `PUBLIC_SESSION_STATE`.
+- `SessionController` and `SessionLogService` share the `SESSION_READABLE` decision and emit read-access logs using `SessionAccessDecision`.
+- `SessionAccessResolver.requirePlayerSelf(...)` enforces `PLAYER_SELF`.
+- `SessionAccessResolver.requirePlayerToken(...)` is used for player-token-only actions without a path player id, such as `leave`.
+- `SessionAccessResolver.requireGm(...)` enforces `GM_ONLY`.
+- `SessionCommandAuthorization` enforces command authorization using `SessionCommandType` and `SessionCommandAuth`.
+
+## Logging
+
+- Read-access logs are emitted only for `SESSION_READABLE` endpoints.
+- Logged fields are `code`, `endpoint`, `source`, `tokenBased`, `loginBased`, `username`, and `playerId`.
+- Session token values are never logged.

@@ -30,6 +30,8 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
+                        // Filter-layer grouping mirrors the policy names documented in SecurityPaths
+                        // and docs/session-authorization-policy.md.
                         .requestMatchers(SecurityPaths.PUBLIC_WEB).permitAll()
 
                         .requestMatchers(SecurityPaths.CONTENT_READ_METHOD, SecurityPaths.API_CONTENT).permitAll()
