@@ -304,7 +304,7 @@ export type EngineResponseDto = {
 }
 
 export type SessionEventItemDto = {
-  cursor: string
+  cursor: number
   version: number
   type: string
   payload: unknown
@@ -320,7 +320,7 @@ export type SessionEventPageResponse = {
 }
 
 export type SessionLogItemDto = {
-  cursor: string
+  cursor: number
   version: number
   type: string
   message: string

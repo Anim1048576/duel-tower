@@ -1078,9 +1078,16 @@
   function mergeEventItems(bufferedItems: readonly SessionEventItemDto[], fetchedItems: readonly SessionEventItemDto[]) {
     const seen = new Set<string>()
     const merged: SessionEventItemDto[] = []
+    const toCursorNumber = (cursor: number | string | null | undefined) => {
+      const normalized = Number(cursor)
+      return Number.isFinite(normalized) ? normalized : -1
+    }
 
     for (const item of [...bufferedItems, ...fetchedItems]) {
-      const key = item.cursor || `${item.version}:${item.type}:${item.timestamp ?? ''}`
+      const key =
+        Number.isFinite(Number(item.cursor))
+          ? String(Number(item.cursor))
+          : `${item.version}:${item.type}:${item.timestamp ?? ''}`
 
       if (seen.has(key)) {
         continue
@@ -1090,16 +1097,16 @@
       merged.push(item)
     }
 
-    return merged
-      .sort((left, right) => {
-        if (left.version !== right.version) {
-          return right.version - left.version
-        }
+      return merged
+        .sort((left, right) => {
+          if (left.version !== right.version) {
+            return right.version - left.version
+          }
 
-        return (right.cursor ?? '').localeCompare(left.cursor ?? '')
-      })
-      .slice(0, combatSidebarEventLimit)
-  }
+          return toCursorNumber(right.cursor) - toCursorNumber(left.cursor)
+        })
+        .slice(0, combatSidebarEventLimit)
+    }
 
   function handleWindowStateChange() {
     void loadCombatState()
