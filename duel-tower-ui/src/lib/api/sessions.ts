@@ -10,6 +10,7 @@ import type {
   KickPlayerRequest,
   RecentResultsResponse,
   ResetSessionRequest,
+  RestoreGmAccessResponse,
   SessionCode,
   SessionEventsQuery,
   SessionEventPageResponse,
@@ -113,6 +114,16 @@ export function joinSession(code: SessionCode, payload: JoinSessionRequest) {
   return apiPost<JoinSessionResponse, JoinSessionRequest>(
     `${getSessionResourcePath(code)}/join`,
     payload,
+  )
+}
+
+export function restoreGmAccess(code: SessionCode) {
+  return apiPost<RestoreGmAccessResponse, null>(
+    `${getSessionResourcePath(code)}/gm-access/restore`,
+    null,
+    {
+      handleUnauthorized: false,
+    },
   )
 }
 

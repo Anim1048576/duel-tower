@@ -216,6 +216,12 @@ export type CreateSessionResponse = {
   state: SessionStateDto
 }
 
+export type RestoreGmAccessResponse = {
+  code: SessionCode
+  gmToken: SessionToken
+  state: SessionStateDto
+}
+
 export type JoinSessionRequest = {
   playerId: string
   characterId: number | null

@@ -13,6 +13,7 @@ import com.example.dueltower.session.dto.JoinSessionResponse;
 import com.example.dueltower.session.dto.KickPlayerRequest;
 import com.example.dueltower.session.dto.RecentResultsResponse;
 import com.example.dueltower.session.dto.ResetSessionRequest;
+import com.example.dueltower.session.dto.RestoreGmAccessResponse;
 import com.example.dueltower.session.dto.RunStateDto;
 import com.example.dueltower.session.dto.SessionRunChoicesResponse;
 import com.example.dueltower.session.dto.SessionRunInventoryResponse;
@@ -171,6 +172,22 @@ public class SessionController {
 
         String playerToken = sessionLobbyService.issuePlayerToken(code, requestedPlayerId);
         return new JoinSessionResponse(state, playerToken);
+    }
+
+    @PostMapping("/{code}/gm-access/restore")
+    public RestoreGmAccessResponse restoreGmAccess(@PathVariable String code,
+                                                   Authentication authentication) {
+        String username = requireAuthenticatedUsername(authentication);
+        SessionRuntime rt = sessionLifecycleService.get(code);
+        if (!rt.gmId().equals(username)) {
+            throw new ResponseStatusException(FORBIDDEN, "gm access restore forbidden");
+        }
+
+        SessionStateDto state = sessionLifecycleService.withLockedSession(
+                code,
+                lockedRt -> StateMapper.toDto(lockedRt.code(), lockedRt.state())
+        );
+        return new RestoreGmAccessResponse(rt.code(), rt.gmToken(), state);
     }
 
     @PostMapping("/{code}/players/{playerId}/forget")

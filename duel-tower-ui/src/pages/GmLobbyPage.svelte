@@ -4,7 +4,13 @@
   import type { CharacterProfileResponse } from '../lib/api/characterTypes'
   import { listCards, listPassives } from '../lib/api/content'
   import type { CardDefinition, PassiveDefinition } from '../lib/api/contentTypes'
-  import { executeSessionCommand, getSessionState, kickPlayer, resetSession } from '../lib/api/sessions'
+  import {
+    executeSessionCommand,
+    getSessionState,
+    kickPlayer,
+    resetSession,
+    restoreGmAccess,
+  } from '../lib/api/sessions'
   import type { PlayerStateDto, SessionRequestAccess, SessionStateDto } from '../lib/api/sessionTypes'
   import { getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
@@ -17,6 +23,7 @@
     isStoredGmSessionAccess,
     normalizeSessionCode,
     readStoredSessionAccess,
+    setStoredSessionAccess,
     type StoredSessionAccess,
   } from '../lib/session/access'
   import {
@@ -92,17 +99,9 @@
     return code ? normalizeSessionCode(code) : null
   }
 
-  function getInvalidAccessMessage(nextRouteCode: string | null, nextAccess: StoredSessionAccess | null) {
+  function getInvalidAccessMessage(nextRouteCode: string | null) {
     if (!nextRouteCode) {
       return 'No session code is present in the current GM lobby URL.'
-    }
-
-    if (!isStoredGmSessionAccess(nextAccess)) {
-      return 'GM session access is not available. Re-enter through the session entry page first.'
-    }
-
-    if (!hasStoredSessionCode(nextAccess, nextRouteCode)) {
-      return 'The stored GM session access does not match the requested session code.'
     }
 
     return null
@@ -453,7 +452,7 @@
   async function loadGmLobbyState() {
     const nextRouteCode = routeSessionCode
     const nextAccess = readStoredSessionAccess()
-    const nextInvalidAccessMessage = getInvalidAccessMessage(nextRouteCode, nextAccess)
+    const nextInvalidAccessMessage = getInvalidAccessMessage(nextRouteCode)
     const requestId = ++requestSequence
 
     stopGmLobbyPolling()
@@ -576,14 +575,7 @@
   }
 
   async function handleStartCombat() {
-    if (
-      loading ||
-      actionPending ||
-      !routeSessionCode ||
-      !session ||
-      !selectedStartPlayerId ||
-      !isStoredGmSessionAccess(runtimeAccess)
-    ) {
+    if (loading || actionPending || !routeSessionCode || !session || !selectedStartPlayerId) {
       return
     }
 
@@ -599,41 +591,186 @@
     actionErrorMessage = null
     actionSuccessMessage = null
 
-    try {
-      const response = await executeSessionCommand(
+    let activeSession = session
+    let activeGmToken = isStoredGmSessionAccess(runtimeAccess) ? runtimeAccess.gmToken : null
+    let restoredGmAccess = false
+
+    const syncResponseState = (nextState: SessionStateDto | null) => {
+      if (!nextState) {
+        return null
+      }
+
+      syncLobbyState(nextState)
+      updateGmLobbyPollingVersion(nextState)
+      activeSession = nextState
+      return nextState
+    }
+
+    const navigateToCombat = (nextState: SessionStateDto | null) => {
+      navigateTo(pathBuilders.combat(nextState?.sessionCode ?? routeSessionCode))
+    }
+
+    const isVersionMismatch = (message: string) => message.toLowerCase().includes('version mismatch')
+    const isCombatAlreadyStarted = (message: string) => message.toLowerCase().includes('combat already started')
+    const isGmAuthorizationFailure = (message: string) =>
+      message.toLowerCase().includes('gm authorization required')
+    const getRejectedMessage = (errors: string[]) =>
+      errors.length > 0 ? errors.join(', ') : 'START_COMBAT was rejected by the engine.'
+
+    const syncRestoredGmAccess = (response: Awaited<ReturnType<typeof restoreGmAccess>>) => {
+      const nextAccess = setStoredSessionAccess({
+        code: response.code,
+        role: 'gm',
+        gmToken: response.gmToken,
+      })
+
+      runtimeAccess = nextAccess
+      syncLobbyState(response.state)
+      updateGmLobbyPollingVersion(response.state)
+      startGmLobbyPolling(routeSessionCode, nextAccess, response.state)
+      activeSession = response.state
+      return response
+    }
+
+    const restoreGmSessionAccess = async () => {
+      const restored = syncRestoredGmAccess(await restoreGmAccess(routeSessionCode))
+      activeGmToken = restored.gmToken
+      restoredGmAccess = true
+      return restored
+    }
+
+    const executeStartCombat = (expectedVersion: number, gmToken: string) =>
+      executeSessionCommand(
         routeSessionCode,
         {
           type: 'START_COMBAT',
           playerId: selectedStartPlayerId,
-          expectedVersion: session.version,
+          expectedVersion,
         },
         {
-          role: 'gm',
-          gmToken: runtimeAccess.gmToken,
+          role: 'gm' as const,
+          gmToken,
         },
       )
 
-      if (response.state) {
-        syncLobbyState(response.state)
-        updateGmLobbyPollingVersion(response.state)
-      }
+    const handleRejectedStartCombat = async (
+      response: Awaited<ReturnType<typeof executeStartCombat>>,
+      retried: boolean,
+      gmToken: string,
+    ) => {
+      const syncedState = syncResponseState(response.state)
+      const rejectionMessage = getRejectedMessage(response.errors)
 
-      if (!response.accepted) {
-        const rejectionMessage =
-          response.errors.length > 0
-            ? response.errors.join(', ')
-            : 'START_COMBAT was rejected by the engine.'
+        if (isCombatAlreadyStarted(rejectionMessage)) {
+          actionErrorTitle = 'Combat already in progress'
+          actionErrorMessage =
+            'Combat had already started in this session, so you were moved to the combat screen.'
+          navigateToCombat(syncedState)
+          return true
+        }
+
+      if (!retried && syncedState && isVersionMismatch(rejectionMessage)) {
+        const retryResponse = await executeStartCombat(syncedState.version, gmToken)
+        const retryState = syncResponseState(retryResponse.state)
+
+        if (retryResponse.accepted) {
+          actionSuccessMessage = restoredGmAccess
+            ? 'GM access was restored, the lobby synced to the latest session state, and combat started.'
+            : 'The GM lobby synced to the latest session state and retried START_COMBAT once before combat started.'
+          navigateToCombat(retryState)
+          return true
+        }
+
+        const retryMessage = getRejectedMessage(retryResponse.errors)
+
+        if (isCombatAlreadyStarted(retryMessage)) {
+          actionErrorTitle = 'Combat already in progress'
+          actionErrorMessage = restoredGmAccess
+            ? 'GM access was restored, but combat had already started, so you were moved to the combat screen.'
+            : 'After syncing the latest session state, the lobby detected that combat had already started and moved you to the combat screen.'
+          navigateToCombat(retryState)
+          return true
+        }
 
         actionErrorTitle = 'Combat start rejected'
-        actionErrorMessage = rejectionMessage.includes('version mismatch')
-          ? `${rejectionMessage}. The GM lobby was synced to the latest session version. Try again.`
-          : rejectionMessage
+        actionErrorMessage = isVersionMismatch(retryMessage)
+          ? 'The GM lobby synced to the latest session state and retried START_COMBAT once, but the version changed again before combat could start. Try once more after the lobby settles.'
+          : retryMessage
+        return true
+      }
+
+      actionErrorTitle = 'Combat start rejected'
+      actionErrorMessage = isVersionMismatch(rejectionMessage)
+        ? 'The GM lobby synced to the latest session state, but START_COMBAT still could not be applied with the refreshed version.'
+        : rejectionMessage
+      return true
+    }
+
+    try {
+      if (!activeGmToken) {
+        try {
+          await restoreGmSessionAccess()
+        } catch (restoreError) {
+          actionErrorTitle = 'GM access restore failed'
+          actionErrorMessage = getApiErrorMessage(
+            restoreError,
+            'Unable to restore GM access for this session. Sign in as the original GM again or return to session entry and reopen the session.',
+          )
+          return
+        }
+      }
+
+      if (!activeGmToken) {
+        actionErrorTitle = 'GM access restore failed'
+        actionErrorMessage = 'GM access could not be restored for the current session.'
         return
       }
 
-      navigateTo(pathBuilders.combat(response.state?.sessionCode ?? routeSessionCode))
+      const response = await executeStartCombat(activeSession.version, activeGmToken)
+
+      if (!response.accepted) {
+        await handleRejectedStartCombat(response, false, activeGmToken)
+        return
+      }
+
+      const nextState = syncResponseState(response.state)
+      if (restoredGmAccess) {
+        actionSuccessMessage = 'GM access was restored from the logged-in account and combat started.'
+      }
+      navigateToCombat(nextState)
     } catch (error) {
-      actionErrorMessage = getApiErrorMessage(error, 'Unable to start combat from the current GM lobby.')
+      const status =
+        typeof error === 'object' && error && 'status' in error && typeof error.status === 'number'
+          ? error.status
+          : null
+      const errorMessage = getApiErrorMessage(error, 'Unable to start combat from the current GM lobby.')
+
+      if ((status === 401 || isGmAuthorizationFailure(errorMessage)) && !restoredGmAccess) {
+        try {
+          const restored = await restoreGmSessionAccess()
+          const retryResponse = await executeStartCombat(restored.state.version, restored.gmToken)
+
+          if (!retryResponse.accepted) {
+            await handleRejectedStartCombat(retryResponse, true, restored.gmToken)
+            return
+          }
+
+          const retryState = syncResponseState(retryResponse.state)
+          actionSuccessMessage =
+            'GM access was restored from the logged-in account and START_COMBAT succeeded with the refreshed session state.'
+          navigateToCombat(retryState)
+          return
+        } catch (restoreError) {
+          actionErrorTitle = 'GM access restore failed'
+          actionErrorMessage = getApiErrorMessage(
+            restoreError,
+            'Unable to restore GM access for this session. Sign in as the original GM again or return to session entry and reopen the session.',
+          )
+          return
+        }
+      }
+
+      actionErrorMessage = errorMessage
     } finally {
       actionPending = null
     }
@@ -678,10 +815,6 @@
       return 'Session state is unavailable.'
     }
 
-    if (!isStoredGmSessionAccess(runtimeAccess)) {
-      return 'GM token access is required before START_COMBAT can be sent.'
-    }
-
     if (participantCount === 0) {
       return 'At least one participant must join before combat can start.'
     }
@@ -712,17 +845,17 @@
     </SectionFrame>
   {:else if invalidAccessMessage}
     <SectionFrame
-      eyebrow="GM Access"
-      title="GM lobby access is unavailable"
-      description="This page expects GM runtime access that matches the current session code."
+      eyebrow="Session Route"
+      title="GM lobby route is unavailable"
+      description="This page needs a valid session code in the URL before it can restore the current GM lobby."
     >
       <ContentStatePanel
-        title={sessionPageStateCopy.invalidGmAccess.title}
+        title="Session code is missing"
         message={invalidAccessMessage}
         tone="error"
       >
         <p>Requested code: {routeSessionCode ?? 'Unavailable'}</p>
-        <p>Open the session entry screen and create a GM session again to restore GM access.</p>
+        <p>Open the session entry screen and enter a valid session code to restore the GM lobby.</p>
       </ContentStatePanel>
 
       <div class="gm-lobby-page__actions">
