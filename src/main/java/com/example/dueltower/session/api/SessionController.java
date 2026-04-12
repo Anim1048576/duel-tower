@@ -43,6 +43,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NO_CONTENT;
@@ -322,9 +323,7 @@ public class SessionController {
     }
 
     // COMMAND WRITE FLOW:
-    // controller는 헤더/바디를 받고, 실제 command 실행은 SessionCommandService에 위임한다.
-    // 현재 command 처리와 expectedVersion 기반 쓰기 흐름은 controller 에 있다.
-    // 다음 단계 이후에는 SessionCommandService 로 이동시켜 controller 는 인증/입력 검증에 집중시킨다.
+    // controller는 HTTP 경계만 담당하고, 실제 command 실행은 SessionCommandService가 맡는다.
     @PostMapping("/{code}/command")
     public EngineResponseDto command(@PathVariable String code,
                                      @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
@@ -339,5 +338,4 @@ public class SessionController {
         }
         return authentication.getName();
     }
-
 }

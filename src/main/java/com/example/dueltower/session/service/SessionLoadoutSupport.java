@@ -46,6 +46,13 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
+/**
+ * Shared loadout helper used by lobby/loadout flows.
+ *
+ * <p>Contains parsing, validation, deck runtime mutation, and persistence helpers
+ * that would otherwise be duplicated between {@link SessionLobbyService} and
+ * {@link SessionLoadoutService}.</p>
+ */
 @Component
 public class SessionLoadoutSupport {
 
@@ -108,6 +115,10 @@ public class SessionLoadoutSupport {
             return starterLoadoutConfig.defaultOwnedCards();
         }
         return SessionNormalizationSupport.normalizeOwnedCards(ownedCardsRaw);
+    }
+
+    public List<OwnedCardModifier> toOwnedCardModifiers(OwnedCardDto dto) {
+        return SessionNormalizationSupport.normalizeOwnedCardModifiers(dto);
     }
 
     public List<String> resolveJoinDeckOwnedCardIds(CharacterJoinTemplate characterTemplate,
@@ -428,7 +439,7 @@ public class SessionLoadoutSupport {
         );
     }
 
-    private List<OwnedCardDto> parseOwnedCardsJson(String raw) {
+    public List<OwnedCardDto> parseOwnedCardsJson(String raw) {
         if (raw == null || raw.isBlank()) return List.of();
         try {
             List<JsonNode> nodes = JSON.readValue(raw, new TypeReference<>() {});
