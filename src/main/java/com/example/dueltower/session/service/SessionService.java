@@ -81,7 +81,7 @@ public class SessionService {
         if (sessionLifecycleService == null) {
             throw new IllegalStateException("SessionLifecycleService is not available");
         }
-        return sessionLifecycleService.withSessionLock(code, reader);
+        return sessionLifecycleService.withLockedSession(code, reader);
     }
 
     // Legacy reflection entry points kept for parsing-focused tests.

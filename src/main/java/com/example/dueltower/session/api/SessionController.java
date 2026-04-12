@@ -159,7 +159,7 @@ public class SessionController {
         List<String> requestedPassiveIds = (req.passiveIds() == null) ? List.of() : req.passiveIds();
         sessionLobbyService.join(code, requestedPlayerId, req.characterId(), requestedPassiveIds, req.requestedPresetDeckOwnedCardIds(), req.presetExCardId(), req.ownedCards());
 
-        SessionStateDto state = sessionLifecycleService.withSessionLock(code, rt -> {
+        SessionStateDto state = sessionLifecycleService.withLockedSession(code, rt -> {
             log.info("session join code={} playerId={} requestedPassiveIds={} playersNow={}",
                     code,
                     requestedPlayerId,
@@ -191,7 +191,7 @@ public class SessionController {
         );
 
         sessionLoadoutService.forgetOwnedCard(code, actorPlayerId, playerId, req.ownedCardIndex());
-        return sessionLifecycleService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+        return sessionLifecycleService.withLockedSession(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
 
     @PostMapping("/{code}/players/{playerId}/deck")
@@ -211,7 +211,7 @@ public class SessionController {
                 "players may only edit their own deck"
         );
         sessionLoadoutService.updateDeck(code, actorPlayerId, playerId, req.requestedDeckOwnedCardIds());
-        return sessionLifecycleService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+        return sessionLifecycleService.withLockedSession(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
 
     @PostMapping("/{code}/players/{playerId}/loadout")
@@ -238,7 +238,7 @@ public class SessionController {
                 req.deckOwnedCardIds(),
                 req.exCardId()
         );
-        return sessionLifecycleService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+        return sessionLifecycleService.withLockedSession(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
 
     @PostMapping("/{code}/players/{playerId}/loadout/from-preset")
@@ -257,7 +257,7 @@ public class SessionController {
                 "players may only edit their own loadout"
         );
         sessionLoadoutService.applyPresetToLoadout(code, actorPlayerId, playerId, req.presetId());
-        return sessionLifecycleService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+        return sessionLifecycleService.withLockedSession(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
 
     @PutMapping("/{code}/players/{playerId}/ready")
@@ -276,7 +276,7 @@ public class SessionController {
                 "players may only update their own ready state"
         );
         sessionLobbyService.setPlayerReady(code, actorPlayerId, playerId, req.ready());
-        return sessionLifecycleService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+        return sessionLifecycleService.withLockedSession(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
 
     @PostMapping("/{code}/leave")
@@ -285,7 +285,7 @@ public class SessionController {
         SessionRuntime runtime = sessionLifecycleService.get(code);
         String actorPlayerId = sessionAccessResolver.requirePlayerToken(runtime, playerTokenHeader);
         sessionLobbyService.leaveSession(code, actorPlayerId);
-        return sessionLifecycleService.withSessionLock(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+        return sessionLifecycleService.withLockedSession(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
 
     @PostMapping("/{code}/players/{playerId}/kick")
@@ -299,7 +299,7 @@ public class SessionController {
             log.info("session kick code={} playerId={} reason={}", code, playerId, req.reason().trim());
         }
         sessionLobbyService.kickPlayer(rt.code(), playerId);
-        return sessionLifecycleService.withSessionLock(code, lockedRt -> StateMapper.toDto(lockedRt.code(), lockedRt.state()));
+        return sessionLifecycleService.withLockedSession(code, lockedRt -> StateMapper.toDto(lockedRt.code(), lockedRt.state()));
     }
 
     @PostMapping("/{code}/reset")
@@ -310,7 +310,7 @@ public class SessionController {
         sessionAccessResolver.requireGm(rt, gmTokenHeader);
         ResetSessionRequest resetReq = (req == null) ? new ResetSessionRequest(null, null, null) : req;
         sessionLobbyService.resetSession(rt.code(), resetReq.keepPlayersOrDefault(), resetReq.keepLoadoutsOrDefault(), resetReq.newSeed());
-        return sessionLifecycleService.withSessionLock(code, lockedRt -> StateMapper.toDto(lockedRt.code(), lockedRt.state()));
+        return sessionLifecycleService.withLockedSession(code, lockedRt -> StateMapper.toDto(lockedRt.code(), lockedRt.state()));
     }
 
     @DeleteMapping("/{code}")

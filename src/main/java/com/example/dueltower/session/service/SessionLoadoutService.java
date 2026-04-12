@@ -54,8 +54,7 @@ public class SessionLoadoutService {
 
         PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
         PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
-        SessionRuntime rt = sessionLifecycleService.get(code);
-        return rt.withLock(() -> {
+        return sessionLifecycleService.withLockedSession(code, rt -> {
             GameState state = rt.state();
             if (!actor.equals(target)) {
                 throw new ResponseStatusException(FORBIDDEN, "players may only edit their own deck");
@@ -126,8 +125,7 @@ public class SessionLoadoutService {
 
         PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
         PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
-        SessionRuntime rt = sessionLifecycleService.get(code);
-        return rt.withLock(() -> {
+        return sessionLifecycleService.withLockedSession(code, rt -> {
             GameState state = rt.state();
             if (!actor.equals(target)) {
                 throw new ResponseStatusException(FORBIDDEN, "players may only forget their own cards");
@@ -206,8 +204,7 @@ public class SessionLoadoutService {
 
         PlayerId actor = new PlayerId(actorPlayerId);
         PlayerId target = new PlayerId(targetPlayerId);
-        SessionRuntime rt = sessionLifecycleService.get(code);
-        return rt.withLock(() -> {
+        return sessionLifecycleService.withLockedSession(code, rt -> {
             GameState state = rt.state();
             if (!actor.equals(target)) {
                 throw new ResponseStatusException(FORBIDDEN, "players may only edit their own loadout");

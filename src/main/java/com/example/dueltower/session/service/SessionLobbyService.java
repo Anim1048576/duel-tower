@@ -56,7 +56,6 @@ public class SessionLobbyService {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
 
-        SessionRuntime rt = sessionLifecycleService.get(code);
         PlayerId pid = new PlayerId(playerIdRaw.trim());
 
         SessionLoadoutSupport.CharacterJoinTemplate characterTemplate = (characterIdRaw == null)
@@ -65,7 +64,7 @@ public class SessionLobbyService {
 
         List<String> passiveIds = sessionLoadoutSupport.parsePassiveIds(characterTemplate != null ? characterTemplate.passiveIds() : passiveIdsRaw);
 
-        return rt.withLock(() -> {
+        return sessionLifecycleService.withLockedSession(code, rt -> {
             GameState state = rt.state();
 
             if (state.players().containsKey(pid)) {
@@ -112,9 +111,8 @@ public class SessionLobbyService {
         if (playerIdRaw == null || playerIdRaw.isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
-        SessionRuntime rt = sessionLifecycleService.get(code);
         String playerId = playerIdRaw.trim();
-        return rt.withLock(() -> {
+        return sessionLifecycleService.withLockedSession(code, rt -> {
             if (!rt.state().players().containsKey(new PlayerId(playerId))) {
                 throw new ResponseStatusException(NOT_FOUND, "player not found");
             }
@@ -126,9 +124,8 @@ public class SessionLobbyService {
         if (playerTokenRaw == null || playerTokenRaw.isBlank()) {
             return null;
         }
-        SessionRuntime rt = sessionLifecycleService.get(code);
         String token = playerTokenRaw.trim();
-        return rt.withLock(() -> rt.findPlayerIdByToken(token));
+        return sessionLifecycleService.withLockedSession(code, rt -> rt.findPlayerIdByToken(token));
     }
 
     public GameState leaveSession(String code, String actorPlayerIdRaw) {
@@ -136,8 +133,7 @@ public class SessionLobbyService {
             throw new ResponseStatusException(BAD_REQUEST, "actorPlayerId is required");
         }
         PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
-        SessionRuntime rt = sessionLifecycleService.get(code);
-        return rt.withLock(() -> removePlayerFromSession(rt, actor, "player not found"));
+        return sessionLifecycleService.withLockedSession(code, rt -> removePlayerFromSession(rt, actor, "player not found"));
     }
 
     public GameState setPlayerReady(String code, String actorPlayerIdRaw, String targetPlayerIdRaw, boolean ready) {
@@ -154,8 +150,7 @@ public class SessionLobbyService {
             throw new ResponseStatusException(FORBIDDEN, "players may only update their own ready state");
         }
 
-        SessionRuntime rt = sessionLifecycleService.get(code);
-        return rt.withLock(() -> {
+        return sessionLifecycleService.withLockedSession(code, rt -> {
             PlayerState player = rt.state().players().get(target);
             if (player == null) {
                 throw new ResponseStatusException(NOT_FOUND, "player not found");
@@ -170,13 +165,11 @@ public class SessionLobbyService {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
         }
         PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
-        SessionRuntime rt = sessionLifecycleService.get(code);
-        return rt.withLock(() -> removePlayerFromSession(rt, target, "player not found"));
+        return sessionLifecycleService.withLockedSession(code, rt -> removePlayerFromSession(rt, target, "player not found"));
     }
 
     public GameState resetSession(String code, boolean keepPlayers, boolean keepLoadouts, Long newSeed) {
-        SessionRuntime rt = sessionLifecycleService.get(code);
-        return rt.withLock(() -> {
+        return sessionLifecycleService.withLockedSession(code, rt -> {
             GameState state = rt.state();
             long resetSeed = (newSeed == null) ? state.seed() : newSeed;
             resetSessionState(rt, state, keepPlayers, keepLoadouts, resetSeed);

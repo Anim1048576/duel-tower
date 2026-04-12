@@ -50,52 +50,51 @@ public class SessionCommandService {
             throw new ResponseStatusException(BAD_REQUEST, "expectedVersion is required");
         }
 
-        SessionRuntime rt = sessionLifecycleService.get(code);
-        UUID commandId = parseOrNewUuid(req.commandId());
-        SessionCommandType commandType = SessionCommandType.from(req.type());
+        return sessionLifecycleService.withLockedSession(code, rt -> {
+            UUID commandId = parseOrNewUuid(req.commandId());
+            SessionCommandType commandType = SessionCommandType.from(req.type());
 
-        sessionCommandAuthorization.authorize(rt, commandType, req, gmTokenHeader, playerTokenHeader);
+            sessionCommandAuthorization.authorize(rt, commandType, req, gmTokenHeader, playerTokenHeader);
 
-        log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} summonId={} itemId={} count={} reason={} discardIds={} targetPlayers={} targetEnemies={} targets={}",
-                code,
-                commandType.requestType(),
-                req.trimmedPlayerId(),
-                req.expectedVersion(),
-                commandId,
-                req.trimmedCardId(),
-                req.trimmedSummonId(),
-                req.trimmedItemId(),
-                req.count(),
-                req.trimmedReason(),
-                (req.discardIds() == null) ? 0 : req.discardIds().size(),
-                (req.targetPlayerIds() == null) ? 0 : req.targetPlayerIds().size(),
-                (req.targetEnemyIds() == null) ? 0 : req.targetEnemyIds().size(),
-                (req.targets() == null) ? 0 : req.targets().size()
-        );
+            log.debug("command received code={} type={} playerId={} expectedVersion={} commandId={} cardId={} summonId={} itemId={} count={} reason={} discardIds={} targetPlayers={} targetEnemies={} targets={}",
+                    code,
+                    commandType.requestType(),
+                    req.trimmedPlayerId(),
+                    req.expectedVersion(),
+                    commandId,
+                    req.trimmedCardId(),
+                    req.trimmedSummonId(),
+                    req.trimmedItemId(),
+                    req.count(),
+                    req.trimmedReason(),
+                    (req.discardIds() == null) ? 0 : req.discardIds().size(),
+                    (req.targetPlayerIds() == null) ? 0 : req.targetPlayerIds().size(),
+                    (req.targetEnemyIds() == null) ? 0 : req.targetEnemyIds().size(),
+                    (req.targets() == null) ? 0 : req.targets().size()
+            );
 
-        final EngineResult res = rt.withLock(() -> {
             GameCommand cmd = commandType.toCommand(req, commandId, req.expectedVersion());
-            return rt.apply(cmd);
+            final EngineResult res = rt.apply(cmd);
+
+            long tookMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
+            if (res.accepted()) {
+                log.debug("command accepted code={} type={} commandId={} events={} newVersion={} ({}ms)",
+                        code, req.type(), commandId, res.events().size(), res.state().version(), tookMs);
+            } else {
+                log.warn("command rejected code={} type={} commandId={} errors={} version={} ({}ms)",
+                        code, req.type(), commandId, res.errors(), res.state().version(), tookMs);
+            }
+
+            SessionStateDto state = StateMapper.toDto(rt.code(), res.state());
+
+            return new EngineResponseDto(
+                    res.accepted(),
+                    res.errors(),
+                    res.accepted() ? List.of() : List.of(ApiErrorResolver.commandRejection(res.errors())),
+                    StateMapper.toEventDtos(res.events()),
+                    state
+            );
         });
-
-        long tookMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
-        if (res.accepted()) {
-            log.debug("command accepted code={} type={} commandId={} events={} newVersion={} ({}ms)",
-                    code, req.type(), commandId, res.events().size(), res.state().version(), tookMs);
-        } else {
-            log.warn("command rejected code={} type={} commandId={} errors={} version={} ({}ms)",
-                    code, req.type(), commandId, res.errors(), res.state().version(), tookMs);
-        }
-
-        SessionStateDto state = rt.withLock(() -> StateMapper.toDto(rt.code(), res.state()));
-
-        return new EngineResponseDto(
-                res.accepted(),
-                res.errors(),
-                res.accepted() ? List.of() : List.of(ApiErrorResolver.commandRejection(res.errors())),
-                StateMapper.toEventDtos(res.events()),
-                state
-        );
     }
 
     private static UUID parseOrNewUuid(String v) {

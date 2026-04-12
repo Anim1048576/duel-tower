@@ -32,7 +32,7 @@ public class SessionQueryService {
     }
 
     public SessionStateDto getPublicState(String code) {
-        return sessionLifecycleService.withSessionLock(code, rt -> {
+        return sessionLifecycleService.withLockedSession(code, rt -> {
             log.debug("session state requested code={} version={}", code, rt.state().version());
             return StateMapper.toDto(rt.code(), rt.state());
         });
@@ -48,12 +48,12 @@ public class SessionQueryService {
                 playerTokenHeader,
                 authentication,
                 "GET /api/sessions/{code}/recent-results",
-                rt -> rt.withLock(() -> new RecentResultsResponse(
+                rt -> new RecentResultsResponse(
                         rt.state().version(),
                         rt.state().runState().resultPending(),
                         StateMapper.toCurrentNodeDto(rt.state().runState()),
                         StateMapper.toRecentResultDtos(rt.state().runState())
-                ))
+                )
         );
     }
 
@@ -67,7 +67,7 @@ public class SessionQueryService {
                 playerTokenHeader,
                 authentication,
                 "GET /api/sessions/{code}/run",
-                rt -> rt.withLock(() -> StateMapper.toRunDto(rt.state().runState()))
+                rt -> StateMapper.toRunDto(rt.state().runState())
         );
     }
 
@@ -81,10 +81,10 @@ public class SessionQueryService {
                 playerTokenHeader,
                 authentication,
                 "GET /api/sessions/{code}/inventory",
-                rt -> rt.withLock(() -> new SessionRunInventoryResponse(
+                rt -> new SessionRunInventoryResponse(
                         rt.state().version(),
                         StateMapper.toInventoryDto(rt.state().runState())
-                ))
+                )
         );
     }
 
@@ -98,12 +98,12 @@ public class SessionQueryService {
                 playerTokenHeader,
                 authentication,
                 "GET /api/sessions/{code}/results",
-                rt -> rt.withLock(() -> new RecentResultsResponse(
+                rt -> new RecentResultsResponse(
                         rt.state().version(),
                         rt.state().runState().resultPending(),
                         StateMapper.toCurrentNodeDto(rt.state().runState()),
                         StateMapper.toRecentResultDtos(rt.state().runState())
-                ))
+                )
         );
     }
 
@@ -117,12 +117,12 @@ public class SessionQueryService {
                 playerTokenHeader,
                 authentication,
                 "GET /api/sessions/{code}/choices",
-                rt -> rt.withLock(() -> new SessionRunChoicesResponse(
+                rt -> new SessionRunChoicesResponse(
                         rt.state().version(),
                         rt.state().runState().resultPending(),
                         StateMapper.toCurrentNodeDto(rt.state().runState()),
                         StateMapper.toNodeChoiceDtos(rt.state().runState())
-                ))
+                )
         );
     }
 
@@ -136,17 +136,18 @@ public class SessionQueryService {
                                             Authentication authentication,
                                             String endpoint,
                                             Function<SessionRuntime, T> reader) {
-        SessionRuntime rt = sessionLifecycleService.get(code);
-        SessionAccessDecision decision = sessionAccessResolver.requireSessionReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
-        log.info("session read granted code={} endpoint={} source={} tokenBased={} loginBased={} username={} playerId={}",
-                decision.sessionCode(),
-                endpoint,
-                decision.source(),
-                decision.tokenBased(),
-                decision.loginBased(),
-                decision.username(),
-                decision.playerId()
-        );
-        return reader.apply(rt);
+        return sessionLifecycleService.withLockedSession(code, rt -> {
+            SessionAccessDecision decision = sessionAccessResolver.requireSessionReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+            log.info("session read granted code={} endpoint={} source={} tokenBased={} loginBased={} username={} playerId={}",
+                    decision.sessionCode(),
+                    endpoint,
+                    decision.source(),
+                    decision.tokenBased(),
+                    decision.loginBased(),
+                    decision.username(),
+                    decision.playerId()
+            );
+            return reader.apply(rt);
+        });
     }
 }

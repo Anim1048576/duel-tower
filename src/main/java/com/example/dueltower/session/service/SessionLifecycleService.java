@@ -15,6 +15,7 @@ import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.Ids.SessionId;
 import com.example.dueltower.session.runtime.SessionRuntime;
+import com.example.dueltower.session.store.SessionRuntimeStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -25,22 +26,22 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import static org.springframework.http.HttpStatus.GONE;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE;
 
-@Service
-@Slf4j
 /**
  * Session lifecycle service.
  *
- * <p>세션 생성/조회/삭제/만료 정리와 runtime registry 접근의 실제 구현을 담당한다.</p>
+ * <p>세션 생성/조회/삭제/만료 정리와 runtime 접근 정책을 담당한다.
+ * runtime 저장은 {@link SessionRuntimeStore} 뒤로 숨기고, TTL/expire 판단과
+ * 공식 lock 진입점은 lifecycle 계층에 둔다.</p>
  */
+@Service
+@Slf4j
 public class SessionLifecycleService {
 
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
@@ -56,11 +57,9 @@ public class SessionLifecycleService {
     private final RewardTableConfig rewardTableConfig;
     private final RunConfigs runConfigs;
     private final EncounterTables encounterTables;
+    private final SessionRuntimeStore sessionRuntimeStore;
     private final Duration sessionTtl;
     private final Duration cleanupInterval;
-
-    // code -> runtime (in-memory)
-    private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
 
     private final SecureRandom rnd = new SecureRandom();
 
@@ -75,6 +74,7 @@ public class SessionLifecycleService {
                                    RewardTableConfig rewardTableConfig,
                                    RunConfigs runConfigs,
                                    EncounterTables encounterTables,
+                                   SessionRuntimeStore sessionRuntimeStore,
                                    @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                                    @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.cardService = cardService;
@@ -88,6 +88,7 @@ public class SessionLifecycleService {
         this.rewardTableConfig = rewardTableConfig;
         this.runConfigs = runConfigs;
         this.encounterTables = encounterTables;
+        this.sessionRuntimeStore = sessionRuntimeStore;
         this.sessionTtl = sessionTtl;
         this.cleanupInterval = cleanupInterval;
     }
@@ -119,7 +120,7 @@ public class SessionLifecycleService {
             GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong(), runConfigs.runConfig());
             SessionRuntime rt = new SessionRuntime(code, gmId, generateGmToken(), state, ctx);
 
-            if (sessions.putIfAbsent(code, rt) == null) {
+            if (sessionRuntimeStore.putIfAbsent(code, rt)) {
                 log.debug("created session code={} gmId={} sessionId={} seed={}",
                         code, gmId, state.sessionId().value(), state.seed());
                 return rt;
@@ -132,23 +133,36 @@ public class SessionLifecycleService {
 
     public SessionRuntime get(String code) {
         evictExpiredSessions();
-        SessionRuntime rt = sessions.get(code);
+        SessionRuntime rt = sessionRuntimeStore.get(code);
         if (rt == null) throw new ResponseStatusException(NOT_FOUND, "session not found");
         if (isExpired(rt)) {
-            sessions.remove(code, rt);
+            sessionRuntimeStore.remove(code, rt);
             throw new ResponseStatusException(GONE, "session expired");
         }
         rt.touchAccess();
         return rt;
     }
 
-    public <T> T withSessionLock(String code, Function<SessionRuntime, T> reader) {
+    public <T> T withSession(String code, Function<SessionRuntime, T> reader) {
+        return reader.apply(get(code));
+    }
+
+    /**
+     * Canonical runtime lock entrypoint for session-scoped mutations and
+     * read-modify-read flows.
+     */
+    public <T> T withLockedSession(String code, Function<SessionRuntime, T> reader) {
         SessionRuntime rt = get(code);
         return rt.withLock(() -> reader.apply(rt));
     }
 
+    @Deprecated(forRemoval = false)
+    public <T> T withSessionLock(String code, Function<SessionRuntime, T> reader) {
+        return withLockedSession(code, reader);
+    }
+
     public void deleteSession(String code) {
-        SessionRuntime rt = sessions.remove(code);
+        SessionRuntime rt = sessionRuntimeStore.remove(code);
         if (rt == null) {
             throw new ResponseStatusException(NOT_FOUND, "session not found");
         }
@@ -163,14 +177,14 @@ public class SessionLifecycleService {
         Instant now = Instant.now();
         int removed = 0;
 
-        for (Map.Entry<String, SessionRuntime> entry : sessions.entrySet()) {
+        for (var entry : sessionRuntimeStore.entries()) {
             SessionRuntime rt = entry.getValue();
             Instant expirationBoundary = rt.lastAccessedAt().plus(sessionTtl);
             if (expirationBoundary.isAfter(now)) {
                 continue;
             }
 
-            if (sessions.remove(entry.getKey(), rt)) {
+            if (sessionRuntimeStore.remove(entry.getKey(), rt)) {
                 removed++;
             }
         }
