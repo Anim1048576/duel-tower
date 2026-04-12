@@ -20,34 +20,34 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 public enum SessionCommandType {
     START_COMBAT("START_COMBAT", SessionCommandAuth.GM, true) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             PlayerId playerId = parsePlayerId(requireText(req.trimmedPlayerId(), "playerId"));
             return new StartCombatCommand(commandId, expectedVersion, playerId);
         }
     },
     DRAW("DRAW", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             PlayerId playerId = commandPlayerId(req);
             return new DrawCommand(commandId, expectedVersion, playerId, req.countOrDefault(1));
         }
     },
     END_TURN("END_TURN", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new EndTurnCommand(commandId, expectedVersion, commandPlayerId(req));
         }
     },
     HAND_SWAP("HAND_SWAP", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             CardInstId id = parseSingleCardInstId(req.discardIds(), "discardIds");
             return new HandSwapCommand(commandId, expectedVersion, commandPlayerId(req), id);
         }
     },
     PLAY_CARD("PLAY_CARD", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             CardInstId id = parseCardInstId(requireText(req.trimmedCardId(), "cardId"), "cardId");
             return new PlayCardCommand(
                     commandId,
@@ -62,13 +62,13 @@ public enum SessionCommandType {
     },
     USE_EX("USE_EX", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new UseExCommand(commandId, expectedVersion, commandPlayerId(req), parseTargetSelection(req));
         }
     },
     ENEMY_PLAY_CARD("ENEMY_PLAY_CARD", SessionCommandAuth.GM, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             Ids.EnemyId enemyId = parseEnemyId(req.enemyId());
             CardInstId id = parseCardInstId(requireText(req.trimmedCardId(), "cardId"), "cardId");
             return new EnemyPlayCardCommand(commandId, expectedVersion, enemyId, id, parseTargetSelection(req));
@@ -76,87 +76,87 @@ public enum SessionCommandType {
     },
     ENEMY_USE_EX("ENEMY_USE_EX", SessionCommandAuth.GM, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new EnemyUseExCommand(commandId, expectedVersion, parseEnemyId(req.enemyId()), parseTargetSelection(req));
         }
     },
     ENEMY_END_TURN("ENEMY_END_TURN", SessionCommandAuth.GM, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new EnemyEndTurnCommand(commandId, expectedVersion, parseEnemyId(req.enemyId()));
         }
     },
     USE_SUMMON_ACTION("USE_SUMMON_ACTION", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             Ids.SummonInstId summonId = parseSummonInstId(requireText(req.trimmedSummonId(), "summonId"), "summonId");
             return new UseSummonActionCommand(commandId, expectedVersion, commandPlayerId(req), summonId, parseTargetSelection(req));
         }
     },
     USE_EQUIP_ACTION("USE_EQUIP_ACTION", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
             return new UseEquipActionCommand(commandId, expectedVersion, commandPlayerId(req), inventoryEquipId, parseTargetSelection(req));
         }
     },
     RELOAD_EQUIPMENT("RELOAD_EQUIPMENT", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
             return new ReloadEquipmentCommand(commandId, expectedVersion, commandPlayerId(req), inventoryEquipId);
         }
     },
     USE_ITEM("USE_ITEM", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             String itemId = requireText(req.trimmedItemId(), "itemId");
             return new UseItemCommand(commandId, expectedVersion, commandPlayerId(req), itemId, req.countOrDefault(1), parseTargetSelection(req));
         }
     },
     BUY_SHOP_ITEM("BUY_SHOP_ITEM", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             String offerId = requireText(req.trimmedOfferId(), "offerId");
             return new BuyShopItemCommand(commandId, expectedVersion, commandPlayerId(req), offerId, req.countOrDefault(1));
         }
     },
     EQUIP_EQUIPMENT("EQUIP_EQUIPMENT", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
             return new EquipEquipmentCommand(commandId, expectedVersion, commandPlayerId(req), inventoryEquipId);
         }
     },
     UNEQUIP_EQUIPMENT("UNEQUIP_EQUIPMENT", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             String inventoryEquipId = requireText(req.trimmedInventoryEquipId(), "inventoryEquipId");
             return new UnequipEquipmentCommand(commandId, expectedVersion, commandPlayerId(req), inventoryEquipId);
         }
     },
     OPEN_CHEST("OPEN_CHEST", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new OpenChestCommand(commandId, expectedVersion, commandPlayerId(req), req.countOrDefault(1));
         }
     },
     RESOLVE_JUDGEMENT("RESOLVE_JUDGEMENT", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             String choiceId = requireText(req.trimmedChoiceId(), "choiceId");
             return new ResolveJudgementCommand(commandId, expectedVersion, commandPlayerId(req), choiceId);
         }
     },
     SURRENDER_COMBAT("SURRENDER_COMBAT", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new SurrenderCombatCommand(commandId, expectedVersion, commandPlayerId(req), req.trimmedReason());
         }
     },
     SELL_INVENTORY_ITEM("SELL_INVENTORY_ITEM", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new SellInventoryItemCommand(
                     commandId,
                     expectedVersion,
@@ -169,19 +169,19 @@ public enum SessionCommandType {
     },
     RETREAT_COMBAT("RETREAT_COMBAT", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new RetreatCombatCommand(commandId, expectedVersion, commandPlayerId(req), req.trimmedReason());
         }
     },
     DISCARD_TO_HAND_LIMIT("DISCARD_TO_HAND_LIMIT", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new DiscardToHandLimitCommand(commandId, expectedVersion, commandPlayerId(req), parseCardInstIds(req.discardIds(), "discardIds"));
         }
     },
     RESOLVE_INITIATIVE_TIE("RESOLVE_INITIATIVE_TIE", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             if (req.tieGroupIndex() == null) {
                 throw new ResponseStatusException(BAD_REQUEST, "tieGroupIndex is required");
             }
@@ -199,26 +199,26 @@ public enum SessionCommandType {
     },
     SEARCH_PICK("SEARCH_PICK", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new ResolveSearchPickCommand(commandId, expectedVersion, commandPlayerId(req), parseCardInstIds(req.selectedIds(), "selectedIds"));
         }
     },
     RESOLVE_SEARCH_PICK("RESOLVE_SEARCH_PICK", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return SEARCH_PICK.toCommand(req, commandId, expectedVersion);
         }
     },
     SELECT_NODE_CHOICE("SELECT_NODE_CHOICE", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             String choiceId = requireText(req.trimmedChoiceId(), "choiceId");
             return new SelectNodeChoiceCommand(commandId, expectedVersion, commandPlayerId(req), choiceId);
         }
     },
     CLEAR_RECENT_RESULTS("CLEAR_RECENT_RESULTS", SessionCommandAuth.PLAYER, false) {
         @Override
-        GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
             return new ClearRecentResultsCommand(commandId, expectedVersion, commandPlayerId(req));
         }
     };
@@ -233,7 +233,7 @@ public enum SessionCommandType {
         this.requiresPlayerId = requiresPlayerId;
     }
 
-    abstract GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion);
+    public abstract GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion);
 
     public String requestType() {
         return requestType;

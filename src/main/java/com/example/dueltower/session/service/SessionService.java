@@ -54,6 +54,23 @@ import static org.springframework.http.HttpStatus.*;
 
 @Service
 @Slf4j
+/**
+ * Session aggregate application service.
+ *
+ * <p>현재는 세션 생명주기, 참가자 관리, 로드아웃/덱 편집, 토큰 해석, 정리(cleanup)까지 함께 담당한다.
+ * 다음 분해 단계에서는 아래 경계를 기준으로 나눈다.</p>
+ *
+ * <ul>
+ *     <li>SessionLifecycleService: create/get/delete/expire</li>
+ *     <li>SessionLobbyService: join/leave/ready/kick/reset</li>
+ *     <li>SessionLoadoutService: deck/loadout/loadout-from-preset/forget</li>
+ *     <li>SessionQueryService: 조회 전용 read model 조립</li>
+ *     <li>SessionCommandService: command 실행, expectedVersion 검사, 엔진 위임, 후속 처리</li>
+ * </ul>
+ *
+ * <p>이번 단계에서는 실제 이동보다 책임 경계를 문서화하고, 다음 단계의 조회 전용 서비스 분리를 준비한다.</p>
+ */
+// Backing implementation behind lifecycle/lobby/loadout facades.
 public class SessionService {
 
     private static final Pattern PASSIVE_ID_FORMAT = Pattern.compile("^P\\d{3}$");
@@ -120,6 +137,8 @@ public class SessionService {
         this.encounterTables = encounterTables;
     }
 
+    // === 1. 세션 생명주기(create/get/delete/expire/cleanup) ===
+
     public SessionRuntime createSession(String gmId) {
         evictExpiredSessions();
         for (int attempt = 0; attempt < 10_000; attempt++) {
@@ -174,6 +193,8 @@ public class SessionService {
         SessionRuntime rt = get(code);
         return rt.withLock(() -> reader.apply(rt));
     }
+
+    // === 2. 로비/참가자 관리(join/leave/ready/kick/reset) ===
 
     public GameState join(String code,
                           String playerIdRaw,
@@ -391,6 +412,8 @@ public class SessionService {
                 LoadoutApplySpec.fromPreset(presetLoadout)
         );
     }
+
+    // === 3. 로드아웃/덱/프리셋(deck/loadout/loadout-from-preset/forget) ===
 
 
     public GameState forgetOwnedCard(String code,
@@ -1254,6 +1277,8 @@ public class SessionService {
         rnd.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
+
+    // === 1. 세션 생명주기(expire/cleanup) ===
 
     @Scheduled(fixedDelayString = "${duel.session.cleanup-interval:5m}")
     public void cleanupExpiredSessions() {

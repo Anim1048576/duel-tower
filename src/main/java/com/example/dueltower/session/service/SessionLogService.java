@@ -27,11 +27,11 @@ public class SessionLogService {
     private static final int DEFAULT_LOG_LIMIT = 50;
     private static final int MAX_LOG_LIMIT = 200;
 
-    private final SessionService sessionService;
+    private final SessionLifecycleService sessionLifecycleService;
     private final SessionAccessResolver sessionAccessResolver;
 
-    public SessionLogService(SessionService sessionService, SessionAccessResolver sessionAccessResolver) {
-        this.sessionService = sessionService;
+    public SessionLogService(SessionLifecycleService sessionLifecycleService, SessionAccessResolver sessionAccessResolver) {
+        this.sessionLifecycleService = sessionLifecycleService;
         this.sessionAccessResolver = sessionAccessResolver;
     }
 
@@ -120,7 +120,7 @@ public class SessionLogService {
                                             Authentication authentication,
                                             String endpoint,
                                             Function<SessionRuntime, T> reader) {
-        SessionRuntime rt = sessionService.get(code);
+        SessionRuntime rt = sessionLifecycleService.get(code);
         SessionAccessDecision decision = sessionAccessResolver.requireSessionReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
         log.info("session read granted code={} endpoint={} source={} tokenBased={} loginBased={} username={} playerId={}",
                 decision.sessionCode(),
