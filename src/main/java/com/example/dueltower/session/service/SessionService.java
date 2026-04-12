@@ -14,7 +14,6 @@ import com.example.dueltower.content.item.service.ItemService;
 import com.example.dueltower.content.keyword.service.KeywordService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
-import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.config.EncounterTables;
 import com.example.dueltower.engine.config.RunConfigs;
@@ -33,7 +32,6 @@ import com.example.dueltower.preset.service.PresetService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.core.type.TypeReference;
@@ -42,11 +40,8 @@ import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.security.SecureRandom;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -86,20 +81,13 @@ public class SessionService {
     private final PassiveService passiveService;
     private final CardModifierService cardModifierService;
     private final PresetService presetService;
-    private final Duration sessionTtl;
-    private final Duration cleanupInterval;
     private final GameRules gameRules;
     private final RewardTableConfig rewardTableConfig;
     private final StarterLoadoutConfig starterLoadoutConfig;
     private final RunConfigs runConfigs;
     private final EncounterTables encounterTables;
     private final SessionLoadoutSupport sessionLoadoutSupport;
-
-    // code -> runtime (in-memory)
-    private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
-
-    private final SecureRandom rnd = new SecureRandom();
-    private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
+    private final SessionLifecycleService sessionLifecycleService;
 
     @Autowired
     public SessionService(CharacterProfileRepository characterProfileRepository,
@@ -118,6 +106,7 @@ public class SessionService {
                           RunConfigs runConfigs,
                           EncounterTables encounterTables,
                           SessionLoadoutSupport sessionLoadoutSupport,
+                          SessionLifecycleService sessionLifecycleService,
                           @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.characterProfileRepository = characterProfileRepository;
@@ -130,14 +119,13 @@ public class SessionService {
         this.passiveService = passiveService;
         this.cardModifierService = cardModifierService;
         this.presetService = presetService;
-        this.sessionTtl = sessionTtl;
-        this.cleanupInterval = cleanupInterval;
         this.gameRules = gameRules;
         this.rewardTableConfig = rewardTableConfig;
         this.starterLoadoutConfig = starterLoadoutConfig;
         this.runConfigs = runConfigs;
         this.encounterTables = encounterTables;
         this.sessionLoadoutSupport = sessionLoadoutSupport;
+        this.sessionLifecycleService = sessionLifecycleService;
     }
 
     SessionService(CharacterProfileRepository characterProfileRepository,
@@ -181,6 +169,7 @@ public class SessionService {
                         gameRules,
                         starterLoadoutConfig
                 ),
+                null,
                 sessionTtl,
                 cleanupInterval
         );
@@ -188,72 +177,15 @@ public class SessionService {
 
     // === 1. 세션 생명주기(create/get/delete/expire/cleanup) ===
 
-    public SessionRuntime createSession(String gmId) {
-        evictExpiredSessions();
-        for (int attempt = 0; attempt < 10_000; attempt++) {
-            String code = generateCode(8);
-
-            EngineContext ctx = new EngineContext(
-                    cardService.asMap(),
-                    cardService.effectsMap(),
-                    statusService.defsMap(),
-                    statusService.effectsMap(),
-                    keywordService.defsMap(),
-                    keywordService.effectsMap(),
-                    passiveService.defsMap(),
-                    passiveService.effectsMap(),
-                    cardModifierService.defsMap(),
-                    cardModifierService.effectsMap(),
-                    itemService.defsMap(),
-                    itemService.effectsMap(),
-                    equipService.defsMap(),
-                    gameRules,
-                    rewardTableConfig,
-                    encounterTables.encounterTableConfig(),
-                    runConfigs.runConfig()
-            );
-            GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong(), runConfigs.runConfig());
-            SessionRuntime rt = new SessionRuntime(code, gmId, generateGmToken(), state, ctx);
-
-            if (sessions.putIfAbsent(code, rt) == null) {
-                log.debug("created session code={} gmId={} sessionId={} seed={}",
-                        code, gmId, state.sessionId().value(), state.seed());
-                return rt;
-            }
-        }
-
-        log.warn("failed to allocate session code gmId={} after max attempts", gmId);
-        throw new ResponseStatusException(SERVICE_UNAVAILABLE, "failed to allocate session code");
-    }
-
-    public SessionRuntime get(String code) {
-        evictExpiredSessions();
-        SessionRuntime rt = sessions.get(code);
-        if (rt == null) throw new ResponseStatusException(NOT_FOUND, "session not found");
-        if (isExpired(rt)) {
-            sessions.remove(code, rt);
-            throw new ResponseStatusException(GONE, "session expired");
-        }
-        rt.touchAccess();
-        return rt;
-    }
-
+    @Deprecated(forRemoval = false)
     public <T> T withSessionLock(String code, Function<SessionRuntime, T> reader) {
-        SessionRuntime rt = get(code);
-        return rt.withLock(() -> reader.apply(rt));
+        if (sessionLifecycleService == null) {
+            throw new IllegalStateException("SessionLifecycleService is not available");
+        }
+        return sessionLifecycleService.withSessionLock(code, reader);
     }
 
     // === 2. 로비/참가자 관리(join/leave/ready/kick/reset) ===
-
-    public void deleteSession(String code) {
-        SessionRuntime rt = sessions.remove(code);
-        if (rt == null) {
-            throw new ResponseStatusException(NOT_FOUND, "session not found");
-        }
-    }
-
-
-
 
     // === 3. 로드아웃/덱/프리셋(deck/loadout/loadout-from-preset/forget) ===
 
@@ -275,7 +207,7 @@ public class SessionService {
         PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
         PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
 
-        SessionRuntime rt = get(code);
+        SessionRuntime rt = sessionLifecycleService.get(code);
         return rt.withLock(() -> {
             GameState state = rt.state();
             if (!actor.equals(target)) {
@@ -830,7 +762,7 @@ public class SessionService {
 
         PlayerId actor = new PlayerId(actorPlayerId);
         PlayerId target = new PlayerId(targetPlayerId);
-        SessionRuntime rt = get(code);
+        SessionRuntime rt = sessionLifecycleService.get(code);
         return rt.withLock(() -> {
             GameState state = rt.state();
             if (!actor.equals(target)) {
@@ -987,47 +919,6 @@ public class SessionService {
         for (CardInstId id : list) ps.deck().addLast(id);
     }
 
-    private String generateCode(int len) {
-        StringBuilder sb = new StringBuilder(len);
-        for (int i = 0; i < len; i++) sb.append(CODE_ALPHABET[rnd.nextInt(CODE_ALPHABET.length)]);
-        return sb.toString();
-    }
-
-    private String generateGmToken() {
-        byte[] bytes = new byte[32];
-        rnd.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
     // === 1. 세션 생명주기(expire/cleanup) ===
 
-    @Scheduled(fixedDelayString = "${duel.session.cleanup-interval:5m}")
-    public void cleanupExpiredSessions() {
-        evictExpiredSessions();
-    }
-
-    private void evictExpiredSessions() {
-        Instant now = Instant.now();
-        int removed = 0;
-
-        for (Map.Entry<String, SessionRuntime> entry : sessions.entrySet()) {
-            SessionRuntime rt = entry.getValue();
-            Instant expirationBoundary = rt.lastAccessedAt().plus(sessionTtl);
-            if (expirationBoundary.isAfter(now)) {
-                continue;
-            }
-
-            if (sessions.remove(entry.getKey(), rt)) {
-                removed++;
-            }
-        }
-
-        if (removed > 0) {
-            log.info("expired session cleanup removed={} ttl={} interval={}", removed, sessionTtl, cleanupInterval);
-        }
-    }
-
-    private boolean isExpired(SessionRuntime rt) {
-        return !rt.lastAccessedAt().plus(sessionTtl).isAfter(Instant.now());
-    }
 }
