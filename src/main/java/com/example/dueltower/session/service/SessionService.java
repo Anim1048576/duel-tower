@@ -27,11 +27,11 @@ import java.util.List;
 import java.util.function.Function;
 
 /**
- * Legacy compatibility bridge for former {@code SessionService} consumers.
+ * Compatibility surface for legacy tests that still reference {@code SessionService}.
  *
- * <p>Production session responsibilities now live in dedicated services:
- * lifecycle, lobby, loadout, query, and command. This class intentionally keeps
- * only a tiny public surface for compatibility tests and temporary callers.</p>
+ * <p>Production session responsibilities live in dedicated services.
+ * This class intentionally keeps only a tiny bridge plus parsing helpers used by
+ * reflection-based compatibility tests.</p>
  */
 @Service
 @Deprecated(forRemoval = false)

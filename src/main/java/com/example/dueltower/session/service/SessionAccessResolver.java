@@ -22,6 +22,11 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
  *   If a non-blank token header is present but no valid GM/player token succeeds, login fallback is blocked and 401 is returned.
  * - PLAYER_SELF: requires a valid player token that matches the target playerId.
  * - GM_ONLY: requires a valid GM token.
+ *
+ * Lock note:
+ * This resolver still uses {@link SessionRuntime#withLock(java.util.function.Supplier)}
+ * directly because callers already resolved a concrete runtime and need authorization
+ * decisions against that exact instance before continuing the same flow.
  */
 public class SessionAccessResolver {
 

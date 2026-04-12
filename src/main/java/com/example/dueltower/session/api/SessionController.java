@@ -95,7 +95,7 @@ public class SessionController {
                 rt.state().seed()
         );
 
-        SessionStateDto state = rt.withLock(() -> StateMapper.toDto(rt.code(), rt.state()));
+        SessionStateDto state = sessionLifecycleService.withLockedSession(rt.code(), lockedRt -> StateMapper.toDto(lockedRt.code(), lockedRt.state()));
         return new CreateSessionResponse(rt.code(), rt.gmId(), rt.gmToken(), state);
     }
 

@@ -8,7 +8,7 @@
 - 현재 in-memory 구현을 유지하면서도 이후 저장소 교체 가능성을 확보하기 위해
 - 다른 서비스가 `ConcurrentHashMap` 같은 내부 자료구조를 직접 알지 않게 만들기 위해
 
-이번 단계의 목표는 저장소 교체 가능성 확보이지, Redis/DB 저장소 도입이 아니다.
+이번 단계의 목적은 Redis/DB 도입이 아니라 교체 가능성 확보다.
 
 ## 현재 구조
 
@@ -24,19 +24,21 @@
 
 ## 책임 경계
 
-- 저장소 책임:
+- store 책임
   - code 기준 저장
   - code 기준 조회
   - 삭제
   - 전체 엔트리 snapshot 나열
-- lifecycle 책임:
+- lifecycle 책임
   - 세션 존재 판단과 예외 의미
   - last access 기반 TTL / expire 정책
   - cleanup 스케줄링
-  - lock 진입 정책
+  - 공식 lock 진입 정책
 
 Lock 책임은 store가 아니라 lifecycle에 둔다.
-현재는 `SessionRuntime` 내부 lock을 사용하지만, 서비스들은 `SessionLifecycleService#withLockedSession(...)`를 통해서만 잠금 진입을 읽을 수 있게 정리했다.
+
+현재 서비스 코드는 `SessionLifecycleService#withLockedSession(...)`을 기준으로 잠금 진입을 읽는다.
+예외적으로 `SessionAccessResolver`는 이미 확보된 동일 `SessionRuntime` 인스턴스에 대해 권한 판단을 이어서 수행해야 하므로 직접 `SessionRuntime.withLock(...)`를 사용한다.
 
 ## 현재 한계
 
