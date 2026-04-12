@@ -594,6 +594,7 @@
     let activeSession = session
     let activeGmToken = isStoredGmSessionAccess(runtimeAccess) ? runtimeAccess.gmToken : null
     let restoredGmAccess = false
+    let versionRetryUsed = false
 
     const syncResponseState = (nextState: SessionStateDto | null) => {
       if (!nextState) {
@@ -655,7 +656,6 @@
 
     const handleRejectedStartCombat = async (
       response: Awaited<ReturnType<typeof executeStartCombat>>,
-      retried: boolean,
       gmToken: string,
     ) => {
       const syncedState = syncResponseState(response.state)
@@ -669,7 +669,8 @@
           return true
         }
 
-      if (!retried && syncedState && isVersionMismatch(rejectionMessage)) {
+      if (!versionRetryUsed && syncedState && isVersionMismatch(rejectionMessage)) {
+        versionRetryUsed = true
         const retryResponse = await executeStartCombat(syncedState.version, gmToken)
         const retryState = syncResponseState(retryResponse.state)
 
@@ -729,7 +730,7 @@
       const response = await executeStartCombat(activeSession.version, activeGmToken)
 
       if (!response.accepted) {
-        await handleRejectedStartCombat(response, false, activeGmToken)
+        await handleRejectedStartCombat(response, activeGmToken)
         return
       }
 
@@ -751,7 +752,7 @@
           const retryResponse = await executeStartCombat(restored.state.version, restored.gmToken)
 
           if (!retryResponse.accepted) {
-            await handleRejectedStartCombat(retryResponse, true, restored.gmToken)
+            await handleRejectedStartCombat(retryResponse, restored.gmToken)
             return
           }
 
