@@ -93,6 +93,7 @@ public class SessionService {
     private final StarterLoadoutConfig starterLoadoutConfig;
     private final RunConfigs runConfigs;
     private final EncounterTables encounterTables;
+    private final SessionLoadoutSupport sessionLoadoutSupport;
 
     // code -> runtime (in-memory)
     private final Map<String, SessionRuntime> sessions = new ConcurrentHashMap<>();
@@ -116,6 +117,7 @@ public class SessionService {
                           StarterLoadoutConfig starterLoadoutConfig,
                           RunConfigs runConfigs,
                           EncounterTables encounterTables,
+                          SessionLoadoutSupport sessionLoadoutSupport,
                           @Value("${duel.session.ttl:30m}") Duration sessionTtl,
                           @Value("${duel.session.cleanup-interval:5m}") Duration cleanupInterval) {
         this.characterProfileRepository = characterProfileRepository;
@@ -135,6 +137,53 @@ public class SessionService {
         this.starterLoadoutConfig = starterLoadoutConfig;
         this.runConfigs = runConfigs;
         this.encounterTables = encounterTables;
+        this.sessionLoadoutSupport = sessionLoadoutSupport;
+    }
+
+    SessionService(CharacterProfileRepository characterProfileRepository,
+                   CardService cardService,
+                   DeckService deckService,
+                   StatusService statusService,
+                   KeywordService keywordService,
+                   ItemService itemService,
+                   EquipService equipService,
+                   PassiveService passiveService,
+                   CardModifierService cardModifierService,
+                   PresetService presetService,
+                   GameRules gameRules,
+                   RewardTableConfig rewardTableConfig,
+                   StarterLoadoutConfig starterLoadoutConfig,
+                   RunConfigs runConfigs,
+                   EncounterTables encounterTables,
+                   Duration sessionTtl,
+                   Duration cleanupInterval) {
+        this(
+                characterProfileRepository,
+                cardService,
+                deckService,
+                statusService,
+                keywordService,
+                itemService,
+                equipService,
+                passiveService,
+                cardModifierService,
+                presetService,
+                gameRules,
+                rewardTableConfig,
+                starterLoadoutConfig,
+                runConfigs,
+                encounterTables,
+                new SessionLoadoutSupport(
+                        characterProfileRepository,
+                        cardService,
+                        deckService,
+                        passiveService,
+                        gameRules,
+                        starterLoadoutConfig
+                ),
+                sessionTtl,
+                cleanupInterval
+        );
     }
 
     // === 1. 세션 생명주기(create/get/delete/expire/cleanup) ===
@@ -210,11 +259,11 @@ public class SessionService {
         SessionRuntime rt = get(code);
         PlayerId pid = new PlayerId(playerIdRaw.trim());
 
-        CharacterJoinTemplate characterTemplate = (characterIdRaw == null)
+        SessionLoadoutSupport.CharacterJoinTemplate characterTemplate = (characterIdRaw == null)
                 ? null
-                : toCharacterJoinTemplate(loadCharacterProfile(characterIdRaw));
+                : sessionLoadoutSupport.loadCharacterJoinTemplate(characterIdRaw);
 
-        List<String> passiveIds = parsePassiveIds(characterTemplate != null ? characterTemplate.passiveIds() : passiveIdsRaw);
+        List<String> passiveIds = sessionLoadoutSupport.parsePassiveIds(characterTemplate != null ? characterTemplate.passiveIds() : passiveIdsRaw);
 
         return rt.withLock(() -> {
             GameState state = rt.state();
@@ -236,26 +285,26 @@ public class SessionService {
                 rt.bindCharacterId(pid.value(), characterIdRaw);
             }
 
-            List<OwnedCard> ownedCards = parseOwnedCards(characterTemplate != null ? characterTemplate.ownedCards() : ownedCardsRaw);
+            List<OwnedCard> ownedCards = sessionLoadoutSupport.parseOwnedCards(characterTemplate != null ? characterTemplate.ownedCards() : ownedCardsRaw);
             ps.ownedCards(ownedCards);
 
-            List<String> deckOwnedCardIds = resolveJoinDeckOwnedCardIds(
+            List<String> deckOwnedCardIds = sessionLoadoutSupport.resolveJoinDeckOwnedCardIds(
                     characterTemplate,
                     requestedPresetDeckOwnedCardIdsRaw,
                     ps.ownedCards()
             );
             boolean allowEmptyCharacterDeck = characterTemplate != null && deckOwnedCardIds.isEmpty();
             if (!allowEmptyCharacterDeck) {
-                validateDeckBuild(deckOwnedCardIds, ps.ownedCards(), null);
+                sessionLoadoutSupport.validateDeckBuild(deckOwnedCardIds, ps.ownedCards(), null);
             }
 
             state.players().put(pid, ps);
             ps.deckOwnedCardIds(deckOwnedCardIds);
-            loadDeck(state, ps, deckOwnedCardIds);
+            sessionLoadoutSupport.loadDeck(state, ps, deckOwnedCardIds);
             String exCardId = (characterTemplate != null) ? characterTemplate.exCardId() : presetExCardIdRaw;
-            addCardToEx(state, ps, new CardDefId(normalizeExCardId(exCardId)));
+            sessionLoadoutSupport.addCardToEx(state, ps, new CardDefId(sessionLoadoutSupport.normalizeExCardId(exCardId)));
 
-            shuffleDeck(state, ps);
+            sessionLoadoutSupport.shuffleDeck(state, ps);
             return state;
         });
     }
@@ -343,75 +392,8 @@ public class SessionService {
         }
     }
 
-    public GameState updateDeck(String code,
-                                String actorPlayerIdRaw,
-                                String targetPlayerIdRaw,
-                                List<String> deckOwnedCardIdsRaw) {
-        if (targetPlayerIdRaw == null || targetPlayerIdRaw.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
-        }
 
-        if (actorPlayerIdRaw == null || actorPlayerIdRaw.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, "actorPlayerId is required");
-        }
-        PlayerId actor = new PlayerId(actorPlayerIdRaw.trim());
-        PlayerId target = new PlayerId(targetPlayerIdRaw.trim());
 
-        SessionRuntime rt = get(code);
-        return rt.withLock(() -> {
-            GameState state = rt.state();
-            if (!actor.equals(target)) {
-                throw new ResponseStatusException(FORBIDDEN, "players may only edit their own deck");
-            }
-
-            PlayerState ps = state.player(target);
-            if (ps == null) {
-                throw new ResponseStatusException(NOT_FOUND, "player not found");
-            }
-
-            validateDeckEditableState(state.nodeState(), ps);
-
-            List<String> deckOwnedCardIds = resolveRequestedDeckOwnedCardIds(deckOwnedCardIdsRaw, ps.ownedCards());
-            validateDeckBuild(deckOwnedCardIds, ps.ownedCards(), currentDeckOwnedCardIds(ps));
-            ps.deckOwnedCardIds(deckOwnedCardIds);
-            loadDeck(state, ps, deckOwnedCardIds);
-            shuffleDeck(state, ps);
-            persistCharacterDeck(rt, target, deckOwnedCardIds, ps.ownedCards());
-            return state;
-        });
-    }
-
-    public GameState updateLoadout(String code,
-                                   String actorPlayerIdRaw,
-                                   String targetPlayerIdRaw,
-                                   Long characterIdRaw,
-                                   List<String> passiveIdsRaw,
-                                   List<String> deckOwnedCardIdsRaw,
-                                   String exCardIdRaw) {
-        return applyLoadoutToPlayer(
-                code,
-                actorPlayerIdRaw,
-                targetPlayerIdRaw,
-                LoadoutApplySpec.direct(characterIdRaw, passiveIdsRaw, deckOwnedCardIdsRaw, exCardIdRaw)
-        );
-    }
-
-    public GameState applyPresetToLoadout(String code,
-                                          String actorPlayerIdRaw,
-                                          String targetPlayerIdRaw,
-                                          Long presetIdRaw) {
-        if (presetIdRaw == null || presetIdRaw <= 0) {
-            throw new ResponseStatusException(BAD_REQUEST, "presetId must be positive");
-        }
-        String ownerUsername = requirePlayerText(actorPlayerIdRaw, "actorPlayerId is required");
-        PresetService.PresetLoadout presetLoadout = presetService.getOwnedLoadout(ownerUsername, presetIdRaw);
-        return applyLoadoutToPlayer(
-                code,
-                actorPlayerIdRaw,
-                targetPlayerIdRaw,
-                LoadoutApplySpec.fromPreset(presetLoadout)
-        );
-    }
 
     // === 3. 로드아웃/덱/프리셋(deck/loadout/loadout-from-preset/forget) ===
 
@@ -1108,7 +1090,7 @@ public class SessionService {
         Map<PlayerId, String> exCardByPlayerId = new LinkedHashMap<>();
         if (keepPlayers && keepLoadouts) {
             for (Map.Entry<PlayerId, PlayerState> entry : state.players().entrySet()) {
-                exCardByPlayerId.put(entry.getKey(), resolveCurrentExCardId(state, entry.getValue()));
+                exCardByPlayerId.put(entry.getKey(), sessionLoadoutSupport.resolveCurrentExCardId(state, entry.getValue()));
             }
         }
 
@@ -1161,25 +1143,25 @@ public class SessionService {
             List<OwnedCard> defaultOwnedCards = starterLoadoutConfig.defaultOwnedCards();
             ps.passiveIds(List.of());
             ps.ownedCards(defaultOwnedCards);
-            List<String> defaultDeckOwnedCardIds = resolveCardIdsToOwnedCardIds(
+            List<String> defaultDeckOwnedCardIds = sessionLoadoutSupport.resolveCardIdsToOwnedCardIds(
                     starterLoadoutConfig.defaultPresetDeckCardIds(),
                     defaultOwnedCards,
                     "deckCardIds must not contain blank values"
             );
             ps.deckOwnedCardIds(defaultDeckOwnedCardIds);
-            loadDeck(state, ps, defaultDeckOwnedCardIds);
-            addCardToEx(state, ps, new CardDefId(starterLoadoutConfig.defaultExCardId()));
+            sessionLoadoutSupport.loadDeck(state, ps, defaultDeckOwnedCardIds);
+            sessionLoadoutSupport.addCardToEx(state, ps, new CardDefId(starterLoadoutConfig.defaultExCardId()));
             rt.clearCharacterBinding(ps.playerId().value());
-            shuffleDeck(state, ps, resetSeed);
+            sessionLoadoutSupport.shuffleDeck(state, ps, resetSeed);
             return;
         }
 
-        List<String> deckOwnedCardIds = currentDeckOwnedCardIds(ps);
+        List<String> deckOwnedCardIds = sessionLoadoutSupport.currentDeckOwnedCardIds(ps);
         if (deckOwnedCardIds != null && !deckOwnedCardIds.isEmpty()) {
-            loadDeck(state, ps, deckOwnedCardIds);
-            shuffleDeck(state, ps, resetSeed);
+            sessionLoadoutSupport.loadDeck(state, ps, deckOwnedCardIds);
+            sessionLoadoutSupport.shuffleDeck(state, ps, resetSeed);
         }
-        addCardToEx(state, ps, new CardDefId((preservedExCardId == null || preservedExCardId.isBlank())
+        sessionLoadoutSupport.addCardToEx(state, ps, new CardDefId((preservedExCardId == null || preservedExCardId.isBlank())
                 ? starterLoadoutConfig.defaultExCardId()
                 : preservedExCardId.trim()));
     }
