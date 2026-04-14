@@ -1,10 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { listCharacters } from '../lib/api/characters'
   import type { CharacterProfileResponse } from '../lib/api/characterTypes'
-  import { listCards, listPassives } from '../lib/api/content'
   import type { CardDefinition, PassiveDefinition } from '../lib/api/contentTypes'
-  import { listPresets } from '../lib/api/presets'
   import type { PresetResponse } from '../lib/api/presetTypes'
   import {
     applyPresetToSession,
@@ -26,6 +23,11 @@
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
+  import { buildPlayerLobbyParticipantItems } from '../features/session/lobby/shared/participantList'
+  import {
+    loadLobbyPresetCatalog,
+    loadLobbyReferenceCatalogs,
+  } from '../features/session/lobby/shared/referenceCatalog'
   import { buildCardArchiveMeta, buildCardDisplayTags, getCardTypeLabel } from '../lib/content/display'
   import { pathBuilders } from '../lib/navigation'
   import {
@@ -229,20 +231,11 @@
   function buildParticipantItems(nextSession: SessionStateDto | null) {
     if (!nextSession) return [] as LobbyParticipantItem[]
 
-    return Object.values(nextSession.players)
-      .sort((left, right) => {
-        if (left.playerId === currentPlayerId) return -1
-        if (right.playerId === currentPlayerId) return 1
-        return left.playerId.localeCompare(right.playerId)
-      })
-      .map((player, index) => ({
-        id: player.playerId,
-        slot: `P${index + 1}`,
-        name: player.playerId === currentPlayerId ? `${player.playerId} (You)` : player.playerId,
-        state: buildParticipantStateLabel(player, player.playerId),
-        tone: buildParticipantTone(player, player.playerId),
-        note: formatPlayerLoadoutSummary(player, nextSession),
-      }))
+    return buildPlayerLobbyParticipantItems({
+      players: Object.values(nextSession.players),
+      currentPlayerId,
+      buildNote: (player) => formatPlayerLoadoutSummary(player, nextSession),
+    })
   }
 
   function syncLoadoutStateFromPlayer(
@@ -269,62 +262,29 @@
 
   async function loadReferenceCatalogs() {
     referenceLoading = true
-    referenceErrorMessage = null
+    const result = await loadLobbyReferenceCatalogs({
+      unavailableMessage: (errors) =>
+        `Some loadout reference data could not be restored: ${errors.join(', ')}. Manual ids still work.`,
+    })
 
-    const [characterResult, cardResult, passiveResult] = await Promise.allSettled([
-      listCharacters(),
-      listCards(),
-      listPassives(),
-    ])
-
-    const errors: string[] = []
-
-    if (characterResult.status === 'fulfilled') characters = characterResult.value
-    else {
-      characters = []
-      errors.push('character roster')
-    }
-
-    if (cardResult.status === 'fulfilled') cards = cardResult.value
-    else {
-      cards = []
-      errors.push('card archive')
-    }
-
-    if (passiveResult.status === 'fulfilled') passives = passiveResult.value
-    else {
-      passives = []
-      errors.push('passive archive')
-    }
-
-    referenceErrorMessage =
-      errors.length > 0
-        ? `Some loadout reference data could not be restored: ${errors.join(', ')}. Manual ids still work.`
-        : null
+    characters = result.characters
+    cards = result.cards
+    passives = result.passives
+    referenceErrorMessage = result.errorMessage
     referenceLoading = false
   }
 
   async function loadAvailablePresets() {
-    const currentSelectedPresetId = selectedPresetId
     presetsLoading = true
-    presetsErrorMessage = null
+    const result = await loadLobbyPresetCatalog({
+      currentSelectedPresetId: selectedPresetId,
+      unavailableMessage: 'Unable to load the current preset archive.',
+    })
 
-    try {
-      const response = await listPresets()
-      presets = response
-      selectedPresetId =
-        response.find((entry) => String(entry.id) === currentSelectedPresetId)
-          ? currentSelectedPresetId
-          : response[0]
-            ? String(response[0].id)
-            : ''
-    } catch (error) {
-      presets = []
-      selectedPresetId = ''
-      presetsErrorMessage = getApiErrorMessage(error, 'Unable to load the current preset archive.')
-    } finally {
-      presetsLoading = false
-    }
+    presets = result.presets
+    selectedPresetId = result.selectedPresetId
+    presetsErrorMessage = result.errorMessage
+    presetsLoading = false
   }
 
   function syncLobbyState(nextSession: SessionStateDto) {

@@ -1,8 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { listCharacters } from '../lib/api/characters'
   import type { CharacterProfileResponse } from '../lib/api/characterTypes'
-  import { listCards, listPassives } from '../lib/api/content'
   import type { CardDefinition, PassiveDefinition } from '../lib/api/contentTypes'
   import {
     executeSessionCommand,
@@ -17,6 +15,12 @@
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
+  import {
+    buildGmLobbyParticipantItems,
+    getPreferredReadyPlayerId,
+    sortPlayersByReady,
+  } from '../features/session/lobby/shared/participantList'
+  import { loadLobbyReferenceCatalogs } from '../features/session/lobby/shared/referenceCatalog'
   import { pathBuilders } from '../lib/navigation'
   import {
     hasStoredSessionCode,
@@ -99,42 +103,15 @@
 
   async function loadReferenceCatalogs() {
     referenceLoading = true
-    referenceErrorMessage = null
+    const result = await loadLobbyReferenceCatalogs({
+      unavailableMessage: (errors) =>
+        `Some reference data could not be restored: ${errors.join(', ')}. Participant summaries will fall back to ids.`,
+    })
 
-    const [characterResult, cardResult, passiveResult] = await Promise.allSettled([
-      listCharacters(),
-      listCards(),
-      listPassives(),
-    ])
-
-    const errors: string[] = []
-
-    if (characterResult.status === 'fulfilled') {
-      characters = characterResult.value
-    } else {
-      characters = []
-      errors.push('character roster')
-    }
-
-    if (cardResult.status === 'fulfilled') {
-      cards = cardResult.value
-    } else {
-      cards = []
-      errors.push('card archive')
-    }
-
-    if (passiveResult.status === 'fulfilled') {
-      passives = passiveResult.value
-    } else {
-      passives = []
-      errors.push('passive archive')
-    }
-
-    referenceErrorMessage =
-      errors.length > 0
-        ? `Some reference data could not be restored: ${errors.join(', ')}. Participant summaries will fall back to ids.`
-        : null
-
+    characters = result.characters
+    cards = result.cards
+    passives = result.passives
+    referenceErrorMessage = result.errorMessage
     referenceLoading = false
   }
 
@@ -182,14 +159,6 @@
 
     const hiddenCount = totalCount - preview.length
     return hiddenCount > 0 ? `${preview.join(', ')} +${hiddenCount} more` : preview.join(', ')
-  }
-
-  function buildParticipantStateLabel(player: PlayerStateDto) {
-    return player.ready ? 'Ready' : 'Not ready'
-  }
-
-  function buildParticipantTone(player: PlayerStateDto): TagTone {
-    return player.ready ? 'success' : 'muted'
   }
 
   function buildCharacterSummary(player: PlayerStateDto, nextSession: SessionStateDto | null) {
@@ -320,18 +289,11 @@
       return [] as PlayerStateDto[]
     }
 
-    return Object.values(nextSession.players).sort((left, right) => {
-      if (left.ready !== right.ready) {
-        return left.ready ? -1 : 1
-      }
-
-      return left.playerId.localeCompare(right.playerId)
-    })
+    return sortPlayersByReady(Object.values(nextSession.players))
   }
 
   function getPreferredStartPlayerId(nextSession: SessionStateDto | null) {
-    const players = getSortedPlayers(nextSession)
-    return players.find((player) => player.ready)?.playerId ?? players[0]?.playerId ?? ''
+    return getPreferredReadyPlayerId(getSortedPlayers(nextSession))
   }
 
   function buildParticipantItems(nextSession: SessionStateDto | null) {
@@ -339,19 +301,16 @@
       return [] as LobbyParticipantItem[]
     }
 
-    return getSortedPlayers(nextSession)
-      .map((player, index) => ({
-        id: player.playerId,
-        slot: `P${index + 1}`,
-        name: player.playerId,
-        readyLabel: buildParticipantStateLabel(player),
-        readyTone: buildParticipantTone(player),
+    return buildGmLobbyParticipantItems({
+      players: getSortedPlayers(nextSession),
+      buildDetails: (player) => ({
         characterSummary: buildCharacterSummary(player, nextSession),
         exSummary: buildExSummary(player, nextSession),
         passiveSummary: buildPassiveSummary(player),
         deckSummary: buildDeckSummary(player),
         detailTags: buildParticipantTags(player, nextSession),
-      }))
+      }),
+    })
   }
 
   function syncLobbyState(nextSession: SessionStateDto) {
