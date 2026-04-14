@@ -70,8 +70,7 @@ export function sortPlayersByReady(players: readonly PlayerStateDto[]) {
 }
 
 export function getPreferredReadyPlayerId(players: readonly PlayerStateDto[]) {
-  const sortedPlayers = sortPlayersByReady(players)
-  return sortedPlayers.find((player) => player.ready)?.playerId ?? sortedPlayers[0]?.playerId ?? ''
+  return players.find((player) => player.ready)?.playerId ?? players[0]?.playerId ?? ''
 }
 
 export function buildGmLobbyParticipantItems<TDetails>({
@@ -81,7 +80,7 @@ export function buildGmLobbyParticipantItems<TDetails>({
   players: readonly PlayerStateDto[]
   buildDetails: (player: PlayerStateDto) => TDetails
 }) {
-  return sortPlayersByReady(players).map((player, index) => ({
+  return players.map((player, index) => ({
     id: player.playerId,
     slot: `P${index + 1}`,
     name: player.playerId,

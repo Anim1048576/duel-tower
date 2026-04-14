@@ -214,19 +214,6 @@
     return `Deck ${player.deckOwnedCardIds.length} cards | ${passiveSummary} | ${exSummary}`
   }
 
-  function buildParticipantStateLabel(player: PlayerStateDto, playerId: string) {
-    if (playerId === currentPlayerId) {
-      return player.ready ? 'You · Ready' : 'You · Joined'
-    }
-    return player.ready ? 'Ready' : 'Joined'
-  }
-
-  function buildParticipantTone(player: PlayerStateDto, playerId: string): LobbyParticipantItem['tone'] {
-    if (playerId === currentPlayerId) {
-      return player.ready ? 'success' : 'accent'
-    }
-    return player.ready ? 'success' : 'muted'
-  }
 
   function buildParticipantItems(nextSession: SessionStateDto | null) {
     if (!nextSession) return [] as LobbyParticipantItem[]
