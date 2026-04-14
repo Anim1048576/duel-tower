@@ -1,11 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { getSessionInventory } from '../lib/api/sessions'
-  import type {
-    RunInventoryDto,
-    RunInventoryItemDto,
-    SessionRequestAccess,
-  } from '../lib/api/sessionTypes'
+  import type { RunInventoryDto, RunInventoryItemDto } from '../lib/api/sessionTypes'
   import { getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import EntityListPane from '../lib/components/EntityListPane.svelte'
@@ -18,9 +14,12 @@
     isStoredPlayerSessionAccess,
     normalizeSessionCode,
     readStoredSessionAccess,
+    toSessionReadAccess,
     type StoredSessionAccess,
   } from '../lib/session/access'
-  import { readSelectionHandoff, selectionHandoffKeys, setSelectionHandoff } from '../lib/selectionHandoff'
+  import { readSelectionHandoff, selectionHandoffKeys } from '../lib/selectionHandoff'
+  import { readRequestedSessionCodeFromAccessOrHandoff } from '../lib/session/sessionRoute'
+  import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
 
   type SupplyCategoryKey = 'equipment' | 'consumable' | 'special'
   type SupplyTone = 'accent' | 'muted' | 'success' | 'warning'
@@ -91,34 +90,6 @@
       .join(' ')
   }
 
-  function getRequestedInventoryCode(nextAccess: StoredSessionAccess | null) {
-    if (nextAccess?.code) {
-      return normalizeSessionCode(nextAccess.code)
-    }
-
-    const handoffCode = readSelectionHandoff(selectionHandoffKeys.sessionCode)
-    return handoffCode ? normalizeSessionCode(handoffCode) : null
-  }
-
-  function getSessionReadAccess(nextAccess: StoredSessionAccess | null): SessionRequestAccess | null {
-    if (isStoredPlayerSessionAccess(nextAccess)) {
-      return {
-        role: 'player',
-        playerToken: nextAccess.playerToken,
-        playerId: nextAccess.playerId,
-      }
-    }
-
-    if (isStoredGmSessionAccess(nextAccess)) {
-      return {
-        role: 'gm',
-        gmToken: nextAccess.gmToken,
-      }
-    }
-
-    return null
-  }
-
   function getContextMessage(nextCode: string | null, nextAccess: StoredSessionAccess | null) {
     if (!nextCode) {
       return 'Open or rejoin a session first. The supply locker follows the expedition you entered most recently.'
@@ -128,7 +99,7 @@
       return `Session ${nextCode} is known, but this browser no longer has the access needed to reopen its supplies.`
     }
 
-    if (!getSessionReadAccess(nextAccess)) {
+    if (!toSessionReadAccess(nextAccess)) {
       return `Session ${nextCode} was found, but the saved access details are incomplete. Return to Session Entry to restore them.`
     }
 
@@ -295,8 +266,10 @@
 
   async function loadInventory() {
     const nextAccess = readStoredSessionAccess()
-    const nextCode = getRequestedInventoryCode(nextAccess)
-    const nextSessionAccess = getSessionReadAccess(nextAccess)
+    const nextCode = readRequestedSessionCodeFromAccessOrHandoff({
+      storedAccess: nextAccess,
+    }).code
+    const nextSessionAccess = toSessionReadAccess(nextAccess)
     const requestId = ++requestSequence
 
     runtimeAccess = nextAccess
@@ -322,7 +295,7 @@
 
       inventoryVersion = response.version
       inventory = response.inventory
-      setSelectionHandoff(selectionHandoffKeys.sessionCode, nextCode)
+      syncSessionSelectionHandoff(nextCode)
     } catch (error) {
       if (requestId !== requestSequence) {
         return

@@ -11,19 +11,19 @@
     resetSession,
     restoreGmAccess,
   } from '../lib/api/sessions'
-  import type { PlayerStateDto, SessionRequestAccess, SessionStateDto } from '../lib/api/sessionTypes'
+  import type { PlayerStateDto, SessionStateDto } from '../lib/api/sessionTypes'
   import { getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
-  import { pathBuilders, resolveRouteMatch } from '../lib/navigation'
+  import { pathBuilders } from '../lib/navigation'
   import {
     hasStoredSessionCode,
     isStoredGmSessionAccess,
-    normalizeSessionCode,
     readStoredSessionAccess,
     setStoredSessionAccess,
+    toGmReadAccess,
     type StoredSessionAccess,
   } from '../lib/session/access'
   import {
@@ -33,14 +33,10 @@
     type SessionPageFeedback,
   } from '../lib/session/pageState'
   import {
-    startLiveSessionPolling,
-    type LiveSessionPollingHandle,
-  } from '../lib/session/liveSessionPolling'
-  import {
-    removeSelectionHandoff,
-    selectionHandoffKeys,
-    setSelectionHandoff,
-  } from '../lib/selectionHandoff'
+    createLiveSessionPage,
+  } from '../lib/session/liveSessionPage'
+  import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
+  import { readSessionCodeFromRoute } from '../lib/session/sessionRoute'
   import { resolveSessionLoadoutExCardId } from '../lib/session/loadoutEditor'
 
   type TagTone = 'accent' | 'muted' | 'success' | 'warning'
@@ -71,8 +67,6 @@
   let feedback = $state<SessionPageFeedback | null>(null)
   let session = $state<SessionStateDto | null>(null)
   let runtimeAccess = $state<StoredSessionAccess | null>(null)
-  let requestSequence = 0
-  let lobbyPolling: LiveSessionPollingHandle | null = null
   let actionPending = $state<'kick' | 'reset' | 'start' | null>(null)
   let referenceLoading = $state(true)
   let referenceErrorMessage = $state<string | null>(null)
@@ -85,19 +79,6 @@
   let resetKeepPlayers = $state(true)
   let resetKeepLoadouts = $state(true)
   let resetSeedInput = $state('')
-
-  function getSessionCodeFromRoute() {
-    if (typeof window === 'undefined') return null
-
-    const match = resolveRouteMatch(window.location.pathname)
-
-    if (match?.page.key !== 'gm-lobby') {
-      return null
-    }
-
-    const code = match.params.code?.trim()
-    return code ? normalizeSessionCode(code) : null
-  }
 
   function getInvalidAccessMessage(nextRouteCode: string | null) {
     if (!nextRouteCode) {
@@ -375,8 +356,7 @@
 
   function syncLobbyState(nextSession: SessionStateDto) {
     session = nextSession
-    setSelectionHandoff(selectionHandoffKeys.sessionCode, nextSession.sessionCode)
-    removeSelectionHandoff(selectionHandoffKeys.sessionId)
+    syncSessionSelectionHandoff(nextSession.sessionCode)
 
     const remainingPlayerIds = Object.keys(nextSession.players)
     const preferredStartPlayerId = getPreferredStartPlayerId(nextSession)
@@ -390,42 +370,50 @@
     }
   }
 
-  function getGmSessionReadAccess(nextAccess: StoredSessionAccess | null): SessionRequestAccess | null {
-    if (!isStoredGmSessionAccess(nextAccess)) {
-      return null
-    }
-
-    return {
-      role: 'gm',
-      gmToken: nextAccess.gmToken,
-    }
-  }
+  const gmLobbyPage = createLiveSessionPage<StoredSessionAccess | null>({
+    readCode: () => routeSessionCode,
+    readAccess: () => readStoredSessionAccess(),
+    getInvalidMessage: (code) => getInvalidAccessMessage(code),
+    loadState: getSessionState,
+    getPollingAccess: toGmReadAccess,
+    canPoll: ({ code, access, state }) =>
+      state.sessionCode === code &&
+      isStoredGmSessionAccess(access) &&
+      hasStoredSessionCode(access, code),
+    onBeforeLoad: ({ access, invalidMessage }) => {
+      runtimeAccess = access
+      invalidAccessMessage = invalidMessage
+      loading = true
+      notFound = false
+      errorMessage = null
+      actionErrorMessage = null
+      actionSuccessMessage = null
+      session = null
+    },
+    onLoaded: (response) => {
+      syncLobbyState(response)
+    },
+    onPolled: (nextSession, { access }) => {
+      runtimeAccess = access
+      syncLobbyState(nextSession)
+    },
+    onNotFound: () => {
+      notFound = true
+    },
+    onError: (error) => {
+      errorMessage = getApiErrorMessage(error, 'Unable to restore the current GM lobby.')
+    },
+    onLoadSettled: () => {
+      loading = false
+    },
+  })
 
   function stopGmLobbyPolling() {
-    lobbyPolling?.stop()
-    lobbyPolling = null
+    gmLobbyPage.stopPolling()
   }
 
   function updateGmLobbyPollingVersion(nextSession: SessionStateDto) {
-    lobbyPolling?.updateVersion(nextSession.version)
-  }
-
-  function syncPolledGmLobbyState(nextSession: SessionStateDto) {
-    const nextRouteCode = routeSessionCode
-    const nextAccess = readStoredSessionAccess()
-
-    if (
-      !nextRouteCode ||
-      nextSession.sessionCode !== nextRouteCode ||
-      !isStoredGmSessionAccess(nextAccess) ||
-      !hasStoredSessionCode(nextAccess, nextRouteCode)
-    ) {
-      stopGmLobbyPolling()
-      return
-    }
-
-    runtimeAccess = nextAccess
-    syncLobbyState(nextSession)
+    gmLobbyPage.updatePollingVersion(nextSession.version)
   }
 
   function startGmLobbyPolling(
@@ -433,67 +421,14 @@
     nextAccess: StoredSessionAccess | null,
     nextSession: SessionStateDto,
   ) {
-    stopGmLobbyPolling()
-
-    const access = getGmSessionReadAccess(nextAccess)
-
-    if (!nextCode || !access || !hasStoredSessionCode(nextAccess, nextCode)) {
-      return
-    }
-
-    lobbyPolling = startLiveSessionPolling({
+    gmLobbyPage.startPolling(nextSession, {
       code: nextCode,
-      access,
-      initialVersion: nextSession.version,
-      onState: syncPolledGmLobbyState,
+      access: nextAccess,
     })
   }
 
   async function loadGmLobbyState() {
-    const nextRouteCode = routeSessionCode
-    const nextAccess = readStoredSessionAccess()
-    const nextInvalidAccessMessage = getInvalidAccessMessage(nextRouteCode)
-    const requestId = ++requestSequence
-
-    stopGmLobbyPolling()
-    runtimeAccess = nextAccess
-    invalidAccessMessage = nextInvalidAccessMessage
-    loading = true
-    notFound = false
-    errorMessage = null
-    actionErrorMessage = null
-    actionSuccessMessage = null
-    session = null
-
-    if (!nextRouteCode || nextInvalidAccessMessage) {
-      loading = false
-      return
-    }
-
-    try {
-      const response = await getSessionState(nextRouteCode)
-
-      if (requestId !== requestSequence) {
-        return
-      }
-
-      syncLobbyState(response)
-      startGmLobbyPolling(nextRouteCode, nextAccess, response)
-    } catch (error) {
-      if (requestId !== requestSequence) {
-        return
-      }
-
-      if (typeof error === 'object' && error && 'status' in error && error.status === 404) {
-        notFound = true
-      } else {
-        errorMessage = getApiErrorMessage(error, 'Unable to restore the current GM lobby.')
-      }
-    } finally {
-      if (requestId === requestSequence) {
-        loading = false
-      }
-    }
+    await gmLobbyPage.load()
   }
 
   async function handleKickPlayer() {
@@ -788,12 +723,12 @@
     window.addEventListener('popstate', handleWindowStateChange)
 
     return () => {
-      stopGmLobbyPolling()
+      gmLobbyPage.dispose()
       window.removeEventListener('popstate', handleWindowStateChange)
     }
   })
 
-  const routeSessionCode = $derived.by(() => getSessionCodeFromRoute())
+  const routeSessionCode = $derived.by(() => readSessionCodeFromRoute('gm-lobby'))
   const participantItems = $derived.by(() => buildParticipantItems(session))
   const participantCount = $derived.by(() => (session ? Object.keys(session.players).length : 0))
   const readyCount = $derived.by(() =>

@@ -3,7 +3,7 @@
   import { listItems } from '../lib/api/content'
   import { executeSessionCommand, getSessionStateAlias } from '../lib/api/sessions'
   import type { ItemDefinition } from '../lib/api/contentTypes'
-  import type { SessionRequestAccess, SessionStateDto, RunInventoryItemDto } from '../lib/api/sessionTypes'
+  import type { SessionStateDto, RunInventoryItemDto } from '../lib/api/sessionTypes'
   import { getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
@@ -20,15 +20,15 @@
     hasStoredSessionCode,
     isStoredGmSessionAccess,
     isStoredPlayerSessionAccess,
-    normalizeSessionCode,
     readStoredSessionAccess,
+    toSessionReadAccess,
     type StoredSessionAccess,
   } from '../lib/session/access'
   import {
-    startLiveSessionPolling,
-    type LiveSessionPollingHandle,
-  } from '../lib/session/liveSessionPolling'
-  import { readSelectionHandoff, selectionHandoffKeys, setSelectionHandoff } from '../lib/selectionHandoff'
+    createLiveSessionPage,
+  } from '../lib/session/liveSessionPage'
+  import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
+  import { readRequestedSessionCodeFromAccessOrHandoff } from '../lib/session/sessionRoute'
 
   type ShopFilterKey = 'all' | 'consumable' | 'equipment' | 'special'
   type ShopTone = 'accent' | 'muted' | 'success' | 'warning'
@@ -68,8 +68,6 @@
   let selectedFilter = $state<ShopFilterKey>('all')
   let selectedOfferId = $state('')
   let purchasePendingOfferId = $state<string | null>(null)
-  let requestSequence = 0
-  let shopPolling: LiveSessionPollingHandle | null = null
 
   const goldFormatter = new Intl.NumberFormat('en-US')
 
@@ -90,22 +88,6 @@
       .filter(Boolean)
       .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
       .join(' ')
-  }
-
-  function getRequestedShopCode(nextAccess: StoredSessionAccess | null) {
-    if (nextAccess?.code) return normalizeSessionCode(nextAccess.code)
-    const handoffCode = readSelectionHandoff(selectionHandoffKeys.sessionCode)
-    return handoffCode ? normalizeSessionCode(handoffCode) : null
-  }
-
-  function getSessionCommandAccess(nextAccess: StoredSessionAccess | null): SessionRequestAccess | null {
-    if (isStoredPlayerSessionAccess(nextAccess)) {
-      return { role: 'player', playerToken: nextAccess.playerToken, playerId: nextAccess.playerId }
-    }
-    if (isStoredGmSessionAccess(nextAccess)) {
-      return { role: 'gm', gmToken: nextAccess.gmToken }
-    }
-    return null
   }
 
   function getOfferCategory(offer: ShopCatalogOffer, itemDef: ItemDefinition | null): OfferCategory {
@@ -160,7 +142,7 @@
   function syncShopState(nextState: SessionStateDto | null) {
     sessionState = nextState
     if (requestedSessionCode) {
-      setSelectionHandoff(selectionHandoffKeys.sessionCode, requestedSessionCode)
+      syncSessionSelectionHandoff(requestedSessionCode)
     }
   }
 
@@ -170,36 +152,82 @@
     return Boolean(nextNode && nextNode.phase === 'EVENT' && !nextRun?.resultPending)
   }
 
+  const shopPage = createLiveSessionPage<StoredSessionAccess | null>({
+    readCode: () => readRequestedSessionCodeFromAccessOrHandoff({ storedAccess: readStoredSessionAccess() }).code,
+    readAccess: () => readStoredSessionAccess(),
+    canLoad: ({ code, access }) => Boolean(code && access),
+    loadState: async (code) => {
+      const [nextState, nextItems] = await Promise.allSettled([getSessionStateAlias(code), listItems()])
+
+      if (nextState.status === 'rejected') {
+        throw nextState.reason
+      }
+
+      if (nextItems.status === 'fulfilled') {
+        itemCatalog = nextItems.value
+        itemCatalogNoticeMessage = null
+      } else {
+        itemCatalog = []
+        itemCatalogNoticeMessage = getApiErrorMessage(
+          nextItems.reason,
+          'Some item notes could not be loaded, so a few offers are shown with shorter fallback labels.',
+        )
+      }
+
+      return nextState.value
+    },
+    getPollingAccess: toSessionReadAccess,
+    canPoll: ({ code, access, state }) =>
+      state.sessionCode === code &&
+      access !== null &&
+      hasStoredSessionCode(access, code) &&
+      Boolean(toSessionReadAccess(access)) &&
+      isShopOpenState(state),
+    onBeforeLoad: ({ code, access }) => {
+      runtimeAccess = access
+      requestedSessionCode = code
+      contextMessage = !code
+        ? 'Open or rejoin a session first. The expedition shop follows the run you entered most recently.'
+        : !access
+          ? `Session ${code} is known, but this browser no longer has the access needed to reopen its merchant stop.`
+          : null
+      accessNoticeMessage =
+        code && access
+          ? isStoredPlayerSessionAccess(access)
+            ? `Shopping as ${access.playerId} in session ${code}.`
+            : isStoredGmSessionAccess(access)
+              ? `Viewing the merchant in GM mode for session ${code}. Purchases stay disabled here.`
+              : null
+          : null
+      loading = true
+      errorMessage = null
+      itemCatalogNoticeMessage = null
+      actionErrorMessage = null
+      actionSuccessMessage = null
+      sessionState = null
+      itemCatalog = []
+    },
+    onLoaded: (nextState) => {
+      syncShopState(nextState)
+    },
+    onPolled: (nextState, { access }) => {
+      runtimeAccess = access
+      syncShopState(nextState)
+    },
+    onError: (error) => {
+      errorMessage = getApiErrorMessage(error, 'The merchant catalog could not be loaded right now.')
+    },
+    onLoadSettled: () => {
+      loading = false
+    },
+  })
+
   function stopShopPolling() {
-    shopPolling?.stop()
-    shopPolling = null
+    shopPage.stopPolling()
   }
 
   function updateShopPollingVersion(nextState: SessionStateDto) {
-    shopPolling?.updateVersion(nextState.version)
-  }
-
-  function syncPolledShopState(nextState: SessionStateDto) {
-    const nextCode = requestedSessionCode
-    const nextAccess = readStoredSessionAccess()
-
-    if (
-      !nextCode ||
-      nextState.sessionCode !== nextCode ||
-      !nextAccess ||
-      !hasStoredSessionCode(nextAccess, nextCode) ||
-      !getSessionCommandAccess(nextAccess)
-    ) {
-      stopShopPolling()
-      return
-    }
-
-    runtimeAccess = nextAccess
-    syncShopState(nextState)
-
-    if (!isShopOpenState(nextState)) {
-      stopShopPolling()
-    }
+    shopPage.updatePollingVersion(nextState.version)
   }
 
   function startShopPolling(
@@ -207,88 +235,24 @@
     nextAccess: StoredSessionAccess | null,
     nextState: SessionStateDto | null,
   ) {
-    stopShopPolling()
-
-    const access = getSessionCommandAccess(nextAccess)
-
-    if (
-      !nextCode ||
-      !nextAccess ||
-      !nextState ||
-      !access ||
-      !hasStoredSessionCode(nextAccess, nextCode) ||
-      !isShopOpenState(nextState)
-    ) {
+    if (!nextState) {
+      stopShopPolling()
       return
     }
 
-    shopPolling = startLiveSessionPolling({
+    shopPage.startPolling(nextState, {
       code: nextCode,
-      access,
-      initialVersion: nextState.version,
-      onState: syncPolledShopState,
+      access: nextAccess,
     })
   }
 
   async function loadShop() {
-    const nextAccess = readStoredSessionAccess()
-    const nextCode = getRequestedShopCode(nextAccess)
-    const requestId = ++requestSequence
-
-    stopShopPolling()
-    runtimeAccess = nextAccess
-    requestedSessionCode = nextCode
-    contextMessage = !nextCode
-      ? 'Open or rejoin a session first. The expedition shop follows the run you entered most recently.'
-      : !nextAccess
-        ? `Session ${nextCode} is known, but this browser no longer has the access needed to reopen its merchant stop.`
-        : null
-    accessNoticeMessage =
-      nextCode && nextAccess
-        ? isStoredPlayerSessionAccess(nextAccess)
-          ? `Shopping as ${nextAccess.playerId} in session ${nextCode}.`
-          : isStoredGmSessionAccess(nextAccess)
-            ? `Viewing the merchant in GM mode for session ${nextCode}. Purchases stay disabled here.`
-            : null
-        : null
-    loading = true
-    errorMessage = null
-    itemCatalogNoticeMessage = null
-    actionErrorMessage = null
-    actionSuccessMessage = null
-    sessionState = null
-    itemCatalog = []
-
-    if (!nextCode || !nextAccess) {
-      loading = false
-      return
-    }
-
-    try {
-      const [nextState, nextItems] = await Promise.allSettled([getSessionStateAlias(nextCode), listItems()])
-      if (requestId !== requestSequence) return
-      if (nextState.status === 'rejected') throw nextState.reason
-      syncShopState(nextState.value)
-      startShopPolling(nextCode, nextAccess, nextState.value)
-      if (nextItems.status === 'fulfilled') {
-        itemCatalog = nextItems.value
-      } else {
-        itemCatalogNoticeMessage = getApiErrorMessage(
-          nextItems.reason,
-          'Some item notes could not be loaded, so a few offers are shown with shorter fallback labels.',
-        )
-      }
-    } catch (error) {
-      if (requestId !== requestSequence) return
-      errorMessage = getApiErrorMessage(error, 'The merchant catalog could not be loaded right now.')
-    } finally {
-      if (requestId === requestSequence) loading = false
-    }
+    await shopPage.load()
   }
 
   async function handleBuySelectedOffer() {
     const selected = selectedOffer
-    const access = getSessionCommandAccess(runtimeAccess)
+    const access = toSessionReadAccess(runtimeAccess)
     const playerAccess = isStoredPlayerSessionAccess(runtimeAccess) ? runtimeAccess : null
 
     actionErrorMessage = null
@@ -361,8 +325,7 @@
     window.addEventListener('popstate', handleWindowStateChange)
 
     return () => {
-      requestSequence += 1
-      stopShopPolling()
+      shopPage.dispose()
       window.removeEventListener('popstate', handleWindowStateChange)
     }
   })

@@ -19,7 +19,6 @@
     SessionEventItemDto,
     SessionLogItemDto,
     PlayerStateDto,
-    SessionRequestAccess,
     SessionStateDto,
   } from '../lib/api/sessionTypes'
   import { getApiErrorMessage } from '../lib/api/types'
@@ -46,13 +45,13 @@
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import { buildCardArchiveMeta, buildCardDisplayTags, getCardTypeLabel } from '../lib/content/display'
-  import { pathBuilders, resolveRouteMatch } from '../lib/navigation'
+  import { pathBuilders } from '../lib/navigation'
   import {
     hasStoredSessionCode,
     isStoredGmSessionAccess,
     isStoredPlayerSessionAccess,
-    normalizeSessionCode,
     readStoredSessionAccess,
+    toSessionReadAccess,
     type StoredSessionAccess,
   } from '../lib/session/access'
   import {
@@ -64,16 +63,11 @@
     type CombatCommandType,
   } from '../lib/session/combatCommandDraft'
   import {
-    startLiveSessionPolling,
-    type LiveSessionPollingHandle,
-  } from '../lib/session/liveSessionPolling'
+    createLiveSessionPage,
+  } from '../lib/session/liveSessionPage'
   import { sessionPageStateCopy } from '../lib/session/pageState'
-  import {
-    readSelectionHandoff,
-    removeSelectionHandoff,
-    selectionHandoffKeys,
-    setSelectionHandoff,
-  } from '../lib/selectionHandoff'
+  import { readRequestedSessionCodeFromAccessOrHandoff, readSessionCodeFromRoute } from '../lib/session/sessionRoute'
+  import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
 
   type CombatPlayTargetType =
     | 'NONE'
@@ -160,36 +154,8 @@
   let recentResultsErrorMessage = $state<string | null>(null)
   let recentResults = $state<RecentResultsResponse | null>(null)
   let recentResultsRequestSequence = 0
-  let requestSequence = 0
   let sidebarSessionCode = $state<string | null>(null)
   let hadSidebarReadAccess = $state(false)
-  let combatPolling: LiveSessionPollingHandle | null = null
-
-  function getRouteSessionCode() {
-    if (typeof window === 'undefined') {
-      return null
-    }
-
-    const match = resolveRouteMatch(window.location.pathname)
-
-    if (match?.page.key !== 'combat') {
-      return null
-    }
-
-    const code = match.params.code?.trim()
-    return code ? normalizeSessionCode(code) : null
-  }
-
-  function getRequestedSessionCode() {
-    const routeCode = routeSessionCode
-
-    if (routeCode) {
-      return routeCode
-    }
-
-    const handoffCode = readSelectionHandoff(selectionHandoffKeys.sessionCode)
-    return handoffCode ? normalizeSessionCode(handoffCode) : null
-  }
 
   function getInvalidCombatAccessMessage(nextCode: string | null) {
     if (!nextCode) {
@@ -231,8 +197,7 @@
   function syncCombatState(nextSession: SessionStateDto) {
     session = nextSession
     commandDraft = syncCombatCommandDraft(commandDraft, nextSession, runtimeAccess)
-    setSelectionHandoff(selectionHandoffKeys.sessionCode, nextSession.sessionCode)
-    removeSelectionHandoff(selectionHandoffKeys.sessionId)
+    syncSessionSelectionHandoff(nextSession.sessionCode)
 
     if (!routeSessionCode && nextSession.sessionCode) {
       navigateTo(pathBuilders.combat(nextSession.sessionCode), true)
@@ -259,57 +224,6 @@
     return false
   }
 
-  function stopCombatPolling() {
-    combatPolling?.stop()
-    combatPolling = null
-  }
-
-  function updateCombatPollingVersion(nextSession: SessionStateDto) {
-    combatPolling?.updateVersion(nextSession.version)
-  }
-
-  function syncPolledCombatState(nextSession: SessionStateDto) {
-    const nextCode = requestedSessionCode
-    const nextAccess = readStoredSessionAccess()
-
-    if (
-      !nextCode ||
-      nextSession.sessionCode !== nextCode ||
-      !hasCombatReadAccess(nextCode, nextAccess)
-    ) {
-      stopCombatPolling()
-      return
-    }
-
-    runtimeAccess = nextAccess
-    invalidAccessMessage = getInvalidCombatAccessMessage(nextCode)
-    accessNoticeMessage = getAccessNotice(nextCode, nextAccess)
-    hadSidebarReadAccess = true
-    syncCombatState(nextSession)
-    void loadCombatSidebarData()
-  }
-
-  function startCombatPolling(
-    nextCode: string | null,
-    nextAccess: StoredSessionAccess | null,
-    nextSession: SessionStateDto,
-  ) {
-    stopCombatPolling()
-
-    const access = getSessionReadAccess(nextAccess)
-
-    if (!nextCode || !access || !hasCombatReadAccess(nextCode, nextAccess)) {
-      return
-    }
-
-    combatPolling = startLiveSessionPolling({
-      code: nextCode,
-      access,
-      initialVersion: nextSession.version,
-      onState: syncPolledCombatState,
-    })
-  }
-
   function invalidateCombatSidebarRequests() {
     eventsRequestSequence += 1
     logsRequestSequence += 1
@@ -329,63 +243,83 @@
     recentResultsErrorMessage = null
   }
 
-  async function loadCombatState() {
-    const nextCode = requestedSessionCode
-    const nextAccess = readStoredSessionAccess()
-    const nextInvalidAccessMessage = getInvalidCombatAccessMessage(nextCode)
-    const nextHasSidebarReadAccess = hasCombatReadAccess(nextCode, nextAccess)
-    const requestId = ++requestSequence
+  const combatPage = createLiveSessionPage<StoredSessionAccess | null>({
+    readCode: () =>
+      readRequestedSessionCodeFromAccessOrHandoff({
+        pageKey: 'combat',
+        storedAccess: readStoredSessionAccess(),
+        preferStoredAccess: false,
+      }).code,
+    readAccess: () => readStoredSessionAccess(),
+    getInvalidMessage: getInvalidCombatAccessMessage,
+    loadState: getSessionState,
+    getPollingAccess: toSessionReadAccess,
+    canPoll: ({ code, access, state }) => state.sessionCode === code && hasCombatReadAccess(code, access),
+    onBeforeLoad: ({ code, access, invalidMessage }) => {
+      const nextHasSidebarReadAccess = hasCombatReadAccess(code, access)
 
-    stopCombatPolling()
-
-    if (sidebarSessionCode !== nextCode) {
-      invalidateCombatSidebarRequests()
-      resetCombatSidebarState()
-      sidebarSessionCode = nextCode
-    } else if (hadSidebarReadAccess && !nextHasSidebarReadAccess) {
-      invalidateCombatSidebarRequests()
-      resetCombatSidebarState()
-    }
-
-    hadSidebarReadAccess = nextHasSidebarReadAccess
-
-    runtimeAccess = nextAccess
-    invalidAccessMessage = nextInvalidAccessMessage
-    accessNoticeMessage = getAccessNotice(nextCode, nextAccess)
-    loading = true
-    notFound = false
-    errorMessage = null
-    session = null
-
-    if (!nextCode || nextInvalidAccessMessage) {
-      loading = false
-      return
-    }
-
-    try {
-      const response = await getSessionState(nextCode)
-
-      if (requestId !== requestSequence) {
-        return
+      if (sidebarSessionCode !== code) {
+        invalidateCombatSidebarRequests()
+        resetCombatSidebarState()
+        sidebarSessionCode = code
+      } else if (hadSidebarReadAccess && !nextHasSidebarReadAccess) {
+        invalidateCombatSidebarRequests()
+        resetCombatSidebarState()
       }
 
+      hadSidebarReadAccess = nextHasSidebarReadAccess
+
+      runtimeAccess = access
+      invalidAccessMessage = invalidMessage
+      accessNoticeMessage = getAccessNotice(code, access)
+      loading = true
+      notFound = false
+      errorMessage = null
+      session = null
+    },
+    onLoaded: (response) => {
       syncCombatState(response)
-      startCombatPolling(nextCode, nextAccess, response)
-    } catch (error) {
-      if (requestId !== requestSequence) {
-        return
-      }
+    },
+    onPolled: (nextSession, { code, access }) => {
+      runtimeAccess = access
+      invalidAccessMessage = getInvalidCombatAccessMessage(code)
+      accessNoticeMessage = getAccessNotice(code, access)
+      hadSidebarReadAccess = true
+      syncCombatState(nextSession)
+      void loadCombatSidebarData()
+    },
+    onNotFound: () => {
+      notFound = true
+    },
+    onError: (error) => {
+      errorMessage = getApiErrorMessage(error, 'Unable to restore the current combat session shell.')
+    },
+    onLoadSettled: () => {
+      loading = false
+    },
+  })
 
-      if (typeof error === 'object' && error && 'status' in error && error.status === 404) {
-        notFound = true
-      } else {
-        errorMessage = getApiErrorMessage(error, 'Unable to restore the current combat session shell.')
-      }
-    } finally {
-      if (requestId === requestSequence) {
-        loading = false
-      }
-    }
+  function stopCombatPolling() {
+    combatPage.stopPolling()
+  }
+
+  function updateCombatPollingVersion(nextSession: SessionStateDto) {
+    combatPage.updatePollingVersion(nextSession.version)
+  }
+
+  function startCombatPolling(
+    nextCode: string | null,
+    nextAccess: StoredSessionAccess | null,
+    nextSession: SessionStateDto,
+  ) {
+    combatPage.startPolling(nextSession, {
+      code: nextCode,
+      access: nextAccess,
+    })
+  }
+
+  async function loadCombatState() {
+    await combatPage.load()
   }
 
   async function loadCardCatalog() {
@@ -1293,27 +1227,6 @@
     )
   }
 
-  function getSessionReadAccess(
-    nextAccess: StoredSessionAccess | null = runtimeAccess,
-  ): SessionRequestAccess | null {
-    if (isStoredPlayerSessionAccess(nextAccess)) {
-      return {
-        role: 'player' as const,
-        playerToken: nextAccess.playerToken,
-        playerId: nextAccess.playerId,
-      }
-    }
-
-    if (isStoredGmSessionAccess(nextAccess)) {
-      return {
-        role: 'gm' as const,
-        gmToken: nextAccess.gmToken,
-      }
-    }
-
-    return null
-  }
-
   function getPlayerCommandAccess() {
     if (!isStoredPlayerSessionAccess(runtimeAccess)) {
       return null
@@ -1336,7 +1249,7 @@
       return
     }
 
-    const access = getSessionReadAccess()
+    const access = toSessionReadAccess(runtimeAccess)
 
     if (!access) {
       eventsLoading = false
@@ -1384,7 +1297,7 @@
       return
     }
 
-    const access = getSessionReadAccess()
+    const access = toSessionReadAccess(runtimeAccess)
 
     if (!access) {
       logsLoading = false
@@ -1428,7 +1341,7 @@
       return
     }
 
-    const access = getSessionReadAccess()
+    const access = toSessionReadAccess(runtimeAccess)
 
     if (!access) {
       recentResultsLoading = false
@@ -1874,15 +1787,20 @@
     window.addEventListener('popstate', handleWindowStateChange)
 
     return () => {
-      requestSequence += 1
-      stopCombatPolling()
+      combatPage.dispose()
       invalidateCombatSidebarRequests()
       window.removeEventListener('popstate', handleWindowStateChange)
     }
   })
 
-  const routeSessionCode = $derived.by(() => getRouteSessionCode())
-  const requestedSessionCode = $derived.by(() => getRequestedSessionCode())
+  const routeSessionCode = $derived.by(() => readSessionCodeFromRoute('combat'))
+  const requestedSessionCode = $derived.by(() =>
+    readRequestedSessionCodeFromAccessOrHandoff({
+      pageKey: 'combat',
+      storedAccess: runtimeAccess,
+      preferStoredAccess: false,
+    }).code,
+  )
   const combatState = $derived.by(() => session?.combat ?? null)
   const runState = $derived.by(() => session?.run ?? null)
   const statusView = $derived.by(() => buildStatusViewModel(session))

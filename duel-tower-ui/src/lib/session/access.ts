@@ -1,4 +1,4 @@
-import type { SessionCode, SessionRole } from '../api/sessionTypes'
+import type { SessionCode, SessionRequestAccess, SessionRole } from '../api/sessionTypes'
 
 export type StoredSessionAccess = {
   code: SessionCode
@@ -79,6 +79,37 @@ export function isStoredPlayerSessionAccess(
     typeof access.playerId === 'string' &&
     access.playerId.length > 0
   )
+}
+
+export function toPlayerReadAccess(
+  access: StoredSessionAccess | null,
+): Extract<SessionRequestAccess, { role: 'player' }> | null {
+  if (!isStoredPlayerSessionAccess(access)) {
+    return null
+  }
+
+  return {
+    role: 'player',
+    playerToken: access.playerToken,
+    playerId: access.playerId,
+  }
+}
+
+export function toGmReadAccess(
+  access: StoredSessionAccess | null,
+): Extract<SessionRequestAccess, { role: 'gm' }> | null {
+  if (!isStoredGmSessionAccess(access)) {
+    return null
+  }
+
+  return {
+    role: 'gm',
+    gmToken: access.gmToken,
+  }
+}
+
+export function toSessionReadAccess(access: StoredSessionAccess | null): SessionRequestAccess | null {
+  return toPlayerReadAccess(access) ?? toGmReadAccess(access)
 }
 
 export function readStoredSessionAccess() {

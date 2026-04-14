@@ -27,7 +27,7 @@
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
   import { buildCardArchiveMeta, buildCardDisplayTags, getCardTypeLabel } from '../lib/content/display'
-  import { pathBuilders, resolveRouteMatch } from '../lib/navigation'
+  import { pathBuilders } from '../lib/navigation'
   import {
     addPresetIdentifier,
     normalizePresetEditorState,
@@ -37,8 +37,8 @@
     clearStoredSessionAccess,
     hasStoredSessionCode,
     isStoredPlayerSessionAccess,
-    normalizeSessionCode,
     readStoredSessionAccess,
+    toPlayerReadAccess,
     updateStoredSessionAccess,
     type StoredSessionAccess,
   } from '../lib/session/access'
@@ -52,9 +52,8 @@
     type SessionLoadoutDraft,
   } from '../lib/session/loadoutEditor'
   import {
-    startLiveSessionPolling,
-    type LiveSessionPollingHandle,
-  } from '../lib/session/liveSessionPolling'
+    createLiveSessionPage,
+  } from '../lib/session/liveSessionPage'
   import {
     playerLobbyStateCopy,
     readSessionPageFeedback,
@@ -63,11 +62,9 @@
     setSessionPageFeedback,
     type SessionPageFeedback,
   } from '../lib/session/pageState'
-  import {
-    removeSelectionHandoff,
-    selectionHandoffKeys,
-    setSelectionHandoff,
-  } from '../lib/selectionHandoff'
+  import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
+  import { readSessionCodeFromRoute } from '../lib/session/sessionRoute'
+  import { removeSelectionHandoff, selectionHandoffKeys } from '../lib/selectionHandoff'
 
   type LobbyParticipantItem = {
     id: string
@@ -89,8 +86,6 @@
   let feedback = $state<SessionPageFeedback | null>(null)
   let session = $state<SessionStateDto | null>(null)
   let runtimeAccess = $state<StoredSessionAccess | null>(null)
-  let requestSequence = 0
-  let lobbyPolling: LiveSessionPollingHandle | null = null
   let actionPending = $state<'ready' | 'leave' | 'save-loadout' | 'apply-preset' | null>(null)
   let referenceLoading = $state(true)
   let referenceErrorMessage = $state<string | null>(null)
@@ -109,14 +104,6 @@
   let exCardEdited = $state(false)
   let deckOwnedCardIdsEdited = $state(false)
   let passiveIdsEdited = $state(false)
-
-  function getSessionCodeFromRoute() {
-    if (typeof window === 'undefined') return null
-    const match = resolveRouteMatch(window.location.pathname)
-    if (match?.page.key !== 'player-lobby') return null
-    const code = match.params.code?.trim()
-    return code ? normalizeSessionCode(code) : null
-  }
 
   function getInvalidAccessMessage(nextRouteCode: string | null, nextAccess: StoredSessionAccess | null) {
     if (!nextRouteCode) {
@@ -340,128 +327,78 @@
     }
   }
 
-  async function loadPlayerLobbyState() {
-    const nextRouteCode = routeSessionCode
-    const nextAccess = readStoredSessionAccess()
-    const nextInvalidAccessMessage = getInvalidAccessMessage(nextRouteCode, nextAccess)
-    const requestId = ++requestSequence
-
-    stopPlayerLobbyPolling()
-    runtimeAccess = nextAccess
-    invalidAccessMessage = nextInvalidAccessMessage
-    loading = true
-    notFound = false
-    errorMessage = null
-    actionErrorMessage = null
-    actionSuccessTitle = null
-    actionSuccessMessage = null
-    session = null
-
-    if (!nextRouteCode || nextInvalidAccessMessage) {
-      loading = false
-      return
-    }
-
-    try {
-      const response = await getSessionState(nextRouteCode)
-
-      if (requestId !== requestSequence) return
-
-      syncLobbyState(response)
-      const nextPlayerId =
-        nextAccess?.role === 'player' && typeof nextAccess.playerId === 'string' ? nextAccess.playerId : null
-      syncLoadoutStateFromPlayer(nextPlayerId ? response.players[nextPlayerId] ?? null : null, response, {
-        preferredCharacterId: nextAccess?.characterId ?? null,
-        force: true,
-      })
-      startPlayerLobbyPolling(nextRouteCode, nextAccess, response)
-    } catch (error) {
-      if (requestId !== requestSequence) return
-
-      if (typeof error === 'object' && error && 'status' in error && error.status === 404) {
-        notFound = true
-      } else {
-        errorMessage = getApiErrorMessage(error, 'Unable to restore the current player lobby.')
-      }
-    } finally {
-      if (requestId === requestSequence) {
-        loading = false
-      }
-    }
-  }
-
   function syncLobbyState(nextSession: SessionStateDto) {
     session = nextSession
-    setSelectionHandoff(selectionHandoffKeys.sessionCode, nextSession.sessionCode)
-    removeSelectionHandoff(selectionHandoffKeys.sessionId)
+    syncSessionSelectionHandoff(nextSession.sessionCode)
   }
 
-  function getPlayerSessionReadAccess(nextAccess: StoredSessionAccess | null): SessionRequestAccess | null {
-    if (!isStoredPlayerSessionAccess(nextAccess)) {
-      return null
-    }
+  const playerLobbyPage = createLiveSessionPage<StoredSessionAccess | null>({
+    readCode: () => routeSessionCode,
+    readAccess: () => readStoredSessionAccess(),
+    getInvalidMessage: getInvalidAccessMessage,
+    loadState: getSessionState,
+    getPollingAccess: toPlayerReadAccess,
+    canPoll: ({ code, access, state }) =>
+      state.sessionCode === code &&
+      isStoredPlayerSessionAccess(access) &&
+      hasStoredSessionCode(access, code),
+    onBeforeLoad: ({ access, invalidMessage }) => {
+      runtimeAccess = access
+      invalidAccessMessage = invalidMessage
+      loading = true
+      notFound = false
+      errorMessage = null
+      actionErrorMessage = null
+      actionSuccessTitle = null
+      actionSuccessMessage = null
+      session = null
+    },
+    onLoaded: (response, { access }) => {
+      syncLobbyState(response)
+      const nextPlayerId =
+        access?.role === 'player' && typeof access.playerId === 'string' ? access.playerId : null
+      syncLoadoutStateFromPlayer(nextPlayerId ? response.players[nextPlayerId] ?? null : null, response, {
+        preferredCharacterId: access?.characterId ?? null,
+        force: true,
+      })
+    },
+    onPolled: (nextSession, { access }) => {
+      runtimeAccess = access
 
-    return {
-      role: 'player',
-      playerToken: nextAccess.playerToken,
-      playerId: nextAccess.playerId,
-    }
+      if (!isStoredPlayerSessionAccess(access)) {
+        return
+      }
+
+      syncLobbyState(nextSession)
+      syncLoadoutStateFromPlayer(nextSession.players[access.playerId] ?? null, nextSession, {
+        preferredCharacterId: access.characterId ?? null,
+      })
+    },
+    onNotFound: () => {
+      notFound = true
+    },
+    onError: (error) => {
+      errorMessage = getApiErrorMessage(error, 'Unable to restore the current player lobby.')
+    },
+    onLoadSettled: () => {
+      loading = false
+    },
+  })
+
+  async function loadPlayerLobbyState() {
+    await playerLobbyPage.load()
   }
 
   function stopPlayerLobbyPolling() {
-    lobbyPolling?.stop()
-    lobbyPolling = null
+    playerLobbyPage.stopPolling()
   }
 
   function updatePlayerLobbyPollingVersion(nextSession: SessionStateDto) {
-    lobbyPolling?.updateVersion(nextSession.version)
-  }
-
-  function syncPolledPlayerLobbyState(nextSession: SessionStateDto) {
-    const nextRouteCode = routeSessionCode
-    const nextAccess = readStoredSessionAccess()
-
-    if (
-      !nextRouteCode ||
-      nextSession.sessionCode !== nextRouteCode ||
-      !isStoredPlayerSessionAccess(nextAccess) ||
-      !hasStoredSessionCode(nextAccess, nextRouteCode)
-    ) {
-      stopPlayerLobbyPolling()
-      return
-    }
-
-    runtimeAccess = nextAccess
-    syncLobbyState(nextSession)
-    syncLoadoutStateFromPlayer(nextSession.players[nextAccess.playerId] ?? null, nextSession, {
-      preferredCharacterId: nextAccess.characterId ?? null,
-    })
-  }
-
-  function startPlayerLobbyPolling(
-    nextCode: string | null,
-    nextAccess: StoredSessionAccess | null,
-    nextSession: SessionStateDto,
-  ) {
-    stopPlayerLobbyPolling()
-
-    const access = getPlayerSessionReadAccess(nextAccess)
-
-    if (!nextCode || !access || !hasStoredSessionCode(nextAccess, nextCode)) {
-      return
-    }
-
-    lobbyPolling = startLiveSessionPolling({
-      code: nextCode,
-      access,
-      initialVersion: nextSession.version,
-      onState: syncPolledPlayerLobbyState,
-    })
+    playerLobbyPage.updatePollingVersion(nextSession.version)
   }
 
   function clearPlayerLobbyRuntimeState() {
-    stopPlayerLobbyPolling()
-    requestSequence += 1
+    playerLobbyPage.dispose()
     session = null
     runtimeAccess = null
     invalidAccessMessage = null
@@ -730,12 +667,12 @@
     void loadAvailablePresets()
     window.addEventListener('popstate', handleWindowStateChange)
     return () => {
-      stopPlayerLobbyPolling()
+      playerLobbyPage.dispose()
       window.removeEventListener('popstate', handleWindowStateChange)
     }
   })
 
-  const routeSessionCode = $derived.by(() => getSessionCodeFromRoute())
+  const routeSessionCode = $derived.by(() => readSessionCodeFromRoute('player-lobby'))
   const currentPlayerId = $derived.by(() =>
     isStoredPlayerSessionAccess(runtimeAccess) ? runtimeAccess.playerId : null,
   )
