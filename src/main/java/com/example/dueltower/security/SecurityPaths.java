@@ -62,6 +62,24 @@ public final class SecurityPaths {
     public static final String SESSION_COMMAND = "/api/sessions/*/command";
 
     /**
+     * Screen session reads stay permitAll at the filter layer and are enforced
+     * inside the screen service using the same SESSION_READABLE rules.
+     */
+    public static final String[] SCREEN_SESSION_READABLE = {
+            "/api/screens/sessions/*/player-lobby",
+            "/api/screens/sessions/*/gm-lobby",
+            "/api/screens/sessions/*/combat"
+    };
+
+    /**
+     * Screen editor reads use the authenticated web session.
+     */
+    public static final String[] SCREEN_AUTH_REQUIRED = {
+            "/api/screens/decks/new/editor",
+            "/api/screens/decks/*/editor"
+    };
+
+    /**
      * PLAYER_SELF:
      * 플레이어 본인 토큰으로만 허용되는 변경 API.
      */
@@ -97,4 +115,5 @@ public final class SecurityPaths {
     public static final HttpMethod SESSION_DELETE_METHOD = HttpMethod.DELETE;
     public static final HttpMethod SESSION_UPDATE_METHOD = HttpMethod.PUT;
     public static final HttpMethod CONTENT_READ_METHOD = HttpMethod.GET;
+    public static final HttpMethod SCREEN_READ_METHOD = HttpMethod.GET;
 }

@@ -4,6 +4,7 @@ import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.content.deck.dto.AddDeckCardsRequest;
 import com.example.dueltower.content.deck.dto.CreateDeckRequest;
 import com.example.dueltower.content.deck.dto.DeckValidationResponse;
+import com.example.dueltower.content.deck.dto.DeckValidationRequest;
 import com.example.dueltower.content.deck.dto.DeckResponse;
 import com.example.dueltower.content.deck.dto.RemoveDeckCardsRequest;
 import com.example.dueltower.content.deck.dto.ReplaceDeckCardsRequest;
@@ -74,7 +75,7 @@ public class DeckController {
     @PostMapping("/{id}/validate")
     public DeckValidationResponse validate(
             @PathVariable long id,
-            @RequestBody(required = false) ReplaceDeckCardsRequest req
+            @RequestBody(required = false) DeckValidationRequest req
     ) {
         return deckService.validateDeck(id, req);
     }

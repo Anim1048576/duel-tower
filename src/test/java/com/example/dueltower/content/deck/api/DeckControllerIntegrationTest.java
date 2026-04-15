@@ -484,6 +484,29 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("덱 검증은 요청 type을 draft type override로 반영한다")
+    void validateShouldUseRequestedTypeOverrideWhenPresent() throws Exception {
+        MockHttpSession session = signUpAndLogin("deckValidateTypeOverride");
+        Deck deck = createDeck("deck-validate-type-override", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
+
+        mockMvc.perform(post("/api/content/decks/{id}/validate", deck.getId())
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "ENEMY",
+                                  "cards": [
+                                    {"cardId":"C001","count":1}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.issues.length()").value(0))
+                .andExpect(jsonPath("$.normalizedTotalCards").value(1));
+    }
+
+    @Test
     @DisplayName("공개 덱 조회 엔드포인트는 계속 접근 가능해야 한다")
     void publicGetDeckEndpointsShouldRemainAccessible() throws Exception {
         Deck deck = createDeck("deck-public", DeckType.ENEMY, Map.of("C001", 1));

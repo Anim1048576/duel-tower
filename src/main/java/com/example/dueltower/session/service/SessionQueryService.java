@@ -130,12 +130,12 @@ public class SessionQueryService {
      * 조회 전용 세션 read 진입점.
      * get(code), read 권한 확인, access log, lock 기반 DTO 조립을 한 곳에 모은다.
      */
-    private <T> T withSessionReadableAccess(String code,
-                                            String gmTokenHeader,
-                                            String playerTokenHeader,
-                                            Authentication authentication,
-                                            String endpoint,
-                                            Function<SessionRuntime, T> reader) {
+    public <T> T withSessionReadableAccess(String code,
+                                           String gmTokenHeader,
+                                           String playerTokenHeader,
+                                           Authentication authentication,
+                                           String endpoint,
+                                           Function<SessionRuntime, T> reader) {
         return sessionLifecycleService.withLockedSession(code, rt -> {
             SessionAccessDecision decision = sessionAccessResolver.requireSessionReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
             log.info("session read granted code={} endpoint={} source={} tokenBased={} loginBased={} username={} playerId={}",

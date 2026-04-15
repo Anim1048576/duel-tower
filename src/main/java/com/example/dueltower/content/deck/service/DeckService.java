@@ -133,13 +133,28 @@ public class DeckService {
 
     @Transactional(readOnly = true)
     public DeckValidationResponse validateDeck(long id, ReplaceDeckCardsRequest req) {
+        return validateDeck(id, DeckValidationRequest.fromReplaceCardsRequest(req));
+    }
+
+    @Transactional(readOnly = true)
+    public DeckValidationResponse validateDeck(long id, DeckValidationRequest req) {
         Deck deck = getDeckOrThrow(id);
+        DeckType effectiveType = (req != null && req.type() != null) ? req.type() : deck.getType();
         Map<String, Integer> cards = (req != null && req.cards() != null)
                 ? normalizeAndMergeSpecs(req.cards())
                 : toCountMap(deck);
 
-        List<DeckValidationIssue> issues = collectDeckValidationIssues(deck.getType(), cards, true);
+        List<DeckValidationIssue> issues = collectDeckValidationIssues(effectiveType, cards, true);
         int totalCards = cards.values().stream().mapToInt(Integer::intValue).sum();
+        return new DeckValidationResponse(issues.isEmpty(), List.copyOf(issues), totalCards);
+    }
+
+    @Transactional(readOnly = true)
+    public DeckValidationResponse validateDraft(DeckType type, List<DeckCardSpec> cards) {
+        DeckType effectiveType = (type == null) ? DeckType.PLAYER : type;
+        Map<String, Integer> mergedCards = normalizeAndMergeSpecs(cards);
+        List<DeckValidationIssue> issues = collectDeckValidationIssues(effectiveType, mergedCards, true);
+        int totalCards = mergedCards.values().stream().mapToInt(Integer::intValue).sum();
         return new DeckValidationResponse(issues.isEmpty(), List.copyOf(issues), totalCards);
     }
 
