@@ -1,4 +1,5 @@
 import type { PlayerStateDto, SessionStateDto } from '../api/sessionTypes'
+import type { PlayerLobbyLoadoutDto, PlayerLobbySaveLoadoutPayload } from '../api/screenTypes'
 import {
   normalizePresetIdentifier,
   normalizePresetIdentifierList,
@@ -9,6 +10,12 @@ export type SessionLoadoutDraft = {
   deckOwnedCardIds: string[]
   exCardId: string
   passiveIds: string[]
+}
+
+export type SessionLoadoutDraftEditFlags = {
+  exCardEdited: boolean
+  deckOwnedCardIdsEdited: boolean
+  passiveIdsEdited: boolean
 }
 
 export function createEmptySessionLoadoutDraft(): SessionLoadoutDraft {
@@ -26,6 +33,32 @@ export function cloneSessionLoadoutDraft(draft: SessionLoadoutDraft): SessionLoa
     deckOwnedCardIds: [...draft.deckOwnedCardIds],
     exCardId: draft.exCardId,
     passiveIds: [...draft.passiveIds],
+  }
+}
+
+export function createEmptySessionLoadoutDraftEditFlags(): SessionLoadoutDraftEditFlags {
+  return {
+    exCardEdited: false,
+    deckOwnedCardIdsEdited: false,
+    passiveIdsEdited: false,
+  }
+}
+
+export function createSessionLoadoutDraftFromScreen(
+  loadout: PlayerLobbyLoadoutDto | null,
+): SessionLoadoutDraft {
+  if (!loadout) {
+    return createEmptySessionLoadoutDraft()
+  }
+
+  return {
+    characterId:
+      typeof loadout.characterId === 'number' && Number.isFinite(loadout.characterId) && loadout.characterId > 0
+        ? loadout.characterId
+        : null,
+    deckOwnedCardIds: normalizePresetIdentifierList(loadout.deckOwnedCardIds),
+    exCardId: normalizePresetIdentifier(loadout.exCardId),
+    passiveIds: normalizePresetIdentifierList(loadout.passiveIds),
   }
 }
 
@@ -72,6 +105,28 @@ export function normalizeSessionLoadoutDraft(draft: SessionLoadoutDraft): Sessio
     deckOwnedCardIds: normalizePresetIdentifierList(draft.deckOwnedCardIds),
     exCardId: normalizePresetIdentifier(draft.exCardId),
     passiveIds: normalizePresetIdentifierList(draft.passiveIds),
+  }
+}
+
+export function buildSessionLoadoutActionPatch(
+  draft: SessionLoadoutDraft,
+  savedDraft: SessionLoadoutDraft,
+  editFlags: SessionLoadoutDraftEditFlags,
+): PlayerLobbySaveLoadoutPayload {
+  const normalizedDraft = normalizeSessionLoadoutDraft(draft)
+  const characterChanged = normalizedDraft.characterId !== savedDraft.characterId
+
+  return {
+    characterId: normalizedDraft.characterId,
+    ...(!characterChanged || editFlags.passiveIdsEdited
+      ? { passiveIds: normalizedDraft.passiveIds }
+      : {}),
+    ...(!characterChanged || editFlags.deckOwnedCardIdsEdited
+      ? { deckOwnedCardIds: normalizedDraft.deckOwnedCardIds }
+      : {}),
+    ...(!characterChanged || editFlags.exCardEdited
+      ? { exCardId: normalizedDraft.exCardId }
+      : {}),
   }
 }
 

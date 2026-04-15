@@ -3,6 +3,7 @@ package com.example.dueltower.screen.service;
 import com.example.dueltower.session.dto.SessionStateDto;
 import com.example.dueltower.session.runtime.StateMapper;
 import com.example.dueltower.session.service.SessionQueryService;
+import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -17,24 +18,21 @@ public class SessionScreenService {
 
     private final SessionQueryService sessionQueryService;
     private final ScreenResponseFactory screenResponseFactory;
+    private final PlayerLobbyScreenService playerLobbyScreenService;
 
     public SessionScreenService(SessionQueryService sessionQueryService,
-                                ScreenResponseFactory screenResponseFactory) {
+                                ScreenResponseFactory screenResponseFactory,
+                                PlayerLobbyScreenService playerLobbyScreenService) {
         this.sessionQueryService = sessionQueryService;
         this.screenResponseFactory = screenResponseFactory;
+        this.playerLobbyScreenService = playerLobbyScreenService;
     }
 
-    public Object getPlayerLobby(String code,
-                                 String gmTokenHeader,
-                                 String playerTokenHeader,
-                                 Authentication authentication) {
-        return getSessionReadableScreen(
-                ScreenRouteSpec.PLAYER_LOBBY,
-                code,
-                gmTokenHeader,
-                playerTokenHeader,
-                authentication
-        );
+    public PlayerLobbyScreenResponse getPlayerLobby(String code,
+                                                    String gmTokenHeader,
+                                                    String playerTokenHeader,
+                                                    Authentication authentication) {
+        return playerLobbyScreenService.getScreen(code, gmTokenHeader, playerTokenHeader, authentication);
     }
 
     public Object getGmLobby(String code,

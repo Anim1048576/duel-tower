@@ -1,6 +1,7 @@
 package com.example.dueltower.screen.api;
 
 import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
+import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
 import com.example.dueltower.screen.dto.PresetEditorScreenResponse;
 import com.example.dueltower.screen.service.ScreenQueryService;
 import org.springframework.security.core.Authentication;
@@ -21,10 +22,10 @@ public class ScreenController {
     }
 
     @GetMapping("/sessions/{code}/player-lobby")
-    public Object playerLobby(@PathVariable String code,
-                              @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
-                              @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
-                              Authentication authentication) {
+    public PlayerLobbyScreenResponse playerLobby(@PathVariable String code,
+                                                 @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                                 @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                                 Authentication authentication) {
         return screenQueryService.getPlayerLobby(code, gmTokenHeader, playerTokenHeader, authentication);
     }
 

@@ -12,6 +12,21 @@ import com.example.dueltower.screen.dto.DeckEditorDraftCardDto;
 import com.example.dueltower.screen.dto.DeckEditorDraftDto;
 import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
 import com.example.dueltower.screen.dto.DeckEditorValidationDto;
+import com.example.dueltower.screen.dto.DisabledReasonDto;
+import com.example.dueltower.screen.dto.PlayerLobbyDraftFlagsDto;
+import com.example.dueltower.screen.dto.PlayerLobbyLoadoutDto;
+import com.example.dueltower.screen.dto.PlayerLobbyMeDto;
+import com.example.dueltower.screen.dto.PlayerLobbyMeSummaryDto;
+import com.example.dueltower.screen.dto.PlayerLobbyOptionDto;
+import com.example.dueltower.screen.dto.PlayerLobbyOwnedCardOptionDto;
+import com.example.dueltower.screen.dto.PlayerLobbyParticipantSlotDto;
+import com.example.dueltower.screen.dto.PlayerLobbyPresetItemDto;
+import com.example.dueltower.screen.dto.PlayerLobbyPresetPreviewDto;
+import com.example.dueltower.screen.dto.PlayerLobbyPresetsDto;
+import com.example.dueltower.screen.dto.PlayerLobbyPreviewItemDto;
+import com.example.dueltower.screen.dto.PlayerLobbyReferencesDto;
+import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
+import com.example.dueltower.screen.dto.PlayerLobbyTagDto;
 import com.example.dueltower.screen.dto.PresetEditorDerivedDto;
 import com.example.dueltower.screen.dto.PresetEditorDraftDto;
 import com.example.dueltower.screen.dto.PresetEditorResolvedDto;
@@ -21,18 +36,24 @@ import com.example.dueltower.screen.dto.PresetEditorScreenResponse;
 import com.example.dueltower.screen.dto.ScreenActionAuth;
 import com.example.dueltower.screen.dto.ScreenActionDto;
 import com.example.dueltower.screen.dto.SessionScreenSkeletonResponse;
-import com.example.dueltower.session.dto.SessionStateDto;
 import com.example.dueltower.preset.dto.PresetResponse;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.Ids.CardDefId;
+import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.PassiveDefinition;
+import com.example.dueltower.session.dto.OwnedCardDto;
+import com.example.dueltower.session.dto.PlayerStateDto;
+import com.example.dueltower.session.dto.SessionStateDto;
+import com.example.dueltower.session.runtime.SessionRuntime;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -115,6 +136,42 @@ public class ScreenResponseFactory {
                 draft,
                 resolved,
                 derived
+        );
+    }
+
+    public PlayerLobbyScreenResponse playerLobby(ScreenRouteSpec route,
+                                                 SessionStateDto state,
+                                                 SessionRuntime runtime,
+                                                 String currentPlayerId,
+                                                 PlayerStateDto me,
+                                                 List<com.example.dueltower.character.dto.CharacterProfileResponse> characters,
+                                                 List<CardDefinition> exCards,
+                                                 List<PassiveDefinition> passives,
+                                                 List<PresetResponse> presets,
+                                                 List<String> uiNotices) {
+        PlayerLobbyLoadoutDto loadout = playerLobbyLoadout(runtime, me);
+        PlayerLobbyPresetsDto presetSection = playerLobbyPresets(presets);
+        return new PlayerLobbyScreenResponse(
+                route.screenKey(),
+                OffsetDateTime.now(),
+                uiNotices,
+                playerLobbyActions(state.sessionCode(), me, presetSection.selectedId(), loadout),
+                state.sessionCode(),
+                state.version(),
+                route.routeTemplate(),
+                route.readAuth().policyGroup(),
+                route.readAuth().requiredAuth().wireValue(),
+                participantSlots(state, currentPlayerId, runtime),
+                new PlayerLobbyMeDto(
+                        me.playerId(),
+                        me.ready(),
+                        loadout,
+                        playerLobbySummary(me, loadout),
+                        loadout,
+                        playerLobbyDraftFlags(loadout)
+                ),
+                playerLobbyReferences(characters, exCards, passives, me),
+                presetSection
         );
     }
 
@@ -210,6 +267,18 @@ public class ScreenResponseFactory {
                 validatedSignature,
                 OffsetDateTime.now()
         );
+    }
+
+    private List<ScreenActionDto> playerLobbyActions(String sessionCode,
+                                                     PlayerStateDto me,
+                                                     Long selectedPresetId,
+                                                     PlayerLobbyLoadoutDto loadout) {
+        List<ScreenActionDto> actions = new ArrayList<>();
+        actions.add(toggleReadyAction(sessionCode, me));
+        actions.add(leavePlayerLobbyAction(sessionCode));
+        actions.add(saveLoadoutAction(sessionCode, me.playerId(), loadout));
+        actions.add(applyPresetAction(sessionCode, me.playerId(), selectedPresetId));
+        return List.copyOf(actions);
     }
 
     private List<ScreenActionDto> deckEditorActions(Long deckId,
@@ -347,6 +416,77 @@ public class ScreenResponseFactory {
         );
     }
 
+    private ScreenActionDto toggleReadyAction(String sessionCode, PlayerStateDto me) {
+        boolean nextReady = !me.ready();
+        return ScreenActionDto.of(
+                "playerLobby.toggleReady",
+                nextReady ? "Mark ready" : "Mark not ready",
+                "PUT",
+                "/api/sessions/" + sessionCode + "/players/" + me.playerId() + "/ready",
+                ScreenActionAuth.PLAYER_TOKEN,
+                true,
+                null,
+                Map.of("ready", nextReady)
+        );
+    }
+
+    private ScreenActionDto leavePlayerLobbyAction(String sessionCode) {
+        return ScreenActionDto.of(
+                "playerLobby.leave",
+                "Leave session",
+                "POST",
+                "/api/sessions/" + sessionCode + "/leave",
+                ScreenActionAuth.PLAYER_TOKEN,
+                true,
+                null,
+                null
+        );
+    }
+
+    private ScreenActionDto saveLoadoutAction(String sessionCode,
+                                              String playerId,
+                                              PlayerLobbyLoadoutDto loadout) {
+        Map<String, Object> payloadTemplate = new LinkedHashMap<>();
+        payloadTemplate.put("characterId", loadout.characterId());
+        payloadTemplate.put("passiveIds", loadout.passiveIds());
+        payloadTemplate.put("deckOwnedCardIds", loadout.deckOwnedCardIds());
+        payloadTemplate.put("exCardId", safeTrim(loadout.exCardId()));
+        return ScreenActionDto.of(
+                "playerLobby.saveLoadout",
+                "Save loadout",
+                "POST",
+                "/api/sessions/" + sessionCode + "/players/" + playerId + "/loadout",
+                ScreenActionAuth.PLAYER_TOKEN,
+                true,
+                null,
+                payloadTemplate
+        );
+    }
+
+    private ScreenActionDto applyPresetAction(String sessionCode,
+                                              String playerId,
+                                              Long selectedPresetId) {
+        boolean enabled = selectedPresetId != null && selectedPresetId > 0;
+        return ScreenActionDto.of(
+                "playerLobby.applyPreset",
+                "Apply preset",
+                "POST",
+                "/api/sessions/" + sessionCode + "/players/" + playerId + "/loadout/from-preset",
+                ScreenActionAuth.PLAYER_TOKEN,
+                enabled,
+                enabled ? null : new DisabledReasonDto(
+                        "PRESET_REQUIRED",
+                        "VALIDATION",
+                        "Choose a saved preset before applying it to the current session.",
+                        "player lobby applyPreset requires at least one selectable preset",
+                        null,
+                        null,
+                        null
+                ),
+                Map.of("presetId", selectedPresetId == null ? 0L : selectedPresetId)
+        );
+    }
+
     private Map<String, Object> deckUpsertPayload(DeckEditorDraftDto draft) {
         return Map.of(
                 "name", draft.name(),
@@ -389,6 +529,201 @@ public class ScreenResponseFactory {
         return List.copyOf(draftCards);
     }
 
+    private List<PlayerLobbyParticipantSlotDto> participantSlots(SessionStateDto state,
+                                                                 String currentPlayerId,
+                                                                 SessionRuntime runtime) {
+        List<PlayerStateDto> sortedPlayers = state.players().values().stream()
+                .sorted(Comparator.comparing((PlayerStateDto player) -> !player.playerId().equals(currentPlayerId))
+                        .thenComparing(PlayerStateDto::playerId))
+                .toList();
+        List<PlayerLobbyParticipantSlotDto> slots = new ArrayList<>();
+        for (int index = 0; index < sortedPlayers.size(); index++) {
+            PlayerStateDto player = sortedPlayers.get(index);
+            slots.add(new PlayerLobbyParticipantSlotDto(
+                    "P" + (index + 1),
+                    participantName(player, currentPlayerId),
+                    participantState(player, currentPlayerId),
+                    participantTone(player, currentPlayerId),
+                    playerLoadoutSummary(playerLobbyLoadout(runtime, player))
+            ));
+        }
+        return List.copyOf(slots);
+    }
+
+    private PlayerLobbyMeSummaryDto playerLobbySummary(PlayerStateDto me, PlayerLobbyLoadoutDto loadout) {
+        String readyLabel = me.ready() ? "Ready" : "Joined";
+        String readyTone = me.ready() ? "success" : "accent";
+        String loadoutSummary = playerLoadoutSummary(loadout);
+        return new PlayerLobbyMeSummaryDto(
+                readyLabel,
+                readyTone,
+                loadoutSummary,
+                loadoutSummary,
+                me.ready()
+                        ? "You are marked ready in the current session."
+                        : "You are joined in the current session and can still edit your loadout."
+        );
+    }
+
+    private PlayerLobbyDraftFlagsDto playerLobbyDraftFlags(PlayerLobbyLoadoutDto draft) {
+        boolean missingRequiredFields = draft.characterId() == null || safeTrim(draft.exCardId()).isBlank();
+        return new PlayerLobbyDraftFlagsDto(
+                false,
+                draft.characterId() == null,
+                missingRequiredFields
+        );
+    }
+
+    private PlayerLobbyLoadoutDto playerLobbyLoadout(SessionRuntime runtime, PlayerStateDto player) {
+        Long characterId = runtime.findCharacterIdByPlayerId(player.playerId());
+        String exCardId = safeTrim(resolvePlayerExCardId(runtime, player));
+        return new PlayerLobbyLoadoutDto(
+                characterId,
+                resolveCharacterLabel(characterId),
+                List.copyOf(player.deckOwnedCardIds()),
+                exCardId,
+                resolveCardLabel(exCardId, "No EX card selected"),
+                List.copyOf(player.passiveIds()),
+                player.deckOwnedCardIds().size(),
+                player.passiveIds().size()
+        );
+    }
+
+    private PlayerLobbyReferencesDto playerLobbyReferences(List<com.example.dueltower.character.dto.CharacterProfileResponse> characters,
+                                                           List<CardDefinition> exCards,
+                                                           List<PassiveDefinition> passives,
+                                                           PlayerStateDto me) {
+        return new PlayerLobbyReferencesDto(
+                characterOptions(characters),
+                exCardOptions(exCards),
+                passiveOptions(passives),
+                ownedCardOptions(me.ownedCards())
+        );
+    }
+
+    private List<PlayerLobbyOptionDto> characterOptions(List<com.example.dueltower.character.dto.CharacterProfileResponse> characters) {
+        return characters.stream()
+                .map(character -> new PlayerLobbyOptionDto(
+                        String.valueOf(character.id()),
+                        character.name() + " #" + character.id(),
+                        firstNonBlank(character.disposition(), character.oneLiner(), "Character reference"),
+                        List.of(new PlayerLobbyTagDto("Character", "accent"))
+                ))
+                .toList();
+    }
+
+    private List<PlayerLobbyOptionDto> exCardOptions(List<CardDefinition> exCards) {
+        return exCards.stream()
+                .map(card -> new PlayerLobbyOptionDto(
+                        card.id().value(),
+                        presetCardLabel(card),
+                        "EX card | Cost " + card.cost(),
+                        List.of(new PlayerLobbyTagDto("EX", "accent"))
+                ))
+                .toList();
+    }
+
+    private List<PlayerLobbyOptionDto> passiveOptions(List<PassiveDefinition> passives) {
+        return passives.stream()
+                .map(passive -> new PlayerLobbyOptionDto(
+                        passive.id(),
+                        passive.name() + " (" + passive.id() + ")",
+                        "Passive definition | Priority " + passive.priority(),
+                        List.of(new PlayerLobbyTagDto("Passive", "success"))
+                ))
+                .toList();
+    }
+
+    private List<PlayerLobbyOwnedCardOptionDto> ownedCardOptions(List<OwnedCardDto> ownedCards) {
+        return ownedCards.stream()
+                .map(ownedCard -> {
+                    Optional<CardDefinition> resolved = resolveCard(ownedCard.cardId());
+                    List<PlayerLobbyTagDto> tags = new ArrayList<>();
+                    resolved.ifPresent(card -> tags.add(new PlayerLobbyTagDto(card.type().name(), cardTypeTone(card.type()))));
+                    if (Boolean.TRUE.equals(ownedCard.lockedInDeck())) {
+                        tags.add(new PlayerLobbyTagDto("Locked", "warning"));
+                    }
+                    if (Boolean.FALSE.equals(ownedCard.forgettable())) {
+                        tags.add(new PlayerLobbyTagDto("Forget blocked", "muted"));
+                    }
+                    return new PlayerLobbyOwnedCardOptionDto(
+                            safeTrim(ownedCard.ownedCardId()),
+                            safeTrim(ownedCard.cardId()),
+                            resolved.map(card -> card.name() + " (" + safeTrim(ownedCard.ownedCardId()) + ")")
+                                    .orElse(safeTrim(ownedCard.ownedCardId())),
+                            resolved.map(card -> "Card " + card.id().value() + " | Cost " + card.cost())
+                                    .orElse("Owned card reference"),
+                            List.copyOf(tags)
+                    );
+                })
+                .toList();
+    }
+
+    private PlayerLobbyPresetsDto playerLobbyPresets(List<PresetResponse> presets) {
+        Long selectedId = presets.isEmpty() ? null : presets.get(0).id();
+        PlayerLobbyPresetPreviewDto preview = presets.isEmpty() ? null : presetPreview(presets.get(0));
+        return new PlayerLobbyPresetsDto(
+                presets.stream()
+                        .map(preset -> new PlayerLobbyPresetItemDto(
+                                preset.id(),
+                                preset.name() + " | Character #" + preset.characterId() + " | " + preset.deckCardIds().size() + " cards | " + preset.passiveIds().size() + " passives",
+                                "EX " + safeTrim(preset.exCardId())
+                        ))
+                        .toList(),
+                selectedId,
+                preview
+        );
+    }
+
+    private PlayerLobbyPresetPreviewDto presetPreview(PresetResponse preset) {
+        return new PlayerLobbyPresetPreviewDto(
+                preset.name(),
+                "Deck " + preset.deckCardIds().size() + " cards | " + preset.passiveIds().size() + " passives",
+                resolveCharacterLabel(preset.characterId()),
+                resolveCardLabel(preset.exCardId(), "No EX card selected"),
+                preset.deckCardIds().stream()
+                        .map(this::presetPreviewDeckItem)
+                        .toList(),
+                preset.passiveIds().stream()
+                        .map(this::presetPreviewPassiveItem)
+                        .toList()
+        );
+    }
+
+    private PlayerLobbyPreviewItemDto presetPreviewDeckItem(String cardId) {
+        Optional<CardDefinition> resolved = resolveCard(cardId);
+        return resolved
+                .map(card -> new PlayerLobbyPreviewItemDto(
+                        card.id().value(),
+                        presetCardLabel(card),
+                        card.type().name() + " | Cost " + card.cost(),
+                        List.of(new PlayerLobbyTagDto(card.type().name(), cardTypeTone(card.type())))
+                ))
+                .orElseGet(() -> new PlayerLobbyPreviewItemDto(
+                        safeTrim(cardId),
+                        cardMissingLabel(cardId, "Unresolved card"),
+                        "Card reference could not be restored",
+                        List.of(new PlayerLobbyTagDto("Unresolved", "warning"))
+                ));
+    }
+
+    private PlayerLobbyPreviewItemDto presetPreviewPassiveItem(String passiveId) {
+        Optional<PassiveDefinition> resolved = resolvePassive(passiveId);
+        return resolved
+                .map(passive -> new PlayerLobbyPreviewItemDto(
+                        passive.id(),
+                        passive.name() + " (" + passive.id() + ")",
+                        "Passive definition | Priority " + passive.priority(),
+                        List.of(new PlayerLobbyTagDto("Passive", "success"))
+                ))
+                .orElseGet(() -> new PlayerLobbyPreviewItemDto(
+                        safeTrim(passiveId),
+                        safeTrim(passiveId),
+                        "Passive reference could not be restored",
+                        List.of(new PlayerLobbyTagDto("Unresolved", "warning"))
+                ));
+    }
+
     private String deriveTitle(String mode, DeckResponse sourceDeck, DeckEditorDraftDto draft) {
         String trimmedName = draft.name() == null ? "" : draft.name().trim();
         if (!trimmedName.isBlank()) {
@@ -401,6 +736,56 @@ public class ScreenResponseFactory {
             return sourceDeck.name();
         }
         return "Untitled deck";
+    }
+
+    private String participantName(PlayerStateDto player, String currentPlayerId) {
+        return player.playerId().equals(currentPlayerId)
+                ? player.playerId() + " (You)"
+                : player.playerId();
+    }
+
+    private String participantState(PlayerStateDto player, String currentPlayerId) {
+        if (player.playerId().equals(currentPlayerId)) {
+            return player.ready() ? "You / Ready" : "You / Joined";
+        }
+        return player.ready() ? "Ready" : "Joined";
+    }
+
+    private String participantTone(PlayerStateDto player, String currentPlayerId) {
+        if (player.playerId().equals(currentPlayerId)) {
+            return player.ready() ? "success" : "accent";
+        }
+        return player.ready() ? "success" : "muted";
+    }
+
+    private String playerLoadoutSummary(PlayerLobbyLoadoutDto loadout) {
+        String passiveSummary = loadout.passiveCount() > 0 ? loadout.passiveCount() + " passives" : "No passives";
+        String exSummary = safeTrim(loadout.exCardId()).isBlank() ? "No EX card" : "EX " + safeTrim(loadout.exCardId());
+        return "Deck " + loadout.deckCount() + " cards | " + passiveSummary + " | " + exSummary;
+    }
+
+    private String resolvePlayerExCardId(SessionRuntime runtime, PlayerStateDto player) {
+        var runtimePlayer = runtime.state().player(new PlayerId(player.playerId()));
+        if (runtimePlayer == null) {
+            return safeTrim(player.exCard());
+        }
+        if (runtimePlayer.exCard() == null) {
+            return safeTrim(player.exCard());
+        }
+        var exCard = runtime.state().card(runtimePlayer.exCard());
+        return safeTrim(exCard == null ? player.exCard() : exCard.defId().value());
+    }
+
+    private String resolveCharacterLabel(Long characterId) {
+        return resolveCharacter(characterId)
+                .map(this::presetCharacterLabel)
+                .orElse(characterMissingLabel(characterId));
+    }
+
+    private String resolveCardLabel(String rawCardId, String emptyLabel) {
+        return resolveCard(rawCardId)
+                .map(this::presetCardLabel)
+                .orElse(cardMissingLabel(rawCardId, emptyLabel));
     }
 
     private Optional<CharacterProfile> resolveCharacter(Long characterId) {
@@ -623,6 +1008,16 @@ public class ScreenResponseFactory {
                 .reduce((left, right) -> left + "|" + right)
                 .orElse("");
         return "type=" + typeToken + ";cards=" + cardsToken;
+    }
+
+    private String firstNonBlank(String first, String second, String fallback) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return fallback;
     }
 
     private String safeTrim(String value) {

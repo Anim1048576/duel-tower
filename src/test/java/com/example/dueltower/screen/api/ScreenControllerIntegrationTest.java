@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,16 +67,24 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     @Test
-    void sessionScreenRequiresSessionReadableAuthorization() throws Exception {
+    void playerLobbyScreenRequiresPlayerLobbyAccessAndReturnsResolvedScreenModel() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo session = createSession(gmSession, "gm");
         MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
-        String playerToken = joinAsPlayer(playerSession, session.code(), "player1");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "player1", characterId);
+        createPreset("player1", characterId);
 
         MvcResult unauthorized = mockMvc.perform(get("/api/screens/sessions/{code}/player-lobby", session.code()))
                 .andExpect(status().isUnauthorized())
                 .andReturn();
         assertApiErrorContract(unauthorized, 401);
+
+        MvcResult forbiddenForGm = mockMvc.perform(get("/api/screens/sessions/{code}/player-lobby", session.code())
+                        .session(gmSession))
+                .andExpect(status().isForbidden())
+                .andReturn();
+        assertApiErrorContract(forbiddenForGm, 403);
 
         MvcResult authorized = mockMvc.perform(get("/api/screens/sessions/{code}/player-lobby", session.code())
                         .header("X-Player-Token", playerToken))
@@ -84,9 +93,50 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
 
         var body = assertBaseScreenContract(authorized, "PlayerLobby");
         assertThat(body.path("sessionCode").asText()).isEqualTo(session.code());
+        assertThat(body.path("version").asLong()).isGreaterThanOrEqualTo(0L);
+        assertThat(body.path("routeTemplate").asText()).isEqualTo("/api/screens/sessions/{code}/player-lobby");
         assertThat(body.path("policyGroup").asText()).isEqualTo("SESSION_READABLE");
         assertThat(body.path("auth").asText()).isEqualTo("sessionReadable");
-        assertThat(body.path("stub").asBoolean()).isTrue();
+        assertThat(body.path("participantSlots")).hasSize(1);
+        assertThat(body.path("participantSlots").get(0).path("slot").asText()).isEqualTo("P1");
+        assertThat(body.path("participantSlots").get(0).path("name").asText()).contains("player1");
+        assertThat(body.path("participantSlots").get(0).path("tone").asText()).isEqualTo("accent");
+        assertThat(body.path("me").path("playerId").asText()).isEqualTo("player1");
+        assertThat(body.path("me").path("ready").asBoolean()).isFalse();
+        assertThat(body.path("me").path("loadout").path("characterId").asLong()).isEqualTo(characterId);
+        assertThat(body.path("me").path("loadout").path("characterLabel").asText()).contains("#" + characterId);
+        assertThat(body.path("me").path("loadout").path("exCardId").asText()).isEqualTo("EX901");
+        assertThat(body.path("me").path("loadout").path("deckOwnedCardIds")).isNotEmpty();
+        assertThat(body.path("me").path("draft").path("characterId").asLong()).isEqualTo(characterId);
+        assertThat(body.path("me").path("draftFlags").path("dirty").asBoolean()).isFalse();
+        assertThat(body.path("me").path("draftFlags").path("deckEditingLocked").asBoolean()).isFalse();
+        assertThat(body.path("me").path("draftFlags").path("requiredFieldsMissing").asBoolean()).isFalse();
+        assertThat(body.path("references").path("characterOptions")).isNotEmpty();
+        assertThat(body.path("references").path("exCardOptions")).isNotEmpty();
+        assertThat(body.path("references").path("passiveOptions")).isNotEmpty();
+        assertThat(body.path("references").path("ownedCardOptions")).isNotEmpty();
+        assertThat(body.path("presets").path("items")).hasSize(1);
+        assertThat(body.path("presets").path("selectedId").asLong()).isPositive();
+        assertThat(body.path("presets").path("preview").path("characterLabel").asText()).contains("#" + characterId);
+        assertThat(body.path("presets").path("preview").path("exLabel").asText()).contains("EX901");
+        assertThat(body.path("presets").path("preview").path("deckItems")).hasSize(2);
+        assertThat(body.path("presets").path("preview").path("passiveItems")).hasSize(1);
+
+        JsonNode toggleReadyAction = findAction(body, "playerLobby.toggleReady");
+        JsonNode leaveAction = findAction(body, "playerLobby.leave");
+        JsonNode saveLoadoutAction = findAction(body, "playerLobby.saveLoadout");
+        JsonNode applyPresetAction = findAction(body, "playerLobby.applyPreset");
+        assertThat(body.path("possibleActions")).hasSize(4);
+        assertActionContract(toggleReadyAction);
+        assertActionContract(leaveAction);
+        assertActionContract(saveLoadoutAction);
+        assertActionContract(applyPresetAction);
+        assertThat(toggleReadyAction.path("label").asText()).isEqualTo("Mark ready");
+        assertThat(toggleReadyAction.path("auth").asText()).isEqualTo("playerToken");
+        assertThat(toggleReadyAction.path("payloadTemplate").path("ready").asBoolean()).isTrue();
+        assertThat(saveLoadoutAction.path("payloadTemplate").path("characterId").asLong()).isEqualTo(characterId);
+        assertThat(applyPresetAction.path("enabled").asBoolean()).isTrue();
+        assertThat(applyPresetAction.path("payloadTemplate").path("presetId").asLong()).isPositive();
     }
 
     @Test
@@ -102,6 +152,71 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         var body = assertBaseScreenContract(result, "GmLobby");
         assertThat(body.path("routeTemplate").asText()).isEqualTo("/api/screens/sessions/{code}/gm-lobby");
         assertThat(body.path("policyGroup").asText()).isEqualTo("SESSION_READABLE");
+    }
+
+    @Test
+    void playerLobbyScreenExposesMissingCharacterStateAndDisablesPresetApplyWhenArchiveIsEmpty() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-missing", "gm-missing@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-missing");
+        MockHttpSession playerSession = signUpAndLogin("player-missing", "player-missing@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, session.code(), "player-missing", null);
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/player-lobby", session.code())
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "PlayerLobby");
+        assertThat(body.path("me").path("loadout").path("characterId").isNull()).isTrue();
+        assertThat(body.path("me").path("draftFlags").path("dirty").asBoolean()).isFalse();
+        assertThat(body.path("me").path("draftFlags").path("deckEditingLocked").asBoolean()).isTrue();
+        assertThat(body.path("me").path("draftFlags").path("requiredFieldsMissing").asBoolean()).isTrue();
+        assertThat(body.path("references").path("ownedCardOptions")).isNotEmpty();
+        assertThat(body.path("presets").path("items")).hasSize(0);
+        assertThat(body.path("presets").path("selectedId").isNull()).isTrue();
+        assertThat(body.path("presets").path("preview").isNull()).isTrue();
+
+        JsonNode applyPresetAction = findAction(body, "playerLobby.applyPreset");
+        assertDisabledActionContract(applyPresetAction);
+        assertThat(applyPresetAction.path("disabledReason").path("code").asText()).isEqualTo("PRESET_REQUIRED");
+        assertThat(applyPresetAction.path("payloadTemplate").path("presetId").asLong()).isZero();
+    }
+
+    @Test
+    void playerLobbyScreenUpdatesToggleReadyActionAfterReadyStateChanges() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-ready", "gm-ready@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-ready");
+        MockHttpSession playerSession = signUpAndLogin("player-ready", "player-ready@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "player-ready", characterId);
+
+        MvcResult beforeReady = mockMvc.perform(get("/api/screens/sessions/{code}/player-lobby", session.code())
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode beforeReadyBody = assertBaseScreenContract(beforeReady, "PlayerLobby");
+        assertThat(findAction(beforeReadyBody, "playerLobby.toggleReady").path("label").asText()).isEqualTo("Mark ready");
+
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", session.code(), "player-ready")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        MvcResult afterReady = mockMvc.perform(get("/api/screens/sessions/{code}/player-lobby", session.code())
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode afterReadyBody = assertBaseScreenContract(afterReady, "PlayerLobby");
+        assertThat(afterReadyBody.path("me").path("ready").asBoolean()).isTrue();
+        assertThat(afterReadyBody.path("participantSlots").get(0).path("state").asText()).isEqualTo("You / Ready");
+        assertThat(findAction(afterReadyBody, "playerLobby.toggleReady").path("label").asText()).isEqualTo("Mark not ready");
+        assertThat(findAction(afterReadyBody, "playerLobby.toggleReady").path("payloadTemplate").path("ready").asBoolean()).isFalse();
     }
 
     @Test
@@ -324,6 +439,11 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
 
     private String joinAsPlayer(MockHttpSession session, String code, String playerId) throws Exception {
         long characterId = createCharacter();
+        return joinAsPlayer(session, code, playerId, characterId);
+    }
+
+    private String joinAsPlayer(MockHttpSession session, String code, String playerId, Long characterId) throws Exception {
+        String characterPayload = characterId == null ? "null" : characterId.toString();
 
         MvcResult result = mockMvc.perform(post("/api/sessions/{code}/join", code)
                         .session(session)
@@ -331,9 +451,9 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                         .content("""
                                 {
                                   "playerId": "%s",
-                                  "characterId": %d
+                                  "characterId": %s
                                 }
-                                """.formatted(playerId, characterId)))
+                                """.formatted(playerId, characterPayload)))
                 .andExpect(status().isOk())
                 .andReturn();
 

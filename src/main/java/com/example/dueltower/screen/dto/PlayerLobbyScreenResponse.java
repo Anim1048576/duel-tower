@@ -1,0 +1,82 @@
+package com.example.dueltower.screen.dto;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+
+/**
+ * Screen model for PlayerLobby.
+ * The server owns participant summary, reference option curation, preset preview resolution,
+ * and action availability so the frontend can stay in render + local draft mode.
+ */
+public class PlayerLobbyScreenResponse extends ScreenResponseBase {
+    private final String sessionCode;
+    private final long version;
+    private final String routeTemplate;
+    private final String policyGroup;
+    private final String auth;
+    private final List<PlayerLobbyParticipantSlotDto> participantSlots;
+    private final PlayerLobbyMeDto me;
+    private final PlayerLobbyReferencesDto references;
+    private final PlayerLobbyPresetsDto presets;
+
+    public PlayerLobbyScreenResponse(String screenKey,
+                                     OffsetDateTime generatedAt,
+                                     List<String> uiNotices,
+                                     List<ScreenActionDto> possibleActions,
+                                     String sessionCode,
+                                     long version,
+                                     String routeTemplate,
+                                     String policyGroup,
+                                     String auth,
+                                     List<PlayerLobbyParticipantSlotDto> participantSlots,
+                                     PlayerLobbyMeDto me,
+                                     PlayerLobbyReferencesDto references,
+                                     PlayerLobbyPresetsDto presets) {
+        super(screenKey, generatedAt, uiNotices, possibleActions);
+        this.sessionCode = sessionCode;
+        this.version = version;
+        this.routeTemplate = routeTemplate;
+        this.policyGroup = policyGroup;
+        this.auth = auth;
+        this.participantSlots = participantSlots == null ? List.of() : List.copyOf(participantSlots);
+        this.me = me;
+        this.references = references;
+        this.presets = presets;
+    }
+
+    public String getSessionCode() {
+        return sessionCode;
+    }
+
+    public long getVersion() {
+        return version;
+    }
+
+    public String getRouteTemplate() {
+        return routeTemplate;
+    }
+
+    public String getPolicyGroup() {
+        return policyGroup;
+    }
+
+    public String getAuth() {
+        return auth;
+    }
+
+    public List<PlayerLobbyParticipantSlotDto> getParticipantSlots() {
+        return participantSlots;
+    }
+
+    public PlayerLobbyMeDto getMe() {
+        return me;
+    }
+
+    public PlayerLobbyReferencesDto getReferences() {
+        return references;
+    }
+
+    public PlayerLobbyPresetsDto getPresets() {
+        return presets;
+    }
+}

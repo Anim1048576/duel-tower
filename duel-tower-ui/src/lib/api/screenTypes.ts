@@ -1,6 +1,6 @@
 import type { DeckIdentifier, DeckResponse, DeckType, DeckValidationIssue } from './deckTypes'
 import type { PresetIdentifier, PresetResponse } from './presetTypes'
-import type { SessionCode } from './sessionTypes'
+import type { SessionCode, SessionStateDto } from './sessionTypes'
 
 export type ScreenKey = 'PlayerLobby' | 'GmLobby' | 'Combat' | 'DeckEditor' | 'PresetEditor'
 
@@ -60,6 +60,26 @@ export type PresetEditorActionPayload = {
   passiveIds?: string[] | null
 }
 
+export type PlayerLobbyToggleReadyPayload = {
+  ready?: boolean | null
+}
+
+export type PlayerLobbySaveLoadoutPayload = {
+  characterId?: number | null
+  passiveIds?: string[] | null
+  deckOwnedCardIds?: string[] | null
+  exCardId?: string | null
+}
+
+export type PlayerLobbyApplyPresetPayload = {
+  presetId?: number | null
+}
+
+export type PlayerLobbyActionPayload =
+  | PlayerLobbyToggleReadyPayload
+  | PlayerLobbySaveLoadoutPayload
+  | PlayerLobbyApplyPresetPayload
+
 export type DeckEditorActionId =
   | 'deckEditor.validate'
   | 'deckEditor.save'
@@ -71,6 +91,12 @@ export type PresetEditorActionId =
   | 'presetEditor.create'
   | 'presetEditor.clone'
   | 'presetEditor.delete'
+
+export type PlayerLobbyActionId =
+  | 'playerLobby.toggleReady'
+  | 'playerLobby.leave'
+  | 'playerLobby.saveLoadout'
+  | 'playerLobby.applyPreset'
 
 export type DeckEditorDraftCardDto = {
   key: string
@@ -128,6 +154,103 @@ export type PresetEditorDerivedDto = {
   dirty: boolean
   createdAtLabel: string
   updatedAtLabel: string
+}
+
+export type PlayerLobbyTagDto = {
+  label: string
+  tone: 'accent' | 'muted' | 'success' | 'warning'
+}
+
+export type PlayerLobbyParticipantSlotDto = {
+  slot: string
+  name: string
+  state: string
+  tone: 'accent' | 'muted' | 'success' | 'warning'
+  note: string
+}
+
+export type PlayerLobbyLoadoutDto = {
+  characterId: number | null
+  characterLabel: string
+  deckOwnedCardIds: string[]
+  exCardId: string
+  exLabel: string
+  passiveIds: string[]
+  deckCount: number
+  passiveCount: number
+}
+
+export type PlayerLobbyMeSummaryDto = {
+  readyLabel: string
+  readyTone: 'accent' | 'muted' | 'success' | 'warning'
+  loadoutSummary: string
+  draftSummary: string
+  membershipSummary: string
+}
+
+export type PlayerLobbyDraftFlagsDto = {
+  dirty: boolean
+  deckEditingLocked: boolean
+  requiredFieldsMissing: boolean
+}
+
+export type PlayerLobbyMeDto = {
+  playerId: string
+  ready: boolean
+  loadout: PlayerLobbyLoadoutDto
+  summary: PlayerLobbyMeSummaryDto
+  draft: PlayerLobbyLoadoutDto
+  draftFlags: PlayerLobbyDraftFlagsDto
+}
+
+export type PlayerLobbyOptionDto = {
+  id: string
+  label: string
+  subtitle: string
+  tags: PlayerLobbyTagDto[]
+}
+
+export type PlayerLobbyOwnedCardOptionDto = {
+  ownedCardId: string
+  cardId: string
+  label: string
+  subtitle: string
+  tags: PlayerLobbyTagDto[]
+}
+
+export type PlayerLobbyReferencesDto = {
+  characterOptions: PlayerLobbyOptionDto[]
+  exCardOptions: PlayerLobbyOptionDto[]
+  passiveOptions: PlayerLobbyOptionDto[]
+  ownedCardOptions: PlayerLobbyOwnedCardOptionDto[]
+}
+
+export type PlayerLobbyPresetItemDto = {
+  presetId: number
+  label: string
+  subtitle: string
+}
+
+export type PlayerLobbyPreviewItemDto = {
+  id: string
+  label: string
+  subtitle: string
+  tags: PlayerLobbyTagDto[]
+}
+
+export type PlayerLobbyPresetPreviewDto = {
+  name: string
+  summary: string
+  characterLabel: string
+  exLabel: string
+  deckItems: PlayerLobbyPreviewItemDto[]
+  passiveItems: PlayerLobbyPreviewItemDto[]
+}
+
+export type PlayerLobbyPresetsDto = {
+  items: PlayerLobbyPresetItemDto[]
+  selectedId: number | null
+  preview: PlayerLobbyPresetPreviewDto | null
 }
 
 /**
@@ -235,6 +358,10 @@ export type PresetEditorScreenAction = ScreenActionDto<PresetEditorActionPayload
   id: PresetEditorActionId
 }
 
+export type PlayerLobbyScreenAction = ScreenActionDto<PlayerLobbyActionPayload> & {
+  id: PlayerLobbyActionId
+}
+
 export type ScreenResponseBase<TAction extends ScreenActionDto = ScreenActionDto> = {
   screenKey: string
   generatedAt: string
@@ -269,6 +396,24 @@ export type PresetEditorScreenResponse = ScreenResponseBase<PresetEditorScreenAc
   derived: PresetEditorDerivedDto
 }
 
+/**
+ * PlayerLobby screen contract.
+ * The backend owns participant slot summary, reference option curation,
+ * preset preview resolution, and action metadata. The frontend keeps only
+ * local loadout input state and editor-style presentation helpers.
+ */
+export type PlayerLobbyScreenResponse = ScreenResponseBase<PlayerLobbyScreenAction> & {
+  sessionCode: string
+  version: number
+  routeTemplate: string
+  policyGroup: string
+  auth: string
+  participantSlots: PlayerLobbyParticipantSlotDto[]
+  me: PlayerLobbyMeDto
+  references: PlayerLobbyReferencesDto
+  presets: PlayerLobbyPresetsDto
+}
+
 export type DeckEditorActionResponseById = {
   'deckEditor.validate': DeckValidationResponseLike
   'deckEditor.save': DeckResponse
@@ -281,6 +426,13 @@ export type PresetEditorActionResponseById = {
   'presetEditor.create': PresetResponse
   'presetEditor.clone': PresetResponse
   'presetEditor.delete': void
+}
+
+export type PlayerLobbyActionResponseById = {
+  'playerLobby.toggleReady': SessionStateDto
+  'playerLobby.leave': SessionStateDto
+  'playerLobby.saveLoadout': SessionStateDto
+  'playerLobby.applyPreset': SessionStateDto
 }
 
 type DeckValidationResponseLike = {
@@ -335,6 +487,13 @@ export function findDeckEditorAction(
 export function findPresetEditorAction(
   screen: Pick<PresetEditorScreenResponse, 'possibleActions'>,
   actionId: PresetEditorActionId,
+) {
+  return screen.possibleActions.find((action) => action.id === actionId) ?? null
+}
+
+export function findPlayerLobbyAction(
+  screen: Pick<PlayerLobbyScreenResponse, 'possibleActions'>,
+  actionId: PlayerLobbyActionId,
 ) {
   return screen.possibleActions.find((action) => action.id === actionId) ?? null
 }

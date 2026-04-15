@@ -262,6 +262,9 @@ function resolveActionArgs(
 
 export function buildScreenHref(screenKey: 'DeckEditor', params?: ScreenRequestParamsByKey['DeckEditor']): string
 export function buildScreenHref(screenKey: 'PresetEditor', params?: ScreenRequestParamsByKey['PresetEditor']): string
+export function buildScreenHref(screenKey: 'PlayerLobby', params: ScreenRequestParamsByKey['PlayerLobby']): string
+export function buildScreenHref(screenKey: 'GmLobby', params: ScreenRequestParamsByKey['GmLobby']): string
+export function buildScreenHref(screenKey: 'Combat', params: ScreenRequestParamsByKey['Combat']): string
 export function buildScreenHref<TKey extends Exclude<ScreenKey, 'DeckEditor' | 'PresetEditor'>>(
   screenKey: TKey,
   params: ScreenRequestParamsByKey[TKey],
@@ -304,6 +307,21 @@ export function getScreen<TScreen extends ScreenResponseBase = ScreenResponseBas
 export function getScreen<TScreen extends ScreenResponseBase = ScreenResponseBase>(
   screenKey: 'PresetEditor',
   params?: ScreenRequestParamsByKey['PresetEditor'],
+  options?: ScreenRequestOptions,
+): Promise<TScreen>
+export function getScreen<TScreen extends ScreenResponseBase = ScreenResponseBase>(
+  screenKey: 'PlayerLobby',
+  params: ScreenRequestParamsByKey['PlayerLobby'],
+  options?: ScreenRequestOptions,
+): Promise<TScreen>
+export function getScreen<TScreen extends ScreenResponseBase = ScreenResponseBase>(
+  screenKey: 'GmLobby',
+  params: ScreenRequestParamsByKey['GmLobby'],
+  options?: ScreenRequestOptions,
+): Promise<TScreen>
+export function getScreen<TScreen extends ScreenResponseBase = ScreenResponseBase>(
+  screenKey: 'Combat',
+  params: ScreenRequestParamsByKey['Combat'],
   options?: ScreenRequestOptions,
 ): Promise<TScreen>
 export function getScreen<TKey extends Exclude<ScreenKey, 'DeckEditor' | 'PresetEditor'>, TScreen extends ScreenResponseBase = ScreenResponseBase>(
