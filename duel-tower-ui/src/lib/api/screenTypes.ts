@@ -131,6 +131,70 @@ export type PresetEditorDerivedDto = {
 }
 
 /**
+ * Server-side PresetEditor draft snapshot.
+ * The frontend copies this into local editor state and does not reinterpret preset semantics.
+ */
+export type PresetEditorServerDraft = PresetEditorDraftDto
+
+/**
+ * Server-side resolved preview snapshot.
+ * Character / EX / deck / passive labels and tags are resolved on the backend.
+ */
+export type PresetEditorServerResolved = PresetEditorResolvedDto
+
+/**
+ * Frontend-only presentation state for PresetEditor.
+ * This mirrors the current local draft for dirty/title/preview display without
+ * re-implementing backend reference resolution or action-enable rules.
+ */
+export type PresetEditorLocalPresentationState = {
+  title: string
+  summary: string
+  dirty: boolean
+  previewNeedsResolveRefresh: boolean
+  deckCount: number
+  passiveCount: number
+  character: {
+    label: string
+    subtitle: string
+    tags: {
+      label: string
+      tone?: 'accent' | 'muted' | 'success' | 'warning'
+    }[]
+  }
+  ex: {
+    label: string
+    subtitle: string
+    tags: {
+      label: string
+      tone?: 'accent' | 'muted' | 'success' | 'warning'
+    }[]
+  }
+  deckItems: {
+    id: string
+    title: string
+    subtitle?: string
+    meta?: string
+    note?: string
+    tags?: {
+      label: string
+      tone?: 'accent' | 'muted' | 'success' | 'warning'
+    }[]
+  }[]
+  passiveItems: {
+    id: string
+    title: string
+    subtitle?: string
+    meta?: string
+    note?: string
+    tags?: {
+      label: string
+      tone?: 'accent' | 'muted' | 'success' | 'warning'
+    }[]
+  }[]
+}
+
+/**
  * Server-side validation snapshot for the last validated deck draft.
  * This does not encode whether the current local editor state is stale.
  * validatedDraftSignature is the server's identifier for the exact draft that was validated.
@@ -189,14 +253,19 @@ export type DeckEditorScreenResponse = ScreenResponseBase<DeckEditorScreenAction
   validation: DeckEditorServerValidationDto
 }
 
+/**
+ * PresetEditor screen contract.
+ * The backend owns draft serialization, resolved preview metadata, derived labels,
+ * and mode-specific actions. The frontend adds only local presentation state on top.
+ */
 export type PresetEditorScreenResponse = ScreenResponseBase<PresetEditorScreenAction> & {
   presetId: number | null
   mode: 'create' | 'edit'
   routeTemplate: string
   policyGroup: string
   auth: string
-  draft: PresetEditorDraftDto
-  resolved: PresetEditorResolvedDto
+  draft: PresetEditorServerDraft
+  resolved: PresetEditorServerResolved
   derived: PresetEditorDerivedDto
 }
 

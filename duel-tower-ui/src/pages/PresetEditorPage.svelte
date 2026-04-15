@@ -1,12 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { getScreen, invokeScreenAction } from '../lib/api/screens'
+  import { getScreen } from '../lib/api/screens'
   import {
-    buildScreenActionPayload,
+    invokeEditorEntityActionAndRefresh,
+    invokeEditorScreenAction,
+  } from '../lib/api/editorScreenActions'
+  import {
     findPresetEditorAction,
+    type PresetEditorActionPayload,
     type PresetEditorActionId,
     type PresetEditorActionResponseById,
-    type PresetEditorResolvedItemDto,
+    type PresetEditorScreenAction,
     type PresetEditorScreenResponse,
   } from '../lib/api/screenTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
@@ -20,9 +24,12 @@
     buildPresetEditorActionPatch,
     createEmptyPresetEditorState,
     createPresetEditorState,
-    isPresetEditorStateDirty,
     type PresetEditorState,
   } from '../lib/presets/editorModel'
+  import {
+    createPresetEditorLocalPresentation,
+    isPresetEditorLocalDirty,
+  } from '../lib/presets/presentationState.js'
   import {
     presetEditorStateCopy,
     presetListStateCopy,
@@ -37,22 +44,8 @@
     setSelectionHandoff,
   } from '../lib/selectionHandoff'
 
-  type EntityTagTone = 'accent' | 'muted' | 'success' | 'warning'
-
-  type EntityTag = {
-    label: string
-    tone?: EntityTagTone
-  }
-
-  type EntityItem = {
-    id: string
-    title: string
-    subtitle?: string
-    meta?: string
-    tags?: EntityTag[]
-  }
-
   let loading = $state(true)
+  // Server snapshot: the latest preset editor screen returned by the Screen API.
   let screen = $state<PresetEditorScreenResponse | null>(null)
   let editorState = $state<PresetEditorState>(createEmptyPresetEditorState())
   let errorMessage = $state<string | null>(null)
@@ -95,6 +88,7 @@
   }
 
   function applyScreen(nextScreen: PresetEditorScreenResponse) {
+    // Action success and initial load both resync the local draft from the latest screen snapshot.
     screen = nextScreen
     editorState = createPresetEditorState(nextScreen.draft)
     deleteConfirmOpen = false
@@ -246,19 +240,6 @@
     }
   }
 
-  function toEntityItem(item: PresetEditorResolvedItemDto): EntityItem {
-    return {
-      id: item.id,
-      title: item.label,
-      subtitle: item.subtitle,
-      meta: item.meta,
-      tags: item.tags.map((tag) => ({
-        label: tag.label,
-        tone: tag.tone as EntityTagTone,
-      })),
-    }
-  }
-
   function handlePrimarySubmit(event: SubmitEvent) {
     event.preventDefault()
     void runAction(isCreateMode ? 'presetEditor.create' : 'presetEditor.save')
@@ -295,9 +276,7 @@
       return
     }
 
-    const action = findPresetEditorAction(screen, actionId)
-
-    if (!action || !action.enabled) {
+    if (!findPresetEditorAction(screen, actionId)?.enabled) {
       return
     }
 
@@ -306,14 +285,25 @@
     actionSuccessMessage = null
 
     try {
-      const patch = buildPresetEditorActionPatch(action.id, editorState)
-      const body = action.payloadTemplate && patch ? buildScreenActionPayload(action, patch) : undefined
-
       if (actionId === 'presetEditor.delete') {
-        await invokeScreenAction<PresetEditorScreenResponse, PresetEditorActionResponseById['presetEditor.delete']>(
-          action,
-          body === undefined ? undefined : { body },
-        )
+        const result = await invokeEditorScreenAction<
+          PresetEditorScreenResponse,
+          PresetEditorScreenAction,
+          PresetEditorActionId,
+          PresetEditorState,
+          PresetEditorActionPayload,
+          PresetEditorActionResponseById['presetEditor.delete']
+        >({
+          screen,
+          actionId,
+          editorState,
+          findAction: findPresetEditorAction,
+          buildPatch: buildPresetEditorActionPatch,
+        })
+
+        if (!result) {
+          return
+        }
 
         removeSelectionHandoff(selectionHandoffKeys.presetId)
         setPresetPageFeedback(presetListStateCopy.deletedFeedback)
@@ -321,13 +311,31 @@
         return
       }
 
-      const response = await invokeScreenAction<
+      const result = await invokeEditorEntityActionAndRefresh<
         PresetEditorScreenResponse,
-        PresetEditorActionResponseById['presetEditor.save' | 'presetEditor.create' | 'presetEditor.clone']
-      >(action, body === undefined ? undefined : { body })
+        PresetEditorScreenAction,
+        PresetEditorActionId,
+        PresetEditorState,
+        PresetEditorActionPayload,
+        PresetEditorActionResponseById['presetEditor.save' | 'presetEditor.create' | 'presetEditor.clone'],
+        string
+      >({
+        screen,
+        actionId,
+        editorState,
+        findAction: findPresetEditorAction,
+        buildPatch: buildPresetEditorActionPatch,
+        getResourceId: (response) => String(response.id),
+        refreshScreen: async (nextPresetId) => {
+          await loadPresetEditorScreen(nextPresetId)
+        },
+      })
 
-      const nextPresetId = String(response.id)
-      await loadPresetEditorScreen(nextPresetId)
+      if (!result) {
+        return
+      }
+
+      const nextPresetId = result.resourceId
 
       if (actionId === 'presetEditor.clone') {
         setPresetPageFeedback(presetEditorStateCopy.cloneSuccessFeedback)
@@ -391,36 +399,24 @@
 
   const isCreateMode = $derived.by(() => screen?.mode === 'create')
 
-  const localDirty = $derived.by(() => {
+  const localPresentation = $derived.by(() => {
     if (!screen) {
-      return false
+      return null
     }
 
-    return isPresetEditorStateDirty(createPresetEditorState(screen.draft), editorState)
+    const localDirty = isPresetEditorLocalDirty(editorState, screen.draft)
+
+    // Local presentation mirrors current editor input for title/dirty/preview only.
+    return createPresetEditorLocalPresentation(
+      editorState,
+      screen.draft,
+      screen.resolved,
+      screen.mode,
+      localDirty,
+    )
   })
 
   const editorControlsDisabled = $derived.by(() => Boolean(loading || pendingActionId))
-
-  const screenTitle = $derived.by(() => {
-    if (!screen) {
-      return 'Preset Detail'
-    }
-
-    const localName = editorState.name.trim()
-    if (localName) {
-      return localName
-    }
-
-    const draftName = screen.draft.name.trim()
-    if (draftName) {
-      return draftName
-    }
-
-    return isCreateMode ? 'New Preset' : 'Preset Detail'
-  })
-
-  const deckCardItems = $derived.by(() => (screen ? screen.resolved.deckItems.map(toEntityItem) : []))
-  const passiveItems = $derived.by(() => (screen ? screen.resolved.passiveItems.map(toEntityItem) : []))
   const saveAction = $derived.by(() => (screen ? findPresetEditorAction(screen, 'presetEditor.save') : null))
   const createAction = $derived.by(() => (screen ? findPresetEditorAction(screen, 'presetEditor.create') : null))
   const cloneAction = $derived.by(() => (screen ? findPresetEditorAction(screen, 'presetEditor.clone') : null))
@@ -476,11 +472,11 @@
         </a>
       </div>
     </SectionFrame>
-  {:else if screen}
+  {:else if screen && localPresentation}
     <form class="preset-editor-page" onsubmit={handlePrimarySubmit}>
       <SectionFrame
         eyebrow={isCreateMode ? 'New Preset' : 'Selected Preset'}
-        title={screenTitle}
+        title={localPresentation.title}
         description={isCreateMode
           ? 'Create a new preset from the current local draft.'
           : 'The editor renders the current preset screen model and keeps only local input state in the browser.'}
@@ -491,20 +487,28 @@
 
         <div class="preset-editor-page__hero">
           <div class="preset-editor-page__hero-copy">
-            <p>{screen.resolved.characterLabel}</p>
+            <p>{localPresentation.character.label}</p>
             <h3>
-              {screen.resolved.deckItems.length} deck cards, {screen.resolved.passiveItems.length} passives, EX {screen.resolved.exLabel}
+              {localPresentation.deckCount} deck cards, {localPresentation.passiveCount} passives, EX {localPresentation.ex.label}
             </h3>
+            <span>{localPresentation.summary}</span>
           </div>
 
           <div class="preset-editor-page__hero-tags">
-            {#each screen.resolved.characterTags as tag}
-              <TagChip label={tag.label} tone={tag.tone as 'accent' | 'muted' | 'success' | 'warning'} />
+            {#each localPresentation.character.tags as tag}
+              <TagChip label={tag.label} tone={tag.tone} />
             {/each}
-            {#each screen.resolved.exTags as tag}
-              <TagChip label={tag.label} tone={tag.tone as 'accent' | 'muted' | 'success' | 'warning'} />
+            {#each localPresentation.ex.tags as tag}
+              <TagChip label={tag.label} tone={tag.tone} />
             {/each}
-            <TagChip label={localDirty ? 'Draft Changed' : screen.derived.dirty ? 'Draft Changed' : 'Draft Synced'} tone={localDirty ? 'warning' : screen.derived.dirty ? 'warning' : 'success'} />
+            <TagChip
+              label={localPresentation.dirty ? 'Draft Changed' : 'Draft Synced'}
+              tone={localPresentation.dirty ? 'warning' : 'success'}
+            />
+            <TagChip
+              label={localPresentation.previewNeedsResolveRefresh ? 'Preview Pending Refresh' : 'Preview Synced'}
+              tone={localPresentation.previewNeedsResolveRefresh ? 'warning' : 'success'}
+            />
           </div>
         </div>
 
@@ -593,21 +597,21 @@
       <div class="preset-editor-page__grid">
         <SectionFrame
           title="Deck card preview"
-          description="The preview panel renders the last resolved deck items from the preset editor screen model."
+          description="The preview reflects the current local draft and reuses the latest resolved screen metadata when ids still match."
         >
           <EntityListPane
-            items={deckCardItems}
-            emptyMessage="No deck card ids are currently present in the screen model."
+            items={localPresentation.deckItems}
+            emptyMessage="No deck card ids are currently present in the local draft."
           />
         </SectionFrame>
 
         <SectionFrame
           title="Passive preview"
-          description="The preview panel renders the last resolved passive items from the preset editor screen model."
+          description="The preview reflects the current local draft and reuses the latest resolved screen metadata when ids still match."
         >
           <EntityListPane
-            items={passiveItems}
-            emptyMessage="No passive ids are currently present in the screen model."
+            items={localPresentation.passiveItems}
+            emptyMessage="No passive ids are currently present in the local draft."
           />
         </SectionFrame>
       </div>
@@ -615,21 +619,21 @@
       <div class="preset-editor-page__grid">
         <SectionFrame
           title="Character reference"
-          description="The current character preview is resolved on the server and rendered as-is."
+          description="The reference follows the current local character selection and falls back to the latest resolved server snapshot."
         >
           <div class="preset-editor-page__copy">
-            <p><strong>{screen.resolved.characterLabel}</strong></p>
-            <p>{screen.resolved.characterSubtitle}</p>
+            <p><strong>{localPresentation.character.label}</strong></p>
+            <p>{localPresentation.character.subtitle}</p>
           </div>
         </SectionFrame>
 
         <SectionFrame
           title="EX card reference"
-          description="The current EX preview is resolved on the server and rendered as-is."
+          description="The reference follows the current local EX selection and falls back to the latest resolved server snapshot."
         >
           <div class="preset-editor-page__copy">
-            <p><strong>{screen.resolved.exLabel}</strong></p>
-            <p>{screen.resolved.exSubtitle}</p>
+            <p><strong>{localPresentation.ex.label}</strong></p>
+            <p>{localPresentation.ex.subtitle}</p>
           </div>
         </SectionFrame>
       </div>
@@ -688,11 +692,15 @@
 
         <div class="preset-editor-page__status">
           <p>
-            {localDirty
+            {localPresentation.dirty
               ? 'Local changes are pending on top of the last loaded preset screen.'
               : 'Local draft matches the last loaded preset screen.'}
           </p>
-          <p>Resolved preview and timestamp metadata remain sourced from the latest screen response.</p>
+          <p>
+            {localPresentation.previewNeedsResolveRefresh
+              ? 'Changed ids are reflected immediately in the local preview. Save, create, or clone to refresh server-resolved metadata for those ids.'
+              : 'Local preview is aligned with the latest resolved screen snapshot.'}
+          </p>
           <p>Character, deck card ids, EX card id, and passive ids are normalized when an action is invoked.</p>
         </div>
 
@@ -762,6 +770,7 @@
 
   .preset-editor-page__hero-copy p,
   .preset-editor-page__hero-copy h3,
+  .preset-editor-page__hero-copy span,
   .preset-editor-page__copy p,
   .preset-editor-page__status p {
     margin: 0;
@@ -778,6 +787,11 @@
     font-family: var(--font-display);
     font-size: clamp(1.8rem, 2.6vw, 2.4rem);
     line-height: 1.1;
+  }
+
+  .preset-editor-page__hero-copy span {
+    color: var(--color-text-soft);
+    line-height: 1.6;
   }
 
   .preset-editor-page__hero-tags {

@@ -3,6 +3,11 @@ package com.example.dueltower.screen.dto;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+/**
+ * Screen model for PresetEditor.
+ * The server owns draft serialization, resolved preview metadata, derived labels,
+ * and mode-specific actions so the frontend can stay in render + local input mode.
+ */
 public class PresetEditorScreenResponse extends ScreenResponseBase {
     private final Long presetId;
     private final String mode;

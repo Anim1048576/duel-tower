@@ -1,13 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { DeckType, DeckValidationResponse } from '../lib/api/deckTypes'
-  import { getScreen, invokeScreenAction } from '../lib/api/screens'
+  import { getScreen } from '../lib/api/screens'
   import {
-    buildScreenActionPayload,
+    invokeEditorEntityActionAndRefresh,
+    invokeEditorScreenAction,
+  } from '../lib/api/editorScreenActions'
+  import {
     findDeckEditorAction,
+    type DeckEditorActionPayload,
     type DeckEditorActionId,
     type DeckEditorActionResponseById,
     type DeckEditorLocalValidationState,
+    type DeckEditorScreenAction,
     type DeckEditorScreenResponse,
     type DeckEditorServerValidationDto,
   } from '../lib/api/screenTypes'
@@ -268,9 +273,7 @@
       return
     }
 
-    const action = findDeckEditorAction(screen, actionId)
-
-    if (!action || !action.enabled) {
+    if (!findDeckEditorAction(screen, actionId)?.enabled) {
       return
     }
 
@@ -279,28 +282,53 @@
     actionSuccessMessage = null
 
     try {
-      const patch = buildDeckEditorActionPatch(action.id, editorState)
-      const body = action.payloadTemplate ? buildScreenActionPayload(action, patch) : undefined
-
       if (actionId === 'deckEditor.validate') {
-        const response = await invokeScreenAction<
+        const result = await invokeEditorScreenAction<
           DeckEditorScreenResponse,
+          DeckEditorScreenAction,
+          DeckEditorActionId,
+          DeckEditorState,
+          DeckEditorActionPayload,
           DeckEditorActionResponseById['deckEditor.validate']
-        >(action, body === undefined ? undefined : { body })
+        >({
+          screen,
+          actionId,
+          editorState,
+          findAction: findDeckEditorAction,
+          buildPatch: buildDeckEditorActionPatch,
+        })
+
+        if (!result) {
+          return
+        }
 
         screen = {
           ...screen,
-          validation: toDeckEditorServerValidation(response as DeckValidationResponse),
+          validation: toDeckEditorServerValidation(result.response as DeckValidationResponse),
         }
         actionSuccessMessage = getActionSuccessMessage(actionId)
         return
       }
 
       if (actionId === 'deckEditor.delete') {
-        await invokeScreenAction<DeckEditorScreenResponse, DeckEditorActionResponseById['deckEditor.delete']>(
-          action,
-          body === undefined ? undefined : { body },
-        )
+        const result = await invokeEditorScreenAction<
+          DeckEditorScreenResponse,
+          DeckEditorScreenAction,
+          DeckEditorActionId,
+          DeckEditorState,
+          DeckEditorActionPayload,
+          DeckEditorActionResponseById['deckEditor.delete']
+        >({
+          screen,
+          actionId,
+          editorState,
+          findAction: findDeckEditorAction,
+          buildPatch: buildDeckEditorActionPatch,
+        })
+
+        if (!result) {
+          return
+        }
 
         removeSelectionHandoff(selectionHandoffKeys.deckId)
         setDeckPageFeedback(deckListStateCopy.deletedFeedback)
@@ -308,13 +336,31 @@
         return
       }
 
-      const response = await invokeScreenAction<
+      const result = await invokeEditorEntityActionAndRefresh<
         DeckEditorScreenResponse,
-        DeckEditorActionResponseById['deckEditor.save' | 'deckEditor.create']
-      >(action, body === undefined ? undefined : { body })
-      const nextDeckId = String(response.id)
+        DeckEditorScreenAction,
+        DeckEditorActionId,
+        DeckEditorState,
+        DeckEditorActionPayload,
+        DeckEditorActionResponseById['deckEditor.save' | 'deckEditor.create'],
+        string
+      >({
+        screen,
+        actionId,
+        editorState,
+        findAction: findDeckEditorAction,
+        buildPatch: buildDeckEditorActionPatch,
+        getResourceId: (response) => String(response.id),
+        refreshScreen: async (nextDeckId) => {
+          await loadDeckEditorScreen(nextDeckId)
+        },
+      })
 
-      await loadDeckEditorScreen(nextDeckId)
+      if (!result) {
+        return
+      }
+
+      const nextDeckId = result.resourceId
       actionSuccessMessage = getActionSuccessMessage(actionId)
 
       if (actionId === 'deckEditor.create') {

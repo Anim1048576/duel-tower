@@ -13,6 +13,11 @@ import java.util.List;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @Service
+/**
+ * PresetEditor Screen API assembler.
+ * The backend owns preview resolution and screen-shape assembly so the frontend
+ * only keeps local input state and presentation helpers.
+ */
 public class PresetEditorScreenService {
 
     private static final List<String> PRESET_EDITOR_NOTICE = List.of(
