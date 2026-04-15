@@ -1,5 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import {
+    buildCommandRequirementViewModel,
+    getPlayCardRequirementError,
+  } from '../features/session/combat/commandRequirements'
+  import {
+    normalizePlaySpec,
+  } from '../features/session/combat/playSpec'
   import { getCard, listCards } from '../lib/api/content'
   import type { CardDefinition, CardDetailResponse } from '../lib/api/contentTypes'
   import {
@@ -68,58 +75,6 @@
   import { sessionPageStateCopy } from '../lib/session/pageState'
   import { readRequestedSessionCodeFromAccessOrHandoff, readSessionCodeFromRoute } from '../lib/session/sessionRoute'
   import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
-
-  type CombatPlayTargetType =
-    | 'NONE'
-    | 'SELF'
-    | 'ALLY_ONE'
-    | 'ALLY_ALL'
-    | 'ALLY_SIDE'
-    | 'ENEMY_ONE'
-    | 'ENEMY_ALL'
-    | 'ENEMY_SIDE'
-    | 'ANY_ONE'
-    | string
-
-  type CombatPlayTargetSpec = {
-    target: CombatPlayTargetType
-    requiredSelection: boolean
-  }
-
-  type CombatChoiceOption = {
-    id: string
-    label: string
-    description: string | null
-  }
-
-  type CombatExtraPlayRequirement =
-    | {
-        type: 'discard_from_hand'
-        count: number
-        excludeSourceCard: boolean
-        filter: string
-      }
-    | {
-        type: 'select_field_cards'
-        minSelections: number
-        maxSelections: number
-        scope: string
-        filter: string
-        excludeSourceCard: boolean
-      }
-    | {
-        type: 'choice'
-        id: string
-        label: string
-        minSelections: number
-        maxSelections: number
-        options: CombatChoiceOption[]
-      }
-
-  type CombatResolvedPlaySpec = {
-    target: CombatPlayTargetSpec
-    extraRequirements: CombatExtraPlayRequirement[]
-  }
 
   const combatSidebarEventLimit = 12
 
@@ -395,103 +350,6 @@
     }
   }
 
-  function asRecord(value: unknown) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return null
-    }
-
-    return value as Record<string, unknown>
-  }
-
-  function readString(value: unknown) {
-    return typeof value === 'string' ? value.trim() : ''
-  }
-
-  function readBoolean(value: unknown, fallback = false) {
-    return typeof value === 'boolean' ? value : fallback
-  }
-
-  function readInteger(value: unknown, fallback = 0) {
-    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback
-  }
-
-  function normalizePlaySpec(playSpec: unknown): CombatResolvedPlaySpec {
-    const playSpecRecord = asRecord(playSpec)
-    const targetRecord = asRecord(playSpecRecord?.target)
-    const target = readString(targetRecord?.target) || 'NONE'
-    const requiredSelection = readBoolean(targetRecord?.requiredSelection)
-    const extraRequirementValues = Array.isArray(playSpecRecord?.extraRequirements)
-      ? playSpecRecord.extraRequirements
-      : []
-
-    const extraRequirements = extraRequirementValues
-      .map((value) => {
-        const record = asRecord(value)
-        const type = readString(record?.type)
-
-        if (type === 'discard_from_hand') {
-          return {
-            type,
-            count: readInteger(record?.count, 1),
-            excludeSourceCard: readBoolean(record?.excludeSourceCard, true),
-            filter: readString(record?.filter) || 'ANY',
-          } satisfies CombatExtraPlayRequirement
-        }
-
-        if (type === 'select_field_cards') {
-          return {
-            type,
-            minSelections: readInteger(record?.minSelections),
-            maxSelections: readInteger(record?.maxSelections),
-            scope: readString(record?.scope) || 'ALL_PLAYER_FIELDS',
-            filter: readString(record?.filter) || 'INSTALLED_ONLY',
-            excludeSourceCard: readBoolean(record?.excludeSourceCard),
-          } satisfies CombatExtraPlayRequirement
-        }
-
-        if (type === 'choice') {
-          const options = Array.isArray(record?.options)
-            ? record.options
-                .map((optionValue) => {
-                  const optionRecord = asRecord(optionValue)
-                  const id = readString(optionRecord?.id)
-
-                  if (!id) {
-                    return null
-                  }
-
-                  return {
-                    id,
-                    label: readString(optionRecord?.label) || id,
-                    description: readString(optionRecord?.description) || null,
-                  } satisfies CombatChoiceOption
-                })
-                .filter((option): option is CombatChoiceOption => option !== null)
-            : []
-
-          return {
-            type,
-            id: readString(record?.id) || 'choice',
-            label: readString(record?.label) || 'Choice input',
-            minSelections: readInteger(record?.minSelections),
-            maxSelections: readInteger(record?.maxSelections),
-            options,
-          } satisfies CombatExtraPlayRequirement
-        }
-
-        return null
-      })
-      .filter((requirement): requirement is CombatExtraPlayRequirement => requirement !== null)
-
-    return {
-      target: {
-        target,
-        requiredSelection,
-      },
-      extraRequirements,
-    } satisfies CombatResolvedPlaySpec
-  }
-
   function getCardDefIdFromInstanceId(instanceId: string | null | undefined) {
     const normalizedId = instanceId?.trim() ?? ''
 
@@ -536,157 +394,6 @@
     }
 
     return 'Unknown target'
-  }
-
-  function describeTargetRequirement(targetSpec: CombatPlayTargetSpec) {
-    if (!targetSpec.requiredSelection || targetSpec.target === 'NONE') {
-      return 'No manual target required'
-    }
-
-    switch (targetSpec.target) {
-      case 'ENEMY_ONE':
-        return 'Select exactly one enemy or summon target'
-      case 'ALLY_ONE':
-        return 'Select exactly one ally player or summon target'
-      case 'ANY_ONE':
-        return 'Select exactly one target'
-      case 'SELF':
-        return 'Self-targeted automatically'
-      case 'ENEMY_ALL':
-      case 'ENEMY_SIDE':
-        return 'Enemy-side target is resolved automatically'
-      case 'ALLY_ALL':
-      case 'ALLY_SIDE':
-        return 'Ally-side target is resolved automatically'
-      default:
-        return `Target rule: ${targetSpec.target}`
-    }
-  }
-
-  function getPlaySpecRequirement(
-    playSpec: CombatResolvedPlaySpec,
-    type: CombatExtraPlayRequirement['type'],
-  ) {
-    return playSpec.extraRequirements.find((requirement) => requirement.type === type) ?? null
-  }
-
-  function buildCommandRequirementViewModel(
-    sourceLabel: string,
-    playSpec: CombatResolvedPlaySpec,
-  ): CombatCommandRequirementViewModel {
-    const discardRequirement = getPlaySpecRequirement(playSpec, 'discard_from_hand')
-    const fieldRequirement = getPlaySpecRequirement(playSpec, 'select_field_cards')
-    const choiceRequirement = getPlaySpecRequirement(playSpec, 'choice')
-
-    return {
-      sourceLabel,
-      targetSummary: describeTargetRequirement(playSpec.target),
-      discardSummary:
-        discardRequirement?.type === 'discard_from_hand'
-          ? `Select ${discardRequirement.count} hand discard${discardRequirement.count > 1 ? 's' : ''}${discardRequirement.excludeSourceCard ? ' excluding the source card' : ''}`
-          : 'No extra hand discard required',
-      fieldSelectionSummary:
-        fieldRequirement?.type === 'select_field_cards'
-          ? `Select ${fieldRequirement.minSelections}-${fieldRequirement.maxSelections} field card ids`
-          : 'No extra field selection required',
-      choiceSummary:
-        choiceRequirement?.type === 'choice'
-          ? `${choiceRequirement.label} (${choiceRequirement.options.map((option) => option.label).join(', ') || 'choice options'})`
-          : 'No explicit choice requirement',
-    }
-  }
-
-  function getTargetSelectionError(
-    commandLabel: string,
-    targetSpec: CombatPlayTargetSpec,
-    selectedTargets: CombatCommandDraft['selectedTargets'],
-  ) {
-    if (!targetSpec.requiredSelection || targetSpec.target === 'NONE') {
-      return null
-    }
-
-    if (targetSpec.target === 'SELF') {
-      return null
-    }
-
-    if (targetSpec.target === 'ALLY_ALL' || targetSpec.target === 'ALLY_SIDE' || targetSpec.target === 'ENEMY_ALL' || targetSpec.target === 'ENEMY_SIDE') {
-      return null
-    }
-
-    if (selectedTargets.length !== 1) {
-      return `${commandLabel} requires exactly one target selection.`
-    }
-
-    const [target] = selectedTargets
-
-    switch (targetSpec.target) {
-      case 'ENEMY_ONE':
-        return target.enemyId || target.summonInstanceId
-          ? null
-          : `${commandLabel} requires one enemy or summon target.`
-      case 'ALLY_ONE':
-        return target.playerId || target.summonInstanceId
-          ? null
-          : `${commandLabel} requires one ally player or summon target.`
-      case 'ANY_ONE':
-        return target.enemyId || target.playerId || target.summonInstanceId
-          ? null
-          : `${commandLabel} requires one target.`
-      default:
-        return selectedTargets.length > 0 ? null : `${commandLabel} requires a target selection.`
-    }
-  }
-
-  function getPlayCardRequirementError(
-    commandLabel: string,
-    playSpec: CombatResolvedPlaySpec | null,
-    sourceCardId: string,
-    selectedTargets: CombatCommandDraft['selectedTargets'],
-    selectedDiscardIds: string[],
-    selectedFieldIds: string[],
-  ) {
-    if (!playSpec) {
-      return null
-    }
-
-    const targetError = getTargetSelectionError(commandLabel, playSpec.target, selectedTargets)
-
-    if (targetError) {
-      return targetError
-    }
-
-    const discardRequirement = getPlaySpecRequirement(playSpec, 'discard_from_hand')
-
-    if (discardRequirement?.type === 'discard_from_hand') {
-      if (selectedDiscardIds.length !== discardRequirement.count) {
-        return `${commandLabel} requires ${discardRequirement.count} hand discard selection${discardRequirement.count > 1 ? 's' : ''}.`
-      }
-
-      if (discardRequirement.excludeSourceCard && selectedDiscardIds.includes(sourceCardId)) {
-        return 'The source card cannot be selected as an extra discard.'
-      }
-    }
-
-    const fieldRequirement = getPlaySpecRequirement(playSpec, 'select_field_cards')
-
-    if (fieldRequirement?.type === 'select_field_cards') {
-      if (
-        selectedFieldIds.length < fieldRequirement.minSelections ||
-        selectedFieldIds.length > fieldRequirement.maxSelections
-      ) {
-        return `${commandLabel} requires ${fieldRequirement.minSelections}-${fieldRequirement.maxSelections} selected field ids.`
-      }
-
-      if (fieldRequirement.excludeSourceCard && selectedFieldIds.includes(sourceCardId)) {
-        return 'The source card cannot be selected as a field helper id.'
-      }
-    }
-
-    if (getPlaySpecRequirement(playSpec, 'choice')) {
-      return `${commandLabel} has a choice-based follow-up that is not wired in this combat step yet.`
-    }
-
-    return null
   }
 
   function handleClearSelectedTargets() {
