@@ -132,9 +132,10 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(newEditorBody.path("validation").path("valid").asBoolean()).isFalse();
         assertThat(newEditorBody.path("validation").path("normalizedTotalCards").asInt()).isEqualTo(0);
         assertThat(newEditorBody.path("validation").path("issues")).isNotEmpty();
-        assertThat(newEditorBody.path("validation").path("isStale").asBoolean()).isFalse();
+        assertThat(newEditorBody.path("validation").path("isStale").isMissingNode()).isTrue();
         assertThat(newEditorBody.path("validation").path("validatedDraftSignature").asText())
                 .isEqualTo("type=PLAYER;cards=");
+        assertThat(newEditorBody.path("validation").path("validatedAt").asText()).isNotBlank();
 
         JsonNode createAction = findAction(newEditorBody, "deckEditor.create");
         assertThat(newEditorBody.path("possibleActions")).hasSize(1);
@@ -178,7 +179,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(editorBody.path("validation").path("valid").asBoolean()).isTrue();
         assertThat(editorBody.path("validation").path("normalizedTotalCards").asInt()).isEqualTo(12);
         assertThat(editorBody.path("validation").path("issues")).hasSize(0);
-        assertThat(editorBody.path("validation").path("isStale").asBoolean()).isFalse();
+        assertThat(editorBody.path("validation").path("isStale").isMissingNode()).isTrue();
         String expectedValidatedSignature = "type=%s;cards=%s".formatted(
                 editorBody.path("draft").path("type").asText(),
                 StreamSupport.stream(editorBody.path("draft").path("cards").spliterator(), false)
@@ -188,6 +189,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         );
         assertThat(editorBody.path("validation").path("validatedDraftSignature").asText())
                 .isEqualTo(expectedValidatedSignature);
+        assertThat(editorBody.path("validation").path("validatedAt").asText()).isNotBlank();
 
         JsonNode validateAction = findAction(editorBody, "deckEditor.validate");
         JsonNode saveAction = findAction(editorBody, "deckEditor.save");

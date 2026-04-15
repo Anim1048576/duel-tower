@@ -745,5 +745,12 @@ gantt
 
 외부 참고(패턴 근거)
 
-- entity["company","Microsoft","technology company"] Azure Architecture Center: Backends for Frontends(BFF) pattern. citeturn1search10  
+- entity["company","Microsoft","technology company"] Azure Architecture Center: Backends for Frontends(BFF) pattern. citeturn1search10 
 - entity["company","Amazon Web Services","cloud provider"] Prescriptive Guidance: micro-frontends에서의 BFF 역할(aggregation/transform/authorization). citeturn1search9
+
+### DeckEditor Validation Boundary Note
+
+- 서버 `validation` DTO는 "마지막으로 검증된 draft snapshot"만 표현한다.
+- `validatedDraftSignature`는 검증 대상 draft의 deck type + ordered card entries + count를 요약한 식별자다.
+- 프론트 stale 표시는 현재 로컬 editor draft와 `validatedDraftSignature` 비교 결과다.
+- 이 stale 계산은 편집기 표현 상태를 위한 것이며, 게임 규칙 validation 자체를 프론트로 되돌리는 것이 아니다.

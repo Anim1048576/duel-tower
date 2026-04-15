@@ -7,8 +7,9 @@
     findDeckEditorAction,
     type DeckEditorActionId,
     type DeckEditorActionResponseById,
+    type DeckEditorLocalValidationState,
     type DeckEditorScreenResponse,
-    type DeckEditorValidationDto,
+    type DeckEditorServerValidationDto,
   } from '../lib/api/screenTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
@@ -33,7 +34,7 @@
   } from '../lib/decks/presentationState.js'
   import {
     createDeckEditorDraftSignature,
-    isDeckEditorValidationStale,
+    isDeckEditorValidationLocallyStale,
   } from '../lib/decks/validationFreshness.js'
   import {
     deckEditorStateCopy,
@@ -235,13 +236,17 @@
     }
   }
 
-  function toDeckEditorValidation(response: DeckValidationResponse): DeckEditorValidationDto {
+  function toDeckEditorServerValidation(
+    response: DeckValidationResponse,
+  ): DeckEditorServerValidationDto {
     return {
       valid: response.valid,
       normalizedTotalCards: response.normalizedTotalCards,
       issues: response.issues,
-      isStale: false,
+      // validate action currently returns domain validation only, so the page
+      // reattaches the local draft signature to keep the validation snapshot coherent.
       validatedDraftSignature: createDeckEditorDraftSignature(editorState),
+      validatedAt: new Date().toISOString(),
     }
   }
 
@@ -285,7 +290,7 @@
 
         screen = {
           ...screen,
-          validation: toDeckEditorValidation(response as DeckValidationResponse),
+          validation: toDeckEditorServerValidation(response as DeckValidationResponse),
         }
         actionSuccessMessage = getActionSuccessMessage(actionId)
         return
@@ -371,17 +376,28 @@
     return selectedIndex >= 0 ? selectedIndex + 1 : editorState.cards.length ? 1 : 0
   })
 
-  const validationState = $derived.by(() => {
+  // Server snapshot: the last validated draft and its validation result.
+  const serverValidation = $derived.by(() => {
+    if (!screen) {
+      return null
+    }
+
+    return screen.validation
+  })
+
+  // Frontend freshness: compare the current local draft against the last validated draft.
+  const localValidationState = $derived.by((): DeckEditorLocalValidationState | null => {
     if (!screen) {
       return null
     }
 
     return {
       ...screen.validation,
-      isStale: isDeckEditorValidationStale(editorState, screen.validation),
+      isLocallyStale: isDeckEditorValidationLocallyStale(editorState, screen.validation),
     }
   })
 
+  // Local presentation mirrors current editor input for summary/dirty display only.
   const localPresentation = $derived.by(() => {
     if (!screen) {
       return null
@@ -498,7 +514,8 @@
 
     <DeckEditorControlsPanel
       {screen}
-      {validationState}
+      {serverValidation}
+      {localValidationState}
       {localPresentation}
       {pendingActionId}
       {deleteConfirmOpen}

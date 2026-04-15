@@ -5,9 +5,10 @@
   import TagChip from '../../components/TagChip.svelte'
   import type {
     DeckEditorActionId,
+    DeckEditorLocalValidationState,
     DeckEditorScreenAction,
     DeckEditorScreenResponse,
-    DeckEditorValidationDto,
+    DeckEditorServerValidationDto,
   } from '../../api/screenTypes'
   import { pathBuilders } from '../../navigation'
 
@@ -18,7 +19,8 @@
 
   let {
     screen,
-    validationState,
+    serverValidation,
+    localValidationState,
     localPresentation,
     pendingActionId,
     deleteConfirmOpen,
@@ -33,7 +35,8 @@
     onCancelDeleteConfirmation,
   }: {
     screen: DeckEditorScreenResponse
-    validationState: DeckEditorValidationDto | null
+    serverValidation: DeckEditorServerValidationDto | null
+    localValidationState: DeckEditorLocalValidationState | null
     localPresentation: LocalPresentation | null
     pendingActionId: DeckEditorActionId | null
     deleteConfirmOpen: boolean
@@ -134,8 +137,9 @@
   <div class="controls-panel__status">
     <p>Current draft title: {localPresentation?.title ?? screen.derived.title}</p>
     <p>Current local dirty flag: {localPresentation?.dirty ? 'Changed' : 'Synced'}</p>
-    <p>Current validation state: {validationState?.valid ? 'Valid' : 'Invalid'}</p>
-    <p>Validation issues and action metadata remain sourced from the latest server response.</p>
+    <p>Current validation state: {serverValidation?.valid ? 'Valid' : 'Invalid'}</p>
+    <p>Validation issues come from the latest server validation snapshot.</p>
+    <p>Local freshness is derived in the editor from the current draft and validated signature.</p>
     {#if getDisabledReason(validateAction)}
       <p>{getDisabledReason(validateAction)}</p>
     {/if}
@@ -185,16 +189,16 @@
     <div class="controls-panel__validation-header">
       <div class="controls-panel__validation-copy">
         <p>Validation result</p>
-        <h3>{validationState?.valid ? 'Deck draft is valid' : 'Deck draft has validation issues'}</h3>
+        <h3>{serverValidation?.valid ? 'Deck draft is valid' : 'Deck draft has validation issues'}</h3>
       </div>
 
       <div class="controls-panel__hero-tags">
         <TagChip
-          label={validationState?.valid ? 'Valid' : 'Invalid'}
-          tone={validationState?.valid ? 'success' : 'warning'}
+          label={serverValidation?.valid ? 'Valid' : 'Invalid'}
+          tone={serverValidation?.valid ? 'success' : 'warning'}
         />
-        <TagChip label={`Normalized ${validationState?.normalizedTotalCards ?? 0}`} tone="accent" />
-        {#if validationState?.isStale}
+        <TagChip label={`Normalized ${serverValidation?.normalizedTotalCards ?? 0}`} tone="accent" />
+        {#if localValidationState?.isLocallyStale}
           <TagChip label="Stale" tone="muted" />
         {/if}
       </div>
@@ -202,29 +206,29 @@
 
     <div class="controls-panel__stats controls-panel__stats--compact">
       <StatBlock
-        value={validationState?.valid ? 'Valid' : 'Invalid'}
+        value={serverValidation?.valid ? 'Valid' : 'Invalid'}
         label="Draft state"
-        note={validationState?.isStale
+        note={localValidationState?.isLocallyStale
           ? 'The current local draft differs from the last validated draft'
           : 'Validation matches the current local draft'}
       />
       <StatBlock
-        value={validationState?.normalizedTotalCards ?? 0}
+        value={serverValidation?.normalizedTotalCards ?? 0}
         label="Normalized cards"
         note="Total cards reported by server-side validation"
       />
       <StatBlock
-        value={validationState?.issues.length ?? 0}
+        value={serverValidation?.issues.length ?? 0}
         label="Issues"
-        note={(validationState?.issues.length ?? 0)
+        note={(serverValidation?.issues.length ?? 0)
           ? 'Server-reported validation issues'
           : 'No validation issues were returned'}
       />
     </div>
 
-    {#if (validationState?.issues.length ?? 0)}
+    {#if (serverValidation?.issues.length ?? 0)}
       <ul class="controls-panel__validation-list">
-        {#each validationState?.issues ?? [] as issue}
+        {#each serverValidation?.issues ?? [] as issue}
           <li>
             <p>{issue.message}</p>
             <span>{issue.field ? `${issue.field} | ${issue.code}` : issue.code}</span>

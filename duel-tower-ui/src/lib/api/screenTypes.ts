@@ -74,12 +74,26 @@ export type DeckEditorDerivedDto = {
   dirty: boolean
 }
 
-export type DeckEditorValidationDto = {
+/**
+ * Server-side validation snapshot for the last validated deck draft.
+ * This does not encode whether the current local editor state is stale.
+ * validatedDraftSignature is the server's identifier for the exact draft that was validated.
+ */
+export type DeckEditorServerValidationDto = {
   valid: boolean
   normalizedTotalCards: number
   issues: DeckValidationIssue[]
-  isStale: boolean
   validatedDraftSignature: string
+  validatedAt: string
+}
+
+/**
+ * Frontend-only validation view state.
+ * Local freshness is computed from the current editor state vs validatedDraftSignature.
+ * This is editor UX state, not a game-rule calculation.
+ */
+export type DeckEditorLocalValidationState = DeckEditorServerValidationDto & {
+  isLocallyStale: boolean
 }
 
 export type ScreenActionDto<TPayloadTemplate = ScreenActionPayloadTemplate> = {
@@ -112,7 +126,7 @@ export type DeckEditorScreenResponse = ScreenResponseBase<DeckEditorScreenAction
   auth: string
   draft: DeckEditorDraftDto
   derived: DeckEditorDerivedDto
-  validation: DeckEditorValidationDto
+  validation: DeckEditorServerValidationDto
 }
 
 export type DeckEditorActionResponseById = {

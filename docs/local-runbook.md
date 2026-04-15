@@ -105,3 +105,28 @@ Gameplay/API failures are being normalized onto a small shared shape for the mai
 ```
 
 Current high-value coverage: session deck edits, forgetting restrictions, and session command rejections such as pending-decision/search-pick validation. Legacy string/message fallbacks still remain available in the frontend for older endpoints.
+
+## Frontend Test Entry Points
+
+Run these commands from `duel-tower-ui/`.
+
+```bash
+npm test
+npm run check
+npm run build
+```
+
+- `npm test`: runs frontend tests in `tests/**/*.test.js`
+- `npm run test:unit`: same test set as `npm test`
+- `npm run test:watch`: watch mode for local iteration
+- `npm run check`: Svelte and TypeScript validation
+- `npm run build`: production build verification
+
+For DeckEditor changes, the recommended frontend verification flow is:
+
+```bash
+cd duel-tower-ui
+npm test
+npm run check
+npm run build
+```

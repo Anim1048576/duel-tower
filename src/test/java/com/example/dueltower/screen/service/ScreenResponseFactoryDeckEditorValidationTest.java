@@ -16,7 +16,7 @@ class ScreenResponseFactoryDeckEditorValidationTest {
     private final ScreenResponseFactory factory = new ScreenResponseFactory();
 
     @Test
-    void deckEditorValidationIsFreshImmediatelyAfterValidation() {
+    void deckEditorValidationCarriesValidatedDraftSnapshotMetadata() {
         DeckEditorDraftDto draft = draft(
                 DeckType.PLAYER,
                 new DeckEditorDraftCardDto("deck-card-1", "C001", 2, 1)
@@ -24,12 +24,12 @@ class ScreenResponseFactoryDeckEditorValidationTest {
 
         var validation = factory.deckEditorValidation(new DeckValidationResponse(true, List.of(), 2), draft);
 
-        assertThat(validation.isStale()).isFalse();
         assertThat(validation.validatedDraftSignature()).isEqualTo("type=PLAYER;cards=C001:2");
+        assertThat(validation.validatedAt()).isNotNull();
     }
 
     @Test
-    void validatedDraftSignatureChangesWhenCardCountChanges() {
+    void validatedDraftSignatureChangesWhenValidatedDraftCountChanges() {
         var before = factory.deckEditorValidation(
                 new DeckValidationResponse(true, List.of(), 2),
                 draft(DeckType.PLAYER, new DeckEditorDraftCardDto("deck-card-1", "C001", 2, 1))
@@ -43,7 +43,7 @@ class ScreenResponseFactoryDeckEditorValidationTest {
     }
 
     @Test
-    void validatedDraftSignatureChangesWhenCardOrderChanges() {
+    void validatedDraftSignatureChangesWhenValidatedDraftOrderChanges() {
         var ordered = factory.deckEditorValidation(
                 new DeckValidationResponse(true, List.of(), 2),
                 draft(
@@ -65,7 +65,7 @@ class ScreenResponseFactoryDeckEditorValidationTest {
     }
 
     @Test
-    void validatedDraftSignatureChangesWhenDeckTypeChanges() {
+    void validatedDraftSignatureChangesWhenValidatedDraftTypeChanges() {
         var player = factory.deckEditorValidation(
                 new DeckValidationResponse(true, List.of(), 1),
                 draft(DeckType.PLAYER, new DeckEditorDraftCardDto("deck-card-1", "C001", 1, 1))

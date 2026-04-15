@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   createDeckEditorDraftSignature,
-  isDeckEditorValidationStale,
+  isDeckEditorValidationLocallyStale,
 } from '../src/lib/decks/validationFreshness.js'
 
 function runTest(name, fn) {
@@ -14,7 +14,7 @@ function runTest(name, fn) {
   }
 }
 
-runTest('validate 직후 stale=false', () => {
+runTest('local freshness is false immediately after validating the same draft', () => {
   const state = {
     name: 'Starter',
     type: 'PLAYER',
@@ -28,14 +28,14 @@ runTest('validate 직후 stale=false', () => {
     valid: true,
     normalizedTotalCards: 3,
     issues: [],
-    isStale: false,
     validatedDraftSignature: createDeckEditorDraftSignature(state),
+    validatedAt: '2026-04-15T00:00:00Z',
   }
 
-  assert.equal(isDeckEditorValidationStale(state, validation), false)
+  assert.equal(isDeckEditorValidationLocallyStale(state, validation), false)
 })
 
-runTest('validation 이후 카드 수 변경 stale=true', () => {
+runTest('local freshness becomes true after a validated draft changes count', () => {
   const validatedState = {
     type: 'PLAYER',
     cards: [{ key: 'deck-card-1', cardId: 'C001', count: 2 }],
@@ -47,14 +47,14 @@ runTest('validation 이후 카드 수 변경 stale=true', () => {
   }
 
   assert.equal(
-    isDeckEditorValidationStale(currentState, {
+    isDeckEditorValidationLocallyStale(currentState, {
       validatedDraftSignature: createDeckEditorDraftSignature(validatedState),
     }),
     true,
   )
 })
 
-runTest('validation 이후 카드 순서 변경 stale=true', () => {
+runTest('local freshness becomes true after a validated draft changes order', () => {
   const validatedState = {
     type: 'PLAYER',
     cards: [
@@ -72,14 +72,14 @@ runTest('validation 이후 카드 순서 변경 stale=true', () => {
   }
 
   assert.equal(
-    isDeckEditorValidationStale(reorderedState, {
+    isDeckEditorValidationLocallyStale(reorderedState, {
       validatedDraftSignature: createDeckEditorDraftSignature(validatedState),
     }),
     true,
   )
 })
 
-runTest('deck type도 signature에 포함', () => {
+runTest('validated draft signature includes deck type', () => {
   const playerSignature = createDeckEditorDraftSignature({
     type: 'PLAYER',
     cards: [{ cardId: 'C001', count: 1 }],

@@ -8,6 +8,12 @@ function normalizeDeckName(name) {
   return typeof name === 'string' ? name.trim() : ''
 }
 
+/**
+ * DeckEditor local presentation helpers intentionally stay in the editor-UX layer.
+ * They mirror the current local draft for summaries and dirty markers without
+ * recreating server-side deck validation or action-enable rules.
+ */
+
 /** @param {Pick<DeckEditorState, 'cards'>} state */
 export function getDeckEditorLocalTotalCards(state) {
   return (state.cards ?? []).reduce((total, card) => total + (Number.isFinite(card.count) ? Math.max(1, Math.floor(card.count)) : 1), 0)

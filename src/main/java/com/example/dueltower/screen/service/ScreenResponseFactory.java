@@ -96,8 +96,8 @@ public class ScreenResponseFactory {
                 validationResponse.valid(),
                 validationResponse.normalizedTotalCards(),
                 validationResponse.issues(),
-                false,
-                validatedSignature
+                validatedSignature,
+                OffsetDateTime.now()
         );
     }
 
