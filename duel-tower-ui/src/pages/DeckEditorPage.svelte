@@ -1,26 +1,23 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { createDeck, deleteDeck, getDeck, replaceDeckCards, updateDeck, validateDeck } from '../lib/api/decks'
-  import type {
-    DeckCardDto,
-    DeckResponse,
-    DeckType,
-    DeckValidationResponse,
-  } from '../lib/api/deckTypes'
+  import type { DeckType, DeckValidationResponse } from '../lib/api/deckTypes'
+  import { getScreen, invokeScreenAction } from '../lib/api/screens'
+  import {
+    buildScreenActionPayload,
+    findScreenAction,
+    type DeckEditorScreenResponse,
+    type DeckEditorValidationDto,
+  } from '../lib/api/screenTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import EntityListPane from '../lib/components/EntityListPane.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
-  import { formatContentEnumLabel } from '../lib/content/display'
   import {
+    buildDeckEditorActionPatch,
     createDeckEditorState,
     createEmptyDeckEditorState,
-    getDeckEditorTotalCards,
-    isDeckEditorStateDirty,
-    toDeckEditorReplaceCardsRequest,
-    toDeckEditorUpdateRequest,
     type DeckEditorCardState,
     type DeckEditorState,
   } from '../lib/decks/editorModel'
@@ -46,40 +43,22 @@
     tags?: { label: string; tone?: 'accent' | 'muted' | 'success' | 'warning' }[]
   }
 
-  type DeckCardEntry = DeckCardDto & {
-    entryId: string
-    position: number
-  }
-
-  type DeckEditorMode = 'selection' | 'create' | 'edit'
+  type DeckCardTagItem = { label: string; tone?: 'accent' | 'muted' | 'success' | 'warning' }
 
   const deckTypeOptions: DeckType[] = ['PLAYER', 'ENEMY']
 
   let loading = $state(true)
-  let editorMode = $state<DeckEditorMode>('selection')
-  let deck = $state<DeckResponse | null>(null)
+  let screen = $state<DeckEditorScreenResponse | null>(null)
   let editorState = $state<DeckEditorState>(createEmptyDeckEditorState())
   let errorMessage = $state<string | null>(null)
   let notFoundId = $state<string | null>(null)
   let requestedDeckId = $state<string | null>(null)
   let selectedCardKey = $state('')
-  let requestSequence = 0
-  let creating = $state(false)
-  let createErrorMessage = $state<string | null>(null)
-  let createRequestSequence = 0
-  let deleting = $state(false)
+  let pendingActionId = $state<string | null>(null)
   let deleteConfirmOpen = $state(false)
-  let deleteErrorMessage = $state<string | null>(null)
-  let deleteRequestSequence = 0
-  let saving = $state(false)
-  let saveErrorMessage = $state<string | null>(null)
-  let saveSuccessMessage = $state<string | null>(null)
-  let saveRequestSequence = 0
-  let validating = $state(false)
-  let validationResult = $state<DeckValidationResponse | null>(null)
-  let validationErrorMessage = $state<string | null>(null)
-  let lastValidatedCardsSignature = $state<string | null>(null)
-  let validationRequestSequence = 0
+  let actionErrorMessage = $state<string | null>(null)
+  let actionSuccessMessage = $state<string | null>(null)
+  let requestSequence = 0
 
   function getDeckIdFromRoute() {
     if (typeof window === 'undefined') return null
@@ -101,13 +80,6 @@
     return match?.page.key === 'deck-editor' && !match.params.id && match.page.path === routePaths.deckEditor
   }
 
-  function createNewDeckEditorState(): DeckEditorState {
-    return {
-      ...createEmptyDeckEditorState(),
-      type: 'PLAYER',
-    }
-  }
-
   function getDeckTypeTone(type: DeckType | '' | null | undefined): 'muted' | 'success' | 'warning' {
     if (type === 'PLAYER') {
       return 'success'
@@ -120,121 +92,143 @@
     return 'muted'
   }
 
-  function buildDeckSummary(state: Pick<DeckEditorState, 'cards'>) {
-    if (!state.cards.length) {
-      return 'This deck draft currently has no card entries.'
+  function buildDeckSummary(currentScreen: DeckEditorScreenResponse) {
+    if (!currentScreen.draft.cards.length) {
+      return 'This screen currently reports no saved card entries.'
     }
 
-    const totalCards = getDeckEditorTotalCards(state)
-    const entryLabel = state.cards.length === 1 ? 'entry' : 'entries'
-    return `${totalCards} total cards are currently distributed across ${state.cards.length} draft ${entryLabel}.`
+    const entryLabel = currentScreen.draft.cards.length === 1 ? 'entry' : 'entries'
+    return `${currentScreen.derived.totalCards} total cards are currently reported across ${currentScreen.draft.cards.length} ${entryLabel}.`
   }
 
-  function buildDeckCardMeta(entry: DeckCardEntry) {
-    return `Count ${entry.count} · Entry ${entry.position}`
-  }
-
-  function buildDeckCardNote(entry: DeckCardEntry, totalEntries: number) {
-    const totalLabel = totalEntries === 1 ? 'saved entry' : 'saved entries'
-    return `Card reference ${entry.cardId} is stored as item ${entry.position} of ${totalEntries} ${totalLabel}.`
-  }
-
-  function getDeckCardMetaLabel(entry: DeckCardEntry) {
-    return `Count ${entry.count} | Entry ${entry.position}`
-  }
-
-  function getDeckCardTagItems(entry: DeckCardEntry) {
-    const countTone: 'muted' | 'success' = entry.count > 1 ? 'success' : 'muted'
-
-    return [
-      { label: `x${entry.count}`, tone: countTone },
-      { label: `Entry ${entry.position}`, tone: 'accent' as const },
-    ]
-  }
-
-  function buildDeckCardTags(entry: DeckCardEntry) {
-    return [
-      { label: `x${entry.count}`, tone: entry.count > 1 ? 'success' : 'muted' as const },
-      { label: `Entry ${entry.position}`, tone: 'accent' as const },
-    ]
-  }
-
-  function getDeckCardEntryId(card: DeckCardDto, index: number) {
-    return `${String(card.cardId)}:${index}`
-  }
-
-  function toDeckCardEntry(card: DeckCardDto, index: number): DeckCardEntry {
-    return {
-      ...card,
-      entryId: getDeckCardEntryId(card, index),
-      position: index + 1,
-    }
-  }
-
-  function toDeckCardItem(entry: DeckCardEntry, totalEntries: number): DeckCardItem {
-    return {
-      id: entry.entryId,
-      title: entry.cardId,
-      subtitle: 'Saved deck card',
-      meta: getDeckCardMetaLabel(entry),
-      note: buildDeckCardNote(entry, totalEntries),
-      tags: getDeckCardTagItems(entry),
-    }
-  }
-
-  function syncSelectedCardEntry(nextEntries: readonly DeckCardEntry[]) {
-    const nextIds = nextEntries.map((entry) => entry.entryId)
-    selectedCardKey = nextIds.includes(selectedCardKey) ? selectedCardKey : nextIds[0] ?? ''
-  }
-
-  function getDraftDeckCardMetaLabel(entry: DeckEditorCardState, position: number) {
+  function getDeckCardMetaLabel(entry: DeckEditorCardState, position: number) {
     return `Count ${entry.count} | Entry ${position}`
   }
 
-  function buildDraftDeckCardNote(entry: DeckEditorCardState, position: number, totalEntries: number) {
+  function buildDeckCardNote(entry: DeckEditorCardState, position: number, totalEntries: number) {
     const totalLabel = totalEntries === 1 ? 'draft entry' : 'draft entries'
     return `Card reference ${entry.cardId || 'N/A'} is currently tracked as item ${position} of ${totalEntries} ${totalLabel}.`
   }
 
-  function getDraftDeckCardTagItems(entry: DeckEditorCardState, position: number) {
-    const countTone: 'muted' | 'success' = entry.count > 1 ? 'success' : 'muted'
-
+  function getDeckCardTagItems(entry: DeckEditorCardState, position: number): DeckCardTagItem[] {
     return [
-      { label: `x${entry.count}`, tone: countTone },
+      { label: `x${entry.count}`, tone: entry.count > 1 ? 'success' : 'muted' as const },
       { label: `Entry ${position}`, tone: 'accent' as const },
     ]
   }
 
-  function toDraftDeckCardItem(
-    entry: DeckEditorCardState,
-    index: number,
-    totalEntries: number,
-  ): DeckCardItem {
+  function toDeckCardItem(entry: DeckEditorCardState, index: number, totalEntries: number): DeckCardItem {
     const position = index + 1
 
     return {
       id: entry.key,
       title: entry.cardId.trim() || 'Unnamed card reference',
       subtitle: 'Draft deck card',
-      meta: getDraftDeckCardMetaLabel(entry, position),
-      note: buildDraftDeckCardNote(entry, position, totalEntries),
-      tags: getDraftDeckCardTagItems(entry, position),
+      meta: getDeckCardMetaLabel(entry, position),
+      note: buildDeckCardNote(entry, position, totalEntries),
+      tags: getDeckCardTagItems(entry, position),
     }
   }
 
-  function syncDraftSelectedCard(nextCards: readonly DeckEditorCardState[]) {
+  function syncSelectedCard(nextCards: readonly DeckEditorCardState[]) {
     const nextKeys = nextCards.map((entry) => entry.key)
     selectedCardKey = nextKeys.includes(selectedCardKey) ? selectedCardKey : nextKeys[0] ?? ''
   }
 
-  function syncEditorState(response: DeckResponse) {
-    const nextState = createDeckEditorState(response)
+  function clearActionFeedback() {
+    actionErrorMessage = null
+    actionSuccessMessage = null
+  }
 
-    editorMode = 'edit'
-    deck = response
-    editorState = nextState
-    syncDraftSelectedCard(nextState.cards)
-    setSelectionHandoff(selectionHandoffKeys.deckId, String(response.id))
+  function applyScreen(nextScreen: DeckEditorScreenResponse) {
+    screen = nextScreen
+    editorState = createDeckEditorState(nextScreen.draft)
+    syncSelectedCard(editorState.cards)
+    deleteConfirmOpen = false
+
+    if (nextScreen.deckId != null) {
+      setSelectionHandoff(selectionHandoffKeys.deckId, String(nextScreen.deckId))
+    }
+  }
+
+  function resetTransientState() {
+    pendingActionId = null
+    deleteConfirmOpen = false
+    clearActionFeedback()
+  }
+
+  function navigateTo(path: string, replace = false) {
+    if (typeof window === 'undefined') return
+
+    if (replace) {
+      window.history.replaceState({}, '', path)
+    } else {
+      window.history.pushState({}, '', path)
+    }
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
+  function replaceWithDeckEditor(id: string) {
+    navigateTo(pathBuilders.deckEditor(id), true)
+  }
+
+  async function loadDeckEditorScreen(deckId?: string | null) {
+    const requestId = ++requestSequence
+
+    loading = true
+    screen = null
+    editorState = createEmptyDeckEditorState()
+    requestedDeckId = deckId ?? null
+    errorMessage = null
+    notFoundId = null
+    selectedCardKey = ''
+    resetTransientState()
+
+    try {
+      const response = deckId
+        ? await getScreen<DeckEditorScreenResponse>('DeckEditor', { deckId })
+        : await getScreen<DeckEditorScreenResponse>('DeckEditor')
+
+      if (requestId !== requestSequence) {
+        return
+      }
+
+      applyScreen(response)
+    } catch (error) {
+      if (requestId !== requestSequence) {
+        return
+      }
+
+      if (error instanceof ApiError && (error.status === 404 || error.code === 'not_found')) {
+        notFoundId = deckId ?? null
+        return
+      }
+
+      errorMessage = getApiErrorMessage(error, 'Unable to load the selected deck editor screen.')
+    } finally {
+      if (requestId === requestSequence) {
+        loading = false
+      }
+    }
+  }
+
+  function retryLoad() {
+    const routeDeckId = getDeckIdFromRoute()
+
+    if (routeDeckId) {
+      void loadDeckEditorScreen(routeDeckId)
+      return
+    }
+
+    if (isCreateDeckRoute()) {
+      void loadDeckEditorScreen(null)
+      return
+    }
+
+    if (requestedDeckId) {
+      void loadDeckEditorScreen(requestedDeckId)
+    }
   }
 
   function sanitizeDeckCardCount(value: number) {
@@ -275,308 +269,145 @@
     }
   }
 
-  function getDeckValidationSignature(cards: readonly DeckEditorCardState[]) {
-    return cards.map((card) => `${card.cardId.trim()}:${card.count}`).join('|')
+  function getAction(actionId: string) {
+    return screen ? findScreenAction(screen, actionId) : null
   }
 
-  function resetValidationState() {
-    validationRequestSequence += 1
-    validating = false
-    validationResult = null
-    validationErrorMessage = null
-    lastValidatedCardsSignature = null
+  function getActionDisabledReason(actionId: string) {
+    return getAction(actionId)?.disabledReason?.userMessage ?? null
   }
 
-  function resetCreateState() {
-    createRequestSequence += 1
-    creating = false
-    createErrorMessage = null
+  function getPendingActionLabel(actionId: string) {
+    switch (actionId) {
+      case 'deckEditor.validate':
+        return 'Validating deck...'
+      case 'deckEditor.save':
+        return 'Saving deck...'
+      case 'deckEditor.create':
+        return 'Creating deck...'
+      case 'deckEditor.delete':
+        return 'Deleting deck...'
+      default:
+        return 'Processing...'
+    }
   }
 
-  function resetDeleteState() {
-    deleteRequestSequence += 1
-    deleting = false
-    deleteConfirmOpen = false
-    deleteErrorMessage = null
+  function getActionLabel(actionId: string) {
+    const action = getAction(actionId)
+
+    if (!action) {
+      return ''
+    }
+
+    return pendingActionId === actionId ? getPendingActionLabel(actionId) : action.label
   }
 
-  function resetSaveState() {
-    saveRequestSequence += 1
-    saving = false
-    saveErrorMessage = null
-    saveSuccessMessage = null
+  function toDeckEditorValidation(response: DeckValidationResponse): DeckEditorValidationDto {
+    return {
+      valid: response.valid,
+      normalizedTotalCards: response.normalizedTotalCards,
+      issues: response.issues,
+      isStale: false,
+    }
   }
 
-  function enterCreateMode() {
-    editorMode = 'create'
-    loading = false
-    deck = null
-    editorState = createNewDeckEditorState()
-    errorMessage = null
-    notFoundId = null
-    requestedDeckId = null
-    selectedCardKey = ''
-    resetCreateState()
-    resetDeleteState()
-    resetSaveState()
-    resetValidationState()
+  function getActionSuccessMessage(actionId: string) {
+    switch (actionId) {
+      case 'deckEditor.validate':
+        return 'Deck validation refreshed.'
+      case 'deckEditor.save':
+        return 'Deck changes saved.'
+      case 'deckEditor.create':
+        return 'Deck created.'
+      default:
+        return null
+    }
   }
 
-  async function runValidation() {
-    if (!deck || editorMode !== 'edit' || validating || saving || creating || deleting || deleteConfirmOpen) {
+  async function runAction(actionId: string) {
+    if (!screen || pendingActionId) {
       return
     }
 
-    const requestId = ++validationRequestSequence
-    const payload = replaceCardsPayload
-    const payloadSignature = validationCardsSignature
+    const action = getAction(actionId)
 
-    validating = true
-    validationErrorMessage = null
-
-    try {
-      const response = await validateDeck(deck.id, payload)
-
-      if (requestId !== validationRequestSequence) {
-        return
-      }
-
-      validationResult = response
-      lastValidatedCardsSignature = payloadSignature
-    } catch (error) {
-      if (requestId !== validationRequestSequence) {
-        return
-      }
-
-      validationResult = null
-      validationErrorMessage = getApiErrorMessage(error, 'Unable to validate the current deck draft.')
-      lastValidatedCardsSignature = null
-    } finally {
-      if (requestId === validationRequestSequence) {
-        validating = false
-      }
-    }
-  }
-
-  async function createDeckRecord() {
-    if (editorMode !== 'create' || creating || saving || validating || deleting) {
+    if (!action || !action.enabled) {
       return
     }
 
-    const requestId = ++createRequestSequence
-    const payload = updatePayload
-
-    creating = true
-    createErrorMessage = null
-    deleteErrorMessage = null
-    saveErrorMessage = null
-    saveSuccessMessage = null
+    pendingActionId = actionId
+    actionErrorMessage = null
+    actionSuccessMessage = null
 
     try {
-      const response = await createDeck(payload)
+      const patch = buildDeckEditorActionPatch(action.id, editorState)
+      const body = action.payloadTemplate ? buildScreenActionPayload(action, patch) : undefined
+      const response = await invokeScreenAction(action, body === undefined ? undefined : { body })
 
-      if (requestId !== createRequestSequence) {
+      if (actionId === 'deckEditor.validate') {
+        screen = {
+          ...screen,
+          validation: toDeckEditorValidation(response as DeckValidationResponse),
+        }
+        actionSuccessMessage = getActionSuccessMessage(actionId)
         return
       }
 
-      syncEditorState(response)
-      resetValidationState()
-      replaceWithDeckEditor(String(response.id))
+      if (actionId === 'deckEditor.delete') {
+        removeSelectionHandoff(selectionHandoffKeys.deckId)
+        setDeckPageFeedback(deckListStateCopy.deletedFeedback)
+        navigateTo(pathBuilders.deckList(), true)
+        return
+      }
+
+      const responseDeckId =
+        response && typeof response === 'object' && 'id' in response ? String(response.id) : null
+      const nextDeckId = responseDeckId ?? (screen.deckId == null ? null : String(screen.deckId))
+
+      if (!nextDeckId) {
+        throw new Error('Deck action completed without a follow-up deck id.')
+      }
+
+      await loadDeckEditorScreen(nextDeckId)
+      actionSuccessMessage = getActionSuccessMessage(actionId)
+
+      if (actionId === 'deckEditor.create') {
+        replaceWithDeckEditor(nextDeckId)
+      }
     } catch (error) {
-      if (requestId !== createRequestSequence) {
-        return
-      }
-
-      createErrorMessage = getApiErrorMessage(error, 'Unable to create a new deck.')
+      actionErrorMessage = getApiErrorMessage(error, 'Unable to complete the requested deck action.')
     } finally {
-      if (requestId === createRequestSequence) {
-        creating = false
-      }
-    }
-  }
-
-  async function saveDeck() {
-    if (!deck || editorMode !== 'edit' || saving || validating || creating || deleting || deleteConfirmOpen) {
-      return
-    }
-
-    const requestId = ++saveRequestSequence
-    const deckId = deck.id
-    const nextUpdatePayload = updatePayload
-    const nextReplacePayload = replaceCardsPayload
-
-    saving = true
-    saveErrorMessage = null
-    deleteErrorMessage = null
-    saveSuccessMessage = null
-
-    try {
-      await updateDeck(deckId, nextUpdatePayload)
-
-      if (requestId !== saveRequestSequence) {
-        return
-      }
-
-      const response = await replaceDeckCards(deckId, nextReplacePayload)
-
-      if (requestId !== saveRequestSequence) {
-        return
-      }
-
-      syncEditorState(response)
-      resetValidationState()
-      saveSuccessMessage = 'Deck changes saved.'
-    } catch (error) {
-      if (requestId !== saveRequestSequence) {
-        return
-      }
-
-      saveErrorMessage = getApiErrorMessage(error, 'Unable to save deck changes.')
-    } finally {
-      if (requestId === saveRequestSequence) {
-        saving = false
-      }
+      pendingActionId = null
     }
   }
 
   function openDeleteConfirmation() {
-    if (!deck || editorMode !== 'edit' || creating || saving || validating || deleting) {
+    if (!getAction('deckEditor.delete') || pendingActionId) {
       return
     }
 
+    clearActionFeedback()
     deleteConfirmOpen = true
-    deleteErrorMessage = null
-    saveSuccessMessage = null
   }
 
   function cancelDeleteConfirmation() {
-    if (deleting) {
+    if (pendingActionId === 'deckEditor.delete') {
       return
     }
 
     deleteConfirmOpen = false
-    deleteErrorMessage = null
-  }
-
-  async function deleteDeckRecord() {
-    if (!deck || editorMode !== 'edit' || deleting || saving || validating || creating) {
-      return
-    }
-
-    const requestId = ++deleteRequestSequence
-
-    deleting = true
-    deleteErrorMessage = null
-    saveErrorMessage = null
-    saveSuccessMessage = null
-
-    try {
-      await deleteDeck(deck.id)
-
-      if (requestId !== deleteRequestSequence) {
-        return
-      }
-
-      removeSelectionHandoff(selectionHandoffKeys.deckId)
-      setDeckPageFeedback(deckListStateCopy.deletedFeedback)
-      navigateTo(pathBuilders.deckList(), true)
-    } catch (error) {
-      if (requestId !== deleteRequestSequence) {
-        return
-      }
-
-      deleteErrorMessage = getApiErrorMessage(error, 'Unable to delete the current deck.')
-    } finally {
-      if (requestId === deleteRequestSequence) {
-        deleting = false
-      }
-    }
-  }
-
-  function navigateTo(path: string, replace = false) {
-    if (typeof window === 'undefined') return
-
-    if (replace) {
-      window.history.replaceState({}, '', path)
-    } else {
-      window.history.pushState({}, '', path)
-    }
-
-    window.dispatchEvent(new PopStateEvent('popstate'))
-  }
-
-  function replaceWithDeckEditor(id: string) {
-    navigateTo(pathBuilders.deckEditor(id), true)
-  }
-
-  async function loadDeckRecord(id: string) {
-    const requestId = ++requestSequence
-    editorMode = 'edit'
-    requestedDeckId = id
-    loading = true
-    deck = null
-    editorState = createEmptyDeckEditorState()
-    resetCreateState()
-    resetDeleteState()
-    resetSaveState()
-    resetValidationState()
-    errorMessage = null
-    notFoundId = null
-    selectedCardKey = ''
-
-    try {
-      const response = await getDeck(id)
-
-      if (requestId !== requestSequence) {
-        return
-      }
-
-      syncEditorState(response)
-    } catch (error) {
-      if (requestId !== requestSequence) {
-        return
-      }
-
-      deck = null
-      editorState = createEmptyDeckEditorState()
-      selectedCardKey = ''
-
-      if (error instanceof ApiError && (error.status === 404 || error.code === 'not_found')) {
-        notFoundId = id
-        return
-      }
-
-      errorMessage = getApiErrorMessage(error, 'Unable to load the selected deck.')
-    } finally {
-      if (requestId === requestSequence) {
-        loading = false
-      }
-    }
-  }
-
-  function retryLoad() {
-    const routeDeckId = getDeckIdFromRoute()
-
-    if (routeDeckId) {
-      void loadDeckRecord(routeDeckId)
-      return
-    }
-
-    if (requestedDeckId) {
-      void loadDeckRecord(requestedDeckId)
-    }
   }
 
   onMount(() => {
     const routeDeckId = getDeckIdFromRoute()
 
     if (routeDeckId) {
-      void loadDeckRecord(routeDeckId)
+      void loadDeckEditorScreen(routeDeckId)
       return
     }
 
     if (isCreateDeckRoute()) {
-      enterCreateMode()
+      void loadDeckEditorScreen(null)
       return
     }
 
@@ -587,52 +418,16 @@
       return
     }
 
-    editorMode = 'selection'
     loading = false
   })
 
-  const deckNameLabel = $derived.by(() => editorState.name.trim() || deck?.name || 'Untitled deck')
-  const deckTypeLabel = $derived.by(() => formatContentEnumLabel(editorState.type || deck?.type, 'N/A'))
-  const totalCards = $derived.by(() => getDeckEditorTotalCards(editorState))
-  const editorDirty = $derived.by(() => (deck ? isDeckEditorStateDirty(deck, editorState) : false))
-  const updatePayload = $derived.by(() => toDeckEditorUpdateRequest(editorState))
-  const replaceCardsPayload = $derived.by(() => toDeckEditorReplaceCardsRequest(editorState))
-  const updatePayloadCardCount = $derived.by(() => updatePayload.cards?.length ?? 0)
-  const replacePayloadCardCount = $derived.by(() => replaceCardsPayload.cards?.length ?? 0)
-  const isCreateMode = $derived.by(() => editorMode === 'create')
-  const editorControlsDisabled = $derived.by(() => saving || creating || deleting)
-  const editorTitle = $derived.by(() => (isCreateMode ? editorState.name.trim() || 'New deck' : deckNameLabel))
-  const editorEyebrow = $derived.by(() => (isCreateMode ? 'New Deck' : 'Selected Deck'))
-  const editorDescription = $derived.by(() =>
-    isCreateMode
-      ? deckEditorStateCopy.createDescription
-      : deckEditorStateCopy.editDescription,
-  )
-  const draftStatusLabel = $derived.by(() => (isCreateMode ? 'Create Mode' : editorDirty ? 'Draft Changed' : 'Draft Synced'))
-  const draftStatusTone = $derived.by(() => (isCreateMode ? 'accent' : editorDirty ? 'warning' : 'success'))
-  const sourceDeckIdLabel = $derived.by(() => (deck ? String(deck.id) : 'Assigned after create'))
-  const saveSuccessVisible = $derived.by(() => Boolean(saveSuccessMessage) && !editorDirty && !isCreateMode)
-  const actionButtonsDisabled = $derived.by(() => creating || saving || deleting || validating)
-  const validationCardsSignature = $derived.by(() => getDeckValidationSignature(editorState.cards))
-  const validationIssueCount = $derived.by(() => validationResult?.issues.length ?? 0)
-  const validationIsStale = $derived.by(
-    () => Boolean(validationResult) && lastValidatedCardsSignature !== validationCardsSignature,
-  )
-  const deckCardItems = $derived.by(() => {
-    const entries = editorState.cards
-    return entries.map((entry, index) => toDraftDeckCardItem(entry, index, entries.length))
-  })
   const selectedCardEntry = $derived.by(
     () => editorState.cards.find((entry) => entry.key === selectedCardKey) ?? editorState.cards[0] ?? null,
   )
+
   const selectedCardPosition = $derived.by(() => {
     const selectedIndex = editorState.cards.findIndex((entry) => entry.key === selectedCardKey)
-
-    if (selectedIndex >= 0) {
-      return selectedIndex + 1
-    }
-
-    return editorState.cards.length ? 1 : 0
+    return selectedIndex >= 0 ? selectedIndex + 1 : editorState.cards.length ? 1 : 0
   })
 </script>
 
@@ -641,7 +436,7 @@
     <SectionFrame
       eyebrow="Deck Editor"
       title={deckEditorStateCopy.loadingTitle}
-      description="Resolving the current deck record from the URL before showing the editor shell."
+      description="Resolving the current deck editor screen from the URL."
     >
       <ContentStatePanel
         title={deckEditorStateCopy.loadingTitle}
@@ -669,7 +464,7 @@
     <SectionFrame
       eyebrow="Deck Error"
       title={deckEditorStateCopy.loadErrorTitle}
-      description="The editor could not retrieve the current deck record."
+      description="The editor could not retrieve the current screen response."
     >
       <ContentStatePanel
         title={deckEditorStateCopy.loadErrorMessageTitle}
@@ -685,29 +480,46 @@
         </a>
       </div>
     </SectionFrame>
-  {:else if deck || isCreateMode}
+  {:else if screen}
     <SectionFrame
-      eyebrow={editorEyebrow}
-      title={editorTitle}
-      description={editorDescription}
+      eyebrow={screen.mode === 'create' ? 'New Deck' : 'Selected Deck'}
+      title={screen.derived.title}
+      description={screen.mode === 'create'
+        ? deckEditorStateCopy.createDescription
+        : deckEditorStateCopy.editDescription}
     >
       <div class="editor-page__hero">
         <div class="editor-page__hero-copy">
-          <p>{deckTypeLabel}</p>
-          <h3>{buildDeckSummary(editorState)}</h3>
+          <p>{screen.derived.deckTypeLabel}</p>
+          <h3>{buildDeckSummary(screen)}</h3>
         </div>
 
         <div class="editor-page__hero-tags">
-          <TagChip label={deckTypeLabel} tone={getDeckTypeTone(editorState.type || deck?.type)} />
-          <TagChip label={`${editorState.cards.length} Entries`} tone="accent" />
-          <TagChip label={draftStatusLabel} tone={draftStatusTone} />
+          <TagChip label={screen.derived.deckTypeLabel} tone={getDeckTypeTone(screen.draft.type)} />
+          <TagChip label={`${screen.draft.cards.length} Entries`} tone="accent" />
+          <TagChip
+            label={screen.derived.dirty ? 'Draft Changed' : 'Draft Synced'}
+            tone={screen.derived.dirty ? 'warning' : 'success'}
+          />
         </div>
       </div>
 
       <div class="editor-page__stats">
-        <StatBlock value={totalCards} label="Cards" note="Total cards computed from the local deck draft" />
-        <StatBlock value={editorState.cards.length} label="Draft entries" note="Card entries currently tracked in the local editor state" />
-        <StatBlock value={deckTypeLabel} label="Deck type" note="Deck classification in the current local draft" />
+        <StatBlock
+          value={screen.derived.totalCards}
+          label="Cards"
+          note="Total cards reported by the current screen response"
+        />
+        <StatBlock
+          value={screen.draft.cards.length}
+          label="Screen entries"
+          note="Card entries contained in the latest server draft"
+        />
+        <StatBlock
+          value={screen.derived.deckTypeLabel}
+          label="Deck type"
+          note="Deck classification reported by the current screen"
+        />
       </div>
 
       <fieldset class="editor-page__fieldset">
@@ -716,36 +528,49 @@
         <div class="editor-page__form-grid">
           <label class="editor-page__field editor-page__field--span-2">
             <span>Deck name</span>
-            <input type="text" bind:value={editorState.name} placeholder="Enter deck name" disabled={editorControlsDisabled} />
+            <input
+              type="text"
+              bind:value={editorState.name}
+              placeholder="Enter deck name"
+              disabled={Boolean(pendingActionId)}
+            />
           </label>
 
           <label class="editor-page__field">
             <span>Deck type</span>
-            <select bind:value={editorState.type} disabled={editorControlsDisabled}>
+            <select bind:value={editorState.type} disabled={Boolean(pendingActionId)}>
               {#each deckTypeOptions as option}
-                <option value={option}>{formatContentEnumLabel(option, option)}</option>
+                <option value={option}>{option}</option>
               {/each}
             </select>
           </label>
 
           <div class="editor-page__field">
-            <span>{isCreateMode ? 'Deck id' : 'Source deck id'}</span>
-            <p class="editor-page__readonly">{sourceDeckIdLabel}</p>
+            <span>{screen.mode === 'create' ? 'Deck id' : 'Source deck id'}</span>
+            <p class="editor-page__readonly">{screen.deckId == null ? 'Assigned after create' : screen.deckId}</p>
           </div>
         </div>
       </fieldset>
+
+      {#if screen.uiNotices.length}
+        <div class="editor-page__note">
+          {#each screen.uiNotices as notice}
+            <p>{notice}</p>
+          {/each}
+        </div>
+      {/if}
     </SectionFrame>
 
     <div class="editor-page__grid">
       <SectionFrame
         title="Deck cards"
-        description="EntityListPane stays in use here so the draft card list matches the existing list-page browsing pattern."
+        description="The list reflects the current local input state while the summary above continues to reflect the latest screen response."
       >
         <EntityListPane
-          items={deckCardItems}
+          items={editorState.cards.map((entry, index) => toDeckCardItem(entry, index, editorState.cards.length))}
           selectedId={selectedCardKey}
           onSelect={(id) => {
-            if (!editorControlsDisabled) {
+            if (!pendingActionId) {
               selectedCardKey = id
             }
           }}
@@ -755,22 +580,22 @@
 
       <SectionFrame
         title="Selected card"
-        description="This panel now edits the selected card entry from the local draft model."
+        description="This panel only manages local input state for the currently selected entry."
       >
         {#if selectedCardEntry}
           <div class="editor-page__card-detail">
             <div>
               <h3>{selectedCardEntry.cardId || 'Unnamed card reference'}</h3>
-              <p>{getDraftDeckCardMetaLabel(selectedCardEntry, selectedCardPosition)}</p>
+              <p>{getDeckCardMetaLabel(selectedCardEntry, selectedCardPosition)}</p>
             </div>
 
             <div class="editor-page__card-tags">
-              {#each getDraftDeckCardTagItems(selectedCardEntry, selectedCardPosition) as tag}
+              {#each getDeckCardTagItems(selectedCardEntry, selectedCardPosition) as tag}
                 <TagChip label={tag.label} tone={tag.tone} />
               {/each}
             </div>
 
-            <p>{buildDraftDeckCardNote(selectedCardEntry, selectedCardPosition, editorState.cards.length)}</p>
+            <p>{buildDeckCardNote(selectedCardEntry, selectedCardPosition, editorState.cards.length)}</p>
 
             <fieldset class="editor-page__fieldset">
               <legend>Selected card draft</legend>
@@ -781,7 +606,7 @@
                   <input
                     type="text"
                     value={selectedCardEntry.cardId}
-                    disabled={editorControlsDisabled}
+                    disabled={Boolean(pendingActionId)}
                     oninput={(event) => updateSelectedCardId((event.currentTarget as HTMLInputElement).value)}
                   />
                 </label>
@@ -793,7 +618,7 @@
                     min="1"
                     step="1"
                     value={selectedCardEntry.count}
-                    disabled={editorControlsDisabled}
+                    disabled={Boolean(pendingActionId)}
                     oninput={(event) =>
                       updateSelectedCardCount((event.currentTarget as HTMLInputElement).valueAsNumber)}
                   />
@@ -807,8 +632,8 @@
             </fieldset>
 
             <div class="editor-page__note">
-              <p>This card entry now renders from the local draft state instead of the live response object.</p>
-              <p>Save, validation, and delete actions now operate on the same local draft model.</p>
+              <p>Edits stay local until an action is invoked.</p>
+              <p>Validation, dirty state, total cards, and button availability render from the latest screen model.</p>
             </div>
           </div>
         {:else}
@@ -822,146 +647,160 @@
 
     <SectionFrame
       title="Editor actions"
-      description={isCreateMode
-        ? 'Create a new deck record from the current draft.'
-        : 'Run validation, save deck changes, or delete the current deck from here.'}
+      description={screen.mode === 'create'
+        ? 'Create a new deck record from the current local input state.'
+        : 'Validate, save, or delete by invoking the screen-declared actions.'}
     >
       <div class="editor-page__actions">
         <a class="editor-page__link-action" data-nav href={pathBuilders.deckList()}>
           Back to deck list
         </a>
-        <button type="button" disabled={isCreateMode || actionButtonsDisabled || deleteConfirmOpen} onclick={runValidation}>
-          {isCreateMode ? 'Validate after create' : validating ? 'Validating deck...' : 'Validate deck'}
-        </button>
-        {#if isCreateMode}
-          <button type="button" disabled={actionButtonsDisabled} onclick={createDeckRecord}>
-            {creating ? 'Creating deck...' : 'Create deck'}
+
+        {#if getAction('deckEditor.validate')}
+          <button
+            type="button"
+            disabled={Boolean(pendingActionId) || deleteConfirmOpen || !getAction('deckEditor.validate')?.enabled}
+            onclick={() => void runAction('deckEditor.validate')}
+          >
+            {getActionLabel('deckEditor.validate')}
+          </button>
+        {/if}
+
+        {#if screen.mode === 'create'}
+          <button
+            type="button"
+            disabled={Boolean(pendingActionId) || !getAction('deckEditor.create')?.enabled}
+            onclick={() => void runAction('deckEditor.create')}
+          >
+            {getActionLabel('deckEditor.create')}
           </button>
         {:else}
-          <button type="button" disabled={actionButtonsDisabled || deleteConfirmOpen} onclick={saveDeck}>
-            {saving ? 'Saving deck...' : 'Save deck'}
+          <button
+            type="button"
+            disabled={Boolean(pendingActionId) || deleteConfirmOpen || !getAction('deckEditor.save')?.enabled}
+            onclick={() => void runAction('deckEditor.save')}
+          >
+            {getActionLabel('deckEditor.save')}
           </button>
-          <button type="button" disabled={actionButtonsDisabled} onclick={openDeleteConfirmation}>
-            {deleting ? 'Deleting deck...' : deleteConfirmOpen ? 'Delete pending' : 'Delete deck'}
+          <button
+            type="button"
+            disabled={Boolean(pendingActionId) || !getAction('deckEditor.delete')?.enabled}
+            onclick={openDeleteConfirmation}
+          >
+            {pendingActionId === 'deckEditor.delete'
+              ? getPendingActionLabel('deckEditor.delete')
+              : deleteConfirmOpen
+                ? 'Delete pending'
+                : getAction('deckEditor.delete')?.label}
           </button>
         {/if}
       </div>
 
       <div class="editor-page__status">
-        <p>{isCreateMode ? 'The current local draft is ready to be submitted as a new deck record.' : editorDirty ? 'Local changes are pending on top of the last loaded deck response.' : 'Local draft matches the last loaded deck response.'}</p>
-        <p>Update payload is ready with {updatePayloadCardCount} card entries plus deck metadata.</p>
-        <p>Replace payload is ready with {replacePayloadCardCount} card entries.</p>
+        <p>Current server draft title: {screen.derived.title}</p>
+        <p>Current server dirty flag: {screen.derived.dirty ? 'Changed' : 'Synced'}</p>
+        <p>Current server validation state: {screen.validation.valid ? 'Valid' : 'Invalid'}</p>
+        {#if getActionDisabledReason('deckEditor.validate')}
+          <p>{getActionDisabledReason('deckEditor.validate')}</p>
+        {/if}
+        {#if getActionDisabledReason('deckEditor.save')}
+          <p>{getActionDisabledReason('deckEditor.save')}</p>
+        {/if}
+        {#if getActionDisabledReason('deckEditor.create')}
+          <p>{getActionDisabledReason('deckEditor.create')}</p>
+        {/if}
+        {#if getActionDisabledReason('deckEditor.delete')}
+          <p>{getActionDisabledReason('deckEditor.delete')}</p>
+        {/if}
       </div>
 
-      {#if createErrorMessage}
+      {#if actionErrorMessage}
         <ContentStatePanel
-          title={deckEditorStateCopy.createErrorTitle}
-          message={createErrorMessage}
+          title="Deck action failed"
+          message={actionErrorMessage}
           tone="error"
         />
-      {:else if saveErrorMessage}
+      {:else if actionSuccessMessage}
         <ContentStatePanel
-          title={deckEditorStateCopy.saveErrorTitle}
-          message={saveErrorMessage}
-          tone="error"
-        />
-      {:else if deleteErrorMessage}
-        <ContentStatePanel
-          title={deckEditorStateCopy.deleteErrorTitle}
-          message={deleteErrorMessage}
-          tone="error"
-        />
-      {:else if saveSuccessVisible}
-        <ContentStatePanel
-          title={deckEditorStateCopy.saveSuccessTitle}
-          message={saveSuccessMessage ?? 'Deck changes were saved.'}
+          title="Deck action complete"
+          message={actionSuccessMessage}
         />
       {/if}
 
-      {#if !isCreateMode && deleting}
-        <ContentStatePanel
-          title={deckEditorStateCopy.deleteLoadingTitle}
-          message={deckEditorStateCopy.deleteLoadingMessage}
-        />
-      {:else if !isCreateMode && deleteConfirmOpen}
+      {#if deleteConfirmOpen}
         <ContentStatePanel
           title={deckEditorStateCopy.deleteConfirmTitle}
           message={deckEditorStateCopy.deleteConfirmMessage}
           tone="error"
         >
           <div class="editor-page__confirm-actions">
-            <button type="button" onclick={deleteDeckRecord}>Confirm delete</button>
+            <button type="button" onclick={() => void runAction('deckEditor.delete')}>
+              Confirm delete
+            </button>
             <button type="button" onclick={cancelDeleteConfirmation}>Cancel</button>
           </div>
         </ContentStatePanel>
-      {:else if !isCreateMode && validating}
-        <ContentStatePanel
-          title={deckEditorStateCopy.validationLoadingTitle}
-          message={deckEditorStateCopy.validationLoadingMessage}
-        />
-      {:else if !isCreateMode && validationErrorMessage}
-        <ContentStatePanel
-          title={deckEditorStateCopy.validationErrorTitle}
-          message={validationErrorMessage}
-          tone="error"
-          actionLabel="Retry validation"
-          onAction={runValidation}
-        />
-      {:else if !isCreateMode && validationResult}
-        <div class="editor-page__validation">
-          <div class="editor-page__validation-header">
-            <div class="editor-page__validation-copy">
-              <p>Validation result</p>
-              <h3>{validationResult.valid ? 'Deck draft is valid' : 'Deck draft has validation issues'}</h3>
-            </div>
-
-            <div class="editor-page__hero-tags">
-              <TagChip label={validationResult.valid ? 'Valid' : 'Invalid'} tone={validationResult.valid ? 'success' : 'warning'} />
-              <TagChip label={`Normalized ${validationResult.normalizedTotalCards}`} tone="accent" />
-              {#if validationIsStale}
-                <TagChip label="Draft changed" tone="muted" />
-              {/if}
-            </div>
-          </div>
-
-          <div class="editor-page__stats editor-page__stats--compact">
-            <StatBlock
-              value={validationResult.valid ? 'Valid' : 'Invalid'}
-              label="Draft state"
-              note={validationIsStale ? 'Last validation result applies to an older draft state' : 'Validation matches the current draft cards'}
-            />
-            <StatBlock
-              value={validationResult.normalizedTotalCards}
-              label="Normalized cards"
-              note="Total cards reported by the validation response"
-            />
-            <StatBlock
-              value={validationIssueCount}
-              label="Issues"
-              note={validationIssueCount ? 'Server-reported validation issues' : 'No validation issues were returned'}
-            />
-          </div>
-
-          {#if validationIssueCount}
-            <ul class="editor-page__validation-list">
-              {#each validationResult.issues as issue}
-                <li>
-                  <p>{issue.message}</p>
-                  <span>{issue.field ? `${issue.field} | ${issue.code}` : issue.code}</span>
-                </li>
-              {/each}
-            </ul>
-          {:else}
-            <div class="editor-page__note">
-              <p>{deckEditorStateCopy.validationNoIssuesMessage}</p>
-            </div>
-          {/if}
-        </div>
-      {:else if isCreateMode}
-        <div class="editor-page__note">
-          <p>{deckEditorStateCopy.createModeValidationMessage}</p>
-        </div>
       {/if}
+    </SectionFrame>
+
+    <SectionFrame
+      title="Validation"
+      description="The panel renders the validation block carried by the latest screen model."
+    >
+      <div class="editor-page__validation">
+        <div class="editor-page__validation-header">
+          <div class="editor-page__validation-copy">
+            <p>Validation result</p>
+            <h3>{screen.validation.valid ? 'Deck draft is valid' : 'Deck draft has validation issues'}</h3>
+          </div>
+
+          <div class="editor-page__hero-tags">
+            <TagChip
+              label={screen.validation.valid ? 'Valid' : 'Invalid'}
+              tone={screen.validation.valid ? 'success' : 'warning'}
+            />
+            <TagChip label={`Normalized ${screen.validation.normalizedTotalCards}`} tone="accent" />
+            {#if screen.validation.isStale}
+              <TagChip label="Stale" tone="muted" />
+            {/if}
+          </div>
+        </div>
+
+        <div class="editor-page__stats editor-page__stats--compact">
+          <StatBlock
+            value={screen.validation.valid ? 'Valid' : 'Invalid'}
+            label="Draft state"
+            note="Validation state reported by the latest server response"
+          />
+          <StatBlock
+            value={screen.validation.normalizedTotalCards}
+            label="Normalized cards"
+            note="Total cards reported by server-side validation"
+          />
+          <StatBlock
+            value={screen.validation.issues.length}
+            label="Issues"
+            note={screen.validation.issues.length
+              ? 'Server-reported validation issues'
+              : 'No validation issues were returned'}
+          />
+        </div>
+
+        {#if screen.validation.issues.length}
+          <ul class="editor-page__validation-list">
+            {#each screen.validation.issues as issue}
+              <li>
+                <p>{issue.message}</p>
+                <span>{issue.field ? `${issue.field} | ${issue.code}` : issue.code}</span>
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <div class="editor-page__note">
+            <p>{deckEditorStateCopy.validationNoIssuesMessage}</p>
+          </div>
+        {/if}
+      </div>
     </SectionFrame>
   {:else}
     <SectionFrame
@@ -1064,6 +903,11 @@
     padding-top: 1rem;
   }
 
+  .editor-page__note p {
+    color: var(--color-text-muted);
+    line-height: 1.6;
+  }
+
   .editor-page__fieldset {
     display: grid;
     gap: 1rem;
@@ -1124,11 +968,6 @@
     color: var(--color-text-soft);
   }
 
-  .editor-page__note p {
-    color: var(--color-text-muted);
-    line-height: 1.6;
-  }
-
   .editor-page__actions {
     display: flex;
     flex-wrap: wrap;
@@ -1136,7 +975,8 @@
   }
 
   .editor-page__link-action,
-  .editor-page__actions button {
+  .editor-page__actions button,
+  .editor-page__confirm-actions button {
     min-height: 3rem;
     padding: 0.75rem 1rem;
     border: 1px solid var(--color-border);
@@ -1172,24 +1012,10 @@
     gap: 0.75rem;
   }
 
-  .editor-page__confirm-actions button {
-    min-height: 2.75rem;
-    padding: 0.65rem 0.95rem;
-    border: 1px solid var(--color-border);
-    background: rgba(12, 11, 10, 0.28);
-    color: var(--color-text);
-  }
-
   .editor-page__validation,
   .editor-page__validation-copy {
     display: grid;
     gap: 1rem;
-  }
-
-  .editor-page__validation {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-border);
   }
 
   .editor-page__validation-header {

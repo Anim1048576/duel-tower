@@ -1,4 +1,4 @@
-import type { DeckIdentifier } from './deckTypes'
+import type { DeckIdentifier, DeckType, DeckValidationIssue } from './deckTypes'
 import type { SessionCode } from './sessionTypes'
 
 export type ScreenKey = 'PlayerLobby' | 'GmLobby' | 'Combat' | 'DeckEditor'
@@ -39,6 +39,42 @@ export type DisabledReasonDto = {
 
 export type ScreenActionPayloadTemplate = Record<string, unknown>
 
+export type DeckEditorActionPayload = {
+  name?: string | null
+  type?: DeckType | null
+  cards?: {
+    cardId: string
+    count?: number | null
+  }[] | null
+}
+
+export type DeckEditorDraftCardDto = {
+  key: string
+  cardId: string
+  count: number
+  position: number
+}
+
+export type DeckEditorDraftDto = {
+  name: string
+  type: DeckType
+  cards: DeckEditorDraftCardDto[]
+}
+
+export type DeckEditorDerivedDto = {
+  title: string
+  deckTypeLabel: string
+  totalCards: number
+  dirty: boolean
+}
+
+export type DeckEditorValidationDto = {
+  valid: boolean
+  normalizedTotalCards: number
+  issues: DeckValidationIssue[]
+  isStale: boolean
+}
+
 export type ScreenActionDto<TPayloadTemplate = ScreenActionPayloadTemplate> = {
   id: string
   label: string
@@ -50,11 +86,24 @@ export type ScreenActionDto<TPayloadTemplate = ScreenActionPayloadTemplate> = {
   payloadTemplate: TPayloadTemplate | null
 }
 
+export type DeckEditorScreenAction = ScreenActionDto<DeckEditorActionPayload>
+
 export type ScreenResponseBase<TAction extends ScreenActionDto = ScreenActionDto> = {
   screenKey: string
   generatedAt: string
   uiNotices: string[]
   possibleActions: TAction[]
+}
+
+export type DeckEditorScreenResponse = ScreenResponseBase<DeckEditorScreenAction> & {
+  deckId: number | null
+  mode: 'create' | 'edit'
+  routeTemplate: string
+  policyGroup: string
+  auth: string
+  draft: DeckEditorDraftDto
+  derived: DeckEditorDerivedDto
+  validation: DeckEditorValidationDto
 }
 
 export type ScreenActionResponse<TScreen extends ScreenResponseBase = ScreenResponseBase> = Record<

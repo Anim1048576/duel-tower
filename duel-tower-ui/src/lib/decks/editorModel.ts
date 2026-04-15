@@ -1,12 +1,8 @@
 import type {
-  DeckCardDto,
   DeckCardSpec,
-  DeckResponse,
   DeckType,
-  ReplaceDeckCardsRequest,
-  UpdateDeckRequest,
 } from '../api/deckTypes'
-import { getDeckCardTotal } from '../api/deckTypes'
+import type { DeckEditorActionPayload, DeckEditorDraftCardDto, DeckEditorDraftDto } from '../api/screenTypes'
 
 export type DeckEditorCardState = {
   key: string
@@ -33,21 +29,21 @@ export function createEmptyDeckEditorState(): DeckEditorState {
 }
 
 export function createDeckEditorCardState(
-  card: Pick<DeckCardDto, 'cardId' | 'count'>,
+  card: Pick<DeckEditorDraftCardDto, 'key' | 'cardId' | 'count'>,
   index: number,
 ): DeckEditorCardState {
   return {
-    key: createDeckEditorCardKey(index),
+    key: card.key?.trim() || createDeckEditorCardKey(index),
     cardId: String(card.cardId),
     count: card.count,
   }
 }
 
-export function createDeckEditorState(response: DeckResponse): DeckEditorState {
+export function createDeckEditorState(draft: DeckEditorDraftDto): DeckEditorState {
   return {
-    name: response.name,
-    type: response.type,
-    cards: response.cards.map(createDeckEditorCardState),
+    name: draft.name,
+    type: draft.type,
+    cards: draft.cards.map(createDeckEditorCardState),
   }
 }
 
@@ -62,58 +58,23 @@ export function toDeckEditorCardSpecs(cards: readonly DeckEditorCardState[]) {
   return cards.map(toDeckEditorCardSpec)
 }
 
-export function toDeckEditorUpdateRequest(state: DeckEditorState): UpdateDeckRequest {
+export function buildDeckEditorActionPatch(
+  actionId: string,
+  state: DeckEditorState,
+): Partial<DeckEditorActionPayload> {
+  const cards = toDeckEditorCardSpecs(state.cards)
+  const type = state.type || null
+
+  if (actionId === 'deckEditor.validate') {
+    return {
+      type,
+      cards,
+    }
+  }
+
   return {
     name: state.name.trim(),
-    type: state.type || null,
-    cards: toDeckEditorCardSpecs(state.cards),
+    type,
+    cards,
   }
-}
-
-export function toDeckEditorReplaceCardsRequest(
-  state: Pick<DeckEditorState, 'cards'>,
-): ReplaceDeckCardsRequest {
-  return {
-    cards: toDeckEditorCardSpecs(state.cards),
-  }
-}
-
-export function getDeckEditorTotalCards(state: Pick<DeckEditorState, 'cards'>) {
-  return getDeckCardTotal(toDeckEditorCardSpecs(state.cards))
-}
-
-function areDeckCardsEqual(sourceCards: readonly DeckCardDto[], draftCards: readonly DeckEditorCardState[]) {
-  if (sourceCards.length !== draftCards.length) {
-    return false
-  }
-
-  for (const [index, sourceCard] of sourceCards.entries()) {
-    const draftCard = draftCards[index]
-
-    if (!draftCard) {
-      return false
-    }
-
-    if (String(sourceCard.cardId) !== String(draftCard.cardId).trim()) {
-      return false
-    }
-
-    if (sourceCard.count !== draftCard.count) {
-      return false
-    }
-  }
-
-  return true
-}
-
-export function isDeckEditorStateDirty(source: DeckResponse, state: DeckEditorState) {
-  if (source.name !== state.name.trim()) {
-    return true
-  }
-
-  if (source.type !== state.type) {
-    return true
-  }
-
-  return !areDeckCardsEqual(source.cards, state.cards)
 }
