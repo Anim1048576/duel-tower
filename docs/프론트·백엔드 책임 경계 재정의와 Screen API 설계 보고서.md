@@ -754,3 +754,9 @@ gantt
 - `validatedDraftSignature`는 검증 대상 draft의 deck type + ordered card entries + count를 요약한 식별자다.
 - 프론트 stale 표시는 현재 로컬 editor draft와 `validatedDraftSignature` 비교 결과다.
 - 이 stale 계산은 편집기 표현 상태를 위한 것이며, 게임 규칙 validation 자체를 프론트로 되돌리는 것이 아니다.
+### PlayerLobby Screen Boundary Note
+
+- 서버 `PlayerLobby` screen은 participant slot summary, reference options, preset preview snapshot, action metadata를 책임진다.
+- `me.loadout`와 `me.draft`는 마지막 서버 동기화 기준 snapshot이며, 프론트 로컬 draft 자체는 아니다.
+- 프론트 `localPresentation`은 현재 브라우저 안의 loadout 입력 기준으로 dirty, summary, deck lock, preset preview freshness만 계산한다.
+- character/card/passive resolve와 preset preview 조립은 계속 서버 책임이며, 프론트는 서버 snapshot 위에 local UX 상태만 덧씌운다.

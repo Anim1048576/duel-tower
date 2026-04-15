@@ -6,6 +6,7 @@
     findPlayerLobbyAction,
     type PlayerLobbyActionId,
     type PlayerLobbyActionResponseById,
+    type PlayerLobbyLocalPresentationState,
     type PlayerLobbyScreenResponse,
   } from '../lib/api/screenTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
@@ -45,8 +46,10 @@
     type SessionPageFeedback,
   } from '../lib/session/pageState'
   import { createPlayerLobbyLocalPresentation } from '../lib/session/playerLobbyPresentation.js'
+  import { resolvePlayerLobbyScreenRefreshPlan } from '../lib/session/playerLobbyScreenRefresh.js'
   import { readSessionCodeFromRoute } from '../lib/session/sessionRoute'
   import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
+  import { startTimedPolling, type TimedPollingHandle } from '../lib/session/liveSessionPolling'
   import { removeSelectionHandoff, selectionHandoffKeys } from '../lib/selectionHandoff'
 
   const POLLING_INTERVAL_MS = 4000
@@ -72,7 +75,7 @@
   let passiveCandidate = $state('')
   let requestedSessionCode = $state<string | null>(null)
   let requestSequence = 0
-  let pollTimer: ReturnType<typeof window.setInterval> | null = null
+  let pollingHandle: TimedPollingHandle | null = null
 
   function getRouteSessionCode() {
     return readSessionCodeFromRoute('player-lobby')
@@ -121,10 +124,8 @@
   }
 
   function stopPolling() {
-    if (pollTimer !== null) {
-      window.clearInterval(pollTimer)
-      pollTimer = null
-    }
+    pollingHandle?.stop()
+    pollingHandle = null
   }
 
   function syncStoredCharacterId(characterId: number | null) {
@@ -181,15 +182,30 @@
     stopPolling()
     if (typeof window === 'undefined' || !screen || !isStoredPlayerSessionAccess(runtimeAccess)) return
 
-    pollTimer = window.setInterval(() => {
-      if (!pendingActionId) {
-        void loadPlayerLobbyScreen({ showLoading: false, forceDraftSync: false })
-      }
-    }, POLLING_INTERVAL_MS)
+    pollingHandle = startTimedPolling({
+      intervalMs: POLLING_INTERVAL_MS,
+      onPoll: async () => {
+        if (!pendingActionId) {
+          await refreshPlayerLobbyScreen('polling')
+        }
+      },
+      onError: (error) => {
+        errorMessage = getApiErrorMessage(error, 'Unable to refresh the current player lobby screen.')
+      },
+    })
   }
 
-  async function loadPlayerLobbyScreen(options: { showLoading?: boolean; forceDraftSync?: boolean } = {}) {
-    const { showLoading = true, forceDraftSync = true } = options
+  async function refreshPlayerLobbyScreen(
+    reason:
+      | 'initial-load'
+      | 'retry-load'
+      | 'route-change'
+      | 'polling'
+      | 'action-toggle-ready'
+      | 'action-save-loadout'
+      | 'action-apply-preset',
+  ) {
+    const plan = resolvePlayerLobbyScreenRefreshPlan(reason)
     const requestId = ++requestSequence
     const nextRouteCode = getRouteSessionCode()
     const nextAccess = readStoredSessionAccess()
@@ -199,7 +215,7 @@
     invalidAccessMessage = nextInvalidAccessMessage
     requestedSessionCode = nextRouteCode
 
-    if (showLoading) {
+    if (plan.showLoading) {
       loading = true
       notFound = false
       errorMessage = null
@@ -209,7 +225,7 @@
 
     if (!nextRouteCode || nextInvalidAccessMessage) {
       stopPolling()
-      if (showLoading) loading = false
+      if (plan.showLoading) loading = false
       return
     }
 
@@ -218,7 +234,7 @@
       if (requestId !== requestSequence) return
       notFound = false
       errorMessage = null
-      applyScreen(response, { forceDraftSync })
+      applyScreen(response, { forceDraftSync: plan.forceDraftSync })
       startPolling()
     } catch (error) {
       if (requestId !== requestSequence) return
@@ -231,12 +247,12 @@
         errorMessage = getApiErrorMessage(error, 'Unable to restore the current player lobby.')
       }
     } finally {
-      if (requestId === requestSequence && showLoading) loading = false
+      if (requestId === requestSequence && plan.showLoading) loading = false
     }
   }
 
   function retryLoad() {
-    void loadPlayerLobbyScreen({ showLoading: true, forceDraftSync: true })
+    void refreshPlayerLobbyScreen('retry-load')
   }
 
   function updateCharacterId(value: string) {
@@ -315,7 +331,7 @@
         action,
         { body: buildScreenActionPayload(action, { ready: requestedReady }) },
       )
-      await loadPlayerLobbyScreen({ showLoading: false, forceDraftSync: false })
+      await refreshPlayerLobbyScreen('action-toggle-ready')
       actionSuccessTitle = 'Ready updated'
       actionSuccessMessage = requestedReady
         ? 'You are marked ready in the current session.'
@@ -385,7 +401,7 @@
         action,
         { body: buildScreenActionPayload(action, savePayload) },
       )
-      await loadPlayerLobbyScreen({ showLoading: false, forceDraftSync: true })
+      await refreshPlayerLobbyScreen('action-save-loadout')
       actionSuccessTitle = playerLobbyStateCopy.loadoutSavedFeedback.title
       actionSuccessMessage = playerLobbyStateCopy.loadoutSavedFeedback.message
     } catch (error) {
@@ -420,7 +436,7 @@
         { body: buildScreenActionPayload(action, { presetId }) },
       )
       lastAppliedPresetLabel = presetItem.label
-      await loadPlayerLobbyScreen({ showLoading: false, forceDraftSync: true })
+      await refreshPlayerLobbyScreen('action-apply-preset')
       actionSuccessTitle = playerLobbyStateCopy.presetAppliedFeedback.title
       actionSuccessMessage = `${playerLobbyStateCopy.presetAppliedFeedback.message} (${presetItem.label})`
     } catch (error) {
@@ -431,12 +447,12 @@
   }
 
   function handlePopState() {
-    void loadPlayerLobbyScreen({ showLoading: true, forceDraftSync: true })
+    void refreshPlayerLobbyScreen('route-change')
   }
 
   onMount(() => {
     feedback = readSessionPageFeedback()
-    void loadPlayerLobbyScreen({ showLoading: true, forceDraftSync: true })
+    void refreshPlayerLobbyScreen('initial-load')
     window.addEventListener('popstate', handlePopState)
   })
 
@@ -445,8 +461,15 @@
     window.removeEventListener('popstate', handlePopState)
   })
 
+  // server screen owns slot/reference/preset snapshots; localPresentation owns current draft UX only.
   const localPresentation = $derived.by(() =>
-    screen ? createPlayerLobbyLocalPresentation(screen, normalizeSessionLoadoutDraft(loadoutDraft), selectedPresetId) : null,
+    screen
+      ? (createPlayerLobbyLocalPresentation(
+          screen,
+          normalizeSessionLoadoutDraft(loadoutDraft),
+          selectedPresetId,
+        ) as PlayerLobbyLocalPresentationState)
+      : null,
   )
   const currentPlayerId = $derived.by(() => screen?.me.playerId ?? runtimeAccess?.playerId ?? null)
   const participantCount = $derived.by(() => screen?.participantSlots.length ?? 0)
@@ -455,7 +478,6 @@
   const leaveAction = $derived.by(() => (screen ? findPlayerLobbyAction(screen, 'playerLobby.leave') : null))
   const saveLoadoutAction = $derived.by(() => (screen ? findPlayerLobbyAction(screen, 'playerLobby.saveLoadout') : null))
   const applyPresetAction = $derived.by(() => (screen ? findPlayerLobbyAction(screen, 'playerLobby.applyPreset') : null))
-  const loadoutDirty = $derived.by(() => screen !== null && isSessionLoadoutDraftDirty(savedLoadoutDraft, normalizeSessionLoadoutDraft(loadoutDraft)))
   const loadoutEditGuardMessage = $derived.by(() => !saveLoadoutAction?.enabled ? saveLoadoutAction?.disabledReason?.userMessage ?? 'Current loadout editing is unavailable.' : null)
   const presetApplyGuardMessage = $derived.by(() => !applyPresetAction?.enabled ? applyPresetAction?.disabledReason?.userMessage ?? 'Preset apply is unavailable.' : null)
 </script>
@@ -496,11 +518,13 @@
           <p>Player lobby</p>
           <h3>Code: {screen.sessionCode}</h3>
         </div>
-        <div class="player-lobby-page__summary-tags">
+      <div class="player-lobby-page__summary-tags">
           <TagChip label="Player View" tone="accent" />
           <TagChip label={`Me: ${currentPlayerId ?? 'Unknown'}`} tone="success" />
           <TagChip label={`Ready: ${screen.me.summary.readyLabel}`} tone={screen.me.summary.readyTone} />
           <TagChip label={localPresentation.dirty ? 'Draft Changed' : 'Draft Synced'} tone={localPresentation.dirty ? 'warning' : 'success'} />
+          <TagChip label={localPresentation.deckEditingLocked ? 'Deck Locked' : 'Deck Editable'} tone={localPresentation.deckEditingLocked ? 'warning' : 'success'} />
+          <TagChip label={localPresentation.preset.previewStale ? 'Preset Preview Stale' : 'Preset Preview Fresh'} tone={localPresentation.preset.previewStale ? 'warning' : 'success'} />
         </div>
       </div>
       <div class="player-lobby-page__stats">
@@ -535,7 +559,8 @@
         <div class="player-lobby-page__guide">
           <p>Current player id: {screen.me.playerId}</p>
           <p>Ready state: {screen.me.summary.readyLabel}</p>
-          <p>{screen.me.summary.loadoutSummary}</p>
+          <p>Current draft summary: {localPresentation.summary}</p>
+          <p>Last synced summary: {localPresentation.syncedSummary}</p>
         </div>
         <div class="player-lobby-page__reference-summary">
           <div>
@@ -544,6 +569,7 @@
             <p>EX: {screen.me.loadout.exLabel}</p>
             <p>Deck: {screen.me.loadout.deckCount} owned cards</p>
             <p>Passives: {screen.me.loadout.passiveCount}</p>
+            <p>Summary: {localPresentation.syncedSummary}</p>
           </div>
           <div>
             <strong>Draft to save</strong>
@@ -551,10 +577,11 @@
             <p>EX: {localPresentation.ex.label}</p>
             <p>Deck: {localPresentation.deckCount} owned cards</p>
             <p>Passives: {localPresentation.passiveCount}</p>
+            <p>Summary: {localPresentation.summary}</p>
           </div>
         </div>
         <div class="player-lobby-page__todo">
-          <p>{loadoutDirty ? 'Current draft has unsaved loadout changes.' : 'Current draft matches the last synced loadout state.'}</p>
+          <p>{localPresentation.dirty ? 'Current draft has unsaved loadout changes.' : 'Current draft matches the last synced loadout state.'}</p>
           <p>
             {#if localPresentation.characterChangePending}
               Save the new character first to refresh server-owned cards and character defaults before editing the deck again.
@@ -564,6 +591,9 @@
               Current draft preview is aligned with the latest server reference options.
             {/if}
           </p>
+          {#if localPresentation.deckEditingLocked}
+            <p>{localPresentation.deckEditingLockReason}</p>
+          {/if}
           {#if lastAppliedPresetLabel}
             <p>Last preset applied to this live session: {lastAppliedPresetLabel}</p>
           {/if}
@@ -578,6 +608,9 @@
         {/if}
         {#if localPresentation.characterChangePending}
           <ContentStatePanel title="Character change pending" message="Save this character selection first. The next screen response will refresh owned cards, deck defaults, and the synced loadout summary." />
+        {/if}
+        {#if localPresentation.deckEditingLocked}
+          <ContentStatePanel title="Deck editing locked" message={localPresentation.deckEditingLockReason} />
         {/if}
         <div class="player-lobby-page__form-grid">
           <label class="player-lobby-page__field">
@@ -636,7 +669,7 @@
         </div>
 
         <div class="player-lobby-page__actions">
-          <button type="button" onclick={() => void runSaveLoadout()} disabled={loading || pendingActionId !== null || Boolean(loadoutEditGuardMessage) || !loadoutDirty || !saveLoadoutAction?.enabled}>
+          <button type="button" onclick={() => void runSaveLoadout()} disabled={loading || pendingActionId !== null || Boolean(loadoutEditGuardMessage) || !localPresentation.dirty || !saveLoadoutAction?.enabled}>
             {pendingActionId === 'playerLobby.saveLoadout' ? getPendingActionLabel('playerLobby.saveLoadout') : saveLoadoutAction?.label ?? 'Save loadout'}
           </button>
         </div>
@@ -650,6 +683,11 @@
       <SectionFrame title="Apply saved preset" description="Choose a server-provided preset item, review the latest preview snapshot, and invoke the apply action.">
         <div class="player-lobby-page__guide">
           <p>{localPresentation.preset.summary}</p>
+          <p>
+            {localPresentation.preset.previewStale
+              ? 'Selected preset changed locally. Resolved preview refreshes after the next server-selected preset snapshot.'
+              : 'Selected preset preview matches the latest server-selected preset snapshot.'}
+          </p>
           {#if lastAppliedPresetLabel}
             <p>Current live session was last updated from preset: {lastAppliedPresetLabel}</p>
           {/if}
@@ -657,7 +695,7 @@
         {#if presetApplyGuardMessage}
           <ContentStatePanel title="Preset apply unavailable" message={presetApplyGuardMessage} tone="error" />
         {/if}
-        {#if loadoutDirty}
+        {#if localPresentation.dirty}
           <ContentStatePanel title="Preset apply replaces the current draft" message="Applying a preset updates the live session loadout and replaces the current unsaved draft with the next server screen response." />
         {/if}
         <label class="player-lobby-page__field">

@@ -100,7 +100,9 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("participantSlots")).hasSize(1);
         assertThat(body.path("participantSlots").get(0).path("slot").asText()).isEqualTo("P1");
         assertThat(body.path("participantSlots").get(0).path("name").asText()).contains("player1");
+        assertThat(body.path("participantSlots").get(0).path("state").asText()).isEqualTo("You / Joined");
         assertThat(body.path("participantSlots").get(0).path("tone").asText()).isEqualTo("accent");
+        assertThat(body.path("participantSlots").get(0).path("note").asText()).contains("Deck");
         assertThat(body.path("me").path("playerId").asText()).isEqualTo("player1");
         assertThat(body.path("me").path("ready").asBoolean()).isFalse();
         assertThat(body.path("me").path("loadout").path("characterId").asLong()).isEqualTo(characterId);
@@ -115,12 +117,23 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("references").path("exCardOptions")).isNotEmpty();
         assertThat(body.path("references").path("passiveOptions")).isNotEmpty();
         assertThat(body.path("references").path("ownedCardOptions")).isNotEmpty();
+        assertThat(body.path("references").path("characterOptions").get(0).path("label").asText()).isNotBlank();
+        assertThat(body.path("references").path("characterOptions").get(0).path("tags").isArray()).isTrue();
+        assertThat(body.path("references").path("ownedCardOptions").get(0).path("ownedCardId").asText()).isNotBlank();
+        assertThat(body.path("references").path("ownedCardOptions").get(0).path("label").asText()).isNotBlank();
+        assertThat(body.path("references").path("ownedCardOptions").get(0).path("subtitle").asText()).isNotBlank();
+        assertThat(body.path("references").path("ownedCardOptions").get(0).path("tags").isArray()).isTrue();
         assertThat(body.path("presets").path("items")).hasSize(1);
         assertThat(body.path("presets").path("selectedId").asLong()).isPositive();
+        assertThat(body.path("presets").path("items").get(0).path("label").asText()).isNotBlank();
+        assertThat(body.path("presets").path("items").get(0).path("subtitle").asText()).isNotBlank();
         assertThat(body.path("presets").path("preview").path("characterLabel").asText()).contains("#" + characterId);
         assertThat(body.path("presets").path("preview").path("exLabel").asText()).contains("EX901");
         assertThat(body.path("presets").path("preview").path("deckItems")).hasSize(2);
         assertThat(body.path("presets").path("preview").path("passiveItems")).hasSize(1);
+        assertThat(body.path("presets").path("preview").path("deckItems").get(0).path("label").asText()).contains("C001");
+        assertThat(body.path("presets").path("preview").path("deckItems").get(0).path("tags").isArray()).isTrue();
+        assertThat(body.path("presets").path("preview").path("passiveItems").get(0).path("label").asText()).contains("Tig001_Passive");
 
         JsonNode toggleReadyAction = findAction(body, "playerLobby.toggleReady");
         JsonNode leaveAction = findAction(body, "playerLobby.leave");

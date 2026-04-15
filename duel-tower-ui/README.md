@@ -50,3 +50,17 @@ npm run build
 Current frontend tests cover:
 - PresetEditor local presentation and dirty/preview reactions
 - Editor screen action orchestration and refresh flow
+
+## PlayerLobby Verification
+
+After changing PlayerLobby screen contracts, local loadout presentation, or screen refresh policy, run:
+
+```bash
+npm test
+npm run check
+npm run build
+```
+
+Current frontend tests cover:
+- PlayerLobby local dirty, summary, deck lock, and preset preview freshness reactions
+- PlayerLobby screen refresh policy after polling and player actions

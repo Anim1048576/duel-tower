@@ -107,6 +107,7 @@ runTest('local dirty reacts immediately to loadout draft changes', () => {
   )
 
   assert.equal(presentation.dirty, true)
+  assert.equal(presentation.summary, 'Deck 2 cards | 1 passives | EX ex-1')
   assert.equal(presentation.deckItems[1].title, 'Burst')
   assert.equal(presentation.previewNeedsResolveRefresh, true)
 })
@@ -125,6 +126,10 @@ runTest('local preview falls back cleanly for unresolved ids', () => {
 
   assert.equal(presentation.character.label, 'Basil #202')
   assert.equal(presentation.ex.label, 'EX card (unresolved)')
+  assert.equal(
+    presentation.deckEditingLockReason,
+    'Save the new character first to refresh owned card options and unlock deck editing.',
+  )
   assert.equal(presentation.deckItems[0].title, 'oc-9')
   assert.equal(presentation.deckItems[0].note, 'This owned card id is not available in the latest server reference options.')
 })
@@ -134,8 +139,10 @@ runTest('preset preview only uses the latest server-selected preset snapshot', (
   const unsyncedPresentation = createPlayerLobbyLocalPresentation(baseScreen, baseScreen.me.draft, '12')
 
   assert.equal(syncedPresentation.preset.previewSynced, true)
+  assert.equal(syncedPresentation.preset.previewStale, false)
   assert.equal(syncedPresentation.preset.characterLabel, 'Alice #101')
   assert.equal(unsyncedPresentation.preset.previewSynced, false)
+  assert.equal(unsyncedPresentation.preset.previewStale, true)
   assert.equal(
     unsyncedPresentation.preset.summary,
     'Resolved preview is available only for the latest server-selected preset snapshot.',

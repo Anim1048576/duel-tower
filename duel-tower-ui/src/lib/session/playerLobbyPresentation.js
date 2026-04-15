@@ -266,17 +266,27 @@ export function createPlayerLobbyLocalPresentation(screen, loadoutDraft, selecte
     screen.presets.selectedId == null ? '' : String(screen.presets.selectedId)
   const characterChangePending = characterId !== normalizeCharacterId(screen.me.draft.characterId)
   const requiredFieldsMissing = characterId === null || exCardId === ''
+  const deckEditingLocked = screen.me.draftFlags.deckEditingLocked || characterChangePending
   const presetPreviewSynced =
     normalizeText(selectedPresetId) !== '' &&
     normalizeText(selectedPresetId) === normalizeText(serverSelectedPresetId) &&
     screen.presets.preview !== null
+  const presetPreviewStale = normalizeText(selectedPresetId) !== '' && !presetPreviewSynced
+  const localSummary = `Deck ${deckOwnedCardIds.length} cards | ${passiveIds.length} passives | EX ${exCardId || 'none'}`
+  const syncedSummary = normalizeText(screen.me.summary.loadoutSummary) || screen.me.summary.draftSummary
 
   return {
     dirty: localDirty,
     characterChangePending,
-    deckEditingLocked: screen.me.draftFlags.deckEditingLocked || characterChangePending,
+    deckEditingLocked,
+    deckEditingLockReason: deckEditingLocked
+      ? characterChangePending
+        ? 'Save the new character first to refresh owned card options and unlock deck editing.'
+        : 'Deck editing is locked in the latest server snapshot.'
+      : '',
     requiredFieldsMissing,
-    summary: `Deck ${deckOwnedCardIds.length} cards | ${passiveIds.length} passives | EX ${exCardId || 'none'}`,
+    summary: localSummary,
+    syncedSummary,
     deckCount: deckOwnedCardIds.length,
     passiveCount: passiveIds.length,
     previewNeedsResolveRefresh:
@@ -302,6 +312,7 @@ export function createPlayerLobbyLocalPresentation(screen, loadoutDraft, selecte
       label: selectedPreset?.label ?? 'No preset selected',
       subtitle: selectedPreset?.subtitle ?? 'Choose a saved preset from the current server-provided list.',
       previewSynced: presetPreviewSynced,
+      previewStale: presetPreviewStale,
       name: presetPreviewSynced ? screen.presets.preview?.name ?? '' : selectedPreset?.label ?? '',
       summary: presetPreviewSynced
         ? screen.presets.preview?.summary ?? ''

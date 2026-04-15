@@ -9,6 +9,16 @@ import type {
 const defaultLiveSessionPollIntervalMs = 800
 const defaultLiveSessionEventLimit = 25
 
+export type TimedPollingOptions = {
+  intervalMs?: number
+  onPoll: () => Promise<void> | void
+  onError?: (error: unknown) => void
+}
+
+export type TimedPollingHandle = {
+  stop: () => void
+}
+
 export type LiveSessionPollingOptions = {
   code: SessionCode
   access: SessionRequestAccess
@@ -35,23 +45,15 @@ function getLatestSessionVersion(currentVersion: SessionVersion, nextVersion: Se
   return Math.max(currentVersion, nextVersion)
 }
 
-export function startLiveSessionPolling({
-  code,
-  access,
-  initialVersion,
+export function startTimedPolling({
   intervalMs,
-  onState,
+  onPoll,
   onError,
-}: LiveSessionPollingOptions): LiveSessionPollingHandle {
+}: TimedPollingOptions): TimedPollingHandle {
   const pollingIntervalMs = normalizePositiveNumber(intervalMs, defaultLiveSessionPollIntervalMs)
-  let lastSeenVersion = normalizePositiveNumber(initialVersion, 0)
   let timeoutId: ReturnType<typeof setTimeout> | null = null
   let inFlight = false
   let disposed = false
-
-  function updateVersion(nextVersion: SessionVersion) {
-    lastSeenVersion = getLatestSessionVersion(lastSeenVersion, nextVersion)
-  }
 
   function scheduleNextPoll() {
     if (disposed || timeoutId !== null) {
@@ -77,6 +79,45 @@ export function startLiveSessionPolling({
     inFlight = true
 
     try {
+      await onPoll()
+    } catch (error) {
+      if (!disposed) {
+        onError?.(error)
+      }
+    } finally {
+      inFlight = false
+      scheduleNextPoll()
+    }
+  }
+
+  scheduleNextPoll()
+
+  return {
+    stop() {
+      disposed = true
+
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+    },
+  }
+}
+
+export function startLiveSessionPolling({
+  code,
+  access,
+  initialVersion,
+  intervalMs,
+  onState,
+  onError,
+}: LiveSessionPollingOptions): LiveSessionPollingHandle {
+  const pollingIntervalMs = normalizePositiveNumber(intervalMs, defaultLiveSessionPollIntervalMs)
+  let lastSeenVersion = normalizePositiveNumber(initialVersion, 0)
+  let disposed = false
+  const timedPolling = startTimedPolling({
+    intervalMs: pollingIntervalMs,
+    onPoll: async () => {
       const events = await getSessionEvents(
         code,
         { afterVersion: lastSeenVersion, limit: defaultLiveSessionEventLimit },
@@ -95,27 +136,19 @@ export function startLiveSessionPolling({
 
       updateVersion(nextState.version)
       onState(nextState)
-    } catch (error) {
-      if (!disposed) {
-        onError?.(error)
-      }
-    } finally {
-      inFlight = false
-      scheduleNextPoll()
-    }
-  }
+    },
+    onError,
+  })
 
-  scheduleNextPoll()
+  function updateVersion(nextVersion: SessionVersion) {
+    lastSeenVersion = getLatestSessionVersion(lastSeenVersion, nextVersion)
+  }
 
   return {
     updateVersion,
     stop() {
       disposed = true
-
-      if (timeoutId !== null) {
-        clearTimeout(timeoutId)
-        timeoutId = null
-      }
+      timedPolling.stop()
     },
   }
 }

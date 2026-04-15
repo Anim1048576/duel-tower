@@ -254,6 +254,114 @@ export type PlayerLobbyPresetsDto = {
 }
 
 /**
+ * Server-side PlayerLobby me snapshot.
+ * loadout/draft/draftFlags come from the backend and should be treated as
+ * the latest synced lobby truth, not as frontend-derived UX state.
+ */
+export type PlayerLobbyServerMe = PlayerLobbyMeDto
+
+/**
+ * Server-curated PlayerLobby references.
+ * Character/card/passive labels and tags are already resolved on the backend.
+ */
+export type PlayerLobbyServerReferences = PlayerLobbyReferencesDto
+
+/**
+ * Server-side preset archive snapshot for PlayerLobby.
+ * preview belongs to the currently selected preset snapshot on the backend.
+ */
+export type PlayerLobbyServerPresets = PlayerLobbyPresetsDto
+
+/**
+ * Frontend-only PlayerLobby presentation state.
+ * This keeps dirty/summary/preview-freshness aligned with the current local draft
+ * without reintroducing reference resolution or action-enable rules on the client.
+ */
+export type PlayerLobbyLocalPresentationState = {
+  dirty: boolean
+  characterChangePending: boolean
+  deckEditingLocked: boolean
+  deckEditingLockReason: string
+  requiredFieldsMissing: boolean
+  summary: string
+  syncedSummary: string
+  deckCount: number
+  passiveCount: number
+  previewNeedsResolveRefresh: boolean
+  character: {
+    label: string
+    subtitle: string
+    tags: {
+      label: string
+      tone?: 'accent' | 'muted' | 'success' | 'warning'
+    }[]
+  }
+  ex: {
+    label: string
+    subtitle: string
+    tags: {
+      label: string
+      tone?: 'accent' | 'muted' | 'success' | 'warning'
+    }[]
+  }
+  deckItems: {
+    id: string
+    title: string
+    subtitle?: string
+    meta?: string
+    note?: string
+    tags?: {
+      label: string
+      tone?: 'accent' | 'muted' | 'success' | 'warning'
+    }[]
+  }[]
+  passiveItems: {
+    id: string
+    title: string
+    subtitle?: string
+    meta?: string
+    note?: string
+    tags?: {
+      label: string
+      tone?: 'accent' | 'muted' | 'success' | 'warning'
+    }[]
+  }[]
+  preset: {
+    selectedId: string
+    label: string
+    subtitle: string
+    previewSynced: boolean
+    previewStale: boolean
+    name: string
+    summary: string
+    characterLabel: string
+    exLabel: string
+    deckItems: {
+      id: string
+      title: string
+      subtitle?: string
+      meta?: string
+      note?: string
+      tags?: {
+        label: string
+        tone?: 'accent' | 'muted' | 'success' | 'warning'
+      }[]
+    }[]
+    passiveItems: {
+      id: string
+      title: string
+      subtitle?: string
+      meta?: string
+      note?: string
+      tags?: {
+        label: string
+        tone?: 'accent' | 'muted' | 'success' | 'warning'
+      }[]
+    }[]
+  }
+}
+
+/**
  * Server-side PresetEditor draft snapshot.
  * The frontend copies this into local editor state and does not reinterpret preset semantics.
  */
@@ -409,9 +517,9 @@ export type PlayerLobbyScreenResponse = ScreenResponseBase<PlayerLobbyScreenActi
   policyGroup: string
   auth: string
   participantSlots: PlayerLobbyParticipantSlotDto[]
-  me: PlayerLobbyMeDto
-  references: PlayerLobbyReferencesDto
-  presets: PlayerLobbyPresetsDto
+  me: PlayerLobbyServerMe
+  references: PlayerLobbyServerReferences
+  presets: PlayerLobbyServerPresets
 }
 
 export type DeckEditorActionResponseById = {
