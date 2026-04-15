@@ -1,5 +1,6 @@
 package com.example.dueltower.screen.api;
 
+import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
 import com.example.dueltower.screen.service.ScreenQueryService;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,13 +44,13 @@ public class ScreenController {
     }
 
     @GetMapping("/decks/new/editor")
-    public Object newDeckEditor(Authentication authentication) {
+    public DeckEditorScreenResponse newDeckEditor(Authentication authentication) {
         return screenQueryService.getNewDeckEditor(authentication);
     }
 
     @GetMapping("/decks/{id}/editor")
-    public Object deckEditor(@PathVariable long id,
-                             Authentication authentication) {
+    public DeckEditorScreenResponse deckEditor(@PathVariable long id,
+                                               Authentication authentication) {
         return screenQueryService.getDeckEditor(id, authentication);
     }
 }

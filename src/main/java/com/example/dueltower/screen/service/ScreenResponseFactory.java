@@ -91,13 +91,13 @@ public class ScreenResponseFactory {
 
     public DeckEditorValidationDto deckEditorValidation(DeckValidationResponse validationResponse,
                                                         DeckEditorDraftDto draft) {
-        String draftSignature = draftSignature(draft.cards());
-        String validatedSignature = draftSignature(draft.cards());
+        String validatedSignature = draftSignature(draft);
         return new DeckEditorValidationDto(
                 validationResponse.valid(),
                 validationResponse.normalizedTotalCards(),
                 validationResponse.issues(),
-                !draftSignature.equals(validatedSignature)
+                false,
+                validatedSignature
         );
     }
 
@@ -256,11 +256,13 @@ public class ScreenResponseFactory {
         return false;
     }
 
-    private String draftSignature(List<DeckEditorDraftCardDto> cards) {
-        return cards.stream()
+    private String draftSignature(DeckEditorDraftDto draft) {
+        String typeToken = draft.type() == null ? "" : draft.type().name();
+        String cardsToken = draft.cards().stream()
                 .map(card -> safeTrim(card.cardId()) + ":" + card.count())
                 .reduce((left, right) -> left + "|" + right)
                 .orElse("");
+        return "type=" + typeToken + ";cards=" + cardsToken;
     }
 
     private String safeTrim(String value) {

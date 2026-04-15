@@ -1,5 +1,6 @@
 package com.example.dueltower.screen.service;
 
+import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -36,11 +37,11 @@ public class ScreenQueryService {
         return sessionScreenService.getCombat(code, gmTokenHeader, playerTokenHeader, authentication);
     }
 
-    public Object getDeckEditor(long deckId, Authentication authentication) {
+    public DeckEditorScreenResponse getDeckEditor(long deckId, Authentication authentication) {
         return deckEditorScreenService.getEditor(deckId, authentication);
     }
 
-    public Object getNewDeckEditor(Authentication authentication) {
+    public DeckEditorScreenResponse getNewDeckEditor(Authentication authentication) {
         return deckEditorScreenService.getNewEditor(authentication);
     }
 }

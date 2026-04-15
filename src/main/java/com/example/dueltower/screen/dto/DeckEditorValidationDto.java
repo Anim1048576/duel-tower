@@ -8,6 +8,7 @@ public record DeckEditorValidationDto(
         boolean valid,
         int normalizedTotalCards,
         List<DeckValidationIssue> issues,
-        boolean isStale
+        boolean isStale,
+        String validatedDraftSignature
 ) {
 }

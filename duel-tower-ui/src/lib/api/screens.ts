@@ -311,11 +311,11 @@ export async function getScreen<TScreen extends ScreenResponseBase = ScreenRespo
 
 export function invokeScreenAction<
   TScreen extends ScreenResponseBase = ScreenResponseBase,
-  TResponse extends ScreenActionResponse<TScreen> = ScreenActionResponse<TScreen>,
+  TResponse = ScreenActionResponse<TScreen>,
 >(action: ScreenActionDto, options?: InvokeScreenActionOptions): Promise<TResponse>
 export function invokeScreenAction<
   TScreen extends ScreenResponseBase = ScreenResponseBase,
-  TResponse extends ScreenActionResponse<TScreen> = ScreenActionResponse<TScreen>,
+  TResponse = ScreenActionResponse<TScreen>,
 >(
   screen: Pick<ScreenResponseBase, 'possibleActions'>,
   actionId: string,
@@ -323,7 +323,7 @@ export function invokeScreenAction<
 ): Promise<TResponse>
 export async function invokeScreenAction<
   TScreen extends ScreenResponseBase = ScreenResponseBase,
-  TResponse extends ScreenActionResponse<TScreen> = ScreenActionResponse<TScreen>,
+  TResponse = ScreenActionResponse<TScreen>,
 >(
   actionOrScreen: ScreenActionDto | Pick<ScreenResponseBase, 'possibleActions'>,
   actionIdOrOptions?: string | InvokeScreenActionOptions,

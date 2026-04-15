@@ -4,6 +4,7 @@ import com.example.dueltower.content.deck.dto.DeckCardSpec;
 import com.example.dueltower.content.deck.dto.DeckResponse;
 import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.screen.dto.DeckEditorDraftDto;
+import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -28,7 +29,7 @@ public class DeckEditorScreenService {
         this.screenResponseFactory = screenResponseFactory;
     }
 
-    public Object getEditor(long deckId, Authentication authentication) {
+    public DeckEditorScreenResponse getEditor(long deckId, Authentication authentication) {
         requireAuthenticatedUsername(authentication);
         DeckResponse deck = deckService.get(deckId);
         DeckEditorDraftDto draft = screenResponseFactory.deckEditorDraft(deck);
@@ -46,7 +47,7 @@ public class DeckEditorScreenService {
         );
     }
 
-    public Object getNewEditor(Authentication authentication) {
+    public DeckEditorScreenResponse getNewEditor(Authentication authentication) {
         requireAuthenticatedUsername(authentication);
         DeckEditorDraftDto draft = screenResponseFactory.newDeckEditorDraft();
         return screenResponseFactory.deckEditor(

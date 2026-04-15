@@ -133,6 +133,8 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(newEditorBody.path("validation").path("normalizedTotalCards").asInt()).isEqualTo(0);
         assertThat(newEditorBody.path("validation").path("issues")).isNotEmpty();
         assertThat(newEditorBody.path("validation").path("isStale").asBoolean()).isFalse();
+        assertThat(newEditorBody.path("validation").path("validatedDraftSignature").asText())
+                .isEqualTo("type=PLAYER;cards=");
 
         JsonNode createAction = findAction(newEditorBody, "deckEditor.create");
         assertThat(newEditorBody.path("possibleActions")).hasSize(1);
@@ -177,6 +179,15 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(editorBody.path("validation").path("normalizedTotalCards").asInt()).isEqualTo(12);
         assertThat(editorBody.path("validation").path("issues")).hasSize(0);
         assertThat(editorBody.path("validation").path("isStale").asBoolean()).isFalse();
+        String expectedValidatedSignature = "type=%s;cards=%s".formatted(
+                editorBody.path("draft").path("type").asText(),
+                StreamSupport.stream(editorBody.path("draft").path("cards").spliterator(), false)
+                        .map(card -> card.path("cardId").asText() + ":" + card.path("count").asInt())
+                        .reduce((left, right) -> left + "|" + right)
+                        .orElse("")
+        );
+        assertThat(editorBody.path("validation").path("validatedDraftSignature").asText())
+                .isEqualTo(expectedValidatedSignature);
 
         JsonNode validateAction = findAction(editorBody, "deckEditor.validate");
         JsonNode saveAction = findAction(editorBody, "deckEditor.save");

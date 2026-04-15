@@ -1,4 +1,4 @@
-import type { DeckIdentifier, DeckType, DeckValidationIssue } from './deckTypes'
+import type { DeckIdentifier, DeckResponse, DeckType, DeckValidationIssue } from './deckTypes'
 import type { SessionCode } from './sessionTypes'
 
 export type ScreenKey = 'PlayerLobby' | 'GmLobby' | 'Combat' | 'DeckEditor'
@@ -48,6 +48,12 @@ export type DeckEditorActionPayload = {
   }[] | null
 }
 
+export type DeckEditorActionId =
+  | 'deckEditor.validate'
+  | 'deckEditor.save'
+  | 'deckEditor.create'
+  | 'deckEditor.delete'
+
 export type DeckEditorDraftCardDto = {
   key: string
   cardId: string
@@ -73,6 +79,7 @@ export type DeckEditorValidationDto = {
   normalizedTotalCards: number
   issues: DeckValidationIssue[]
   isStale: boolean
+  validatedDraftSignature: string
 }
 
 export type ScreenActionDto<TPayloadTemplate = ScreenActionPayloadTemplate> = {
@@ -86,7 +93,9 @@ export type ScreenActionDto<TPayloadTemplate = ScreenActionPayloadTemplate> = {
   payloadTemplate: TPayloadTemplate | null
 }
 
-export type DeckEditorScreenAction = ScreenActionDto<DeckEditorActionPayload>
+export type DeckEditorScreenAction = ScreenActionDto<DeckEditorActionPayload> & {
+  id: DeckEditorActionId
+}
 
 export type ScreenResponseBase<TAction extends ScreenActionDto = ScreenActionDto> = {
   screenKey: string
@@ -104,6 +113,19 @@ export type DeckEditorScreenResponse = ScreenResponseBase<DeckEditorScreenAction
   draft: DeckEditorDraftDto
   derived: DeckEditorDerivedDto
   validation: DeckEditorValidationDto
+}
+
+export type DeckEditorActionResponseById = {
+  'deckEditor.validate': DeckValidationResponseLike
+  'deckEditor.save': DeckResponse
+  'deckEditor.create': DeckResponse
+  'deckEditor.delete': void
+}
+
+type DeckValidationResponseLike = {
+  valid: boolean
+  normalizedTotalCards: number
+  issues: DeckValidationIssue[]
 }
 
 export type ScreenActionResponse<TScreen extends ScreenResponseBase = ScreenResponseBase> = Record<
@@ -138,6 +160,13 @@ export function isScreenActionDisabled(action: Pick<ScreenActionDto, 'enabled'>)
 export function findScreenAction<TAction extends ScreenActionDto>(
   screen: Pick<ScreenResponseBase<TAction>, 'possibleActions'>,
   actionId: string,
+) {
+  return screen.possibleActions.find((action) => action.id === actionId) ?? null
+}
+
+export function findDeckEditorAction(
+  screen: Pick<DeckEditorScreenResponse, 'possibleActions'>,
+  actionId: DeckEditorActionId,
 ) {
   return screen.possibleActions.find((action) => action.id === actionId) ?? null
 }
