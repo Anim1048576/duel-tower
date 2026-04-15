@@ -5,6 +5,12 @@
     getPlayCardRequirementError,
   } from '../features/session/combat/commandRequirements'
   import {
+    getOrderedTieActorKeys,
+    getPendingCandidateIds,
+    getSelectedDiscardIdsFromHand,
+    getSelectedFieldIds,
+  } from '../features/session/combat/selectionFilters'
+  import {
     normalizePlaySpec,
   } from '../features/session/combat/playSpec'
   import { getCard, listCards } from '../lib/api/content'
@@ -358,26 +364,6 @@
     }
 
     return session?.cards[normalizedId]?.defId ?? null
-  }
-
-  function getSelectedDiscardIdsFromHand(player: PlayerStateDto | null) {
-    const handIds = new Set(player?.hand ?? [])
-    return commandDraft.selectedDiscardIds.filter((instanceId) => handIds.has(instanceId))
-  }
-
-  function getSelectedFieldIds(player: PlayerStateDto | null) {
-    const fieldIds = new Set(player?.field ?? [])
-    return commandDraft.selectedIds.filter((instanceId) => fieldIds.has(instanceId))
-  }
-
-  function getPendingCandidateIds(pendingDecision: PendingDecisionDto | null) {
-    const candidateIds = new Set(pendingDecision?.candidateIds ?? [])
-    return commandDraft.selectedIds.filter((value) => candidateIds.has(value))
-  }
-
-  function getOrderedTieActorKeys(pendingDecision: PendingDecisionDto | null) {
-    const actorKeys = new Set(pendingDecision?.actorKeys ?? [])
-    return commandDraft.orderedActorKeys.filter((actorKey) => actorKeys.has(actorKey))
   }
 
   function formatTargetSelectionLabel(target: CombatCommandDraft['selectedTargets'][number]) {
@@ -1610,10 +1596,18 @@
 
     return null
   })
-  const selectedDiscardIdsFromHand = $derived.by(() => getSelectedDiscardIdsFromHand(runtimePlayerState))
-  const selectedFieldIds = $derived.by(() => getSelectedFieldIds(runtimePlayerState))
-  const pendingCandidateIds = $derived.by(() => getPendingCandidateIds(runtimePendingDecision))
-  const orderedTieActorKeys = $derived.by(() => getOrderedTieActorKeys(runtimePendingDecision))
+  const selectedDiscardIdsFromHand = $derived.by(() =>
+    getSelectedDiscardIdsFromHand(runtimePlayerState, commandDraft.selectedDiscardIds),
+  )
+  const selectedFieldIds = $derived.by(() =>
+    getSelectedFieldIds(runtimePlayerState, commandDraft.selectedIds),
+  )
+  const pendingCandidateIds = $derived.by(() =>
+    getPendingCandidateIds(runtimePendingDecision, commandDraft.selectedIds),
+  )
+  const orderedTieActorKeys = $derived.by(() =>
+    getOrderedTieActorKeys(runtimePendingDecision, commandDraft.orderedActorKeys),
+  )
   const selectedCommandRequirementView = $derived.by(() => {
     if (!commandDraft.selectedCommandType || !selectedCommandSourceLabel) {
       return null
