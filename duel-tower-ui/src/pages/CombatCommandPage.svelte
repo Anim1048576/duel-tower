@@ -29,11 +29,9 @@
     getSessionState,
   } from '../lib/api/sessions'
   import type {
-    CardInstanceDto,
     CombatEnemyDto,
     CombatSummonDto,
     CommandRequest,
-    PendingDecisionDto,
     RecentResultsResponse,
     SessionEventItemDto,
     SessionLogItemDto,
@@ -48,7 +46,6 @@
   import HandBar from '../lib/components/combat/HandBar.svelte'
   import type {
     CombatActorSummary,
-    CombatCommandRequirementViewModel,
     CombatEnemyViewModel,
     CombatFeedEntry,
     CombatPlayerViewModel,
@@ -1219,8 +1216,8 @@
       : null
     const playSpec = normalizePlaySpec(commandDetail?.playSpec ?? null)
     const filteredTargets = commandDraft.selectedTargets
-    const filteredDiscardIds = getSelectedDiscardIdsFromHand(runtimePlayer)
-    const filteredSelectedIds = getSelectedFieldIds(runtimePlayer)
+    const filteredDiscardIds = selectedDiscardIdsFromHand
+    const filteredSelectedIds = selectedFieldIds
     const requirementError = getPlayCardRequirementError(
       commandType === 'PLAY_CARD' ? 'PLAY_CARD' : 'USE_EX',
       playSpec,
@@ -1301,7 +1298,7 @@
       return
     }
 
-    const unsupportedMessage = getUnsupportedPendingDecisionMessage(runtimePendingDecision)
+    const unsupportedMessage = unsupportedPendingDecisionMessage
 
     if (unsupportedMessage) {
       commandRejectedMessage = unsupportedMessage
@@ -1321,7 +1318,7 @@
 
     switch (runtimePendingDecision.type) {
       case 'HAND_SWAP': {
-        const discardIds = getSelectedDiscardIdsFromHand(runtimePlayerState)
+        const discardIds = selectedDiscardIdsFromHand
 
         if (discardIds.length !== 1) {
           commandErrorMessage = 'Select exactly one hand card before resolving HAND_SWAP.'
@@ -1334,7 +1331,7 @@
         break
       }
       case 'DISCARD_TO_HAND_LIMIT': {
-        const discardIds = getSelectedDiscardIdsFromHand(runtimePlayerState)
+        const discardIds = selectedDiscardIdsFromHand
 
         if (discardIds.length === 0) {
           commandErrorMessage = 'Select hand cards to discard before resolving DISCARD_TO_HAND_LIMIT.'
