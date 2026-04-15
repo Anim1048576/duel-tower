@@ -7,6 +7,8 @@ import com.example.dueltower.content.deck.domain.Deck;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.repository.DeckRepository;
 import com.example.dueltower.member.MemberRepository;
+import com.example.dueltower.preset.domain.Preset;
+import com.example.dueltower.preset.repository.PresetRepository;
 import com.example.dueltower.screen.support.ScreenApiContractTestSupport;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,8 +54,12 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     @Autowired
     private DeckRepository deckRepository;
 
+    @Autowired
+    private PresetRepository presetRepository;
+
     @BeforeEach
     void setUp() {
+        presetRepository.deleteAll();
         deckRepository.deleteAll();
         memberRepository.deleteAll();
         characterProfileRepository.deleteAll();
@@ -211,6 +217,95 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(deleteAction.path("payloadTemplate").isNull()).isTrue();
     }
 
+    @Test
+    void newPresetEditorScreenReturnsCreateModeDraftResolvedPreviewAndCreateAction() throws Exception {
+        MockHttpSession session = signUpAndLogin("preset-user", "preset-user@example.com", "password123");
+
+        MvcResult newEditor = mockMvc.perform(get("/api/screens/presets/new/editor")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(newEditor, "PresetEditor");
+        assertThat(body.path("mode").asText()).isEqualTo("create");
+        assertThat(body.path("policyGroup").asText()).isEqualTo("AUTHENTICATED_WEB");
+        assertThat(body.path("auth").asText()).isEqualTo("loginCookie");
+        assertThat(body.path("presetId").isNull()).isTrue();
+        assertThat(body.path("draft").path("name").asText()).isEmpty();
+        assertThat(body.path("draft").path("characterId").isNull()).isTrue();
+        assertThat(body.path("draft").path("deckCardIds")).hasSize(0);
+        assertThat(body.path("draft").path("exCardId").asText()).isEmpty();
+        assertThat(body.path("draft").path("passiveIds")).hasSize(0);
+        assertThat(body.path("resolved").path("characterLabel").asText()).isEqualTo("No character selected");
+        assertThat(body.path("resolved").path("exLabel").asText()).isEqualTo("No EX card selected");
+        assertThat(body.path("resolved").path("deckItems")).hasSize(0);
+        assertThat(body.path("resolved").path("passiveItems")).hasSize(0);
+        assertThat(body.path("derived").path("dirty").asBoolean()).isFalse();
+        assertThat(body.path("derived").path("createdAtLabel").asText()).isEqualTo("Available after create");
+        assertThat(body.path("derived").path("updatedAtLabel").asText()).isEqualTo("Available after create");
+
+        assertThat(body.path("possibleActions")).hasSize(1);
+        JsonNode createAction = findAction(body, "presetEditor.create");
+        assertActionContract(createAction);
+        assertThat(createAction.path("href").asText()).isEqualTo("/api/me/presets");
+        assertThat(createAction.path("method").asText()).isEqualTo("POST");
+        assertThat(createAction.path("payloadTemplate").path("name").asText()).isEmpty();
+        assertThat(createAction.path("payloadTemplate").path("characterId").asLong()).isZero();
+        assertThat(createAction.path("payloadTemplate").path("deckCardIds")).hasSize(0);
+        assertThat(createAction.path("payloadTemplate").path("exCardId").asText()).isEmpty();
+        assertThat(createAction.path("payloadTemplate").path("passiveIds")).hasSize(0);
+    }
+
+    @Test
+    void existingPresetEditorScreenReturnsEditModeDraftResolvedPreviewAndModeSpecificActions() throws Exception {
+        long characterId = createCharacter();
+        MockHttpSession session = signUpAndLogin("preset-user-edit", "preset-user-edit@example.com", "password123");
+        Preset preset = createPreset("preset-user-edit", characterId);
+
+        MvcResult editor = mockMvc.perform(get("/api/screens/presets/{id}/editor", preset.getId())
+                        .session(session))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(editor, "PresetEditor");
+        assertThat(body.path("presetId").asLong()).isEqualTo(preset.getId());
+        assertThat(body.path("mode").asText()).isEqualTo("edit");
+        assertThat(body.path("draft").path("name").asText()).isEqualTo("screen-preset");
+        assertThat(body.path("draft").path("characterId").asLong()).isEqualTo(characterId);
+        assertThat(body.path("draft").path("deckCardIds")).hasSize(2);
+        assertThat(body.path("draft").path("deckCardIds").get(0).asText()).isEqualTo("C001");
+        assertThat(body.path("draft").path("exCardId").asText()).isEqualTo("EX901");
+        assertThat(body.path("draft").path("passiveIds")).hasSize(1);
+        assertThat(body.path("resolved").path("characterLabel").asText()).contains("#" + characterId);
+        assertThat(body.path("resolved").path("deckItems")).hasSize(2);
+        assertThat(body.path("resolved").path("deckItems").get(0).path("label").asText()).contains("C001");
+        assertThat(body.path("resolved").path("deckItems").get(0).path("tags").isArray()).isTrue();
+        assertThat(body.path("resolved").path("passiveItems")).hasSize(1);
+        assertThat(body.path("resolved").path("passiveItems").get(0).path("label").asText()).contains("Tig001_Passive");
+        assertThat(body.path("derived").path("dirty").asBoolean()).isFalse();
+        assertThat(body.path("derived").path("createdAtLabel").asText()).isNotBlank();
+        assertThat(body.path("derived").path("updatedAtLabel").asText()).isNotBlank();
+
+        assertThat(body.path("possibleActions")).hasSize(3);
+        JsonNode saveAction = findAction(body, "presetEditor.save");
+        JsonNode cloneAction = findAction(body, "presetEditor.clone");
+        JsonNode deleteAction = findAction(body, "presetEditor.delete");
+        assertActionContract(saveAction);
+        assertActionContract(cloneAction);
+        assertActionContract(deleteAction);
+        assertThat(saveAction.path("href").asText()).isEqualTo("/api/me/presets/" + preset.getId());
+        assertThat(saveAction.path("method").asText()).isEqualTo("PUT");
+        assertThat(saveAction.path("payloadTemplate").path("name").asText()).isEqualTo("screen-preset");
+        assertThat(saveAction.path("payloadTemplate").path("characterId").asLong()).isEqualTo(characterId);
+        assertThat(saveAction.path("payloadTemplate").path("deckCardIds")).hasSize(2);
+        assertThat(cloneAction.path("href").asText()).isEqualTo("/api/me/presets/" + preset.getId() + "/clone");
+        assertThat(cloneAction.path("method").asText()).isEqualTo("POST");
+        assertThat(cloneAction.path("payloadTemplate").isNull()).isTrue();
+        assertThat(deleteAction.path("href").asText()).isEqualTo("/api/me/presets/" + preset.getId());
+        assertThat(deleteAction.path("method").asText()).isEqualTo("DELETE");
+        assertThat(deleteAction.path("payloadTemplate").isNull()).isTrue();
+    }
+
     private SessionInfo createSession(MockHttpSession session, String gmId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/sessions")
                         .session(session)
@@ -272,6 +367,18 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         Deck deck = Deck.create(name, type);
         deck.syncCards(cards);
         return deckRepository.save(deck);
+    }
+
+    private Preset createPreset(String ownerUsername, long characterId) {
+        Preset preset = Preset.create(
+                ownerUsername,
+                "screen-preset",
+                characterId,
+                List.of("C001", "C002"),
+                "EX901",
+                List.of("Tig001_Passive")
+        );
+        return presetRepository.save(preset);
     }
 
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {

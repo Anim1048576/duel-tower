@@ -1,6 +1,7 @@
 import { readStoredSessionAccess, type StoredSessionAccess } from '../session/access'
 import { apiGet, apiRequest } from './client'
 import type { DeckIdentifier } from './deckTypes'
+import type { PresetIdentifier } from './presetTypes'
 import {
   findScreenAction,
   isScreenActionDisabled,
@@ -59,6 +60,7 @@ const screenRouteAuth: Record<ScreenKey, ScreenActionAuth> = {
   GmLobby: 'sessionReadable',
   Combat: 'sessionReadable',
   DeckEditor: 'loginCookie',
+  PresetEditor: 'loginCookie',
 }
 
 function normalizePathValue(value: string | number, fieldName: string) {
@@ -91,6 +93,14 @@ function getDeckEditorScreenPath(deckId?: DeckIdentifier | null) {
   return normalizedDeckId
     ? `${SCREENS_API_BASE}/decks/${normalizePathValue(normalizedDeckId, 'deck id')}/editor`
     : `${SCREENS_API_BASE}/decks/new/editor`
+}
+
+function getPresetEditorScreenPath(presetId?: PresetIdentifier | null) {
+  const normalizedPresetId = presetId == null ? '' : String(presetId).trim()
+
+  return normalizedPresetId
+    ? `${SCREENS_API_BASE}/presets/${normalizePathValue(normalizedPresetId, 'preset id')}/editor`
+    : `${SCREENS_API_BASE}/presets/new/editor`
 }
 
 function appendQueryParams(href: string, query: ScreenQueryParams | undefined) {
@@ -251,7 +261,8 @@ function resolveActionArgs(
 }
 
 export function buildScreenHref(screenKey: 'DeckEditor', params?: ScreenRequestParamsByKey['DeckEditor']): string
-export function buildScreenHref<TKey extends Exclude<ScreenKey, 'DeckEditor'>>(
+export function buildScreenHref(screenKey: 'PresetEditor', params?: ScreenRequestParamsByKey['PresetEditor']): string
+export function buildScreenHref<TKey extends Exclude<ScreenKey, 'DeckEditor' | 'PresetEditor'>>(
   screenKey: TKey,
   params: ScreenRequestParamsByKey[TKey],
 ): string
@@ -278,6 +289,8 @@ function buildScreenHrefInternal(screenKey: ScreenKey, params?: ScreenRequestPar
       return `${getSessionScreenBasePath(params.code)}/combat`
     case 'DeckEditor':
       return getDeckEditorScreenPath(params && 'deckId' in params ? params.deckId : null)
+    case 'PresetEditor':
+      return getPresetEditorScreenPath(params && 'presetId' in params ? params.presetId : null)
     default:
       throw new Error(`Unsupported screen key: ${screenKey}`)
   }
@@ -288,7 +301,12 @@ export function getScreen<TScreen extends ScreenResponseBase = ScreenResponseBas
   params?: ScreenRequestParamsByKey['DeckEditor'],
   options?: ScreenRequestOptions,
 ): Promise<TScreen>
-export function getScreen<TKey extends Exclude<ScreenKey, 'DeckEditor'>, TScreen extends ScreenResponseBase = ScreenResponseBase>(
+export function getScreen<TScreen extends ScreenResponseBase = ScreenResponseBase>(
+  screenKey: 'PresetEditor',
+  params?: ScreenRequestParamsByKey['PresetEditor'],
+  options?: ScreenRequestOptions,
+): Promise<TScreen>
+export function getScreen<TKey extends Exclude<ScreenKey, 'DeckEditor' | 'PresetEditor'>, TScreen extends ScreenResponseBase = ScreenResponseBase>(
   screenKey: TKey,
   params: ScreenRequestParamsByKey[TKey],
   options?: ScreenRequestOptions,

@@ -1,7 +1,8 @@
 import type { DeckIdentifier, DeckResponse, DeckType, DeckValidationIssue } from './deckTypes'
+import type { PresetIdentifier, PresetResponse } from './presetTypes'
 import type { SessionCode } from './sessionTypes'
 
-export type ScreenKey = 'PlayerLobby' | 'GmLobby' | 'Combat' | 'DeckEditor'
+export type ScreenKey = 'PlayerLobby' | 'GmLobby' | 'Combat' | 'DeckEditor' | 'PresetEditor'
 
 export type ScreenActionAuth =
   | 'public'
@@ -24,6 +25,9 @@ export type ScreenRequestParamsByKey = {
   }
   DeckEditor: {
     deckId?: DeckIdentifier | null
+  }
+  PresetEditor: {
+    presetId?: PresetIdentifier | null
   }
 }
 
@@ -48,11 +52,25 @@ export type DeckEditorActionPayload = {
   }[] | null
 }
 
+export type PresetEditorActionPayload = {
+  name?: string | null
+  characterId?: number | null
+  deckCardIds?: string[] | null
+  exCardId?: string | null
+  passiveIds?: string[] | null
+}
+
 export type DeckEditorActionId =
   | 'deckEditor.validate'
   | 'deckEditor.save'
   | 'deckEditor.create'
   | 'deckEditor.delete'
+
+export type PresetEditorActionId =
+  | 'presetEditor.save'
+  | 'presetEditor.create'
+  | 'presetEditor.clone'
+  | 'presetEditor.delete'
 
 export type DeckEditorDraftCardDto = {
   key: string
@@ -67,11 +85,49 @@ export type DeckEditorDraftDto = {
   cards: DeckEditorDraftCardDto[]
 }
 
+export type PresetEditorDraftDto = {
+  name: string
+  characterId: number | null
+  deckCardIds: string[]
+  exCardId: string
+  passiveIds: string[]
+}
+
 export type DeckEditorDerivedDto = {
   title: string
   deckTypeLabel: string
   totalCards: number
   dirty: boolean
+}
+
+export type PresetEditorResolvedTagDto = {
+  label: string
+  tone: 'accent' | 'muted' | 'success' | 'warning' | string
+}
+
+export type PresetEditorResolvedItemDto = {
+  id: string
+  label: string
+  subtitle: string
+  meta: string
+  tags: PresetEditorResolvedTagDto[]
+}
+
+export type PresetEditorResolvedDto = {
+  characterLabel: string
+  characterSubtitle: string
+  characterTags: PresetEditorResolvedTagDto[]
+  exLabel: string
+  exSubtitle: string
+  exTags: PresetEditorResolvedTagDto[]
+  deckItems: PresetEditorResolvedItemDto[]
+  passiveItems: PresetEditorResolvedItemDto[]
+}
+
+export type PresetEditorDerivedDto = {
+  dirty: boolean
+  createdAtLabel: string
+  updatedAtLabel: string
 }
 
 /**
@@ -111,6 +167,10 @@ export type DeckEditorScreenAction = ScreenActionDto<DeckEditorActionPayload> & 
   id: DeckEditorActionId
 }
 
+export type PresetEditorScreenAction = ScreenActionDto<PresetEditorActionPayload> & {
+  id: PresetEditorActionId
+}
+
 export type ScreenResponseBase<TAction extends ScreenActionDto = ScreenActionDto> = {
   screenKey: string
   generatedAt: string
@@ -129,11 +189,29 @@ export type DeckEditorScreenResponse = ScreenResponseBase<DeckEditorScreenAction
   validation: DeckEditorServerValidationDto
 }
 
+export type PresetEditorScreenResponse = ScreenResponseBase<PresetEditorScreenAction> & {
+  presetId: number | null
+  mode: 'create' | 'edit'
+  routeTemplate: string
+  policyGroup: string
+  auth: string
+  draft: PresetEditorDraftDto
+  resolved: PresetEditorResolvedDto
+  derived: PresetEditorDerivedDto
+}
+
 export type DeckEditorActionResponseById = {
   'deckEditor.validate': DeckValidationResponseLike
   'deckEditor.save': DeckResponse
   'deckEditor.create': DeckResponse
   'deckEditor.delete': void
+}
+
+export type PresetEditorActionResponseById = {
+  'presetEditor.save': PresetResponse
+  'presetEditor.create': PresetResponse
+  'presetEditor.clone': PresetResponse
+  'presetEditor.delete': void
 }
 
 type DeckValidationResponseLike = {
@@ -181,6 +259,13 @@ export function findScreenAction<TAction extends ScreenActionDto>(
 export function findDeckEditorAction(
   screen: Pick<DeckEditorScreenResponse, 'possibleActions'>,
   actionId: DeckEditorActionId,
+) {
+  return screen.possibleActions.find((action) => action.id === actionId) ?? null
+}
+
+export function findPresetEditorAction(
+  screen: Pick<PresetEditorScreenResponse, 'possibleActions'>,
+  actionId: PresetEditorActionId,
 ) {
   return screen.possibleActions.find((action) => action.id === actionId) ?? null
 }

@@ -1,88 +1,69 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { listCharacters } from '../lib/api/characters'
-  import type { CharacterProfileResponse } from '../lib/api/characterTypes'
-  import { clonePreset, createPreset, deletePreset, getPreset, updatePreset } from '../lib/api/presets'
-  import type { PresetResponse, PresetTimestampValue } from '../lib/api/presetTypes'
-  import { listCards, listPassives } from '../lib/api/content'
-  import type { CardDefinition, PassiveDefinition } from '../lib/api/contentTypes'
+  import { getScreen, invokeScreenAction } from '../lib/api/screens'
+  import {
+    buildScreenActionPayload,
+    findPresetEditorAction,
+    type PresetEditorActionId,
+    type PresetEditorActionResponseById,
+    type PresetEditorResolvedItemDto,
+    type PresetEditorScreenResponse,
+  } from '../lib/api/screenTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import EntityListPane from '../lib/components/EntityListPane.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
-  import { buildCardArchiveMeta, buildCardDisplayTags, getCardTypeLabel } from '../lib/content/display'
   import { pathBuilders, resolveRouteMatch, routePaths } from '../lib/navigation'
   import {
-    addPresetIdentifier,
-    clonePresetEditorState,
+    buildPresetEditorActionPatch,
     createEmptyPresetEditorState,
     createPresetEditorState,
     isPresetEditorStateDirty,
-    normalizePresetEditorState,
-    normalizePresetIdentifier,
-    toPresetEditorPayload,
     type PresetEditorState,
   } from '../lib/presets/editorModel'
   import {
-    presetListStateCopy,
     presetEditorStateCopy,
+    presetListStateCopy,
     readPresetPageFeedback,
     setPresetPageFeedback,
     type PresetPageFeedback,
   } from '../lib/presets/pageState'
   import {
+    readSelectionHandoff,
     removeSelectionHandoff,
     selectionHandoffKeys,
     setSelectionHandoff,
   } from '../lib/selectionHandoff'
 
-  type PresetEditorMode = 'create' | 'edit' | 'selection'
+  type EntityTagTone = 'accent' | 'muted' | 'success' | 'warning'
 
-  type PresetEntryItem = {
+  type EntityTag = {
+    label: string
+    tone?: EntityTagTone
+  }
+
+  type EntityItem = {
     id: string
     title: string
     subtitle?: string
     meta?: string
-    note?: string
-    tags?: { label: string; tone?: 'accent' | 'muted' | 'success' | 'warning' }[]
+    tags?: EntityTag[]
   }
 
-  const timestampFormatter = new Intl.DateTimeFormat('ko-KR', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
-
   let loading = $state(true)
-  let editorMode = $state<PresetEditorMode>('selection')
-  let preset = $state<PresetResponse | null>(null)
-  let originalState = $state<PresetEditorState | null>(null)
+  let screen = $state<PresetEditorScreenResponse | null>(null)
   let editorState = $state<PresetEditorState>(createEmptyPresetEditorState())
   let errorMessage = $state<string | null>(null)
   let notFoundId = $state<string | null>(null)
   let requestedPresetId = $state<string | null>(null)
-  let requestSequence = 0
-  let saving = $state(false)
-  let saveErrorMessage = $state<string | null>(null)
-  let saveSuccessMessage = $state<string | null>(null)
-  let saveRequestSequence = 0
-  let lastSaveMode = $state<'create' | 'edit' | null>(null)
-  let cloning = $state(false)
-  let cloneErrorMessage = $state<string | null>(null)
-  let cloneRequestSequence = 0
-  let deleting = $state(false)
+  let pendingActionId = $state<PresetEditorActionId | null>(null)
   let deleteConfirmOpen = $state(false)
-  let deleteErrorMessage = $state<string | null>(null)
-  let deleteRequestSequence = 0
+  let actionErrorMessage = $state<string | null>(null)
+  let actionSuccessMessage = $state<string | null>(null)
+  let requestSequence = 0
   let feedback = $state<PresetPageFeedback | null>(null)
-  let referenceLoading = $state(true)
-  let referenceErrorMessage = $state<string | null>(null)
-  let characters = $state<CharacterProfileResponse[]>([])
-  let cards = $state<CardDefinition[]>([])
-  let passives = $state<PassiveDefinition[]>([])
-  let deckCardCandidate = $state('')
-  let passiveCandidate = $state('')
 
   function getPresetIdFromRoute() {
     if (typeof window === 'undefined') return null
@@ -108,181 +89,25 @@
     return typeof value === 'string' && /^\d+$/.test(value.trim())
   }
 
-  function formatPresetTimestamp(value: PresetTimestampValue) {
-    const date = new Date(value)
-
-    if (Number.isNaN(date.getTime())) {
-      const fallback = String(value).trim()
-      return fallback || 'Unknown time'
-    }
-
-    return timestampFormatter.format(date)
+  function clearActionFeedback() {
+    actionErrorMessage = null
+    actionSuccessMessage = null
   }
 
-  function parseIdentifierText(value: string) {
-    return value
-      .split(/\r?\n|,/)
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-  }
+  function applyScreen(nextScreen: PresetEditorScreenResponse) {
+    screen = nextScreen
+    editorState = createPresetEditorState(nextScreen.draft)
+    deleteConfirmOpen = false
 
-  function formatIdentifierText(values: readonly string[]) {
-    return values.join('\n')
-  }
-
-  async function loadReferenceCatalogs() {
-    referenceLoading = true
-    referenceErrorMessage = null
-
-    const [characterResult, cardResult, passiveResult] = await Promise.allSettled([
-      listCharacters(),
-      listCards(),
-      listPassives(),
-    ])
-
-    const errors: string[] = []
-
-    if (characterResult.status === 'fulfilled') {
-      characters = characterResult.value
-    } else {
-      characters = []
-      errors.push('character roster')
-    }
-
-    if (cardResult.status === 'fulfilled') {
-      cards = cardResult.value
-    } else {
-      cards = []
-      errors.push('card archive')
-    }
-
-    if (passiveResult.status === 'fulfilled') {
-      passives = passiveResult.value
-    } else {
-      passives = []
-      errors.push('passive archive')
-    }
-
-    referenceErrorMessage =
-      errors.length > 0
-        ? `Some reference data could not be restored: ${errors.join(', ')}. Manual ids still work.`
-        : null
-
-    referenceLoading = false
-  }
-
-  function getResolvedCharacter(characterId: number | null) {
-    if (characterId === null) {
-      return null
-    }
-
-    return characters.find((character) => character.id === characterId) ?? null
-  }
-
-  function getResolvedCard(cardId: string) {
-    const normalized = normalizePresetIdentifier(cardId)
-    return cards.find((card) => card.id === normalized) ?? null
-  }
-
-  function getResolvedPassive(passiveId: string) {
-    const normalized = normalizePresetIdentifier(passiveId)
-    return passives.find((passive) => passive.id === normalized) ?? null
-  }
-
-  function buildCharacterMeta(character: CharacterProfileResponse) {
-    const parts = [character.disposition || character.oneLiner || 'Character record']
-
-    if (character.currentSkillDeck?.length) {
-      parts.push(`${character.currentSkillDeck.length} linked deck cards`)
-    }
-
-    return parts.join(' | ')
-  }
-
-  function buildResolvedDeckCardItem(cardId: string, index: number): PresetEntryItem {
-    const resolved = getResolvedCard(cardId)
-
-    if (!resolved) {
-      return {
-        id: `deck-${index + 1}`,
-        title: cardId,
-        subtitle: 'Deck card id',
-        meta: `Entry ${index + 1} | Unresolved`,
-        note: 'This card id was not found in the current card archive.',
-        tags: [{ label: 'Unresolved', tone: 'warning' }],
-      }
-    }
-
-    return {
-      id: `deck-${index + 1}`,
-      title: `${resolved.name} (${resolved.id})`,
-      subtitle: getCardTypeLabel(resolved.type),
-      meta: `Entry ${index + 1} | ${buildCardArchiveMeta(resolved)}`,
-      note: resolved.description,
-      tags: buildCardDisplayTags(resolved),
+    if (nextScreen.presetId != null) {
+      setSelectionHandoff(selectionHandoffKeys.presetId, String(nextScreen.presetId))
     }
   }
 
-  function buildResolvedPassiveItem(passiveId: string, index: number): PresetEntryItem {
-    const resolved = getResolvedPassive(passiveId)
-
-    if (!resolved) {
-      return {
-        id: `passive-${index + 1}`,
-        title: passiveId,
-        subtitle: 'Passive id',
-        meta: `Entry ${index + 1} | Unresolved`,
-        note: 'This passive id was not found in the current passive archive.',
-        tags: [{ label: 'Unresolved', tone: 'warning' }],
-      }
-    }
-
-    return {
-      id: `passive-${index + 1}`,
-      title: `${resolved.name} (${resolved.id})`,
-      subtitle: 'Passive definition',
-      meta: `Entry ${index + 1} | Priority ${resolved.priority ?? 'N/A'}`,
-      note: resolved.description,
-      tags: [{ label: 'Passive', tone: 'success' }],
-    }
-  }
-
-  function addDeckCardCandidate() {
-    const nextValue = normalizePresetIdentifier(deckCardCandidate)
-
-    if (!nextValue) {
-      return
-    }
-
-    editorState = {
-      ...editorState,
-      deckCardIds: addPresetIdentifier(editorState.deckCardIds, nextValue),
-    }
-    deckCardCandidate = ''
-  }
-
-  function addPassiveCandidate() {
-    const nextValue = normalizePresetIdentifier(passiveCandidate)
-
-    if (!nextValue) {
-      return
-    }
-
-    editorState = {
-      ...editorState,
-      passiveIds: addPresetIdentifier(editorState.passiveIds, nextValue),
-    }
-    passiveCandidate = ''
-  }
-
-  function syncPresetState(response: PresetResponse) {
-    const nextOriginal = createPresetEditorState(response)
-
-    preset = response
-    originalState = nextOriginal
-    editorState = clonePresetEditorState(nextOriginal)
-    editorMode = 'edit'
-    setSelectionHandoff(selectionHandoffKeys.presetId, String(response.id))
+  function resetTransientState() {
+    pendingActionId = null
+    deleteConfirmOpen = false
+    clearActionFeedback()
   }
 
   function navigateTo(path: string, replace = false) {
@@ -297,70 +122,48 @@
     window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
-  function enterCreateMode() {
-    editorMode = 'create'
-    loading = false
-    preset = null
-    originalState = null
-    editorState = createEmptyPresetEditorState()
-    errorMessage = null
-    notFoundId = null
-    requestedPresetId = null
-    saveErrorMessage = null
-    saveSuccessMessage = null
-    lastSaveMode = null
-    cloneErrorMessage = null
-    deleteErrorMessage = null
-    deleteConfirmOpen = false
+  function replaceWithPresetEditor(id: string) {
+    navigateTo(pathBuilders.presetEditor(id), true)
   }
 
-  async function loadPresetRecord(id: string) {
+  async function loadPresetEditorScreen(presetId?: string | null) {
     const requestId = ++requestSequence
 
-    editorMode = 'edit'
     loading = true
-    preset = null
-    originalState = null
+    screen = null
     editorState = createEmptyPresetEditorState()
+    requestedPresetId = presetId ?? null
     errorMessage = null
     notFoundId = null
-    requestedPresetId = id
-    saveErrorMessage = null
-    saveSuccessMessage = null
-    lastSaveMode = null
-    cloneErrorMessage = null
-    deleteErrorMessage = null
-    deleteConfirmOpen = false
+    resetTransientState()
 
-    if (!isPresetApiId(id)) {
-      notFoundId = id
+    if (presetId && !isPresetApiId(presetId)) {
+      notFoundId = presetId
       loading = false
       return
     }
 
     try {
-      const response = await getPreset(id)
+      const response = presetId
+        ? await getScreen<PresetEditorScreenResponse>('PresetEditor', { presetId })
+        : await getScreen<PresetEditorScreenResponse>('PresetEditor')
 
       if (requestId !== requestSequence) {
         return
       }
 
-      syncPresetState(response)
+      applyScreen(response)
     } catch (error) {
       if (requestId !== requestSequence) {
         return
       }
 
-      preset = null
-      originalState = null
-      editorState = createEmptyPresetEditorState()
-
       if (error instanceof ApiError && (error.status === 404 || error.code === 'not_found')) {
-        notFoundId = id
+        notFoundId = presetId ?? null
         return
       }
 
-      errorMessage = getApiErrorMessage(error, 'Unable to load the selected preset.')
+      errorMessage = getApiErrorMessage(error, 'Unable to load the selected preset editor screen.')
     } finally {
       if (requestId === requestSequence) {
         loading = false
@@ -372,196 +175,60 @@
     const routePresetId = getPresetIdFromRoute()
 
     if (routePresetId) {
-      void loadPresetRecord(routePresetId)
+      void loadPresetEditorScreen(routePresetId)
+      return
+    }
+
+    if (isCreatePresetRoute()) {
+      void loadPresetEditorScreen(null)
       return
     }
 
     if (requestedPresetId) {
-      void loadPresetRecord(requestedPresetId)
+      void loadPresetEditorScreen(requestedPresetId)
     }
   }
 
-  async function handleSave(event?: SubmitEvent) {
-    event?.preventDefault()
-
-    if (loading || saving || cloning || deleting) {
-      return
-    }
-
-    const normalizedState = normalizePresetEditorState(editorState)
-    editorState = normalizedState
-
-    if (!normalizedState.name) {
-      saveErrorMessage = 'Preset name is required before saving.'
-      saveSuccessMessage = null
-      return
-    }
-
-    if (normalizedState.characterId === null || normalizedState.characterId <= 0) {
-      saveErrorMessage = 'Character selection is required before saving.'
-      saveSuccessMessage = null
-      return
-    }
-
-    if (!normalizedState.exCardId) {
-      saveErrorMessage = 'EX card selection is required before saving.'
-      saveSuccessMessage = null
-      return
-    }
-
-    const requestId = ++saveRequestSequence
-    const payload = toPresetEditorPayload(normalizedState)
-    const presetToUpdate = preset
-    const nextSaveMode = isCreateMode || !presetToUpdate ? 'create' : 'edit'
-
-    saving = true
-    saveErrorMessage = null
-    saveSuccessMessage = null
-    lastSaveMode = null
-    cloneErrorMessage = null
-    deleteErrorMessage = null
-    deleteConfirmOpen = false
-
-    try {
-      let response: PresetResponse
-
-      if (nextSaveMode === 'create') {
-        response = await createPreset(payload)
-      } else {
-        if (!presetToUpdate) {
-          saveErrorMessage = 'The preset record is unavailable. Reload the preset and try again.'
-          return
-        }
-
-        response = await updatePreset(presetToUpdate.id, payload)
-      }
-
-      if (requestId !== saveRequestSequence) {
-        return
-      }
-
-      syncPresetState(response)
-      saveSuccessMessage = nextSaveMode === 'create' ? 'Preset created.' : 'Preset saved.'
-      lastSaveMode = nextSaveMode
-
-      if (nextSaveMode === 'create') {
-        navigateTo(pathBuilders.presetEditor(String(response.id)), true)
-      }
-    } catch (error) {
-      if (requestId !== saveRequestSequence) {
-        return
-      }
-
-      saveErrorMessage = getApiErrorMessage(
-        error,
-        nextSaveMode === 'create' ? 'Unable to create the preset.' : 'Unable to save the preset.',
-      )
-    } finally {
-      if (requestId === saveRequestSequence) {
-        saving = false
-      }
-    }
+  function parseIdentifierText(value: string) {
+    return value
+      .split(/\r?\n|,/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
   }
 
-  async function handleClone() {
-    if (!preset || isCreateMode || loading || saving || cloning || deleting || deleteConfirmOpen) {
-      return
-    }
-
-    const requestId = ++cloneRequestSequence
-
-    cloning = true
-    cloneErrorMessage = null
-    saveErrorMessage = null
-    saveSuccessMessage = null
-    deleteErrorMessage = null
-
-    try {
-      const response = await clonePreset(preset.id)
-
-      if (requestId !== cloneRequestSequence) {
-        return
-      }
-
-      setPresetPageFeedback(presetEditorStateCopy.cloneSuccessFeedback)
-      navigateTo(pathBuilders.presetEditor(String(response.id)))
-    } catch (error) {
-      if (requestId !== cloneRequestSequence) {
-        return
-      }
-
-      cloneErrorMessage = getApiErrorMessage(error, 'Unable to clone the preset.')
-    } finally {
-      if (requestId === cloneRequestSequence) {
-        cloning = false
-      }
-    }
+  function formatIdentifierText(values: readonly string[]) {
+    return values.join('\n')
   }
 
-  function openDeleteConfirmation() {
-    if (!preset || isCreateMode || loading || saving || cloning || deleting) {
-      return
+  function toNullablePositiveNumber(value: string) {
+    const normalized = value.trim()
+    const parsed = normalized ? Number(normalized) : null
+
+    if (parsed === null || !Number.isFinite(parsed) || parsed <= 0) {
+      return null
     }
 
-    deleteConfirmOpen = true
-    deleteErrorMessage = null
-    cloneErrorMessage = null
-    saveErrorMessage = null
-    saveSuccessMessage = null
+    return parsed
   }
 
-  function cancelDeleteConfirmation() {
-    if (deleting) {
-      return
-    }
-
-    deleteConfirmOpen = false
-    deleteErrorMessage = null
-  }
-
-  async function handleDelete() {
-    if (!preset || isCreateMode || loading || saving || cloning || deleting) {
-      return
-    }
-
-    const requestId = ++deleteRequestSequence
-
-    deleting = true
-    deleteErrorMessage = null
-    cloneErrorMessage = null
-    saveErrorMessage = null
-    saveSuccessMessage = null
-
-    try {
-      await deletePreset(preset.id)
-
-      if (requestId !== deleteRequestSequence) {
-        return
-      }
-
-      removeSelectionHandoff(selectionHandoffKeys.presetId)
-      setPresetPageFeedback(presetListStateCopy.deletedFeedback)
-      navigateTo(pathBuilders.presetList(), true)
-    } catch (error) {
-      if (requestId !== deleteRequestSequence) {
-        return
-      }
-
-      deleteErrorMessage = getApiErrorMessage(error, 'Unable to delete the preset.')
-    } finally {
-      if (requestId === deleteRequestSequence) {
-        deleting = false
-      }
+  function updateName(value: string) {
+    editorState = {
+      ...editorState,
+      name: value,
     }
   }
 
   function updateCharacterId(value: string) {
-    const normalized = value.trim()
-    const nextValue = normalized ? Number(normalized) : null
-
     editorState = {
       ...editorState,
-      characterId: nextValue !== null && Number.isFinite(nextValue) ? nextValue : null,
+      characterId: toNullablePositiveNumber(value),
+    }
+  }
+
+  function updateExCardId(value: string) {
+    editorState = {
+      ...editorState,
+      exCardId: value,
     }
   }
 
@@ -579,98 +246,204 @@
     }
   }
 
-  function buildPresetEntryItems(values: readonly string[], kind: 'deck' | 'passive'): PresetEntryItem[] {
-    return values.map((value, index) => ({
-      id: `${kind}-${index + 1}`,
-      title: value,
-      subtitle: kind === 'deck' ? 'Deck card id' : 'Passive id',
-      meta: `Entry ${index + 1}`,
-      note: kind === 'deck' ? 'Included in the local deck card draft.' : 'Included in the local passive draft.',
-      tags: [{ label: `#${index + 1}`, tone: 'accent' }],
-    }))
+  function toEntityItem(item: PresetEditorResolvedItemDto): EntityItem {
+    return {
+      id: item.id,
+      title: item.label,
+      subtitle: item.subtitle,
+      meta: item.meta,
+      tags: item.tags.map((tag) => ({
+        label: tag.label,
+        tone: tag.tone as EntityTagTone,
+      })),
+    }
+  }
+
+  function handlePrimarySubmit(event: SubmitEvent) {
+    event.preventDefault()
+    void runAction(isCreateMode ? 'presetEditor.create' : 'presetEditor.save')
+  }
+
+  function getPendingActionLabel(actionId: PresetEditorActionId) {
+    switch (actionId) {
+      case 'presetEditor.save':
+        return 'Saving preset...'
+      case 'presetEditor.create':
+        return 'Creating preset...'
+      case 'presetEditor.clone':
+        return 'Cloning preset...'
+      case 'presetEditor.delete':
+        return 'Deleting preset...'
+    }
+  }
+
+  function getActionSuccessMessage(actionId: PresetEditorActionId) {
+    switch (actionId) {
+      case 'presetEditor.save':
+        return 'Preset saved.'
+      case 'presetEditor.create':
+        return 'Preset created.'
+      case 'presetEditor.clone':
+        return null
+      case 'presetEditor.delete':
+        return null
+    }
+  }
+
+  async function runAction(actionId: PresetEditorActionId) {
+    if (!screen || pendingActionId) {
+      return
+    }
+
+    const action = findPresetEditorAction(screen, actionId)
+
+    if (!action || !action.enabled) {
+      return
+    }
+
+    pendingActionId = actionId
+    actionErrorMessage = null
+    actionSuccessMessage = null
+
+    try {
+      const patch = buildPresetEditorActionPatch(action.id, editorState)
+      const body = action.payloadTemplate && patch ? buildScreenActionPayload(action, patch) : undefined
+
+      if (actionId === 'presetEditor.delete') {
+        await invokeScreenAction<PresetEditorScreenResponse, PresetEditorActionResponseById['presetEditor.delete']>(
+          action,
+          body === undefined ? undefined : { body },
+        )
+
+        removeSelectionHandoff(selectionHandoffKeys.presetId)
+        setPresetPageFeedback(presetListStateCopy.deletedFeedback)
+        navigateTo(pathBuilders.presetList(), true)
+        return
+      }
+
+      const response = await invokeScreenAction<
+        PresetEditorScreenResponse,
+        PresetEditorActionResponseById['presetEditor.save' | 'presetEditor.create' | 'presetEditor.clone']
+      >(action, body === undefined ? undefined : { body })
+
+      const nextPresetId = String(response.id)
+      await loadPresetEditorScreen(nextPresetId)
+
+      if (actionId === 'presetEditor.clone') {
+        setPresetPageFeedback(presetEditorStateCopy.cloneSuccessFeedback)
+        navigateTo(pathBuilders.presetEditor(nextPresetId))
+        return
+      }
+
+      actionSuccessMessage = getActionSuccessMessage(actionId)
+
+      if (actionId === 'presetEditor.create') {
+        replaceWithPresetEditor(nextPresetId)
+      }
+    } catch (error) {
+      actionErrorMessage = getApiErrorMessage(error, 'Unable to complete the requested preset action.')
+    } finally {
+      pendingActionId = null
+    }
+  }
+
+  function openDeleteConfirmation() {
+    if (!screen || !findPresetEditorAction(screen, 'presetEditor.delete') || pendingActionId) {
+      return
+    }
+
+    clearActionFeedback()
+    deleteConfirmOpen = true
+  }
+
+  function cancelDeleteConfirmation() {
+    if (pendingActionId === 'presetEditor.delete') {
+      return
+    }
+
+    deleteConfirmOpen = false
   }
 
   onMount(() => {
     feedback = readPresetPageFeedback()
-    void loadReferenceCatalogs()
+
     const routePresetId = getPresetIdFromRoute()
 
     if (routePresetId) {
-      void loadPresetRecord(routePresetId)
+      void loadPresetEditorScreen(routePresetId)
       return
     }
 
     if (isCreatePresetRoute()) {
-      enterCreateMode()
+      void loadPresetEditorScreen(null)
       return
     }
 
-    editorMode = 'selection'
+    const handoffPresetId = readSelectionHandoff(selectionHandoffKeys.presetId)?.trim()
+
+    if (handoffPresetId) {
+      replaceWithPresetEditor(handoffPresetId)
+      return
+    }
+
     loading = false
   })
 
-  const isCreateMode = $derived.by(() => editorMode === 'create')
-  const editorDirty = $derived.by(() =>
-    originalState ? isPresetEditorStateDirty(originalState, editorState) : false,
-  )
-  const editorControlsDisabled = $derived.by(() => loading || saving || cloning || deleting)
-  const resolvedCharacter = $derived.by(() => getResolvedCharacter(editorState.characterId))
-  const exCardOptions = $derived.by(() => cards.filter((card) => card.type === 'EX'))
-  const deckCardOptions = $derived.by(() => cards.filter((card) => card.type !== 'EX'))
-  const resolvedExCard = $derived.by(() =>
-    editorState.exCardId ? getResolvedCard(editorState.exCardId) : null,
-  )
-  const editorTitle = $derived.by(() =>
-    isCreateMode ? editorState.name.trim() || 'New Preset' : editorState.name.trim() || 'Preset Detail',
-  )
-  const editorDescription = $derived.by(() =>
-    isCreateMode
-      ? 'Prepare a new preset draft before wiring the create flow.'
-      : 'The selected preset is loaded from the URL id and converted into a local edit model.',
-  )
-  const draftStateLabel = $derived.by(() =>
-    isCreateMode ? 'Create Mode' : editorDirty ? 'Draft Changed' : 'Draft Synced',
-  )
-  const draftStateTone = $derived.by(() => (isCreateMode ? 'accent' : editorDirty ? 'warning' : 'success'))
-  const characterIdLabel = $derived.by(() =>
-    editorState.characterId === null ? 'Not assigned' : String(editorState.characterId),
-  )
-  const sourcePresetIdLabel = $derived.by(() => (preset ? String(preset.id) : 'Assigned after create'))
-  const deckCardItems = $derived.by(() =>
-    editorState.deckCardIds.map((cardId, index) => buildResolvedDeckCardItem(cardId, index)),
-  )
-  const passiveItems = $derived.by(() =>
-    editorState.passiveIds.map((passiveId, index) => buildResolvedPassiveItem(passiveId, index)),
-  )
-  const updatedAtLabel = $derived.by(() =>
-    preset ? formatPresetTimestamp(preset.updatedAt) : 'Available after the first save',
-  )
-  const createdAtLabel = $derived.by(() =>
-    preset ? formatPresetTimestamp(preset.createdAt) : 'Available after the first save',
-  )
-  const saveButtonLabel = $derived.by(() =>
-    saving ? (isCreateMode ? 'Creating preset...' : 'Saving preset...') : isCreateMode ? 'Create preset' : 'Save preset',
-  )
-  const cloneButtonLabel = $derived.by(() => (cloning ? 'Cloning preset...' : 'Clone preset'))
+  const isCreateMode = $derived.by(() => screen?.mode === 'create')
+
+  const localDirty = $derived.by(() => {
+    if (!screen) {
+      return false
+    }
+
+    return isPresetEditorStateDirty(createPresetEditorState(screen.draft), editorState)
+  })
+
+  const editorControlsDisabled = $derived.by(() => Boolean(loading || pendingActionId))
+
+  const screenTitle = $derived.by(() => {
+    if (!screen) {
+      return 'Preset Detail'
+    }
+
+    const localName = editorState.name.trim()
+    if (localName) {
+      return localName
+    }
+
+    const draftName = screen.draft.name.trim()
+    if (draftName) {
+      return draftName
+    }
+
+    return isCreateMode ? 'New Preset' : 'Preset Detail'
+  })
+
+  const deckCardItems = $derived.by(() => (screen ? screen.resolved.deckItems.map(toEntityItem) : []))
+  const passiveItems = $derived.by(() => (screen ? screen.resolved.passiveItems.map(toEntityItem) : []))
+  const saveAction = $derived.by(() => (screen ? findPresetEditorAction(screen, 'presetEditor.save') : null))
+  const createAction = $derived.by(() => (screen ? findPresetEditorAction(screen, 'presetEditor.create') : null))
+  const cloneAction = $derived.by(() => (screen ? findPresetEditorAction(screen, 'presetEditor.clone') : null))
+  const deleteAction = $derived.by(() => (screen ? findPresetEditorAction(screen, 'presetEditor.delete') : null))
 </script>
 
 <div class="preset-editor-page-shell">
   {#if loading}
     <SectionFrame
-      eyebrow="Loadout Editor"
-      title="Loading preset"
-      description="Resolving the preset record from the URL before preparing the local edit model."
+      eyebrow="Preset Editor"
+      title="Loading preset editor"
+      description="Resolving the current preset editor screen from the URL."
     >
       <ContentStatePanel
         title="Loading preset"
-        message="Fetching the selected preset from the preset API."
+        message="Fetching the selected preset editor screen."
       />
     </SectionFrame>
   {:else if notFoundId}
     <SectionFrame
       eyebrow="Preset Missing"
       title="Preset not found"
-      description="The requested preset id could not be restored from the current route or the preset API."
+      description="The requested preset id could not be restored from the current route or the preset screen API."
     >
       <div class="preset-editor-page__copy">
         <p>Requested id: {notFoundId}</p>
@@ -687,10 +460,10 @@
     <SectionFrame
       eyebrow="Preset Error"
       title="Preset could not be loaded"
-      description="The editor could not retrieve the current preset record."
+      description="The editor could not retrieve the current preset screen response."
     >
       <ContentStatePanel
-        title="Unable to load preset data"
+        title="Unable to load preset editor"
         message={errorMessage}
         tone="error"
         actionLabel="Retry load"
@@ -703,318 +476,245 @@
         </a>
       </div>
     </SectionFrame>
-  {:else if preset || isCreateMode}
-    <form class="preset-editor-page" onsubmit={handleSave}>
-    <SectionFrame
-      eyebrow={isCreateMode ? 'New Preset' : 'Selected Preset'}
-      title={editorTitle}
-      description={editorDescription}
-    >
-      {#if feedback}
-        <ContentStatePanel
-          title={feedback.title}
-          message={feedback.message}
-        />
-      {/if}
+  {:else if screen}
+    <form class="preset-editor-page" onsubmit={handlePrimarySubmit}>
+      <SectionFrame
+        eyebrow={isCreateMode ? 'New Preset' : 'Selected Preset'}
+        title={screenTitle}
+        description={isCreateMode
+          ? 'Create a new preset from the current local draft.'
+          : 'The editor renders the current preset screen model and keeps only local input state in the browser.'}
+      >
+        {#if feedback}
+          <ContentStatePanel title={feedback.title} message={feedback.message} />
+        {/if}
 
-      {#if referenceErrorMessage}
-        <ContentStatePanel
-          title="Reference data unavailable"
-          message={referenceErrorMessage}
-        />
-      {/if}
-
-      <div class="preset-editor-page__hero">
-        <div class="preset-editor-page__hero-copy">
-          <p>{characterIdLabel}</p>
-          <h3>
-            {editorState.deckCardIds.length} deck cards, {editorState.passiveIds.length} passives, EX
-            {resolvedExCard ? ` ${resolvedExCard.name}` : editorState.exCardId.trim() || ' not assigned'}
-          </h3>
-        </div>
-
-        <div class="preset-editor-page__hero-tags">
-          <TagChip label={`Character ${characterIdLabel}`} tone="muted" />
-          <TagChip label={`${editorState.deckCardIds.length} Cards`} tone="accent" />
-          <TagChip label={`${editorState.passiveIds.length} Passives`} tone="success" />
-          <TagChip label={draftStateLabel} tone={draftStateTone} />
-        </div>
-      </div>
-
-      <div class="preset-editor-page__stats">
-        <StatBlock value={sourcePresetIdLabel} label="Preset id" note="Current URL-bound preset source" />
-        <StatBlock value={updatedAtLabel} label="Updated" note="Last preset update from the API" />
-        <StatBlock value={createdAtLabel} label="Created" note="Original preset creation time" />
-      </div>
-
-      <fieldset class="preset-editor-page__fieldset">
-        <legend>Preset metadata</legend>
-
-        <div class="preset-editor-page__form-grid">
-          <label class="preset-editor-page__field preset-editor-page__field--span-2">
-            <span>Preset name</span>
-            <input bind:value={editorState.name} type="text" placeholder="Enter preset name" disabled={editorControlsDisabled} />
-          </label>
-
-          <label class="preset-editor-page__field">
-            <span>Character</span>
-            <select
-              value={editorState.characterId === null ? '' : String(editorState.characterId)}
-              disabled={editorControlsDisabled || referenceLoading}
-              onchange={(event) => updateCharacterId((event.currentTarget as HTMLSelectElement).value)}
-            >
-              <option value="">Select character</option>
-              {#if editorState.characterId !== null && !resolvedCharacter}
-                <option value={String(editorState.characterId)}>
-                  Character #{editorState.characterId} (unresolved)
-                </option>
-              {/if}
-              {#each characters as character}
-                <option value={String(character.id)}>
-                  {character.name} #{character.id}
-                </option>
-              {/each}
-            </select>
-          </label>
-
-          <div class="preset-editor-page__field">
-            <span>EX card</span>
-            <select
-              value={editorState.exCardId}
-              disabled={editorControlsDisabled || referenceLoading}
-              onchange={(event) =>
-                (editorState = {
-                  ...editorState,
-                  exCardId: normalizePresetIdentifier((event.currentTarget as HTMLSelectElement).value),
-                })}
-            >
-              <option value="">Select EX card</option>
-              {#if editorState.exCardId && !resolvedExCard}
-                <option value={editorState.exCardId}>{editorState.exCardId} (unresolved)</option>
-              {/if}
-              {#each exCardOptions as card}
-                <option value={card.id}>
-                  {card.name} ({card.id})
-                </option>
-              {/each}
-            </select>
+        <div class="preset-editor-page__hero">
+          <div class="preset-editor-page__hero-copy">
+            <p>{screen.resolved.characterLabel}</p>
+            <h3>
+              {screen.resolved.deckItems.length} deck cards, {screen.resolved.passiveItems.length} passives, EX {screen.resolved.exLabel}
+            </h3>
           </div>
 
-          <div class="preset-editor-page__field preset-editor-page__field--span-2">
-            <span>Current references</span>
-            <div class="preset-editor-page__reference-summary">
-              <div>
-                <strong>Character</strong>
-                <p>
-                  {#if resolvedCharacter}
-                    {resolvedCharacter.name} #{resolvedCharacter.id}
-                  {:else if editorState.characterId !== null}
-                    Character #{editorState.characterId} (unresolved)
-                  {:else}
-                    No character selected.
-                  {/if}
-                </p>
-              </div>
-              <div>
-                <strong>EX card</strong>
-                <p>
-                  {#if resolvedExCard}
-                    {resolvedExCard.name} ({resolvedExCard.id})
-                  {:else if editorState.exCardId}
-                    {editorState.exCardId} (unresolved)
-                  {:else}
-                    No EX card selected.
-                  {/if}
-                </p>
-              </div>
-            </div>
+          <div class="preset-editor-page__hero-tags">
+            {#each screen.resolved.characterTags as tag}
+              <TagChip label={tag.label} tone={tag.tone as 'accent' | 'muted' | 'success' | 'warning'} />
+            {/each}
+            {#each screen.resolved.exTags as tag}
+              <TagChip label={tag.label} tone={tag.tone as 'accent' | 'muted' | 'success' | 'warning'} />
+            {/each}
+            <TagChip label={localDirty ? 'Draft Changed' : screen.derived.dirty ? 'Draft Changed' : 'Draft Synced'} tone={localDirty ? 'warning' : screen.derived.dirty ? 'warning' : 'success'} />
           </div>
-
-          <label class="preset-editor-page__field preset-editor-page__field--span-2">
-            <span>Deck card ids</span>
-            <div class="preset-editor-page__picker-row">
-              <select bind:value={deckCardCandidate} disabled={editorControlsDisabled || referenceLoading}>
-                <option value="">Quick add deck card</option>
-                {#each deckCardOptions as card}
-                  <option value={card.id}>
-                    {card.name} ({card.id})
-                  </option>
-                {/each}
-              </select>
-              <button type="button" disabled={editorControlsDisabled || !deckCardCandidate} onclick={addDeckCardCandidate}>
-                Add card
-              </button>
-            </div>
-            <textarea
-              rows="6"
-              value={formatIdentifierText(editorState.deckCardIds)}
-              placeholder="One card id per line"
-              disabled={editorControlsDisabled}
-              oninput={(event) => updateDeckCardIds((event.currentTarget as HTMLTextAreaElement).value)}
-            ></textarea>
-          </label>
-
-          <label class="preset-editor-page__field preset-editor-page__field--span-2">
-            <span>Passive ids</span>
-            <div class="preset-editor-page__picker-row">
-              <select bind:value={passiveCandidate} disabled={editorControlsDisabled || referenceLoading}>
-                <option value="">Quick add passive</option>
-                {#each passives as passive}
-                  <option value={passive.id}>
-                    {passive.name} ({passive.id})
-                  </option>
-                {/each}
-              </select>
-              <button type="button" disabled={editorControlsDisabled || !passiveCandidate} onclick={addPassiveCandidate}>
-                Add passive
-              </button>
-            </div>
-            <textarea
-              rows="4"
-              value={formatIdentifierText(editorState.passiveIds)}
-              placeholder="One passive id per line"
-              disabled={editorControlsDisabled}
-              oninput={(event) => updatePassiveIds((event.currentTarget as HTMLTextAreaElement).value)}
-            ></textarea>
-          </label>
         </div>
-      </fieldset>
-    </SectionFrame>
 
-    <div class="preset-editor-page__grid">
-      <SectionFrame
-        title="Deck card preview"
-        description="The preview list renders from the local editor state, not directly from the API response."
-      >
-        <EntityListPane
-          items={deckCardItems}
-          emptyMessage="No deck card ids are currently assigned to this preset."
-        />
+        <div class="preset-editor-page__stats">
+          <StatBlock
+            value={screen.presetId == null ? 'Assigned after create' : screen.presetId}
+            label="Preset id"
+            note="Current preset screen source"
+          />
+          <StatBlock
+            value={screen.derived.updatedAtLabel}
+            label="Updated"
+            note="Last update label from the screen model"
+          />
+          <StatBlock
+            value={screen.derived.createdAtLabel}
+            label="Created"
+            note="Original creation label from the screen model"
+          />
+        </div>
+
+        <fieldset class="preset-editor-page__fieldset">
+          <legend>Preset draft</legend>
+
+          <div class="preset-editor-page__form-grid">
+            <label class="preset-editor-page__field preset-editor-page__field--span-2">
+              <span>Preset name</span>
+              <input
+                type="text"
+                value={editorState.name}
+                placeholder="Enter preset name"
+                disabled={editorControlsDisabled}
+                oninput={(event) => updateName((event.currentTarget as HTMLInputElement).value)}
+              />
+            </label>
+
+            <label class="preset-editor-page__field">
+              <span>Character id</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={editorState.characterId ?? ''}
+                placeholder="Enter character id"
+                disabled={editorControlsDisabled}
+                oninput={(event) => updateCharacterId((event.currentTarget as HTMLInputElement).value)}
+              />
+            </label>
+
+            <label class="preset-editor-page__field">
+              <span>EX card id</span>
+              <input
+                type="text"
+                value={editorState.exCardId}
+                placeholder="Enter EX card id"
+                disabled={editorControlsDisabled}
+                oninput={(event) => updateExCardId((event.currentTarget as HTMLInputElement).value)}
+              />
+            </label>
+
+            <label class="preset-editor-page__field preset-editor-page__field--span-2">
+              <span>Deck card ids</span>
+              <textarea
+                rows="6"
+                value={formatIdentifierText(editorState.deckCardIds)}
+                placeholder="One card id per line"
+                disabled={editorControlsDisabled}
+                oninput={(event) => updateDeckCardIds((event.currentTarget as HTMLTextAreaElement).value)}
+              ></textarea>
+            </label>
+
+            <label class="preset-editor-page__field preset-editor-page__field--span-2">
+              <span>Passive ids</span>
+              <textarea
+                rows="4"
+                value={formatIdentifierText(editorState.passiveIds)}
+                placeholder="One passive id per line"
+                disabled={editorControlsDisabled}
+                oninput={(event) => updatePassiveIds((event.currentTarget as HTMLTextAreaElement).value)}
+              ></textarea>
+            </label>
+          </div>
+        </fieldset>
       </SectionFrame>
 
-      <SectionFrame
-        title="Passive preview"
-        description="Passive ids are also rendered from the local editor state for the next save step."
-      >
-        <EntityListPane
-          items={passiveItems}
-          emptyMessage="No passive ids are currently assigned to this preset."
-        />
-      </SectionFrame>
-    </div>
+      <div class="preset-editor-page__grid">
+        <SectionFrame
+          title="Deck card preview"
+          description="The preview panel renders the last resolved deck items from the preset editor screen model."
+        >
+          <EntityListPane
+            items={deckCardItems}
+            emptyMessage="No deck card ids are currently present in the screen model."
+          />
+        </SectionFrame>
 
-    {#if resolvedCharacter || resolvedExCard}
+        <SectionFrame
+          title="Passive preview"
+          description="The preview panel renders the last resolved passive items from the preset editor screen model."
+        >
+          <EntityListPane
+            items={passiveItems}
+            emptyMessage="No passive ids are currently present in the screen model."
+          />
+        </SectionFrame>
+      </div>
+
       <div class="preset-editor-page__grid">
         <SectionFrame
           title="Character reference"
-          description="Current character selection is resolved from the existing character archive."
+          description="The current character preview is resolved on the server and rendered as-is."
         >
-          {#if resolvedCharacter}
-            <div class="preset-editor-page__copy">
-              <p><strong>{resolvedCharacter.name}</strong></p>
-              <p>{buildCharacterMeta(resolvedCharacter)}</p>
-              <p>{resolvedCharacter.oneLiner || resolvedCharacter.story}</p>
-            </div>
-          {:else}
-            <ContentStatePanel message="No character record is currently resolved for this preset." />
-          {/if}
+          <div class="preset-editor-page__copy">
+            <p><strong>{screen.resolved.characterLabel}</strong></p>
+            <p>{screen.resolved.characterSubtitle}</p>
+          </div>
         </SectionFrame>
 
         <SectionFrame
           title="EX card reference"
-          description="Current EX card selection is resolved from the card archive."
+          description="The current EX preview is resolved on the server and rendered as-is."
         >
-          {#if resolvedExCard}
-            <div class="preset-editor-page__copy">
-              <p><strong>{resolvedExCard.name}</strong></p>
-              <p>{buildCardArchiveMeta(resolvedExCard)}</p>
-              <p>{resolvedExCard.description}</p>
-            </div>
-          {:else}
-            <ContentStatePanel message="No EX card is currently resolved for this preset." />
-          {/if}
+          <div class="preset-editor-page__copy">
+            <p><strong>{screen.resolved.exLabel}</strong></p>
+            <p>{screen.resolved.exSubtitle}</p>
+          </div>
         </SectionFrame>
       </div>
-    {/if}
 
-    <SectionFrame
-      title="Editor actions"
-      description="Create, save, clone, and delete use the preset API while the loadout selections stay aligned with the existing character and content archives."
-    >
-      <div class="preset-editor-page__actions">
-        <a class="preset-editor-page__link-action" data-nav href={pathBuilders.presetList()}>
-          Back to preset archive
-        </a>
-        <button type="submit" disabled={editorControlsDisabled || (!isCreateMode && !editorDirty)}>
-          {saveButtonLabel}
-        </button>
-        {#if !isCreateMode}
-          <button type="button" disabled={editorControlsDisabled || deleteConfirmOpen} onclick={() => void handleClone()}>
-            {cloneButtonLabel}
-          </button>
-          <button type="button" disabled={editorControlsDisabled} onclick={openDeleteConfirmation}>
-            {deleting ? 'Deleting preset...' : deleteConfirmOpen ? 'Delete pending' : 'Delete preset'}
-          </button>
+      <SectionFrame
+        title="Editor actions"
+        description="Save, create, clone, and delete are invoked through screen-declared actions."
+      >
+        <div class="preset-editor-page__actions">
+          <a class="preset-editor-page__link-action" data-nav href={pathBuilders.presetList()}>
+            Back to preset archive
+          </a>
+
+          {#if isCreateMode}
+            {#if createAction}
+              <button
+                type="submit"
+                disabled={editorControlsDisabled || !createAction.enabled}
+              >
+                {pendingActionId === createAction.id ? getPendingActionLabel(createAction.id) : createAction.label}
+              </button>
+            {/if}
+          {:else}
+            {#if saveAction}
+              <button
+                type="submit"
+                disabled={editorControlsDisabled || deleteConfirmOpen || !saveAction.enabled}
+              >
+                {pendingActionId === saveAction.id ? getPendingActionLabel(saveAction.id) : saveAction.label}
+              </button>
+            {/if}
+            {#if cloneAction}
+              <button
+                type="button"
+                disabled={editorControlsDisabled || deleteConfirmOpen || !cloneAction.enabled}
+                onclick={() => void runAction(cloneAction.id)}
+              >
+                {pendingActionId === cloneAction.id ? getPendingActionLabel(cloneAction.id) : cloneAction.label}
+              </button>
+            {/if}
+            {#if deleteAction}
+              <button
+                type="button"
+                disabled={editorControlsDisabled || !deleteAction.enabled}
+                onclick={openDeleteConfirmation}
+              >
+                {pendingActionId === 'presetEditor.delete'
+                  ? getPendingActionLabel('presetEditor.delete')
+                  : deleteConfirmOpen
+                    ? 'Delete pending'
+                    : deleteAction.label}
+              </button>
+            {/if}
+          {/if}
+        </div>
+
+        <div class="preset-editor-page__status">
+          <p>
+            {localDirty
+              ? 'Local changes are pending on top of the last loaded preset screen.'
+              : 'Local draft matches the last loaded preset screen.'}
+          </p>
+          <p>Resolved preview and timestamp metadata remain sourced from the latest screen response.</p>
+          <p>Character, deck card ids, EX card id, and passive ids are normalized when an action is invoked.</p>
+        </div>
+
+        {#if actionErrorMessage}
+          <ContentStatePanel title="Preset action failed" message={actionErrorMessage} tone="error" />
+        {:else if actionSuccessMessage}
+          <ContentStatePanel title="Preset action complete" message={actionSuccessMessage} />
         {/if}
-      </div>
 
-      <div class="preset-editor-page__status">
-        <p>
-          {isCreateMode
-            ? 'The current preset draft is empty and ready for the create flow.'
-            : editorDirty
-              ? 'Local changes are pending on top of the last loaded preset response.'
-              : 'Local draft matches the last loaded preset response.'}
-        </p>
-        <p>Character, deck card ids, EX card id, and passive ids are normalized before save.</p>
-        {#if !isCreateMode && preset}
-          <p>Owner: {preset.owner}</p>
+        {#if deleteConfirmOpen}
+          <ContentStatePanel
+            title={presetEditorStateCopy.deleteConfirmTitle}
+            message={presetEditorStateCopy.deleteConfirmMessage}
+            tone="error"
+          >
+            <div class="preset-editor-page__confirm-actions">
+              <button type="button" onclick={() => void runAction('presetEditor.delete')}>Confirm delete</button>
+              <button type="button" onclick={cancelDeleteConfirmation}>Cancel</button>
+            </div>
+          </ContentStatePanel>
         {/if}
-      </div>
-
-      {#if saveErrorMessage}
-        <ContentStatePanel
-          title={isCreateMode ? 'Create failed' : 'Save failed'}
-          message={saveErrorMessage}
-          tone="error"
-        />
-      {:else if cloneErrorMessage}
-        <ContentStatePanel
-          title={presetEditorStateCopy.cloneErrorTitle}
-          message={cloneErrorMessage}
-          tone="error"
-        />
-      {:else if deleteErrorMessage}
-        <ContentStatePanel
-          title={presetEditorStateCopy.deleteErrorTitle}
-          message={deleteErrorMessage}
-          tone="error"
-        />
-      {:else if saveSuccessMessage}
-        <ContentStatePanel
-          title={lastSaveMode === 'create' ? 'Preset created' : 'Preset saved'}
-          message={saveSuccessMessage}
-        />
-      {/if}
-
-      {#if !isCreateMode && deleting}
-        <ContentStatePanel
-          title={presetEditorStateCopy.deleteLoadingTitle}
-          message={presetEditorStateCopy.deleteLoadingMessage}
-        />
-      {:else if !isCreateMode && deleteConfirmOpen}
-        <ContentStatePanel
-          title={presetEditorStateCopy.deleteConfirmTitle}
-          message={presetEditorStateCopy.deleteConfirmMessage}
-          tone="error"
-        >
-          <div class="preset-editor-page__confirm-actions">
-            <button type="button" onclick={() => void handleDelete()}>Confirm delete</button>
-            <button type="button" onclick={cancelDeleteConfirmation}>Cancel</button>
-          </div>
-        </ContentStatePanel>
-      {/if}
-    </SectionFrame>
+      </SectionFrame>
     </form>
   {:else}
     <SectionFrame
@@ -1136,8 +836,8 @@
 
   .preset-editor-page__field input,
   .preset-editor-page__field textarea,
-  .preset-editor-page__field select,
-  .preset-editor-page__picker-row button {
+  .preset-editor-page__actions button,
+  .preset-editor-page__confirm-actions button {
     min-height: 3rem;
     width: 100%;
     border: 1px solid var(--color-border);
@@ -1152,38 +852,8 @@
     resize: vertical;
   }
 
-  .preset-editor-page__picker-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.75rem;
-  }
-
-  .preset-editor-page__picker-row button {
-    width: fit-content;
-    min-width: 8rem;
-  }
-
-  .preset-editor-page__reference-summary {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-    padding: 0.9rem 1rem;
-    border: 1px solid var(--color-border);
-    background: rgba(12, 11, 10, 0.18);
-  }
-
-  .preset-editor-page__reference-summary strong {
-    display: block;
-    margin-bottom: 0.35rem;
-    color: var(--color-text-muted);
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
   .preset-editor-page__copy p,
-  .preset-editor-page__status p,
-  .preset-editor-page__reference-summary p {
+  .preset-editor-page__status p {
     color: var(--color-text-soft);
     line-height: 1.7;
   }
@@ -1194,21 +864,15 @@
     gap: 0.75rem;
   }
 
-  .preset-editor-page__link-action,
-  .preset-editor-page__actions button {
+  .preset-editor-page__link-action {
     min-height: 3rem;
     padding: 0.75rem 1rem;
-    border: 1px solid var(--color-border);
+    border: 1px solid rgba(226, 193, 155, 0.42);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(12, 11, 10, 0.28);
-    color: var(--color-text);
-  }
-
-  .preset-editor-page__link-action {
-    border-color: rgba(226, 193, 155, 0.42);
     background: linear-gradient(180deg, rgba(226, 193, 155, 0.18), rgba(226, 193, 155, 0.08));
+    color: var(--color-text);
   }
 
   .preset-editor-page__status {
@@ -1227,30 +891,17 @@
 
   .preset-editor-page__confirm-actions button {
     min-height: 2.75rem;
-    padding: 0.65rem 0.95rem;
-    border: 1px solid var(--color-border);
-    background: rgba(12, 11, 10, 0.28);
-    color: var(--color-text);
   }
 
   @media (max-width: 960px) {
     .preset-editor-page__stats,
     .preset-editor-page__grid,
-    .preset-editor-page__form-grid,
-    .preset-editor-page__reference-summary {
+    .preset-editor-page__form-grid {
       grid-template-columns: 1fr;
     }
 
     .preset-editor-page__field--span-2 {
       grid-column: span 1;
-    }
-
-    .preset-editor-page__picker-row {
-      grid-template-columns: 1fr;
-    }
-
-    .preset-editor-page__picker-row button {
-      width: 100%;
     }
   }
 </style>

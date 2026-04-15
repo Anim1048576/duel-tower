@@ -1,6 +1,7 @@
 package com.example.dueltower.screen.api;
 
 import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
+import com.example.dueltower.screen.dto.PresetEditorScreenResponse;
 import com.example.dueltower.screen.service.ScreenQueryService;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -52,5 +53,16 @@ public class ScreenController {
     public DeckEditorScreenResponse deckEditor(@PathVariable long id,
                                                Authentication authentication) {
         return screenQueryService.getDeckEditor(id, authentication);
+    }
+
+    @GetMapping("/presets/new/editor")
+    public PresetEditorScreenResponse newPresetEditor(Authentication authentication) {
+        return screenQueryService.getNewPresetEditor(authentication);
+    }
+
+    @GetMapping("/presets/{id}/editor")
+    public PresetEditorScreenResponse presetEditor(@PathVariable long id,
+                                                   Authentication authentication) {
+        return screenQueryService.getPresetEditor(id, authentication);
     }
 }

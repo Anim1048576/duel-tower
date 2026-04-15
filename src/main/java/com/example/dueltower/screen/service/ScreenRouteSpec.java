@@ -25,6 +25,16 @@ public enum ScreenRouteSpec {
             "DeckEditor",
             "/api/screens/decks/new/editor",
             ScreenEndpointAuth.AUTHENTICATED_WEB
+    ),
+    PRESET_EDITOR(
+            "PresetEditor",
+            "/api/screens/presets/{id}/editor",
+            ScreenEndpointAuth.AUTHENTICATED_WEB
+    ),
+    NEW_PRESET_EDITOR(
+            "PresetEditor",
+            "/api/screens/presets/new/editor",
+            ScreenEndpointAuth.AUTHENTICATED_WEB
     );
 
     private final String screenKey;

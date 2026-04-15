@@ -1,8 +1,8 @@
 import type {
   CreatePresetRequest,
-  PresetResponse,
   UpdatePresetRequest,
 } from '../api/presetTypes'
+import type { PresetEditorActionPayload, PresetEditorDraftDto } from '../api/screenTypes'
 
 export type PresetEditorState = {
   name: string
@@ -52,13 +52,13 @@ export function normalizePresetIdentifierList(values: readonly string[]) {
   return Array.from(uniqueValues)
 }
 
-export function createPresetEditorState(response: PresetResponse): PresetEditorState {
+export function createPresetEditorState(draft: PresetEditorDraftDto): PresetEditorState {
   return {
-    name: response.name.trim(),
-    characterId: response.characterId,
-    deckCardIds: normalizePresetIdentifierList(response.deckCardIds),
-    exCardId: normalizePresetIdentifier(response.exCardId),
-    passiveIds: normalizePresetIdentifierList(response.passiveIds),
+    name: draft.name.trim(),
+    characterId: draft.characterId,
+    deckCardIds: normalizePresetIdentifierList(draft.deckCardIds),
+    exCardId: normalizePresetIdentifier(draft.exCardId),
+    passiveIds: normalizePresetIdentifierList(draft.passiveIds),
   }
 }
 
@@ -80,6 +80,25 @@ export function addPresetIdentifier(values: readonly string[], nextValue: string
 }
 
 export function toPresetEditorPayload(state: PresetEditorState): CreatePresetRequest | UpdatePresetRequest {
+  const normalized = normalizePresetEditorState(state)
+
+  return {
+    name: normalized.name,
+    characterId: normalized.characterId ?? 0,
+    deckCardIds: normalized.deckCardIds,
+    exCardId: normalized.exCardId,
+    passiveIds: normalized.passiveIds,
+  }
+}
+
+export function buildPresetEditorActionPatch(
+  actionId: string,
+  state: PresetEditorState,
+): Partial<PresetEditorActionPayload> | null {
+  if (actionId === 'presetEditor.clone' || actionId === 'presetEditor.delete') {
+    return null
+  }
+
   const normalized = normalizePresetEditorState(state)
 
   return {

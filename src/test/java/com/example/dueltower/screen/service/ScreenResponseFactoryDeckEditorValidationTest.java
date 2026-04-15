@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ScreenResponseFactoryDeckEditorValidationTest {
 
-    private final ScreenResponseFactory factory = new ScreenResponseFactory();
+    private final ScreenResponseFactory factory = new ScreenResponseFactory(null, null, null);
 
     @Test
     void deckEditorValidationCarriesValidatedDraftSnapshotMetadata() {
