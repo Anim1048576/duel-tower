@@ -5,6 +5,12 @@
     getPlayCardRequirementError,
   } from '../features/session/combat/commandRequirements'
   import {
+    formatTargetRefSummary,
+    formatTargetSelectionLabel,
+    getUnsupportedCardCommandMessage,
+    getUnsupportedPendingDecisionMessage,
+  } from '../features/session/combat/commandMessages'
+  import {
     getOrderedTieActorKeys,
     getPendingCandidateIds,
     getSelectedDiscardIdsFromHand,
@@ -366,22 +372,6 @@
     return session?.cards[normalizedId]?.defId ?? null
   }
 
-  function formatTargetSelectionLabel(target: CombatCommandDraft['selectedTargets'][number]) {
-    if (target.enemyId) {
-      return `Enemy ${target.enemyId}`
-    }
-
-    if (target.playerId) {
-      return `Player ${target.playerId}`
-    }
-
-    if (target.summonOwnerPlayerId && target.summonInstanceId) {
-      return `Summon ${target.summonInstanceId}`
-    }
-
-    return 'Unknown target'
-  }
-
   function handleClearSelectedTargets() {
     commandDraft = syncCombatCommandDraft(
       {
@@ -511,14 +501,6 @@
     const summary = preview.join(' -> ')
 
     return hiddenCount > 0 ? `${summary} +${hiddenCount} more` : summary
-  }
-
-  function formatTargetRefSummary(targets: CombatCommandDraft['selectedTargets']) {
-    const labels = targets
-      .map((target) => target.enemyId ?? target.playerId ?? target.summonInstanceId ?? null)
-      .filter(Boolean)
-
-    return labels.length > 0 ? labels.join(', ') : 'None'
   }
 
   function getPlayerStateLabel(player: PlayerStateDto) {
@@ -1180,27 +1162,6 @@
       commandErrorMessage = getApiErrorMessage(error, `Unable to execute the ${commandType} command.`)
     } finally {
       commandPending = null
-    }
-  }
-
-  function getUnsupportedCardCommandMessage() {
-    return null
-  }
-
-  function getUnsupportedPendingDecisionMessage(pendingDecision: PendingDecisionDto | null) {
-    if (!pendingDecision?.type) {
-      return 'Pending decision type is missing.'
-    }
-
-    switch (pendingDecision.type) {
-      case 'HAND_SWAP':
-      case 'DISCARD_TO_HAND_LIMIT':
-      case 'SEARCH_PICK':
-      case 'RESOLVE_SEARCH_PICK':
-      case 'RESOLVE_INITIATIVE_TIE':
-        return null
-      default:
-        return `${pendingDecision.type} is not supported in this step yet.`
     }
   }
 
