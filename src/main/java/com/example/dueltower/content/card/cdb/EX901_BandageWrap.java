@@ -1,6 +1,8 @@
 package com.example.dueltower.content.card.cdb;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
@@ -35,6 +37,14 @@ public class EX901_BandageWrap implements CardBlueprint {
                         아군 1명의 체력을 {치유력}*3/4 만큼 회복한다.
                         자신의 패가 1장 이하라면, [스킬 카드]를 1장 뽑는다.
                         """
+        );
+    }
+
+    @Override
+    public CardPlaySpec playSpec() {
+        return new CardPlaySpec(
+                TargetSpec.required(Target.ALLY_ONE),
+                List.of()
         );
     }
 

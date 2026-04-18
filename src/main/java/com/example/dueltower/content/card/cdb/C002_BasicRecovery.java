@@ -1,10 +1,15 @@
 package com.example.dueltower.content.card.cdb;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
-import com.example.dueltower.engine.model.*;
+import com.example.dueltower.engine.model.CardDefinition;
+import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.Ids.CardDefId;
+import com.example.dueltower.engine.model.Target;
+import com.example.dueltower.engine.model.Zone;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -31,6 +36,14 @@ public class C002_BasicRecovery implements CardBlueprint {
                 """
                         아군 1명의 체력을 {치유력} 만큼 회복한다.
                         """
+        );
+    }
+
+    @Override
+    public CardPlaySpec playSpec() {
+        return new CardPlaySpec(
+                TargetSpec.required(Target.ALLY_ONE),
+                List.of()
         );
     }
 

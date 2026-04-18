@@ -1,18 +1,16 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.content.status.sdb.S004_Evasion;
 import com.example.dueltower.content.status.sdb.player.tig.Tig203_Status;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
-import com.example.dueltower.engine.model.CardDefinition;
-import com.example.dueltower.engine.model.CardType;
-import com.example.dueltower.engine.model.Ids;
-import com.example.dueltower.engine.model.PlayerState;
-import com.example.dueltower.engine.model.Target;
-import com.example.dueltower.engine.model.Zone;
+import com.example.dueltower.engine.model.*;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -32,6 +30,14 @@ public class Tig007_Card implements CardBlueprint {
                 """
                         다음 자신의 턴 개시시까지 자신은 [회피]를 [극복]만큼 얻는다.
                         """
+        );
+    }
+
+    @Override
+    public CardPlaySpec playSpec() {
+        return new CardPlaySpec(
+                new TargetSpec(Target.SELF, false),
+                List.of()
         );
     }
 

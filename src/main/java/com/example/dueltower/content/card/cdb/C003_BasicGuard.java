@@ -1,6 +1,8 @@
 package com.example.dueltower.content.card.cdb;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.content.status.sdb.S001_Shield;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
@@ -8,6 +10,7 @@ import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,6 +34,14 @@ public class C003_BasicGuard implements CardBlueprint {
                 """
                         자신은 {치유력} 만큼의 [보호]를 얻는다.
                         """
+        );
+    }
+
+    @Override
+    public CardPlaySpec playSpec() {
+        return new CardPlaySpec(
+                new TargetSpec(Target.SELF, false),
+                List.of()
         );
     }
 
