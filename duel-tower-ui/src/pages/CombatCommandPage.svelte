@@ -177,6 +177,28 @@
     headerExpanded = !headerExpanded
   }
 
+  function setHoveredEntity(nextEntity: CombatInspectorEntityReference | null) {
+    hoveredEntity = nextEntity
+  }
+
+  function setPinnedEntity(nextEntity: CombatInspectorEntityReference | null) {
+    const samePinnedSummon =
+      pinnedEntity?.kind === 'summon' &&
+      nextEntity?.kind === 'summon' &&
+      pinnedEntity.id === nextEntity.id &&
+      pinnedEntity.owner === nextEntity.owner
+    const samePinnedNonSummon =
+      pinnedEntity?.kind !== 'summon' &&
+      nextEntity?.kind !== 'summon' &&
+      pinnedEntity?.kind === nextEntity?.kind &&
+      pinnedEntity?.id === nextEntity?.id
+
+    pinnedEntity =
+      nextEntity && (samePinnedSummon || samePinnedNonSummon)
+        ? null
+        : nextEntity
+  }
+
   function readLocalSelectionState() {
     return {
       selectedActionId,
@@ -1210,6 +1232,8 @@
           onToggleTargetPlayer={handleToggleTargetPlayer}
           onToggleTargetEnemy={handleToggleTargetEnemy}
           onToggleTargetSummon={handleToggleTargetSummon}
+          onHoverEntity={setHoveredEntity}
+          onPinEntity={setPinnedEntity}
         />
       {/snippet}
 

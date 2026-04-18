@@ -16,6 +16,10 @@
     activeTurn?: boolean
     variant?: 'default' | 'enemy'
     compactMetrics?: boolean
+    displayMode?: 'compact' | 'expanded'
+    onInspectHoverStart?: () => void
+    onInspectHoverEnd?: () => void
+    onInspectPin?: () => void
   }
 
   let {
@@ -28,6 +32,10 @@
     activeTurn = false,
     variant = 'default',
     compactMetrics = false,
+    displayMode = 'compact',
+    onInspectHoverStart,
+    onInspectHoverEnd,
+    onInspectPin,
   }: Props = $props()
 
   function getMetricFill(metric: CombatMetric) {
@@ -49,59 +57,123 @@
 
     return null
   }
+
+  const compactPrimaryMetric = $derived(metrics[0] ?? null)
+  const compactSecondaryMetrics = $derived(metrics.slice(1, compactMetrics ? 2 : 3))
+  const compactStatusTags = $derived(tagRows.flat().slice(0, 3))
+  const compactOverflowTagCount = $derived(Math.max(0, tagRows.flat().length - compactStatusTags.length))
 </script>
 
-<article
+<div
   class={`combat-entity-card combat-entity-card--${variant}`}
   class:combat-entity-card--active-turn={activeTurn}
   class:combat-entity-card--selected={actionButtons.some((action) => action.selected)}
+  class:combat-entity-card--compact={displayMode === 'compact'}
+  role="button"
+  tabindex="0"
+  onclick={() => onInspectPin?.()}
+  onkeydown={(event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onInspectPin?.()
+    }
+  }}
+  onmouseenter={() => onInspectHoverStart?.()}
+  onmouseleave={() => onInspectHoverEnd?.()}
 >
   <div class="combat-entity-card__portrait" aria-hidden="true">
     <span>{variant === 'enemy' ? '!' : title.slice(0, 2).toUpperCase()}</span>
   </div>
 
   <div class="combat-entity-card__body">
-    <div class="combat-entity-card__head">
-      <div>
-        <h3>{title}</h3>
-        <p>{subtitle}</p>
+    {#if displayMode === 'compact'}
+      <div class="combat-entity-card__compact-shell">
+        <div class="combat-entity-card__compact-head">
+          <div class="combat-entity-card__title-block">
+            <h3>{title}</h3>
+            <p>{subtitle}</p>
+          </div>
+
+          {#if compactStatusTags.length > 0}
+            <div class="combat-entity-card__tag-row combat-entity-card__tag-row--compact">
+              {#each compactStatusTags as tag}
+                <TagChip label={tag.label} tone={tag.tone} />
+              {/each}
+              {#if compactOverflowTagCount > 0}
+                <TagChip label={`+${compactOverflowTagCount}`} tone="muted" />
+              {/if}
+            </div>
+          {/if}
+        </div>
+
+        <div class="combat-entity-card__compact-main">
+          {#if compactPrimaryMetric}
+            <div class="combat-entity-card__primary-metric">
+              <div class="combat-entity-card__metric-value">
+                <strong>{compactPrimaryMetric.value}</strong>
+                <span>{compactPrimaryMetric.label}</span>
+              </div>
+              <div class="combat-entity-card__meter" aria-hidden="true">
+                <span style={`width: ${getMetricFill(compactPrimaryMetric) ?? 100}%`}></span>
+              </div>
+            </div>
+          {/if}
+
+          {#if compactSecondaryMetrics.length > 0}
+            <div class="combat-entity-card__compact-metrics">
+              {#each compactSecondaryMetrics as metric}
+                <div class="combat-entity-card__compact-metric-pill">
+                  <strong>{metric.value}</strong>
+                  <span>{metric.label}</span>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </div>
+    {:else}
+      <div class="combat-entity-card__head">
+        <div>
+          <h3>{title}</h3>
+          <p>{subtitle}</p>
+        </div>
+
+        {#if tagRows[0]?.length}
+          <div class="combat-entity-card__tag-row">
+            {#each tagRows[0] as tag}
+              <TagChip label={tag.label} tone={tag.tone} />
+            {/each}
+          </div>
+        {/if}
       </div>
 
-      {#if tagRows[0]?.length}
+      <div class:combat-entity-card__metric-grid--compact={compactMetrics} class="combat-entity-card__metric-grid">
+        {#each metrics as metric}
+          <div class="combat-entity-card__metric-card">
+            <div class="combat-entity-card__metric-value">
+              <strong>{metric.value}</strong>
+              <span>{metric.label}</span>
+            </div>
+            <p>{metric.note}</p>
+            <div class="combat-entity-card__meter" aria-hidden="true">
+              <span style={`width: ${getMetricFill(metric) ?? 100}%`}></span>
+            </div>
+          </div>
+        {/each}
+      </div>
+
+      {#each summaryLines as line}
+        <p class="combat-entity-card__unit-note">{line}</p>
+      {/each}
+
+      {#each tagRows.slice(1) as tags}
         <div class="combat-entity-card__tag-row">
-          {#each tagRows[0] as tag}
+          {#each tags as tag}
             <TagChip label={tag.label} tone={tag.tone} />
           {/each}
         </div>
-      {/if}
-    </div>
-
-    <div class:combat-entity-card__metric-grid--compact={compactMetrics} class="combat-entity-card__metric-grid">
-      {#each metrics as metric}
-        <div class="combat-entity-card__metric-card">
-          <div class="combat-entity-card__metric-value">
-            <strong>{metric.value}</strong>
-            <span>{metric.label}</span>
-          </div>
-          <p>{metric.note}</p>
-          <div class="combat-entity-card__meter" aria-hidden="true">
-            <span style={`width: ${getMetricFill(metric) ?? 100}%`}></span>
-          </div>
-        </div>
       {/each}
-    </div>
-
-    {#each summaryLines as line}
-      <p class="combat-entity-card__unit-note">{line}</p>
-    {/each}
-
-    {#each tagRows.slice(1) as tags}
-      <div class="combat-entity-card__tag-row">
-        {#each tags as tag}
-          <TagChip label={tag.label} tone={tag.tone} />
-        {/each}
-      </div>
-    {/each}
+    {/if}
 
     {#if actionButtons.length > 0}
       <div class="combat-entity-card__action-buttons">
@@ -110,7 +182,10 @@
             type="button"
             class:selected={action.selected}
             disabled={action.disabled}
-            onclick={() => action.onClick()}
+            onclick={(event) => {
+              event.stopPropagation()
+              action.onClick()
+            }}
           >
             {action.label}
           </button>
@@ -118,7 +193,7 @@
       </div>
     {/if}
   </div>
-</article>
+</div>
 
 <style>
   .combat-entity-card,
@@ -212,7 +287,7 @@
     min-width: 0;
     flex: 1 1 auto;
     display: grid;
-    gap: 0.85rem;
+    gap: 0.7rem;
   }
 
   .combat-entity-card__head {
@@ -244,10 +319,78 @@
 
   .combat-entity-card__metric-grid,
   .combat-entity-card__tag-row,
-  .combat-entity-card__action-buttons {
+  .combat-entity-card__action-buttons,
+  .combat-entity-card__compact-shell,
+  .combat-entity-card__compact-head,
+  .combat-entity-card__compact-main,
+  .combat-entity-card__compact-metrics {
     display: flex;
     flex-wrap: wrap;
     gap: 0.65rem;
+  }
+
+  .combat-entity-card__compact-shell {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .combat-entity-card__compact-head {
+    justify-content: space-between;
+    align-items: start;
+  }
+
+  .combat-entity-card__compact-main {
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .combat-entity-card__title-block h3,
+  .combat-entity-card__title-block p {
+    margin: 0;
+  }
+
+  .combat-entity-card__title-block p {
+    color: var(--combat-text-soft, var(--color-text-muted));
+    line-height: 1.4;
+    font-size: 0.82rem;
+  }
+
+  .combat-entity-card__primary-metric {
+    min-width: min(100%, 9rem);
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .combat-entity-card__compact-metrics {
+    gap: 0.45rem;
+  }
+
+  .combat-entity-card__compact-metric-pill {
+    display: grid;
+    gap: 0.08rem;
+    min-width: 4.5rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid rgba(226, 193, 155, 0.14);
+    background: rgba(16, 14, 12, 0.48);
+  }
+
+  .combat-entity-card__compact-metric-pill strong,
+  .combat-entity-card__compact-metric-pill span {
+    margin: 0;
+    display: block;
+  }
+
+  .combat-entity-card__compact-metric-pill strong {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .combat-entity-card__compact-metric-pill span {
+    color: var(--combat-text-soft, var(--color-text-muted));
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .combat-entity-card__metric-grid {
@@ -307,8 +450,8 @@
   }
 
   .combat-entity-card__action-buttons button {
-    min-height: 2.5rem;
-    padding: 0.6rem 0.85rem;
+    min-height: 2.15rem;
+    padding: 0.48rem 0.7rem;
     color: var(--combat-text, var(--color-text));
     transition:
       transform 120ms ease,
@@ -330,6 +473,32 @@
     background: rgba(107, 24, 26, 0.42);
   }
 
+  .combat-entity-card--compact {
+    gap: 0.75rem;
+    padding: 0.75rem;
+    align-items: center;
+  }
+
+  .combat-entity-card--compact .combat-entity-card__portrait {
+    flex-basis: 3.8rem;
+    min-height: 4.5rem;
+    font-size: 1rem;
+  }
+
+  .combat-entity-card--compact .combat-entity-card__head h3,
+  .combat-entity-card--compact .combat-entity-card__title-block h3 {
+    font-size: 1rem;
+  }
+
+  .combat-entity-card__tag-row--compact {
+    gap: 0.4rem;
+  }
+
+  .combat-entity-card--compact :global(.tag-chip) {
+    min-height: 1.3rem;
+    font-size: 0.66rem;
+  }
+
   @media (max-width: 620px) {
     .combat-entity-card,
     .combat-entity-card--enemy {
@@ -339,6 +508,10 @@
     .combat-entity-card__portrait {
       min-height: 4.5rem;
       flex-basis: auto;
+    }
+
+    .combat-entity-card__compact-main {
+      justify-content: flex-start;
     }
   }
 </style>

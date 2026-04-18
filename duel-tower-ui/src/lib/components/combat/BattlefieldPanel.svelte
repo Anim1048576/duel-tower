@@ -3,6 +3,7 @@
   import SectionFrame from '../SectionFrame.svelte'
   import CombatEntityCard from './CombatEntityCard.svelte'
   import type {
+    CombatInspectorEntityReference,
     CombatEnemyViewModel,
     CombatPlayerViewModel,
     CombatSummonViewModel,
@@ -27,6 +28,8 @@
     onToggleTargetPlayer: (playerId: string) => void
     onToggleTargetEnemy: (enemyId: string) => void
     onToggleTargetSummon: (owner: string, summonId: string) => void
+    onHoverEntity: (entity: CombatInspectorEntityReference | null) => void
+    onPinEntity: (entity: CombatInspectorEntityReference | null) => void
   }
 
   let {
@@ -42,6 +45,8 @@
     onToggleTargetPlayer,
     onToggleTargetEnemy,
     onToggleTargetSummon,
+    onHoverEntity,
+    onPinEntity,
   }: Props = $props()
 
   function playerHeaderTags(player: CombatPlayerViewModel) {
@@ -73,6 +78,10 @@
   function summonHeaderTags(summon: CombatSummonViewModel) {
     return [{ label: summon.stateLabel, tone: summon.stateTone }] satisfies CombatTag[]
   }
+
+  function pinEntity(entity: CombatInspectorEntityReference) {
+    onPinEntity(entity)
+  }
 </script>
 
 <div class="battlefield-panel">
@@ -86,6 +95,7 @@
           {#each playerViews as player, index}
             <div class:timeline-offset={index % 2 === 1}>
               <CombatEntityCard
+                displayMode="compact"
                 title={player.playerId}
                 subtitle={`${player.ready ? 'Ready participant' : 'Joined participant'} | Hand and zone state`}
                 metrics={player.metrics}
@@ -98,6 +108,9 @@
                     : [{ label: 'No passives', tone: 'muted' as const }],
                 ]}
                 activeTurn={currentTurnPlayerId === player.playerId}
+                onInspectHoverStart={() => onHoverEntity({ kind: 'player', id: player.playerId })}
+                onInspectHoverEnd={() => onHoverEntity(null)}
+                onInspectPin={() => pinEntity({ kind: 'player', id: player.playerId })}
                 actionButtons={[
                   {
                     label: selectedPlayerId === player.playerId ? 'Selected actor' : 'Select actor',
@@ -135,6 +148,7 @@
           {#each enemyViews as enemy, index}
             <div class:timeline-offset={index % 2 === 1}>
               <CombatEntityCard
+                displayMode="compact"
                 title={enemy.enemyId}
                 subtitle="Combat enemy | Live battlefield unit"
                 metrics={enemy.metrics}
@@ -147,6 +161,9 @@
                 ]}
                 activeTurn={currentEnemyId === enemy.enemyId}
                 variant="enemy"
+                onInspectHoverStart={() => onHoverEntity({ kind: 'enemy', id: enemy.enemyId })}
+                onInspectHoverEnd={() => onHoverEntity(null)}
+                onInspectPin={() => pinEntity({ kind: 'enemy', id: enemy.enemyId })}
                 actionButtons={[
                   {
                     label: selectedTargets.some((target) => target.enemyId === enemy.enemyId)
@@ -173,12 +190,16 @@
           <div class="battlefield-panel__unit-list battlefield-panel__unit-list--summons">
             {#each summonViews as summon}
               <CombatEntityCard
+                displayMode="compact"
                 title={summon.summonId}
                 subtitle={`${summon.owner} | Support unit`}
                 metrics={summon.metrics}
                 summaryLines={summon.summaryLines}
                 tagRows={[summonHeaderTags(summon)]}
                 compactMetrics={true}
+                onInspectHoverStart={() => onHoverEntity({ kind: 'summon', id: summon.summonId, owner: summon.owner })}
+                onInspectHoverEnd={() => onHoverEntity(null)}
+                onInspectPin={() => pinEntity({ kind: 'summon', id: summon.summonId, owner: summon.owner })}
                 actionButtons={[
                   {
                     label: selectedTargets.some(
@@ -209,31 +230,32 @@
   .battlefield-panel,
   .battlefield-panel__side,
   .battlefield-panel__unit-list,
-  .battlefield-panel__summon-section {
+  .battlefield-panel__summon-section,
+  .timeline-offset {
     display: grid;
-    gap: 1rem;
+    gap: 0.75rem;
   }
 
   .battlefield-panel {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: center;
-    gap: clamp(1rem, 4vw, 3rem);
-    min-height: 34rem;
+    gap: clamp(0.85rem, 3vw, 2rem);
+    min-height: 28rem;
   }
 
   .battlefield-panel__side--players {
     justify-self: start;
-    width: min(100%, 33rem);
+    width: min(100%, 31rem);
   }
 
   .battlefield-panel__side--enemies {
     justify-self: end;
-    width: min(100%, 35rem);
+    width: min(100%, 32rem);
   }
 
   .battlefield-panel__unit-list--players,
   .battlefield-panel__unit-list--enemies {
-    gap: 1.15rem;
+    gap: 0.75rem;
   }
 
   .battlefield-panel__unit-list--enemies {
@@ -241,11 +263,11 @@
   }
 
   .battlefield-panel__unit-list--players .timeline-offset {
-    margin-left: clamp(0rem, 4vw, 2rem);
+    margin-left: clamp(0rem, 2vw, 1rem);
   }
 
   .battlefield-panel__unit-list--enemies .timeline-offset {
-    margin-right: clamp(0rem, 4vw, 2rem);
+    margin-right: clamp(0rem, 2vw, 1rem);
   }
 
   .battlefield-panel__summon-section > strong {
