@@ -22,6 +22,7 @@
     onToggleDiscard: (instanceId: string) => void
     onHoverHandCard: (instanceId: string | null) => void
     onPinHandCard: (instanceId: string | null) => void
+    resolveInspectState: (instanceId: string) => 'idle' | 'hovered' | 'pinned'
   }
 
   let {
@@ -42,6 +43,7 @@
     onToggleDiscard,
     onHoverHandCard,
     onPinHandCard,
+    resolveInspectState,
   }: Props = $props()
 </script>
 
@@ -61,16 +63,20 @@
       </div>
 
       <div class="hand-bar__quick-actions">
-        {#each commandOptions as option}
-          <button
-            type="button"
-            disabled={option.disabled || commandPending !== null}
-            class:selected={selectedCommandType === option.id}
-            onclick={() => onCommandButtonClick(option.id)}
-          >
-            {commandPending === option.id ? `${option.title}...` : option.title}
-          </button>
-        {/each}
+        {#if commandOptions.length > 0}
+          {#each commandOptions as option}
+            <button
+              type="button"
+              disabled={option.disabled || commandPending !== null}
+              class:selected={selectedCommandType === option.id}
+              onclick={() => onCommandButtonClick(option.id)}
+            >
+              {commandPending === option.id ? `${option.title}...` : option.title}
+            </button>
+          {/each}
+        {:else}
+          <span class="hand-bar__empty-chip">No quick actions available</span>
+        {/if}
       </div>
     </div>
 
@@ -81,6 +87,7 @@
             {card}
             selected={selectedCardId === card.instanceId}
             discardSelected={selectedDiscardIds.includes(card.instanceId)}
+            inspectState={resolveInspectState(card.instanceId)}
             onInspectHoverStart={() => onHoverHandCard(card.instanceId)}
             onInspectHoverEnd={() => onHoverHandCard(null)}
             onInspectPin={() => onPinHandCard(card.instanceId)}
@@ -144,6 +151,13 @@
   .hand-bar__quick-actions button {
     border: 1px solid var(--combat-border, var(--color-border));
     background: rgba(16, 14, 12, 0.58);
+  }
+
+  .hand-bar__empty-chip {
+    padding: 0.45rem 0.7rem;
+    border: 1px dashed rgba(152, 143, 135, 0.32);
+    color: var(--combat-text-soft, var(--color-text-soft));
+    font-size: 0.82rem;
   }
 
   .hand-bar__selected-card {
@@ -213,6 +227,12 @@
 
     .hand-bar__cards {
       grid-auto-columns: minmax(7.6rem, 8.6rem);
+    }
+
+    .hand-bar__quick-actions {
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      padding-bottom: 0.15rem;
     }
   }
 </style>

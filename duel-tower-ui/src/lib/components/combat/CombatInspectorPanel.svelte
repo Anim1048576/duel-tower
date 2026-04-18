@@ -100,7 +100,7 @@
   {:else}
     <ContentStatePanel
       title="Inspector empty"
-      message="상세 대상을 선택하세요. Hover는 임시 미리보기, click은 고정 상세 보기를 위한 상태로 예약되어 있습니다."
+      message="상세 대상을 선택하세요. Hover는 임시 미리보기이고, click은 고정 상세 보기입니다."
     />
   {/if}
 </div>

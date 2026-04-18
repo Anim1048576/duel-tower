@@ -177,33 +177,79 @@
     headerExpanded = !headerExpanded
   }
 
+  function isSameEntityReference(
+    left: CombatInspectorEntityReference | null,
+    right: CombatInspectorEntityReference | null,
+  ) {
+    if (!left || !right || left.kind !== right.kind || left.id !== right.id) {
+      return false
+    }
+
+    return left.kind !== 'summon' || right.kind !== 'summon' || left.owner === right.owner
+  }
+
+  function hasCombatEntity(screenModel: CombatScreenResponse | null, entity: CombatInspectorEntityReference | null) {
+    if (!screenModel || !entity) {
+      return false
+    }
+
+    if (entity.kind === 'player') {
+      return screenModel.actors.players.some((player) => player.playerId === entity.id)
+    }
+
+    if (entity.kind === 'enemy') {
+      return screenModel.actors.enemies.some((enemy) => enemy.enemyId === entity.id)
+    }
+
+    return screenModel.actors.summons.some(
+      (summon) => summon.summonId === entity.id && summon.owner === entity.owner,
+    )
+  }
+
+  function hasVisibleHandCard(screenModel: CombatScreenResponse | null, instanceId: string | null) {
+    if (!screenModel || !instanceId) {
+      return false
+    }
+
+    return screenModel.actors.players.some((player) =>
+      player.handCards.some((card) => card.instanceId === instanceId))
+  }
+
+  function reconcilePresentationState(screenModel: CombatScreenResponse | null) {
+    if (!hasCombatEntity(screenModel, hoveredEntity)) {
+      hoveredEntity = null
+    }
+
+    if (!hasCombatEntity(screenModel, pinnedEntity)) {
+      pinnedEntity = null
+    }
+
+    if (!hasVisibleHandCard(screenModel, hoveredHandCard)) {
+      hoveredHandCard = null
+    }
+
+    if (!hasVisibleHandCard(screenModel, pinnedHandCard)) {
+      pinnedHandCard = null
+    }
+  }
+
   function setHoveredEntity(nextEntity: CombatInspectorEntityReference | null) {
+    hoveredHandCard = null
     hoveredEntity = nextEntity
   }
 
   function setPinnedEntity(nextEntity: CombatInspectorEntityReference | null) {
-    const samePinnedSummon =
-      pinnedEntity?.kind === 'summon' &&
-      nextEntity?.kind === 'summon' &&
-      pinnedEntity.id === nextEntity.id &&
-      pinnedEntity.owner === nextEntity.owner
-    const samePinnedNonSummon =
-      pinnedEntity?.kind !== 'summon' &&
-      nextEntity?.kind !== 'summon' &&
-      pinnedEntity?.kind === nextEntity?.kind &&
-      pinnedEntity?.id === nextEntity?.id
-
-    pinnedEntity =
-      nextEntity && (samePinnedSummon || samePinnedNonSummon)
-        ? null
-        : nextEntity
+    pinnedHandCard = null
+    pinnedEntity = nextEntity && isSameEntityReference(pinnedEntity, nextEntity) ? null : nextEntity
   }
 
   function setHoveredHandCard(nextCardId: string | null) {
+    hoveredEntity = null
     hoveredHandCard = nextCardId
   }
 
   function setPinnedHandCard(nextCardId: string | null) {
+    pinnedEntity = null
     pinnedHandCard = pinnedHandCard === nextCardId ? null : nextCardId
   }
 
@@ -413,6 +459,7 @@
         previousScreen,
       }) as CombatLocalSelectionState,
     )
+    reconcilePresentationState(nextScreen)
 
     if (!getRouteSessionCode() && nextScreen.sessionCode) {
       navigateTo(pathBuilders.combat(nextScreen.sessionCode), true)
@@ -1067,6 +1114,10 @@
 
     return labels
   })
+  const resolveEntityInspectState = (entity: CombatInspectorEntityReference) =>
+    isSameEntityReference(pinnedEntity, entity) ? 'pinned' : isSameEntityReference(hoveredEntity, entity) ? 'hovered' : 'idle'
+  const resolveHandCardInspectState = (instanceId: string) =>
+    pinnedHandCard === instanceId ? 'pinned' : hoveredHandCard === instanceId ? 'hovered' : 'idle'
   const activeInspectorTarget = $derived.by(() =>
     resolveCombatInspectorTarget({
       pinnedEntity,
@@ -1242,6 +1293,7 @@
           onToggleTargetSummon={handleToggleTargetSummon}
           onHoverEntity={setHoveredEntity}
           onPinEntity={setPinnedEntity}
+          resolveInspectState={resolveEntityInspectState}
         />
       {/snippet}
 
@@ -1316,6 +1368,7 @@
           onToggleDiscard={handleToggleDiscard}
           onHoverHandCard={setHoveredHandCard}
           onPinHandCard={setPinnedHandCard}
+          resolveInspectState={resolveHandCardInspectState}
         />
       {/snippet}
     </CombatLayout>

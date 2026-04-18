@@ -30,6 +30,7 @@
     onToggleTargetSummon: (owner: string, summonId: string) => void
     onHoverEntity: (entity: CombatInspectorEntityReference | null) => void
     onPinEntity: (entity: CombatInspectorEntityReference | null) => void
+    resolveInspectState: (entity: CombatInspectorEntityReference) => 'idle' | 'hovered' | 'pinned'
   }
 
   let {
@@ -47,6 +48,7 @@
     onToggleTargetSummon,
     onHoverEntity,
     onPinEntity,
+    resolveInspectState,
   }: Props = $props()
 
   function playerHeaderTags(player: CombatPlayerViewModel) {
@@ -108,6 +110,7 @@
                     : [{ label: 'No passives', tone: 'muted' as const }],
                 ]}
                 activeTurn={currentTurnPlayerId === player.playerId}
+                inspectState={resolveInspectState({ kind: 'player', id: player.playerId })}
                 onInspectHoverStart={() => onHoverEntity({ kind: 'player', id: player.playerId })}
                 onInspectHoverEnd={() => onHoverEntity(null)}
                 onInspectPin={() => pinEntity({ kind: 'player', id: player.playerId })}
@@ -161,6 +164,7 @@
                 ]}
                 activeTurn={currentEnemyId === enemy.enemyId}
                 variant="enemy"
+                inspectState={resolveInspectState({ kind: 'enemy', id: enemy.enemyId })}
                 onInspectHoverStart={() => onHoverEntity({ kind: 'enemy', id: enemy.enemyId })}
                 onInspectHoverEnd={() => onHoverEntity(null)}
                 onInspectPin={() => pinEntity({ kind: 'enemy', id: enemy.enemyId })}
@@ -197,6 +201,7 @@
                 summaryLines={summon.summaryLines}
                 tagRows={[summonHeaderTags(summon)]}
                 compactMetrics={true}
+                inspectState={resolveInspectState({ kind: 'summon', id: summon.summonId, owner: summon.owner })}
                 onInspectHoverStart={() => onHoverEntity({ kind: 'summon', id: summon.summonId, owner: summon.owner })}
                 onInspectHoverEnd={() => onHoverEntity(null)}
                 onInspectPin={() => pinEntity({ kind: 'summon', id: summon.summonId, owner: summon.owner })}

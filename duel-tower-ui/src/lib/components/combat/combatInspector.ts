@@ -175,6 +175,7 @@ function buildSelectionSummaries(input: {
 export function resolveCombatInspectorTarget(
   input: CombatInspectorStateInput,
 ): { source: CombatInspectorInteractionSource; target: CombatInspectorTarget } | null {
+  // Inspector precedence stays explicit: pinned beats hover, and hand-card focus beats entity focus.
   if (input.pinnedHandCard) {
     return {
       source: 'pinned',

@@ -6,6 +6,7 @@
     card: ResolvedCombatCardViewModel
     selected: boolean
     discardSelected: boolean
+    inspectState?: 'idle' | 'hovered' | 'pinned'
     onSelect: (instanceId: string) => void
     onToggleDiscard: (instanceId: string) => void
     onInspectHoverStart?: () => void
@@ -13,13 +14,25 @@
     onInspectPin?: () => void
   }
 
-  let { card, selected, discardSelected, onSelect, onToggleDiscard, onInspectHoverStart, onInspectHoverEnd, onInspectPin }: Props = $props()
+  let {
+    card,
+    selected,
+    discardSelected,
+    inspectState = 'idle',
+    onSelect,
+    onToggleDiscard,
+    onInspectHoverStart,
+    onInspectHoverEnd,
+    onInspectPin,
+  }: Props = $props()
 </script>
 
 <div
   class="combat-hand-card"
   class:selected={selected || discardSelected}
   class:combat-hand-card--unresolved={card.unresolved}
+  class:combat-hand-card--hovered={inspectState === 'hovered'}
+  class:combat-hand-card--pinned={inspectState === 'pinned'}
   role="button"
   tabindex="0"
   onclick={() => onInspectPin?.()}
@@ -100,7 +113,8 @@
       opacity 150ms ease;
   }
 
-  .combat-hand-card:hover {
+  .combat-hand-card:hover,
+  .combat-hand-card--hovered {
     transform: translateY(-0.45rem);
     border-color: rgba(226, 193, 155, 0.46);
   }
@@ -109,6 +123,11 @@
     transform: translateY(-0.8rem);
     border-color: rgba(255, 179, 175, 0.72);
     box-shadow: var(--combat-focus, 0 0 0 1px rgba(255, 179, 175, 0.42)), 0 22px 60px rgba(0, 0, 0, 0.34);
+  }
+
+  .combat-hand-card--pinned {
+    border-color: rgba(226, 193, 155, 0.68);
+    box-shadow: 0 0 0 1px rgba(226, 193, 155, 0.22), 0 18px 44px rgba(0, 0, 0, 0.3);
   }
 
   .combat-hand-card--unresolved {

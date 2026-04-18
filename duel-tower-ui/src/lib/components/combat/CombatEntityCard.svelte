@@ -17,6 +17,7 @@
     variant?: 'default' | 'enemy'
     compactMetrics?: boolean
     displayMode?: 'compact' | 'expanded'
+    inspectState?: 'idle' | 'hovered' | 'pinned'
     onInspectHoverStart?: () => void
     onInspectHoverEnd?: () => void
     onInspectPin?: () => void
@@ -33,6 +34,7 @@
     variant = 'default',
     compactMetrics = false,
     displayMode = 'compact',
+    inspectState = 'idle',
     onInspectHoverStart,
     onInspectHoverEnd,
     onInspectPin,
@@ -69,6 +71,8 @@
   class:combat-entity-card--active-turn={activeTurn}
   class:combat-entity-card--selected={actionButtons.some((action) => action.selected)}
   class:combat-entity-card--compact={displayMode === 'compact'}
+  class:combat-entity-card--hovered={inspectState === 'hovered'}
+  class:combat-entity-card--pinned={inspectState === 'pinned'}
   role="button"
   tabindex="0"
   onclick={() => onInspectPin?.()}
@@ -231,14 +235,17 @@
     background: linear-gradient(120deg, rgba(55, 25, 24, 0.74), rgba(21, 19, 17, 0.9));
   }
 
-  .combat-entity-card:hover {
+  .combat-entity-card:hover,
+  .combat-entity-card--hovered {
     transform: translateY(-2px);
     border-color: rgba(226, 193, 155, 0.36);
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
   }
 
   .combat-entity-card:hover::before,
+  .combat-entity-card--hovered::before,
   .combat-entity-card--selected::before,
+  .combat-entity-card--pinned::before,
   .combat-entity-card--active-turn::before {
     opacity: 1;
   }
@@ -251,6 +258,11 @@
   .combat-entity-card--selected {
     border-color: rgba(255, 179, 175, 0.62);
     box-shadow: var(--combat-focus, 0 0 0 1px rgba(255, 179, 175, 0.42));
+  }
+
+  .combat-entity-card--pinned {
+    border-color: rgba(226, 193, 155, 0.68);
+    box-shadow: 0 0 0 1px rgba(226, 193, 155, 0.22), 0 18px 42px rgba(0, 0, 0, 0.3);
   }
 
   .combat-entity-card__portrait {
