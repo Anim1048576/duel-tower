@@ -53,6 +53,13 @@
     | 'action-success'
     | 'action-failure'
 
+  /**
+   * Combat page boundary:
+   * - server screen owns card/status/sidebar/action metadata and command/action results
+   * - frontend keeps only local selection and transient presentation state
+   * - polling and action follow-up both re-enter through the same screen refresh path
+   */
+
   let loading = $state(true)
   let notFound = $state(false)
   let errorMessage = $state<string | null>(null)
@@ -75,6 +82,7 @@
   let selectedReason = $state('')
   let requestSequence = 0
   let pollingHandle: TimedPollingHandle | null = null
+  type CombatLocalSelectionState = ReturnType<typeof readLocalSelectionState>
 
   function normalizeTone(value: string | null | undefined): CombatTone {
     switch (value) {
@@ -152,7 +160,7 @@
     }
   }
 
-  function writeLocalSelectionState(nextState: ReturnType<typeof readLocalSelectionState>) {
+  function writeLocalSelectionState(nextState: CombatLocalSelectionState) {
     selectedActionId = nextState.selectedActionId
     selectedPlayerId = nextState.selectedPlayerId
     selectedCardId = nextState.selectedCardId
@@ -341,7 +349,7 @@
       reconcileCombatLocalSelectionState(nextScreen, readLocalSelectionState(), {
         reason,
         previousScreen,
-      }),
+      }) as CombatLocalSelectionState,
     )
 
     if (!getRouteSessionCode() && nextScreen.sessionCode) {
@@ -664,22 +672,31 @@
   }
 
   function buildActionBody(action: CombatScreenAction) {
-    const basePayload = buildScreenActionPayload(action, {})
-
     switch (action.id) {
-      case 'combat.draw':
+      case 'combat.draw': {
+        const basePayload = buildScreenActionPayload(action, {})
         return {
           ...basePayload,
           count: selectedCount ?? 1,
           reason: normalizeOptionalText(selectedReason),
         }
-      case 'combat.endTurn':
-      case 'combat.clearRecentResults':
+      }
+      case 'combat.endTurn': {
+        const basePayload = buildScreenActionPayload(action, {})
         return {
           ...basePayload,
           reason: normalizeOptionalText(selectedReason),
         }
-      case 'combat.playCard':
+      }
+      case 'combat.clearRecentResults': {
+        const basePayload = buildScreenActionPayload(action, {})
+        return {
+          ...basePayload,
+          reason: normalizeOptionalText(selectedReason),
+        }
+      }
+      case 'combat.playCard': {
+        const basePayload = buildScreenActionPayload(action, {})
         return {
           ...basePayload,
           cardId: selectedCardId ?? '',
@@ -688,13 +705,17 @@
           targets: buildTargetRefs(selectedTargetKeys),
           reason: normalizeOptionalText(selectedReason),
         }
-      case 'combat.useEx':
+      }
+      case 'combat.useEx': {
+        const basePayload = buildScreenActionPayload(action, {})
         return {
           ...basePayload,
           targets: buildTargetRefs(selectedTargetKeys),
           reason: normalizeOptionalText(selectedReason),
         }
+      }
       case 'combat.resolvePending': {
+        const basePayload = buildScreenActionPayload(action, {})
         const metadata = action.metadata
         const schema = metadata && metadata.kind === 'pendingDecision' ? metadata.schema : null
         const selectedIdsField = schema?.selectedIdsField
@@ -703,12 +724,10 @@
           discardIds: selectedIdsField === 'discardIds' ? selectedDiscardIds : [],
           selectedIds: selectedIdsField === 'selectedIds' ? selectedPendingIds : [],
           orderedActorKeys: selectedIdsField === 'orderedActorKeys' ? orderedActorKeys : [],
-          tieGroupIndex: schema?.groupIndex ?? basePayload.tieGroupIndex ?? null,
+          tieGroupIndex: schema?.groupIndex ?? null,
           reason: normalizeOptionalText(selectedReason),
         }
       }
-      default:
-        return basePayload
     }
   }
 
@@ -866,12 +885,14 @@
   const enemyViews = $derived.by(() => (screen ? screen.actors.enemies.map((enemy) => toEnemyView(enemy)) : []))
   const summonViews = $derived.by(() => (screen ? screen.actors.summons.map((summon) => toSummonView(summon)) : []))
   const visiblePlayerView = $derived.by(() => {
-    if (!screen) {
+    const screenModel = screen
+
+    if (!screenModel) {
       return null
     }
 
     return (
-      playerViews.find((player) => player.playerId === screen.zones.visiblePlayerId) ??
+      playerViews.find((player) => player.playerId === screenModel.zones.visiblePlayerId) ??
       playerViews[0] ??
       null
     )
@@ -941,8 +962,8 @@
   const accessRoleLabel = $derived.by(() => getAccessRoleLabel(screen))
   const currentTurnStateLabel = $derived.by(() => getCurrentTurnStateLabel(screen))
   const currentEnemyView = $derived.by(() =>
-    screen?.status.currentActor?.kind === 'enemy' && screen.status.currentActor.id
-      ? (enemyViews.find((enemy) => enemy.enemyId === screen.status.currentActor?.id) ?? null)
+    screen?.status.currentActor?.kind === 'enemy' && screen?.status.currentActor.id
+      ? (enemyViews.find((enemy) => enemy.enemyId === screen?.status.currentActor?.id) ?? null)
       : null,
   )
   const selectedEnemyView = $derived.by(() => {
@@ -1109,7 +1130,7 @@
         <CombatHeader
           {statusView}
           {accessRoleLabel}
-          combatStateLive={screen.access.guards.hasCombatState}
+          combatStateLive={screen?.access.guards.hasCombatState ?? false}
           currentTurnStateLabel={currentTurnStateLabel}
           recentResultsLoading={false}
           recentResultsErrorMessage={null}
@@ -1127,7 +1148,7 @@
           {playerViews}
           {enemyViews}
           {summonViews}
-          currentTurnPlayerId={screen.status.currentActor?.kind === 'player' ? screen.status.currentActor.id : null}
+          currentTurnPlayerId={screen?.status.currentActor?.kind === 'player' ? screen.status.currentActor.id : null}
           currentEnemyId={currentEnemyView?.enemyId ?? null}
           visiblePlayerId={visiblePlayerView?.playerId ?? null}
           {selectedPlayerId}
@@ -1145,9 +1166,9 @@
           commandPending={pendingActionId}
           selectedCommandType={selectedActionId}
           {commandGuardMessage}
-          isCurrentTurnPlayer={screen.access.guards.isCurrentTurnPlayer}
-          hasPendingDecision={screen.access.guards.hasPendingDecision}
-          exAvailable={screen.access.guards.exAvailable}
+          isCurrentTurnPlayer={screen?.access.guards.isCurrentTurnPlayer ?? false}
+          hasPendingDecision={screen?.access.guards.hasPendingDecision ?? false}
+          exAvailable={screen?.access.guards.exAvailable ?? false}
           recentCommandEventCount={0}
           requirementView={selectedRequirementView}
           sourceLabel={selectedSourceLabel}
@@ -1159,7 +1180,7 @@
           {pendingDecision}
           unsupportedPendingDecisionMessage={pendingActionMetadata?.unsupportedReason ?? pendingLocalBlock}
           {pendingCandidateIds}
-          {orderedActorKeys}
+          orderedTieActorKeys={orderedActorKeys}
           {canResolvePendingCommand}
           {visiblePlayerView}
           eventEntries={eventFeedEntries}
@@ -1178,9 +1199,9 @@
           onToggleOrderedActorKey={handleToggleOrderedActorKey}
           onResolvePendingDecision={handleResolvePendingDecision}
           onToggleSelectedId={handleToggleFieldId}
-          onRetryEvents={() => void refreshCombatScreen('action')}
-          onRetryLogs={() => void refreshCombatScreen('action')}
-          onRetryResults={() => void refreshCombatScreen('action')}
+          onRetryEvents={() => void refreshCombatScreen('action-failure')}
+          onRetryLogs={() => void refreshCombatScreen('action-failure')}
+          onRetryResults={() => void refreshCombatScreen('action-failure')}
         />
       {/snippet}
 
@@ -1190,7 +1211,7 @@
           {selectedCardId}
           {selectedDiscardIds}
           selectedCommandType={selectedActionId}
-          expectedVersion={screen.access.expectedVersion}
+          expectedVersion={screen?.access.expectedVersion ?? null}
           currentActorLabel={statusView.currentTurnLabel}
           visibleHandOwner={visiblePlayerView?.playerId ?? null}
           selectedActor={selectedPlayerId}
@@ -1205,8 +1226,8 @@
           selectedFieldCount={selectedFieldIds.length}
           {selectedCount}
           pendingCandidateCount={selectedPendingIds.length}
-          bufferedEventCount={screen.sidebar.events.length}
-          runNodeSummary={screen.status.runSummary}
+          bufferedEventCount={screen?.sidebar.events.length ?? 0}
+          runNodeSummary={screen?.status.runSummary ?? 'Run summary unavailable.'}
           {selectedReason}
           catalogLoading={false}
           emptyMessage="Visible hand cards will render here once the current visible player has hand instances in the combat screen."

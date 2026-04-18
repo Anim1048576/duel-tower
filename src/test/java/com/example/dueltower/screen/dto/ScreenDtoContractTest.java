@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,5 +79,59 @@ class ScreenDtoContractTest {
 
         assertThat(base.getUiNotices()).isEmpty();
         assertThat(base.getPossibleActions()).isEmpty();
+    }
+
+    @Test
+    void combatScreenResponseCanCarryCuratedReadModelSlices() {
+        CombatScreenResponse response = new CombatScreenResponse(
+                "Combat",
+                OffsetDateTime.parse("2026-04-18T19:10:30+09:00"),
+                List.of("combat screen sample"),
+                List.of(),
+                "ABCD1234",
+                27L,
+                true,
+                new CombatScreenResponse.Status(
+                        2,
+                        "PLAYER",
+                        new CombatScreenResponse.ActorSummary("P:p1", "player", "p1", "p1", "Current player turn", "success"),
+                        "p1 -> e1",
+                        "1 players | 1 enemies",
+                        "Current node: test encounter",
+                        null
+                ),
+                new CombatScreenResponse.Access(
+                        "player",
+                        "p1",
+                        27L,
+                        new CombatScreenResponse.GuardSummary(true, false, true, false, true, false, true, true)
+                ),
+                new CombatScreenResponse.Actors(
+                        List.of(),
+                        List.of(),
+                        List.of()
+                ),
+                new CombatScreenResponse.Zones(
+                        "p1",
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        null
+                ),
+                new CombatScreenResponse.Sidebar(
+                        List.of(),
+                        List.of(),
+                        List.of()
+                )
+        );
+
+        assertThat(response.getSessionCode()).isEqualTo("ABCD1234");
+        assertThat(response.getVersion()).isEqualTo(27L);
+        assertThat(response.isChanged()).isTrue();
+        assertThat(response.getStatus().currentActor().label()).isEqualTo("p1");
+        assertThat(response.getAccess().guards().canIssuePlayerCommand()).isTrue();
+        assertThat(response.getZones().visiblePlayerId()).isEqualTo("p1");
+        assertThat(response.getSidebar().events()).isEmpty();
     }
 }

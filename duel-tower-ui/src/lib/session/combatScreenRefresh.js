@@ -15,8 +15,12 @@
  */
 
 /**
+ * @typedef {import('../api/screenTypes').CombatActionId | null} CombatSelectedActionId
+ */
+
+/**
  * @typedef {{
- *   selectedActionId: string | null
+ *   selectedActionId: CombatSelectedActionId
  *   selectedPlayerId: string | null
  *   selectedCardId: string | null
  *   selectedTargetKeys: string[]
@@ -91,23 +95,37 @@ export function resolveCombatScreenRefreshPlan(reason) {
   }
 }
 
+/**
+ * @param {string} playerId
+ */
 function targetKeyForPlayer(playerId) {
   return `player:${playerId}`
 }
 
+/**
+ * @param {string} enemyId
+ */
 function targetKeyForEnemy(enemyId) {
   return `enemy:${enemyId}`
 }
 
+/**
+ * @param {string} owner
+ * @param {string} summonId
+ */
 function targetKeyForSummon(owner, summonId) {
   return `summon:${owner}:${summonId}`
 }
 
+/**
+ * @param {import('../api/screenTypes').CombatScreenResponse | null | undefined} screen
+ */
 function getPendingMetadata(screen) {
   if (!screen?.possibleActions?.length) {
     return null
   }
 
+  /** @param {import('../api/screenTypes').CombatScreenAction} candidate */
   const action = screen.possibleActions.find((candidate) => candidate.id === 'combat.resolvePending') ?? null
   if (!action?.metadata || action.metadata.kind !== 'pendingDecision') {
     return null
@@ -116,6 +134,9 @@ function getPendingMetadata(screen) {
   return action.metadata
 }
 
+/**
+ * @param {import('../api/screenTypes').CombatScreenResponse | null | undefined} screen
+ */
 function getPendingDecisionSignature(screen) {
   const metadata = getPendingMetadata(screen)
   if (!metadata?.pendingDecisionType) {
@@ -131,16 +152,21 @@ function getPendingDecisionSignature(screen) {
   })
 }
 
+/**
+ * @template T
+ * @param {T[]} values
+ * @returns {T[]}
+ */
 function uniqueValues(values) {
   return Array.from(new Set(values))
 }
 
 /**
- * @param {any} nextScreen
+ * @param {import('../api/screenTypes').CombatScreenResponse} nextScreen
  * @param {CombatLocalSelectionState} currentState
  * @param {{
  *   reason: CombatScreenRefreshReason
- *   previousScreen?: any | null
+ *   previousScreen?: import('../api/screenTypes').CombatScreenResponse | null
  * }} options
  * @returns {CombatLocalSelectionState}
  */
@@ -151,8 +177,8 @@ export function reconcileCombatLocalSelectionState(nextScreen, currentState, { r
   const nextPendingSchema = nextPendingMetadata?.schema ?? null
   const nextPendingSignature = getPendingDecisionSignature(nextScreen)
   const pendingChanged = previousPendingSignature !== nextPendingSignature
-  const validHandIds = new Set((nextScreen?.zones?.hand ?? []).map((card) => card.instanceId))
-  const validFieldIds = new Set((nextScreen?.zones?.field ?? []).map((card) => card.instanceId))
+  const validHandIds = new Set((nextScreen?.zones?.hand ?? []).map((/** @type {import('../api/screenTypes').CombatCardDto} */ card) => card.instanceId))
+  const validFieldIds = new Set((nextScreen?.zones?.field ?? []).map((/** @type {import('../api/screenTypes').CombatCardDto} */ card) => card.instanceId))
   const validTargetKeys = new Set()
   const validCandidateIds = new Set(nextPendingSchema?.candidateIds ?? [])
   const validActorKeys = new Set(nextPendingSchema?.actorKeys ?? [])
@@ -186,13 +212,13 @@ export function reconcileCombatLocalSelectionState(nextScreen, currentState, { r
 
   nextState.selectedPlayerId =
     nextState.selectedPlayerId &&
-    (nextScreen?.actors?.players ?? []).some((player) => player.playerId === nextState.selectedPlayerId)
+    (nextScreen?.actors?.players ?? []).some((/** @type {import('../api/screenTypes').CombatPlayerDto} */ player) => player.playerId === nextState.selectedPlayerId)
       ? nextState.selectedPlayerId
       : nextScreen?.zones?.visiblePlayerId ?? null
 
   nextState.selectedActionId =
     nextState.selectedActionId &&
-    (nextScreen?.possibleActions ?? []).some((action) => action.id === nextState.selectedActionId)
+    (nextScreen?.possibleActions ?? []).some((/** @type {import('../api/screenTypes').CombatScreenAction} */ action) => action.id === nextState.selectedActionId)
       ? nextState.selectedActionId
       : null
 
@@ -216,7 +242,7 @@ export function reconcileCombatLocalSelectionState(nextScreen, currentState, { r
     nextState.orderedActorKeys = []
   } else if (pendingChanged) {
     nextState.selectedPendingIds = []
-    nextState.orderedActorKeys = (nextPendingSchema?.actorKeys ?? []).filter((actorKey) =>
+    nextState.orderedActorKeys = (nextPendingSchema?.actorKeys ?? []).filter((/** @type {string} */ actorKey) =>
       currentState.orderedActorKeys.includes(actorKey),
     )
   } else {

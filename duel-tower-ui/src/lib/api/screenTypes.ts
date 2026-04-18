@@ -536,6 +536,12 @@ export type DeckEditorLocalValidationState = DeckEditorServerValidationDto & {
   isLocallyStale: boolean
 }
 
+/**
+ * Combat screen contract.
+ * The server owns card resolution, actor/status/sidebar composition, action
+ * enablement, requirement metadata, and screen-action follow-up payloads.
+ * The frontend keeps only local selection input on top of this DTO family.
+ */
 export type CombatTagDto = {
   label: string
   tone: string | null
@@ -768,6 +774,59 @@ export type CombatSidebarDto = {
   recentResults: CombatRecentResultEntryDto[]
 }
 
+export type CombatDrawActionPayload = {
+  type: 'DRAW'
+  expectedVersion: number
+  playerId: string
+  count: number
+  reason?: string | null
+}
+
+export type CombatEndTurnActionPayload = {
+  type: 'END_TURN'
+  expectedVersion: number
+  playerId: string
+  reason?: string | null
+}
+
+export type CombatClearRecentResultsActionPayload = {
+  type: 'CLEAR_RECENT_RESULTS'
+  expectedVersion: number
+  playerId: string
+  reason?: string | null
+}
+
+export type CombatPlayCardActionPayload = {
+  type: 'PLAY_CARD'
+  expectedVersion: number
+  playerId: string
+  cardId: string
+  discardIds: string[]
+  selectedIds: string[]
+  targets: Record<string, unknown>[]
+  reason?: string | null
+}
+
+export type CombatUseExActionPayload = {
+  type: 'USE_EX'
+  expectedVersion: number
+  playerId: string
+  targets: Record<string, unknown>[]
+  reason?: string | null
+}
+
+export type CombatResolvePendingActionPayload = {
+  type: string
+  expectedVersion: number
+  playerId: string
+  discardIds: string[]
+  selectedIds: string[]
+  orderedActorKeys: string[]
+  choiceId: string
+  tieGroupIndex?: number | null
+  reason?: string | null
+}
+
 export type ScreenActionDto<
   TPayloadTemplate = ScreenActionPayloadTemplate,
   TMetadata = Record<string, unknown>,
@@ -815,12 +874,55 @@ export type GmLobbyScreenAction =
   | GmLobbyResetAction
   | GmLobbyStartCombatAction
 
-export type CombatScreenAction = ScreenActionDto<
-  Record<string, unknown>,
-  CombatActionMetadataDto
+export type CombatDrawScreenAction = ScreenActionDto<
+  CombatDrawActionPayload,
+  CombatSimpleActionMetadataDto
 > & {
-  id: CombatActionId
+  id: 'combat.draw'
 }
+
+export type CombatEndTurnScreenAction = ScreenActionDto<
+  CombatEndTurnActionPayload,
+  CombatSimpleActionMetadataDto
+> & {
+  id: 'combat.endTurn'
+}
+
+export type CombatClearRecentResultsScreenAction = ScreenActionDto<
+  CombatClearRecentResultsActionPayload,
+  CombatSimpleActionMetadataDto
+> & {
+  id: 'combat.clearRecentResults'
+}
+
+export type CombatPlayCardScreenAction = ScreenActionDto<
+  CombatPlayCardActionPayload,
+  CombatPlayCardActionMetadataDto
+> & {
+  id: 'combat.playCard'
+}
+
+export type CombatUseExScreenAction = ScreenActionDto<
+  CombatUseExActionPayload,
+  CombatUseExActionMetadataDto
+> & {
+  id: 'combat.useEx'
+}
+
+export type CombatResolvePendingScreenAction = ScreenActionDto<
+  CombatResolvePendingActionPayload,
+  CombatPendingActionMetadataDto
+> & {
+  id: 'combat.resolvePending'
+}
+
+export type CombatScreenAction =
+  | CombatDrawScreenAction
+  | CombatEndTurnScreenAction
+  | CombatClearRecentResultsScreenAction
+  | CombatPlayCardScreenAction
+  | CombatUseExScreenAction
+  | CombatResolvePendingScreenAction
 
 export type ScreenResponseBase<TAction extends ScreenActionDto = ScreenActionDto> = {
   screenKey: string

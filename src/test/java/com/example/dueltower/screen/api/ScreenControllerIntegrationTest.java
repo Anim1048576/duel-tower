@@ -602,15 +602,10 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andReturn();
 
         JsonNode body = assertBaseScreenContract(result, "Combat");
+        assertCombatScreenContract(body);
         assertThat(body.path("sessionCode").asText()).isEqualTo(session.code());
         assertThat(body.path("version").asLong()).isGreaterThan(0L);
         assertThat(body.path("changed").asBoolean()).isTrue();
-        assertThat(body.path("status").isObject()).isTrue();
-        assertThat(body.path("access").isObject()).isTrue();
-        assertThat(body.path("actors").isObject()).isTrue();
-        assertThat(body.path("zones").isObject()).isTrue();
-        assertThat(body.path("sidebar").isObject()).isTrue();
-        assertThat(body.path("possibleActions").isArray()).isTrue();
         assertThat(body.path("uiNotices")).isNotEmpty();
         JsonNode drawAction = findAction(body, "combat.draw");
         assertActionContract(drawAction);
@@ -634,6 +629,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andReturn();
 
         JsonNode body = assertBaseScreenContract(result, "Combat");
+        assertCombatScreenContract(body);
         assertThat(body.path("status").path("round").isInt()).isTrue();
         assertThat(body.path("status").path("phase").asText()).isNotBlank();
         assertThat(body.path("status").path("currentActor").path("label").asText()).isNotBlank();
@@ -681,6 +677,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                         .andReturn(),
                 "Combat"
         );
+        assertCombatScreenContract(initialBody);
 
         long currentVersion = initialBody.path("version").asLong();
 
@@ -691,6 +688,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andReturn();
 
         JsonNode unchangedBody = assertBaseScreenContract(unchanged, "Combat");
+        assertCombatScreenContract(unchangedBody);
         assertThat(unchangedBody.path("version").asLong()).isEqualTo(currentVersion);
         assertThat(unchangedBody.path("changed").asBoolean()).isFalse();
     }
@@ -711,10 +709,11 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andReturn();
 
         JsonNode body = assertBaseScreenContract(result, "Combat");
+        assertCombatScreenContract(body);
         assertThat(body.path("zones").path("hand")).isNotEmpty();
 
         JsonNode card = body.path("zones").path("hand").get(0);
-        assertThat(card.path("instanceId").asText()).isNotBlank();
+        assertCombatCardContract(card);
         assertThat(card.path("defId").asText()).isNotBlank();
         assertThat(card.path("title").asText()).isNotBlank();
         assertThat(card.path("title").asText()).isNotEqualTo(card.path("defId").asText());
@@ -758,6 +757,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andReturn();
 
         JsonNode body = assertBaseScreenContract(result, "Combat");
+        assertCombatScreenContract(body);
         JsonNode resolvePendingAction = findAction(body, "combat.resolvePending");
         assertDisabledActionContract(resolvePendingAction);
         assertThat(resolvePendingAction.path("disabledReason").path("code").asText()).isEqualTo("PENDING_DECISION_UNSUPPORTED");
@@ -790,7 +790,6 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("resultSummary").path("actionId").asText()).isEqualTo("combat.draw");
         assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("DRAW");
         assertThat(body.path("serverNotices")).isNotEmpty();
-        assertBaseScreenContract(body.path("latestScreen"), "Combat", true);
         assertThat(body.path("latestScreen").path("version").asLong()).isEqualTo(body.path("latestVersion").asLong());
     }
 
@@ -828,7 +827,6 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("resultSummary").path("actionId").asText()).isEqualTo("combat.useEx");
         assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("USE_EX");
         assertThat(body.path("latestVersion").asLong()).isGreaterThan(beforeVersion);
-        assertBaseScreenContract(body.path("latestScreen"), "Combat", true);
     }
 
     @Test
@@ -858,7 +856,6 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertDisabledReasonContract(body.path("disabledReason"));
         assertThat(body.path("resultSummary").path("actionId").asText()).isEqualTo("combat.playCard");
         assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("PLAY_CARD");
-        assertBaseScreenContract(body.path("latestScreen"), "Combat", true);
         assertThat(body.path("latestVersion").asLong()).isEqualTo(body.path("latestScreen").path("version").asLong());
     }
 
@@ -1234,18 +1231,6 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andExpect(status().isOk())
                 .andReturn();
         return readJson(result);
-    }
-
-    private void assertCombatActionResponseContract(JsonNode body) {
-        assertThat(body.path("success").isBoolean()).isTrue();
-        assertThat(body.path("outcome").isTextual()).isTrue();
-        assertThat(body.path("message").isTextual()).isTrue();
-        assertThat(body.has("disabledReason")).isTrue();
-        assertThat(body.path("latestVersion").isNumber() || body.path("latestVersion").isNull()).isTrue();
-        assertThat(body.path("serverNotices").isArray()).isTrue();
-        assertThat(body.path("resultSummary").isObject()).isTrue();
-        assertThat(body.has("latestScreen")).isTrue();
-        assertThat(body.path("latestScreen").isObject()).isTrue();
     }
 
     private long createCharacter() {

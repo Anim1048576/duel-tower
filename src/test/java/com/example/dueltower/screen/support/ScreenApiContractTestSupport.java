@@ -87,6 +87,77 @@ public abstract class ScreenApiContractTestSupport {
         Assertions.assertThat(disabledReason.path("path").isTextual() || disabledReason.path("path").isNull()).isTrue();
     }
 
+    protected void assertCombatScreenContract(JsonNode body) {
+        assertBaseScreenContract(body, "Combat", true);
+        Assertions.assertThat(body.path("sessionCode").isTextual()).isTrue();
+        Assertions.assertThat(body.path("version").canConvertToLong()).isTrue();
+        Assertions.assertThat(body.path("changed").isBoolean()).isTrue();
+        Assertions.assertThat(body.path("status").isObject()).isTrue();
+        Assertions.assertThat(body.path("access").isObject()).isTrue();
+        Assertions.assertThat(body.path("actors").isObject()).isTrue();
+        Assertions.assertThat(body.path("zones").isObject()).isTrue();
+        Assertions.assertThat(body.path("sidebar").isObject()).isTrue();
+
+        Assertions.assertThat(body.path("status").path("round").isInt() || body.path("status").path("round").isNull()).isTrue();
+        Assertions.assertThat(body.path("status").has("phase")).isTrue();
+        Assertions.assertThat(body.path("status").path("phase").isTextual() || body.path("status").path("phase").isNull()).isTrue();
+        Assertions.assertThat(body.path("status").has("currentActor")).isTrue();
+        Assertions.assertThat(body.path("status").path("currentActor").isObject() || body.path("status").path("currentActor").isNull()).isTrue();
+        Assertions.assertThat(body.path("status").path("turnOrderSummary").isTextual()).isTrue();
+        Assertions.assertThat(body.path("status").path("battlefieldSummary").isTextual()).isTrue();
+        Assertions.assertThat(body.path("status").path("runSummary").isTextual()).isTrue();
+        Assertions.assertThat(body.path("status").has("tieGroupSummary")).isTrue();
+        Assertions.assertThat(body.path("status").path("tieGroupSummary").isTextual() || body.path("status").path("tieGroupSummary").isNull()).isTrue();
+
+        Assertions.assertThat(body.path("access").path("role").isTextual()).isTrue();
+        Assertions.assertThat(body.path("access").has("runtimePlayerId")).isTrue();
+        Assertions.assertThat(body.path("access").path("runtimePlayerId").isTextual() || body.path("access").path("runtimePlayerId").isNull()).isTrue();
+        Assertions.assertThat(body.path("access").path("expectedVersion").canConvertToLong()).isTrue();
+        Assertions.assertThat(body.path("access").path("guards").isObject()).isTrue();
+
+        Assertions.assertThat(body.path("actors").path("players").isArray()).isTrue();
+        Assertions.assertThat(body.path("actors").path("enemies").isArray()).isTrue();
+        Assertions.assertThat(body.path("actors").path("summons").isArray()).isTrue();
+
+        Assertions.assertThat(body.path("zones").has("visiblePlayerId")).isTrue();
+        Assertions.assertThat(body.path("zones").path("visiblePlayerId").isTextual() || body.path("zones").path("visiblePlayerId").isNull()).isTrue();
+        Assertions.assertThat(body.path("zones").path("hand").isArray()).isTrue();
+        Assertions.assertThat(body.path("zones").path("field").isArray()).isTrue();
+        Assertions.assertThat(body.path("zones").path("grave").isArray()).isTrue();
+        Assertions.assertThat(body.path("zones").path("excluded").isArray()).isTrue();
+        Assertions.assertThat(body.path("zones").has("ex")).isTrue();
+        Assertions.assertThat(body.path("zones").path("ex").isObject() || body.path("zones").path("ex").isNull()).isTrue();
+
+        Assertions.assertThat(body.path("sidebar").path("events").isArray()).isTrue();
+        Assertions.assertThat(body.path("sidebar").path("logs").isArray()).isTrue();
+        Assertions.assertThat(body.path("sidebar").path("recentResults").isArray()).isTrue();
+    }
+
+    protected void assertCombatCardContract(JsonNode card) {
+        Assertions.assertThat(card.path("instanceId").isTextual()).isTrue();
+        Assertions.assertThat(card.has("defId")).isTrue();
+        Assertions.assertThat(card.path("defId").isTextual() || card.path("defId").isNull()).isTrue();
+        Assertions.assertThat(card.path("title").isTextual()).isTrue();
+        Assertions.assertThat(card.path("subtitle").isTextual()).isTrue();
+        Assertions.assertThat(card.path("unresolved").isBoolean()).isTrue();
+        Assertions.assertThat(card.path("tags").isArray()).isTrue();
+        Assertions.assertThat(card.has("meta")).isTrue();
+        Assertions.assertThat(card.path("meta").isTextual() || card.path("meta").isNull()).isTrue();
+    }
+
+    protected void assertCombatActionResponseContract(JsonNode body) {
+        Assertions.assertThat(body.path("success").isBoolean()).isTrue();
+        Assertions.assertThat(body.path("outcome").isTextual()).isTrue();
+        Assertions.assertThat(body.path("message").isTextual()).isTrue();
+        Assertions.assertThat(body.has("disabledReason")).isTrue();
+        Assertions.assertThat(body.path("latestVersion").isNumber() || body.path("latestVersion").isNull()).isTrue();
+        Assertions.assertThat(body.path("serverNotices").isArray()).isTrue();
+        Assertions.assertThat(body.path("resultSummary").isObject() || body.path("resultSummary").isNull()).isTrue();
+        Assertions.assertThat(body.has("latestScreen")).isTrue();
+        Assertions.assertThat(body.path("latestScreen").isObject()).isTrue();
+        assertCombatScreenContract(body.path("latestScreen"));
+    }
+
     protected JsonNode assertApiErrorContract(MvcResult result, int expectedStatus) throws Exception {
         Assertions.assertThat(result.getResponse().getStatus()).isEqualTo(expectedStatus);
         String responseBody = result.getResponse().getContentAsString();

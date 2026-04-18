@@ -3,6 +3,14 @@ package com.example.dueltower.screen.dto;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+/**
+ * Combat screen read model curated for the frontend.
+ *
+ * <p>The server owns combat-facing card resolution, actor/status/sidebar
+ * assembly, action metadata, and read-access summary. The frontend should use
+ * this payload as the render source of truth and keep only local
+ * selection/presentation state on top.</p>
+ */
 public class CombatScreenResponse extends ScreenResponseBase {
     private final String sessionCode;
     private final long version;

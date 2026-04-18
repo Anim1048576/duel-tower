@@ -53,6 +53,11 @@ Mixed token rule:
   it can execute with a valid `X-GM-Token`, or with authenticated GM login fallback when the backend can restore GM access.
 - For GmLobby specifically:
   participant summary curation, start blocked-state evaluation, and start-combat procedure belong to the server-side Screen API / screen action layer, not the frontend page.
+- For Combat specifically:
+  card/status/sidebar/action metadata belong to the server-side Screen API, while
+  command execution and pending-decision resolution belong to the combat screen action layer.
+  The frontend keeps only local selection state such as selected card/targets/discard ids and
+  applies the latest returned combat screen after polling or action follow-up.
 
 ## Controller And Service Ownership
 
