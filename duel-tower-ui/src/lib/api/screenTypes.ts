@@ -124,12 +124,22 @@ export type GmLobbyActionId =
   | 'gmLobby.reset'
   | 'gmLobby.startCombat'
 
+export type CombatActionId =
+  | 'combat.draw'
+  | 'combat.endTurn'
+  | 'combat.clearRecentResults'
+  | 'combat.playCard'
+  | 'combat.useEx'
+  | 'combat.resolvePending'
+
 export type GmLobbyStartCombatOutcome =
   | 'STARTED'
   | 'ALREADY_ACTIVE'
   | 'BLOCKED'
   | 'GM_ACCESS_REQUIRED'
   | 'FAILED'
+
+export type CombatScreenActionOutcome = 'SUCCEEDED' | 'FAILED' | 'BLOCKED'
 
 export type DeckEditorDraftCardDto = {
   key: string
@@ -526,7 +536,242 @@ export type DeckEditorLocalValidationState = DeckEditorServerValidationDto & {
   isLocallyStale: boolean
 }
 
-export type ScreenActionDto<TPayloadTemplate = ScreenActionPayloadTemplate> = {
+export type CombatTagDto = {
+  label: string
+  tone: string | null
+}
+
+export type CombatMetricDto = {
+  label: string
+  value: string | number | boolean | null
+  note: string | null
+}
+
+export type CombatCardDto = {
+  instanceId: string
+  defId: string | null
+  title: string
+  subtitle: string
+  unresolved: boolean
+  tags: CombatTagDto[]
+  meta: string | null
+}
+
+export type CombatActorSummaryDto = {
+  raw: string | null
+  kind: string
+  id: string | null
+  label: string
+  note: string
+  tone: string
+}
+
+export type CombatRequirementTargetRuleDto = {
+  target: string
+  requiredSelection: boolean
+}
+
+export type CombatDiscardRequirementDto = {
+  count: number
+  excludeSourceCard: boolean
+  filter: string
+}
+
+export type CombatSelectedIdsRequirementDto = {
+  minSelections: number
+  maxSelections: number
+  scope: string
+  filter: string
+  excludeSourceCard: boolean
+}
+
+export type CombatChoiceOptionDto = {
+  id: string
+  label: string
+  description: string
+}
+
+export type CombatPendingChoiceSchemaDto = {
+  id: string
+  label: string
+  minSelections: number
+  maxSelections: number
+  options: CombatChoiceOptionDto[]
+}
+
+export type CombatRequirementViewDto = {
+  sourceLabel: string
+  targetSummary: string
+  discardSummary: string
+  selectedIdsSummary: string
+  choiceSummary: string
+  targetRule: CombatRequirementTargetRuleDto | null
+  discardRequirement: CombatDiscardRequirementDto | null
+  selectedIdsRequirement: CombatSelectedIdsRequirementDto | null
+  pendingChoiceSchema: CombatPendingChoiceSchemaDto | null
+  unsupportedReason: string | null
+}
+
+export type CombatPlayCardSourceOptionDto = {
+  instanceId: string
+  title: string
+  sourceCard: CombatCardDto | null
+  requirementView: CombatRequirementViewDto | null
+  supported: boolean
+  unsupportedReason: string | null
+}
+
+export type CombatPendingDecisionSchemaDto = {
+  type: string
+  reason?: string | null
+  discardCount?: number | null
+  pickCount?: number | null
+  candidateIds?: string[] | null
+  destination?: string | null
+  shuffleAfterPick?: boolean | null
+  groupIndex?: number | null
+  actorKeys?: string[] | null
+  selectedIdsField?: string | null
+}
+
+export type CombatSimpleActionMetadataDto = {
+  kind: 'simple' | 'utility'
+  note: string
+}
+
+export type CombatPlayCardActionMetadataDto = {
+  kind: 'playCard'
+  note: string
+  localSelection: {
+    requiresSelectedCard: boolean
+    sourceType: string
+  }
+  sourceOptions: CombatPlayCardSourceOptionDto[]
+}
+
+export type CombatUseExActionMetadataDto = {
+  kind: 'useEx'
+  note: string
+  sourceCard: CombatCardDto | null
+  requirementView: CombatRequirementViewDto | null
+  supported: boolean
+  unsupportedReason: string | null
+}
+
+export type CombatPendingActionMetadataDto = {
+  kind: 'pendingDecision'
+  note: string
+  supported: boolean
+  unsupportedReason: string | null
+  pendingDecisionType: string | null
+  schema: CombatPendingDecisionSchemaDto | null
+  blocked: boolean
+}
+
+export type CombatActionMetadataDto =
+  | CombatSimpleActionMetadataDto
+  | CombatPlayCardActionMetadataDto
+  | CombatUseExActionMetadataDto
+  | CombatPendingActionMetadataDto
+
+export type CombatGuardSummaryDto = {
+  canIssuePlayerCommand: boolean
+  canResolvePendingCommand: boolean
+  canClearRecentResultsCommand: boolean
+  canIssueGmCommand: boolean
+  exAvailable: boolean
+  hasPendingDecision: boolean
+  isCurrentTurnPlayer: boolean
+  hasCombatState: boolean
+}
+
+export type CombatAccessDto = {
+  role: string
+  runtimePlayerId: string | null
+  expectedVersion: number
+  guards: CombatGuardSummaryDto
+}
+
+export type CombatStatusDto = {
+  round: number | null
+  phase: string | null
+  currentActor: CombatActorSummaryDto | null
+  turnOrderSummary: string
+  battlefieldSummary: string
+  runSummary: string
+  tieGroupSummary: string | null
+}
+
+export type CombatPlayerDto = {
+  playerId: string
+  ready: boolean
+  stateLabel: string
+  stateTone: string
+  metrics: CombatMetricDto[]
+  summaryLines: string[]
+  statusTags: CombatTagDto[]
+  passives: string[]
+  handCards: CombatCardDto[]
+  fieldCards: CombatCardDto[]
+  graveCards: CombatCardDto[]
+  excludedCards: CombatCardDto[]
+  exCard: CombatCardDto | null
+}
+
+export type CombatEnemyDto = {
+  enemyId: string
+  stateLabel: string
+  stateTone: string
+  metrics: CombatMetricDto[]
+  summaryLines: string[]
+  statusEntries: string[]
+}
+
+export type CombatSummonDto = {
+  summonId: string
+  owner: string
+  stateLabel: string
+  stateTone: string
+  metrics: CombatMetricDto[]
+  summaryLines: string[]
+}
+
+export type CombatActorsDto = {
+  players: CombatPlayerDto[]
+  enemies: CombatEnemyDto[]
+  summons: CombatSummonDto[]
+}
+
+export type CombatZonesDto = {
+  visiblePlayerId: string | null
+  hand: CombatCardDto[]
+  field: CombatCardDto[]
+  grave: CombatCardDto[]
+  excluded: CombatCardDto[]
+  ex: CombatCardDto | null
+}
+
+export type CombatFeedEntryDto = {
+  title: string
+  lines: string[]
+}
+
+export type CombatRecentResultEntryDto = {
+  title: string
+  summary: string
+  meta: string
+}
+
+export type CombatSidebarDto = {
+  events: CombatFeedEntryDto[]
+  logs: CombatFeedEntryDto[]
+  recentResults: CombatRecentResultEntryDto[]
+}
+
+export type ScreenActionDto<
+  TPayloadTemplate = ScreenActionPayloadTemplate,
+  TMetadata = Record<string, unknown>,
+> = {
   id: string
   label: string
   method: ScreenActionMethod | string
@@ -535,6 +780,7 @@ export type ScreenActionDto<TPayloadTemplate = ScreenActionPayloadTemplate> = {
   enabled: boolean
   disabledReason: DisabledReasonDto | null
   payloadTemplate: TPayloadTemplate | null
+  metadata?: TMetadata | null
 }
 
 export type DeckEditorScreenAction = ScreenActionDto<DeckEditorActionPayload> & {
@@ -568,6 +814,13 @@ export type GmLobbyScreenAction =
   | GmLobbyKickAction
   | GmLobbyResetAction
   | GmLobbyStartCombatAction
+
+export type CombatScreenAction = ScreenActionDto<
+  Record<string, unknown>,
+  CombatActionMetadataDto
+> & {
+  id: CombatActionId
+}
 
 export type ScreenResponseBase<TAction extends ScreenActionDto = ScreenActionDto> = {
   screenKey: string
@@ -637,6 +890,17 @@ export type GmLobbyScreenResponse = ScreenResponseBase<GmLobbyScreenAction> & {
   startCombat: GmLobbyStartCombatDto
 }
 
+export type CombatScreenResponse = ScreenResponseBase<CombatScreenAction> & {
+  sessionCode: string
+  version: number
+  changed: boolean
+  status: CombatStatusDto
+  access: CombatAccessDto
+  actors: CombatActorsDto
+  zones: CombatZonesDto
+  sidebar: CombatSidebarDto
+}
+
 export type DeckEditorActionResponseById = {
   'deckEditor.validate': DeckValidationResponseLike
   'deckEditor.save': DeckResponse
@@ -675,6 +939,17 @@ export type GmLobbyActionResponseById = {
   'gmLobby.kick': SessionStateDto
   'gmLobby.reset': SessionStateDto
   'gmLobby.startCombat': GmLobbyStartCombatActionResponse
+}
+
+export type CombatScreenActionResponse = {
+  success: boolean
+  outcome: CombatScreenActionOutcome
+  message: string | null
+  disabledReason: DisabledReasonDto | null
+  latestVersion: number | null
+  serverNotices: string[]
+  resultSummary: Record<string, unknown> | null
+  latestScreen: CombatScreenResponse | null
 }
 
 type DeckValidationResponseLike = {
@@ -747,6 +1022,18 @@ export function findGmLobbyAction<TActionId extends GmLobbyActionId>(
   return (
     screen.possibleActions.find((action) => action.id === actionId) as Extract<
       GmLobbyScreenAction,
+      { id: TActionId }
+    > | null
+  ) ?? null
+}
+
+export function findCombatAction<TActionId extends CombatActionId>(
+  screen: Pick<CombatScreenResponse, 'possibleActions'>,
+  actionId: TActionId,
+) {
+  return (
+    screen.possibleActions.find((action) => action.id === actionId) as Extract<
+      CombatScreenAction,
       { id: TActionId }
     > | null
   ) ?? null

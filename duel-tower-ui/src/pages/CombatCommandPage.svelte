@@ -1,51 +1,28 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onDestroy, onMount } from 'svelte'
+  import { getScreen, invokeScreenAction } from '../lib/api/screens'
   import {
-    buildCommandRequirementViewModel,
-    getPlayCardRequirementError,
-  } from '../features/session/combat/commandRequirements'
-  import {
-    formatTargetRefSummary,
-    formatTargetSelectionLabel,
-    getUnsupportedCardCommandMessage,
-    getUnsupportedPendingDecisionMessage,
-  } from '../features/session/combat/commandMessages'
-  import {
-    getOrderedTieActorKeys,
-    getPendingCandidateIds,
-    getSelectedDiscardIdsFromHand,
-    getSelectedFieldIds,
-  } from '../features/session/combat/selectionFilters'
-  import {
-    normalizePlaySpec,
-  } from '../features/session/combat/playSpec'
-  import { getCard, listCards } from '../lib/api/content'
-  import type { CardDefinition, CardDetailResponse } from '../lib/api/contentTypes'
-  import {
-    executeSessionCommand,
-    getSessionEvents,
-    getSessionLogs,
-    getSessionRecentResults,
-    getSessionState,
-  } from '../lib/api/sessions'
-  import type {
-    CombatEnemyDto,
-    CombatSummonDto,
-    CommandRequest,
-    RecentResultsResponse,
-    SessionEventItemDto,
-    SessionLogItemDto,
-    PlayerStateDto,
-    SessionStateDto,
-  } from '../lib/api/sessionTypes'
-  import { getApiErrorMessage } from '../lib/api/types'
+    buildScreenActionPayload,
+    findCombatAction,
+    type CombatActionId,
+    type CombatCardDto,
+    type CombatPendingActionMetadataDto,
+    type CombatPendingDecisionSchemaDto,
+    type CombatPlayCardActionMetadataDto,
+    type CombatRequirementViewDto,
+    type CombatScreenAction,
+    type CombatScreenActionResponse,
+    type CombatScreenResponse,
+    type CombatUseExActionMetadataDto,
+  } from '../lib/api/screenTypes'
+  import type { PendingDecisionDto, RunRecentResultDto, TargetRefDto } from '../lib/api/sessionTypes'
+  import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import BattlefieldPanel from '../lib/components/combat/BattlefieldPanel.svelte'
   import CombatHeader from '../lib/components/combat/CombatHeader.svelte'
   import CombatLayout from '../lib/components/combat/CombatLayout.svelte'
   import CombatSidebar from '../lib/components/combat/CombatSidebar.svelte'
   import HandBar from '../lib/components/combat/HandBar.svelte'
   import type {
-    CombatActorSummary,
     CombatEnemyViewModel,
     CombatFeedEntry,
     CombatPlayerViewModel,
@@ -54,72 +31,81 @@
     CombatSummonViewModel,
     CombatTag,
     CombatTone,
-    CombatMetric,
     CommandOptionViewModel,
     ResolvedCombatCardViewModel,
   } from '../lib/components/combat/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
-  import { buildCardArchiveMeta, buildCardDisplayTags, getCardTypeLabel } from '../lib/content/display'
   import { pathBuilders } from '../lib/navigation'
   import {
-    hasStoredSessionCode,
     isStoredGmSessionAccess,
     isStoredPlayerSessionAccess,
     readStoredSessionAccess,
-    toSessionReadAccess,
     type StoredSessionAccess,
   } from '../lib/session/access'
-  import {
-    buildCombatCommandGuards,
-    createEmptyCombatCommandDraft,
-    syncCombatCommandDraft,
-    toggleCombatIdentifier,
-    type CombatCommandDraft,
-    type CombatCommandType,
-  } from '../lib/session/combatCommandDraft'
-  import {
-    createLiveSessionPage,
-  } from '../lib/session/liveSessionPage'
-  import { sessionPageStateCopy } from '../lib/session/pageState'
+  import { startTimedPolling, type TimedPollingHandle } from '../lib/session/liveSessionPolling'
   import { readRequestedSessionCodeFromAccessOrHandoff, readSessionCodeFromRoute } from '../lib/session/sessionRoute'
   import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
 
-  const combatSidebarEventLimit = 12
+  const POLLING_INTERVAL_MS = 4000
+  const COMBAT_SIDEBAR_EVENT_LIMIT = 12
 
   let loading = $state(true)
   let notFound = $state(false)
   let errorMessage = $state<string | null>(null)
+  let refreshErrorMessage = $state<string | null>(null)
   let invalidAccessMessage = $state<string | null>(null)
-  let accessNoticeMessage = $state<string | null>(null)
-  let catalogLoading = $state(true)
-  let catalogErrorMessage = $state<string | null>(null)
-  let session = $state<SessionStateDto | null>(null)
+  let actionErrorMessage = $state<string | null>(null)
+  let actionSuccessMessage = $state<string | null>(null)
+  let screen = $state<CombatScreenResponse | null>(null)
   let runtimeAccess = $state<StoredSessionAccess | null>(null)
-  let cardCatalog = $state<CardDefinition[]>([])
-  let cardDetails = $state<Record<string, CardDetailResponse>>({})
-  let cardDetailLoadingIds = $state<string[]>([])
-  let cardDetailErrors = $state<Record<string, string>>({})
-  let commandDraft = $state<CombatCommandDraft>(createEmptyCombatCommandDraft())
-  let commandPending = $state<CombatCommandType | null>(null)
-  let commandErrorMessage = $state<string | null>(null)
-  let commandRejectedMessage = $state<string | null>(null)
-  let commandSuccessMessage = $state<string | null>(null)
-  let recentCommandEvents = $state<SessionEventItemDto[]>([])
-  let eventsLoading = $state(true)
-  let eventsErrorMessage = $state<string | null>(null)
-  let eventItems = $state<SessionEventItemDto[]>([])
-  let eventsRequestSequence = 0
-  let logsLoading = $state(true)
-  let logsErrorMessage = $state<string | null>(null)
-  let logItems = $state<SessionLogItemDto[]>([])
-  let logsRequestSequence = 0
-  let recentResultsLoading = $state(true)
-  let recentResultsErrorMessage = $state<string | null>(null)
-  let recentResults = $state<RecentResultsResponse | null>(null)
-  let recentResultsRequestSequence = 0
-  let sidebarSessionCode = $state<string | null>(null)
-  let hadSidebarReadAccess = $state(false)
+  let pendingActionId = $state<CombatActionId | null>(null)
+  let selectedActionId = $state<CombatActionId | null>(null)
+  let selectedPlayerId = $state<string | null>(null)
+  let selectedCardId = $state<string | null>(null)
+  let selectedTargetKeys = $state<string[]>([])
+  let selectedDiscardIds = $state<string[]>([])
+  let selectedFieldIds = $state<string[]>([])
+  let selectedPendingIds = $state<string[]>([])
+  let orderedActorKeys = $state<string[]>([])
+  let selectedCount = $state<number | null>(1)
+  let selectedReason = $state('')
+  let requestSequence = 0
+  let pollingHandle: TimedPollingHandle | null = null
+
+  function normalizeTone(value: string | null | undefined): CombatTone {
+    switch (value) {
+      case 'accent':
+      case 'muted':
+      case 'success':
+      case 'warning':
+        return value
+      default:
+        return 'accent'
+    }
+  }
+
+  function normalizeOptionalText(value: string | null | undefined) {
+    const normalized = value?.trim()
+    return normalized ? normalized : null
+  }
+
+  function normalizePositiveInteger(value: string) {
+    const parsed = Number(value)
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+  }
+
+  function getRouteSessionCode() {
+    return readSessionCodeFromRoute('combat')
+  }
+
+  function getRequestedSessionCode(nextAccess: StoredSessionAccess | null) {
+    return readRequestedSessionCodeFromAccessOrHandoff({
+      pageKey: 'combat',
+      storedAccess: nextAccess,
+      preferStoredAccess: false,
+    }).code
+  }
 
   function getInvalidCombatAccessMessage(nextCode: string | null) {
     if (!nextCode) {
@@ -127,26 +113,6 @@
     }
 
     return null
-  }
-
-  function getAccessNotice(nextCode: string | null, nextAccess: StoredSessionAccess | null) {
-    if (!nextCode || !nextAccess) {
-      return 'Session runtime access is unavailable. Combat state is restored in read-only mode by session code only.'
-    }
-
-    if (!hasStoredSessionCode(nextAccess, nextCode)) {
-      return 'Stored session access does not match the requested combat code. The page is restored in code-first read-only mode.'
-    }
-
-    if (isStoredPlayerSessionAccess(nextAccess)) {
-      return `Player access restored for ${nextAccess.playerId}. The current hand and player-side zones now follow that player when available.`
-    }
-
-    if (isStoredGmSessionAccess(nextAccess)) {
-      return 'GM access restored for this combat code. The shell now resolves the live combat state and is ready for command wiring in the next step.'
-    }
-
-    return 'Session access is present but incomplete. Combat state is restored in read-only mode.'
   }
 
   function navigateTo(path: string, replace = false) {
@@ -158,1549 +124,878 @@
     window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
-  function syncCombatState(nextSession: SessionStateDto) {
-    session = nextSession
-    commandDraft = syncCombatCommandDraft(commandDraft, nextSession, runtimeAccess)
-    syncSessionSelectionHandoff(nextSession.sessionCode)
-
-    if (!routeSessionCode && nextSession.sessionCode) {
-      navigateTo(pathBuilders.combat(nextSession.sessionCode), true)
-    }
+  function stopPolling() {
+    pollingHandle?.stop()
+    pollingHandle = null
   }
 
-  function hasCombatReadAccess(nextCode: string | null, nextAccess: StoredSessionAccess | null) {
-    if (!nextCode || !nextAccess) {
-      return false
-    }
-
-    if (!hasStoredSessionCode(nextAccess, nextCode)) {
-      return false
-    }
-
-    if (isStoredPlayerSessionAccess(nextAccess)) {
-      return Boolean(nextAccess.playerToken && nextAccess.playerId)
-    }
-
-    if (isStoredGmSessionAccess(nextAccess)) {
-      return Boolean(nextAccess.gmToken)
-    }
-
-    return false
+  function clearActionFeedback() {
+    actionErrorMessage = null
+    actionSuccessMessage = null
   }
 
-  function invalidateCombatSidebarRequests() {
-    eventsRequestSequence += 1
-    logsRequestSequence += 1
-    recentResultsRequestSequence += 1
-  }
-
-  function resetCombatSidebarState() {
-    recentCommandEvents = []
-    eventItems = []
-    logItems = []
-    recentResults = null
-    eventsLoading = false
-    logsLoading = false
-    recentResultsLoading = false
-    eventsErrorMessage = null
-    logsErrorMessage = null
-    recentResultsErrorMessage = null
-  }
-
-  const combatPage = createLiveSessionPage<StoredSessionAccess | null>({
-    readCode: () =>
-      readRequestedSessionCodeFromAccessOrHandoff({
-        pageKey: 'combat',
-        storedAccess: readStoredSessionAccess(),
-        preferStoredAccess: false,
-      }).code,
-    readAccess: () => readStoredSessionAccess(),
-    getInvalidMessage: getInvalidCombatAccessMessage,
-    loadState: getSessionState,
-    getPollingAccess: toSessionReadAccess,
-    canPoll: ({ code, access, state }) => state.sessionCode === code && hasCombatReadAccess(code, access),
-    onBeforeLoad: ({ code, access, invalidMessage }) => {
-      const nextHasSidebarReadAccess = hasCombatReadAccess(code, access)
-
-      if (sidebarSessionCode !== code) {
-        invalidateCombatSidebarRequests()
-        resetCombatSidebarState()
-        sidebarSessionCode = code
-      } else if (hadSidebarReadAccess && !nextHasSidebarReadAccess) {
-        invalidateCombatSidebarRequests()
-        resetCombatSidebarState()
-      }
-
-      hadSidebarReadAccess = nextHasSidebarReadAccess
-
-      runtimeAccess = access
-      invalidAccessMessage = invalidMessage
-      accessNoticeMessage = getAccessNotice(code, access)
-      loading = true
-      notFound = false
-      errorMessage = null
-      session = null
-    },
-    onLoaded: (response) => {
-      syncCombatState(response)
-    },
-    onPolled: (nextSession, { code, access }) => {
-      runtimeAccess = access
-      invalidAccessMessage = getInvalidCombatAccessMessage(code)
-      accessNoticeMessage = getAccessNotice(code, access)
-      hadSidebarReadAccess = true
-      syncCombatState(nextSession)
-      void loadCombatSidebarData()
-    },
-    onNotFound: () => {
-      notFound = true
-    },
-    onError: (error) => {
-      errorMessage = getApiErrorMessage(error, 'Unable to restore the current combat session shell.')
-    },
-    onLoadSettled: () => {
-      loading = false
-    },
-  })
-
-  function stopCombatPolling() {
-    combatPage.stopPolling()
-  }
-
-  function updateCombatPollingVersion(nextSession: SessionStateDto) {
-    combatPage.updatePollingVersion(nextSession.version)
-  }
-
-  function startCombatPolling(
-    nextCode: string | null,
-    nextAccess: StoredSessionAccess | null,
-    nextSession: SessionStateDto,
-  ) {
-    combatPage.startPolling(nextSession, {
-      code: nextCode,
-      access: nextAccess,
-    })
-  }
-
-  async function loadCombatState() {
-    await combatPage.load()
-  }
-
-  async function loadCardCatalog() {
-    catalogLoading = true
-    catalogErrorMessage = null
-
-    try {
-      cardCatalog = await listCards()
-    } catch (error) {
-      cardCatalog = []
-      catalogErrorMessage = getApiErrorMessage(
-        error,
-        'Unable to load the card archive for combat card resolution.',
-      )
-    } finally {
-      catalogLoading = false
-    }
-  }
-
-  function getCardDefinition(defId: string | null) {
-    if (!defId) {
+  function toCardView(card: CombatCardDto | null | undefined): ResolvedCombatCardViewModel | null {
+    if (!card) {
       return null
-    }
-
-    return cardCatalog.find((card) => card.id === defId) ?? null
-  }
-
-  function getCardDetail(defId: string | null) {
-    return defId ? cardDetails[defId] ?? null : null
-  }
-
-  function deleteRecordEntry<T>(record: Record<string, T>, key: string) {
-    const nextRecord = { ...record }
-    delete nextRecord[key]
-    return nextRecord
-  }
-
-  async function ensureCardDetail(defId: string | null) {
-    const normalizedDefId = defId?.trim() ?? ''
-
-    if (!normalizedDefId) {
-      return null
-    }
-
-    const cached = cardDetails[normalizedDefId] ?? null
-
-    if (cached) {
-      return cached
-    }
-
-    if (cardDetailLoadingIds.includes(normalizedDefId)) {
-      return null
-    }
-
-    cardDetailLoadingIds = [...cardDetailLoadingIds, normalizedDefId]
-    cardDetailErrors = deleteRecordEntry(cardDetailErrors, normalizedDefId)
-
-    try {
-      const detail = await getCard(normalizedDefId)
-      cardDetails = {
-        ...cardDetails,
-        [normalizedDefId]: detail,
-      }
-      return detail
-    } catch (error) {
-      cardDetailErrors = {
-        ...cardDetailErrors,
-        [normalizedDefId]: getApiErrorMessage(error, `Unable to load card detail for ${normalizedDefId}.`),
-      }
-      return null
-    } finally {
-      cardDetailLoadingIds = cardDetailLoadingIds.filter((id) => id !== normalizedDefId)
-    }
-  }
-
-  function getCardDefIdFromInstanceId(instanceId: string | null | undefined) {
-    const normalizedId = instanceId?.trim() ?? ''
-
-    if (!normalizedId) {
-      return null
-    }
-
-    return session?.cards[normalizedId]?.defId ?? null
-  }
-
-  function handleClearSelectedTargets() {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedEnemyId: null,
-        selectedTargets: [],
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleClearSelectionInputs() {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedDiscardIds: [],
-        selectedIds: [],
-        orderedActorKeys: [],
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function createUnresolvedCardView(instanceId: string, defId: string | null) {
-    return {
-      instanceId,
-      defId,
-      title: defId ?? instanceId,
-      subtitle: defId ? 'Unresolved card definition' : 'Unresolved card instance',
-      meta: `Instance ${instanceId}`,
-      description: defId
-        ? 'The card instance exists, but its definition is not present in the current card archive.'
-        : 'The requested card instance is not present in the current session card map.',
-      unresolved: true,
-      tags: [{ label: 'Unresolved', tone: 'warning' as const }],
-    } satisfies ResolvedCombatCardViewModel
-  }
-
-  function resolveCombatCard(instanceId: string) {
-    const instance = session?.cards[instanceId] ?? null
-
-    if (!instance) {
-      return createUnresolvedCardView(instanceId, null)
-    }
-
-    const definition = getCardDefinition(instance.defId)
-
-    if (!definition) {
-      return createUnresolvedCardView(instanceId, instance.defId)
     }
 
     return {
-      instanceId,
-      defId: instance.defId,
-      title: definition.name,
-      subtitle: getCardTypeLabel(definition.type),
-      meta: `${buildCardArchiveMeta(definition)} | Instance ${instanceId}`,
-      description: definition.description,
-      unresolved: false,
-      tags: buildCardDisplayTags(definition),
-    } satisfies ResolvedCombatCardViewModel
-  }
-
-  function parseCombatActor(rawActor: string | null | undefined): CombatActorSummary {
-    const normalized = rawActor?.trim() ?? ''
-
-    if (!normalized) {
-      return {
-        raw: null,
-        kind: 'none',
-        id: null,
-        label: 'No active turn',
-        note: 'Combat turn owner is not available in the current state.',
-        tone: 'muted',
-      }
-    }
-
-    if (normalized.startsWith('P:')) {
-      const playerId = normalized.slice(2).trim()
-
-      return {
-        raw: normalized,
-        kind: 'player',
-        id: playerId || null,
-        label: playerId || normalized,
-        note: playerId
-          ? `${playerId} is the current acting player.`
-          : 'A player turn is active, but the actor id is incomplete.',
-        tone: 'success',
-      }
-    }
-
-    if (normalized.startsWith('E:')) {
-      const enemyId = normalized.slice(2).trim()
-
-      return {
-        raw: normalized,
-        kind: 'enemy',
-        id: enemyId || null,
-        label: enemyId || normalized,
-        note: enemyId
-          ? `${enemyId} is the current acting enemy.`
-          : 'An enemy turn is active, but the actor id is incomplete.',
-        tone: 'warning',
-      }
-    }
-
-    return {
-      raw: normalized,
-      kind: 'unknown',
-      id: normalized,
-      label: normalized,
-      note: 'Current actor format is not recognized, so the raw value is shown.',
-      tone: 'accent',
+      instanceId: card.instanceId,
+      defId: card.defId,
+      title: card.title,
+      subtitle: card.subtitle,
+      meta: card.meta ?? '',
+      description: card.meta ?? card.subtitle,
+      unresolved: card.unresolved,
+      tags: card.tags.map((tag) => ({
+        label: tag.label,
+        tone: normalizeTone(tag.tone),
+      })),
     }
   }
 
-  function buildTurnOrderSummary(combat: SessionStateDto['combat']) {
-    if (!combat?.turnOrder.length) {
-      return 'Turn order is not available yet.'
+  function toMetricValue(value: string | number | boolean | null) {
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No'
     }
 
-    const preview = combat.turnOrder.slice(0, 6).map((actorKey) => parseCombatActor(actorKey).label)
-    const hiddenCount = combat.turnOrder.length - preview.length
-    const summary = preview.join(' -> ')
-
-    return hiddenCount > 0 ? `${summary} +${hiddenCount} more` : summary
+    return value ?? 'N/A'
   }
 
-  function getPlayerStateLabel(player: PlayerStateDto) {
-    if (player.pendingDecision?.type) {
-      return player.pendingDecision.type
-    }
-
-    return player.ready ? 'Ready' : 'Joined'
-  }
-
-  function getPlayerStateTone(player: PlayerStateDto) {
-    if (player.pendingDecision) {
-      return 'warning' as const
-    }
-
-    return player.ready ? 'success' : 'accent'
-  }
-
-  function buildPlayerViewModel(player: PlayerStateDto) {
-    const pendingLabel = player.pendingDecision?.type ?? 'None'
-    const exLabel = player.exCard ?? 'None'
-
+  function toPlayerView(player: CombatScreenResponse['actors']['players'][number]): CombatPlayerViewModel {
     return {
       playerId: player.playerId,
       ready: player.ready,
-      stateLabel: getPlayerStateLabel(player),
-      stateTone: getPlayerStateTone(player),
-      metrics: [
-        {
-          label: 'Hand',
-          value: player.hand.length,
-          note: `Limit ${player.handLimit}`,
-        },
-        {
-          label: 'Field',
-          value: player.field.length,
-          note: `Limit ${player.fieldLimit}`,
-        },
-        {
-          label: 'Deck',
-          value: player.deck.length,
-          note: 'Cards remaining',
-        },
-        {
-          label: 'Owned',
-          value: `${player.ownedCardCount}/${player.maxOwnedCardCount}`,
-          note: 'Owned pool',
-        },
-      ],
-      summaryLines: [
-        `EX ${exLabel} | Cooldown ${player.exOnCooldown ? 'Yes' : 'No'} | Passives ${player.passiveIds.length}`,
-        `Pending ${pendingLabel} | Ready ${player.ready ? 'Yes' : 'No'} | Cards played ${player.cardsPlayedThisTurn}`,
-        `Grave ${player.grave.length} | Excluded ${player.excluded.length} | Forgetting required ${player.forgettingRequired ? 'Yes' : 'No'}`,
-      ],
-      statusTags: [
-        {
-          label: player.exCard ? (player.exOnCooldown ? 'EX cooldown' : 'EX ready') : 'No EX',
-          tone: player.exCard ? (player.exOnCooldown ? 'muted' : 'warning') : 'muted',
-        },
-        {
-          label: player.pendingDecision?.type ?? 'No pending decision',
-          tone: player.pendingDecision ? 'warning' : 'muted',
-        },
-        {
-          label: `${player.grave.length} grave`,
-          tone: player.grave.length > 0 ? 'accent' : 'muted',
-        },
-        {
-          label: `${player.excluded.length} excluded`,
-          tone: player.excluded.length > 0 ? 'accent' : 'muted',
-        },
-      ],
-      passives: player.passiveIds,
-      handCards: player.hand.map((instanceId) => resolveCombatCard(instanceId)),
-      fieldCards: player.field.map((instanceId) => resolveCombatCard(instanceId)),
-      graveCards: player.grave.map((instanceId) => resolveCombatCard(instanceId)),
-      excludedCards: player.excluded.map((instanceId) => resolveCombatCard(instanceId)),
-    } satisfies CombatPlayerViewModel
+      stateLabel: player.stateLabel,
+      stateTone: normalizeTone(player.stateTone),
+      metrics: player.metrics.map((metric) => ({
+        label: metric.label,
+        value: toMetricValue(metric.value),
+        note: metric.note ?? '',
+      })),
+      summaryLines: player.summaryLines,
+      statusTags: player.statusTags.map((tag) => ({
+        label: tag.label,
+        tone: normalizeTone(tag.tone),
+      })),
+      passives: player.passives,
+      handCards: player.handCards.map((card) => toCardView(card)).filter(Boolean) as ResolvedCombatCardViewModel[],
+      fieldCards: player.fieldCards.map((card) => toCardView(card)).filter(Boolean) as ResolvedCombatCardViewModel[],
+      graveCards: player.graveCards.map((card) => toCardView(card)).filter(Boolean) as ResolvedCombatCardViewModel[],
+      excludedCards: player.excludedCards.map((card) => toCardView(card)).filter(Boolean) as ResolvedCombatCardViewModel[],
+    }
   }
 
-  function buildEnemyViewModel(enemy: CombatEnemyDto) {
-    const statusEntries = Object.entries(enemy.statuses).map(
-      ([statusId, amount]) => `${statusId}: ${amount}`,
-    )
-
+  function toEnemyView(enemy: CombatScreenResponse['actors']['enemies'][number]): CombatEnemyViewModel {
     return {
       enemyId: enemy.enemyId,
-      stateLabel: enemy.exActivatable ? 'EX ready' : enemy.exOnCooldown ? 'Cooldown' : 'Active',
-      stateTone: enemy.exActivatable ? 'warning' : enemy.exOnCooldown ? 'muted' : 'accent',
-      metrics: [
-        {
-          label: 'HP',
-          value: `${enemy.hp}/${enemy.maxHp}`,
-          note: 'Current / max',
-        },
-        {
-          label: 'AP',
-          value: enemy.ap,
-          note: 'Current AP',
-        },
-        {
-          label: 'ATK',
-          value: enemy.attackPower,
-          note: 'Attack power',
-        },
-        {
-          label: 'HEAL',
-          value: enemy.healPower,
-          note: 'Heal power',
-        },
-      ],
-      summaryLines: [
-        `EX ${enemy.exCardId ?? 'None'} | EX ready ${enemy.exActivatable ? 'Yes' : 'No'} | Cooldown ${enemy.exOnCooldown ? 'Yes' : 'No'}`,
-        `Statuses ${statusEntries.length > 0 ? statusEntries.length : 'None'} | Enemy id ${enemy.enemyId}`,
-      ],
-      statusEntries,
-    } satisfies CombatEnemyViewModel
+      stateLabel: enemy.stateLabel,
+      stateTone: normalizeTone(enemy.stateTone),
+      metrics: enemy.metrics.map((metric) => ({
+        label: metric.label,
+        value: toMetricValue(metric.value),
+        note: metric.note ?? '',
+      })),
+      summaryLines: enemy.summaryLines,
+      statusEntries: enemy.statusEntries,
+    }
   }
 
-  function buildSummonViewModel(summon: CombatSummonDto) {
+  function toSummonView(summon: CombatScreenResponse['actors']['summons'][number]): CombatSummonViewModel {
     return {
       summonId: summon.summonId,
       owner: summon.owner,
-      stateLabel: summon.actionAvailable ? 'Action ready' : 'Tapped',
-      stateTone: summon.actionAvailable ? 'success' : 'muted',
-      metrics: [
-        {
-          label: 'HP',
-          value: summon.hp,
-          note: 'Current HP',
-        },
-        {
-          label: 'ATK',
-          value: summon.atk,
-          note: 'Attack power',
-        },
-        {
-          label: 'HEAL',
-          value: summon.heal,
-          note: 'Heal power',
-        },
-      ],
-      summaryLines: [
-        `Owner ${summon.owner}`,
-        `Action available ${summon.actionAvailable ? 'Yes' : 'No'}`,
-      ],
-    } satisfies CombatSummonViewModel
+      stateLabel: summon.stateLabel,
+      stateTone: normalizeTone(summon.stateTone),
+      metrics: summon.metrics.map((metric) => ({
+        label: metric.label,
+        value: toMetricValue(metric.value),
+        note: metric.note ?? '',
+      })),
+      summaryLines: summon.summaryLines,
+    }
   }
 
-  function buildStatusViewModel(nextSession: SessionStateDto | null) {
-    if (!nextSession) {
+  function toRequirementView(requirement: CombatRequirementViewDto | null | undefined) {
+    if (!requirement) {
       return null
     }
 
-    const combat = nextSession.combat
-    const currentActor = parseCombatActor(combat?.currentTurnPlayer ?? null)
-    const tieGroupCount = combat?.initiativeTieGroups.filter((group) => group.length > 1).length ?? 0
-
     return {
-      sessionCode: nextSession.sessionCode,
-      version: nextSession.version,
-      round: combat?.round ?? null,
-      currentTurnPlayer: combat?.currentTurnPlayer ?? null,
-      phase: combat?.phase ?? null,
-      currentTurnLabel: currentActor.label,
-      currentTurnTone: currentActor.tone,
-      currentTurnNote: currentActor.note,
-      turnOrderSummary: buildTurnOrderSummary(combat),
-      battlefieldSummary: `${Object.keys(nextSession.players).length} players | ${combat?.enemies.length ?? 0} enemies | ${combat?.summons.length ?? 0} summons`,
-      runSummary: nextSession.run?.currentNode
-        ? `${nextSession.run.currentNode.name} | ${nextSession.run.currentNode.typeLabel}`
-        : nextSession.run?.resultPending
-          ? 'A run result is pending resolution.'
-          : 'Run node unavailable',
-      initiativeSummary: combat ? `${Object.keys(combat.initiatives).length} initiative entries` : 'No initiative state',
-      tieGroupSummary: tieGroupCount > 0 ? `${tieGroupCount} tie groups` : 'No tie groups',
-    } satisfies CombatStatusViewModel
+      sourceLabel: requirement.sourceLabel,
+      targetSummary: requirement.targetSummary,
+      discardSummary: requirement.discardSummary,
+      fieldSelectionSummary: requirement.selectedIdsSummary,
+      choiceSummary: requirement.choiceSummary,
+    }
   }
 
-  function formatSidebarTimestamp(value: string | null) {
-    return value?.trim() || 'Timestamp unavailable'
+  function targetKeyForPlayer(playerId: string) {
+    return `player:${playerId}`
   }
 
-  function mergeEventItems(bufferedItems: readonly SessionEventItemDto[], fetchedItems: readonly SessionEventItemDto[]) {
-    const seen = new Set<string>()
-    const merged: SessionEventItemDto[] = []
-    const toCursorNumber = (cursor: number | string | null | undefined) => {
-      const normalized = Number(cursor)
-      return Number.isFinite(normalized) ? normalized : -1
-    }
+  function targetKeyForEnemy(enemyId: string) {
+    return `enemy:${enemyId}`
+  }
 
-    for (const item of [...bufferedItems, ...fetchedItems]) {
-      const key =
-        Number.isFinite(Number(item.cursor))
-          ? String(Number(item.cursor))
-          : `${item.version}:${item.type}:${item.timestamp ?? ''}`
+  function targetKeyForSummon(owner: string, summonId: string) {
+    return `summon:${owner}:${summonId}`
+  }
 
-      if (seen.has(key)) {
-        continue
-      }
+  function buildTargetRefs(targetKeys: readonly string[]): TargetRefDto[] {
+    return targetKeys
+      .map((key) => {
+        if (key.startsWith('player:')) {
+          return {
+            playerId: key.slice('player:'.length),
+          }
+        }
 
-      seen.add(key)
-      merged.push(item)
-    }
+        if (key.startsWith('enemy:')) {
+          return {
+            enemyId: key.slice('enemy:'.length),
+          }
+        }
 
-      return merged
-        .sort((left, right) => {
-          if (left.version !== right.version) {
-            return right.version - left.version
+        if (key.startsWith('summon:')) {
+          const [, owner, summonId] = key.split(':')
+          if (!owner || !summonId) {
+            return null
           }
 
-          return toCursorNumber(right.cursor) - toCursorNumber(left.cursor)
-        })
-        .slice(0, combatSidebarEventLimit)
-    }
+          return {
+            summonOwnerPlayerId: owner,
+            summonInstanceId: summonId,
+          }
+        }
 
-  function handleWindowStateChange() {
-    void loadCombatState()
-    void loadCombatSidebarData()
+        return null
+      })
+      .filter(Boolean) as TargetRefDto[]
   }
 
-  function handleSelectCommand(commandType: CombatCommandType) {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedCommandType: commandType,
-        selectedDiscardIds:
-          commandType === 'PLAY_CARD' ? commandDraft.selectedDiscardIds : [],
-        selectedIds:
-          commandType === 'PLAY_CARD' ? commandDraft.selectedIds : [],
-      },
-      session,
-      runtimeAccess,
-    )
+  function toggleIdentifier(values: readonly string[], value: string) {
+    return values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value]
   }
 
-  function handleSelectEnemy(enemyId: string) {
-    const alreadySelected = commandDraft.selectedTargets.some((target) => target.enemyId === enemyId)
-
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedEnemyId: alreadySelected ? null : enemyId,
-        selectedTargets: alreadySelected
-          ? commandDraft.selectedTargets.filter((target) => target.enemyId !== enemyId)
-          : [...commandDraft.selectedTargets, { enemyId }],
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleSelectPlayer(playerId: string) {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedPlayerId: playerId,
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleToggleTargetPlayer(playerId: string) {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedTargets: commandDraft.selectedTargets.some((target) => target.playerId === playerId)
-          ? commandDraft.selectedTargets.filter((target) => target.playerId !== playerId)
-          : [...commandDraft.selectedTargets, { playerId }],
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleToggleTargetSummon(owner: string, summonId: string) {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedTargets: commandDraft.selectedTargets.some(
-          (target) =>
-            target.summonOwnerPlayerId === owner && target.summonInstanceId === summonId,
-        )
-          ? commandDraft.selectedTargets.filter(
-              (target) =>
-                !(
-                  target.summonOwnerPlayerId === owner && target.summonInstanceId === summonId
-                ),
-            )
-          : [
-              ...commandDraft.selectedTargets,
-              { summonOwnerPlayerId: owner, summonInstanceId: summonId },
-            ],
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleSelectHandCard(instanceId: string) {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedCommandType: 'PLAY_CARD',
-        selectedCardId: instanceId,
-        selectedDiscardIds: [],
-        selectedIds: [],
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleToggleDiscard(instanceId: string) {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedDiscardIds: toggleCombatIdentifier(commandDraft.selectedDiscardIds, instanceId),
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleToggleSelectedId(instanceId: string) {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedIds: toggleCombatIdentifier(commandDraft.selectedIds, instanceId),
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleTogglePendingSelectedId(value: string) {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedIds: toggleCombatIdentifier(commandDraft.selectedIds, value),
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleToggleOrderedActorKey(actorKey: string) {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        orderedActorKeys: toggleCombatIdentifier(commandDraft.orderedActorKeys, actorKey),
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleSelectedCountChange(value: string) {
-    const parsed = Number(value)
-
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedCount: Number.isFinite(parsed) && parsed > 0 ? parsed : 1,
-      },
-      session,
-      runtimeAccess,
-    )
-  }
-
-  function handleSelectedReasonChange(value: string) {
-    commandDraft = {
-      ...commandDraft,
-      selectedReason: value,
-    }
-  }
-
-  function clearCommandMessages() {
-    commandErrorMessage = null
-    commandRejectedMessage = null
-    commandSuccessMessage = null
-  }
-
-  function resetCommandDraftAfterSuccess(commandType: CombatCommandType, nextSession: SessionStateDto | null) {
-    commandDraft = syncCombatCommandDraft(
-      {
-        ...commandDraft,
-        selectedCommandType: commandType,
-        selectedCardId: null,
-        selectedTargets: [],
-        selectedDiscardIds: [],
-        selectedIds: [],
-        orderedActorKeys: [],
-        selectedReason: '',
-      },
-      nextSession ?? session,
-      runtimeAccess,
-    )
-  }
-
-  function getPlayerCommandAccess() {
-    if (!isStoredPlayerSessionAccess(runtimeAccess)) {
+  function findSelectedPlayCardSource(screenModel: CombatScreenResponse | null, instanceId: string | null) {
+    if (!screenModel || !instanceId) {
       return null
     }
 
-    return {
-      role: 'player' as const,
-      playerToken: runtimeAccess.playerToken,
-      playerId: runtimeAccess.playerId,
+    const action = findCombatAction(screenModel, 'combat.playCard')
+    const metadata = action?.metadata
+    if (!metadata || metadata.kind !== 'playCard') {
+      return null
+    }
+
+    return metadata.sourceOptions.find((option) => option.instanceId === instanceId) ?? null
+  }
+
+  function getPendingMetadata(screenModel: CombatScreenResponse | null) {
+    const action = screenModel ? findCombatAction(screenModel, 'combat.resolvePending') : null
+    const metadata = action?.metadata
+    if (!metadata || metadata.kind !== 'pendingDecision') {
+      return null
+    }
+
+    return metadata
+  }
+
+  function normalizeSelections(nextScreen: CombatScreenResponse) {
+    const handIds = new Set(nextScreen.zones.hand.map((card) => card.instanceId))
+    const fieldIds = new Set(nextScreen.zones.field.map((card) => card.instanceId))
+    const targetKeys = new Set<string>()
+
+    for (const player of nextScreen.actors.players) {
+      targetKeys.add(targetKeyForPlayer(player.playerId))
+    }
+
+    for (const enemy of nextScreen.actors.enemies) {
+      targetKeys.add(targetKeyForEnemy(enemy.enemyId))
+    }
+
+    for (const summon of nextScreen.actors.summons) {
+      targetKeys.add(targetKeyForSummon(summon.owner, summon.summonId))
+    }
+
+    const pendingMetadata = getPendingMetadata(nextScreen)
+    const pendingSchema = pendingMetadata?.schema
+    const pendingCandidateIds = new Set(pendingSchema?.candidateIds ?? [])
+    const pendingActorKeys = new Set(pendingSchema?.actorKeys ?? [])
+
+    selectedCardId = selectedCardId && handIds.has(selectedCardId) ? selectedCardId : null
+    selectedDiscardIds = selectedDiscardIds.filter((id) => handIds.has(id))
+    selectedFieldIds = selectedFieldIds.filter((id) => fieldIds.has(id))
+    selectedTargetKeys = selectedTargetKeys.filter((key) => targetKeys.has(key))
+    selectedPendingIds = selectedPendingIds.filter((id) => pendingCandidateIds.has(id))
+    orderedActorKeys = orderedActorKeys.filter((actorKey) => pendingActorKeys.has(actorKey))
+    selectedActionId =
+      selectedActionId && nextScreen.possibleActions.some((action) => action.id === selectedActionId)
+        ? selectedActionId
+        : null
+    selectedPlayerId =
+      selectedPlayerId && nextScreen.actors.players.some((player) => player.playerId === selectedPlayerId)
+        ? selectedPlayerId
+        : nextScreen.zones.visiblePlayerId
+  }
+
+  function applyScreen(nextScreen: CombatScreenResponse) {
+    screen = nextScreen
+    syncSessionSelectionHandoff(nextScreen.sessionCode)
+    normalizeSelections(nextScreen)
+
+    if (!getRouteSessionCode() && nextScreen.sessionCode) {
+      navigateTo(pathBuilders.combat(nextScreen.sessionCode), true)
     }
   }
 
-  async function loadCombatEvents() {
-    const requestId = ++eventsRequestSequence
-
-    if (!requestedSessionCode) {
-      eventsLoading = false
-      eventsErrorMessage = 'Session code is required before events can be restored.'
-      eventItems = []
-      return
-    }
-
-    const access = toSessionReadAccess(runtimeAccess)
-
-    if (!access) {
-      eventsLoading = false
-      eventsErrorMessage = 'Session access token is required before events can be restored.'
-      eventItems = []
-      return
-    }
-
-    eventsLoading = true
-    eventsErrorMessage = null
-
-    try {
-      const response = await getSessionEvents(
-        requestedSessionCode,
-        { limit: combatSidebarEventLimit },
-        access,
-      )
-
-      if (requestId !== eventsRequestSequence) {
-        return
-      }
-
-      eventItems = response.items
-    } catch (error) {
-      if (requestId !== eventsRequestSequence) {
-        return
-      }
-
-      eventItems = []
-      eventsErrorMessage = getApiErrorMessage(error, 'Unable to load combat events.')
-    } finally {
-      if (requestId === eventsRequestSequence) {
-        eventsLoading = false
-      }
-    }
-  }
-
-  async function loadCombatLogs() {
-    const requestId = ++logsRequestSequence
-
-    if (!requestedSessionCode) {
-      logsLoading = false
-      logsErrorMessage = 'Session code is required before logs can be restored.'
-      logItems = []
-      return
-    }
-
-    const access = toSessionReadAccess(runtimeAccess)
-
-    if (!access) {
-      logsLoading = false
-      logsErrorMessage = 'Session access token is required before logs can be restored.'
-      logItems = []
-      return
-    }
-
-    logsLoading = true
-    logsErrorMessage = null
-
-    try {
-      const response = await getSessionLogs(requestedSessionCode, { limit: 12 }, access)
-
-      if (requestId !== logsRequestSequence) {
-        return
-      }
-
-      logItems = response.items
-    } catch (error) {
-      if (requestId !== logsRequestSequence) {
-        return
-      }
-
-      logItems = []
-      logsErrorMessage = getApiErrorMessage(error, 'Unable to load combat logs.')
-    } finally {
-      if (requestId === logsRequestSequence) {
-        logsLoading = false
-      }
-    }
-  }
-
-  async function loadCombatRecentResults() {
-    const requestId = ++recentResultsRequestSequence
-
-    if (!requestedSessionCode) {
-      recentResultsLoading = false
-      recentResultsErrorMessage = 'Session code is required before recent results can be restored.'
-      recentResults = null
-      return
-    }
-
-    const access = toSessionReadAccess(runtimeAccess)
-
-    if (!access) {
-      recentResultsLoading = false
-      recentResultsErrorMessage = 'Session access token is required before recent results can be restored.'
-      recentResults = null
-      return
-    }
-
-    recentResultsLoading = true
-    recentResultsErrorMessage = null
-
-    try {
-      const response = await getSessionRecentResults(requestedSessionCode, access)
-
-      if (requestId !== recentResultsRequestSequence) {
-        return
-      }
-
-      recentResults = response
-    } catch (error) {
-      if (requestId !== recentResultsRequestSequence) {
-        return
-      }
-
-      recentResults = null
-      recentResultsErrorMessage = getApiErrorMessage(error, 'Unable to load recent results.')
-    } finally {
-      if (requestId === recentResultsRequestSequence) {
-        recentResultsLoading = false
-      }
-    }
-  }
-
-  async function loadCombatSidebarData() {
-    await Promise.all([loadCombatEvents(), loadCombatLogs(), loadCombatRecentResults()])
-  }
-
-  function syncEngineResponseSuccess(commandType: CombatCommandType, nextSession: SessionStateDto | null, nextEvents: SessionEventItemDto[]) {
-    if (nextSession) {
-      syncCombatState(nextSession)
-      updateCombatPollingVersion(nextSession)
-    }
-
-    resetCommandDraftAfterSuccess(commandType, nextSession)
-    recentCommandEvents = nextEvents
-    commandSuccessMessage = `${commandType} command was accepted and the combat shell synced to the latest session state.`
-    void loadCombatSidebarData()
-  }
-
-  function handleRejectedCommandResponse(
-    commandType: CombatCommandType,
-    fallbackMessage: string,
-    errors: readonly string[],
-    nextSession: SessionStateDto | null,
-    nextEvents: SessionEventItemDto[],
+  async function refreshCombatScreen(
+    reason: 'initial-load' | 'retry-load' | 'route-change' | 'polling' | 'action',
   ) {
-    const normalizedErrors = errors
-      .map((error) => error.trim())
-      .filter((error) => error.length > 0)
-    const sawVersionMismatch = normalizedErrors.some((error) =>
-      error.toLowerCase().includes('version mismatch'),
-    )
+    const requestId = ++requestSequence
+    const nextAccess = readStoredSessionAccess()
+    const nextRequestedCode = getRequestedSessionCode(nextAccess)
+    const nextInvalidAccessMessage = getInvalidCombatAccessMessage(nextRequestedCode)
+    const showLoading = reason !== 'polling' && reason !== 'action'
 
-    if (nextSession) {
-      syncCombatState(nextSession)
-      updateCombatPollingVersion(nextSession)
+    runtimeAccess = nextAccess
+    invalidAccessMessage = nextInvalidAccessMessage
+
+    if (showLoading) {
+      loading = true
+      notFound = false
+      errorMessage = null
+      refreshErrorMessage = null
+      clearActionFeedback()
     }
 
-    recentCommandEvents = nextEvents
-    commandRejectedMessage =
-      normalizedErrors.length > 0 ? normalizedErrors.join(', ') : fallbackMessage
-
-    if (sawVersionMismatch && nextSession) {
-      commandRejectedMessage = `${commandRejectedMessage} Synced to the latest session state. Try again.`
-    }
-
-    void loadCombatSidebarData()
-  }
-
-  async function handleSimpleCommand(commandType: 'END_TURN' | 'DRAW' | 'CLEAR_RECENT_RESULTS') {
-    if (!requestedSessionCode || !session || commandPending) {
-      return
-    }
-
-    clearCommandMessages()
-
-    const playerAccess = getPlayerCommandAccess()
-
-    if (!playerAccess) {
-      commandErrorMessage = 'Player token access is required before a command can be sent.'
-      return
-    }
-
-    if (commandType === 'CLEAR_RECENT_RESULTS') {
-      if (!commandGuards.canClearRecentResultsCommand) {
-        commandErrorMessage = 'Player token access is required before clearing recent results.'
-        return
+    if (!nextRequestedCode || nextInvalidAccessMessage) {
+      stopPolling()
+      screen = null
+      if (showLoading) {
+        loading = false
       }
-    } else if (!commandGuards.canIssuePlayerCommand) {
-      commandErrorMessage = 'The runtime player must own the current turn before issuing this command.'
       return
-    }
-
-    commandPending = commandType
-    commandDraft = {
-      ...commandDraft,
-      selectedCommandType: commandType,
-      selectedPlayerId: playerAccess.playerId,
     }
 
     try {
-      const payload: CommandRequest = {
-        type: commandType,
-        expectedVersion: session.version,
-        playerId: playerAccess.playerId,
-        count:
-          commandType === 'DRAW'
-            ? typeof commandDraft.selectedCount === 'number' && commandDraft.selectedCount > 0
-              ? commandDraft.selectedCount
-              : 1
-            : undefined,
-      }
-
-      const response = await executeSessionCommand(
-        requestedSessionCode,
-        payload,
-        playerAccess,
-      )
-
-      if (!response.accepted) {
-        handleRejectedCommandResponse(
-          commandType,
-          `${commandType} was rejected by the engine.`,
-          response.errors,
-          response.state,
-          response.events,
-        )
-        return
-      }
-
-      syncEngineResponseSuccess(commandType, response.state, response.events)
-    } catch (error) {
-      commandErrorMessage = getApiErrorMessage(error, `Unable to execute the ${commandType} command.`)
-    } finally {
-      commandPending = null
-    }
-  }
-
-  async function handlePlayerCardCommand(commandType: 'PLAY_CARD' | 'USE_EX') {
-    if (!requestedSessionCode || !session || commandPending) {
-      return
-    }
-
-    clearCommandMessages()
-
-    const playerAccess = getPlayerCommandAccess()
-
-    if (!playerAccess) {
-      commandErrorMessage = 'Player token access is required before this command can be sent.'
-      return
-    }
-
-    if (!commandGuards.canIssuePlayerCommand) {
-      commandErrorMessage = 'The runtime player must own the current turn before issuing this command.'
-      return
-    }
-
-    const unsupportedMessage = getUnsupportedCardCommandMessage()
-
-    if (unsupportedMessage) {
-      commandRejectedMessage = unsupportedMessage
-      commandErrorMessage = null
-      commandSuccessMessage = null
-      return
-    }
-
-    const cardId =
-      commandType === 'PLAY_CARD'
-        ? commandDraft.selectedCardId
-        : session.players[playerAccess.playerId]?.exCard ?? null
-
-    if (!cardId) {
-      commandErrorMessage =
-        commandType === 'PLAY_CARD'
-          ? 'Select a hand card before issuing PLAY_CARD.'
-          : 'EX card is not available for the current runtime player.'
-      return
-    }
-
-    const runtimePlayer = session.players[playerAccess.playerId] ?? null
-
-    if (commandType === 'PLAY_CARD' && !runtimePlayer?.hand.includes(cardId)) {
-      commandErrorMessage = 'Select a card from the runtime player hand before issuing PLAY_CARD.'
-      return
-    }
-
-    const commandDefId = getCardDefIdFromInstanceId(cardId)
-    const commandDetail = commandDefId
-      ? getCardDetail(commandDefId) ?? (await ensureCardDetail(commandDefId))
-      : null
-    const playSpec = normalizePlaySpec(commandDetail?.playSpec ?? null)
-    const filteredTargets = commandDraft.selectedTargets
-    const filteredDiscardIds = selectedDiscardIdsFromHand
-    const filteredSelectedIds = selectedFieldIds
-    const requirementError = getPlayCardRequirementError(
-      commandType === 'PLAY_CARD' ? 'PLAY_CARD' : 'USE_EX',
-      playSpec,
-      cardId,
-      filteredTargets,
-      filteredDiscardIds,
-      filteredSelectedIds,
-    )
-
-    if (requirementError) {
-      commandErrorMessage = requirementError
-      return
-    }
-
-    commandPending = commandType
-    commandDraft = {
-      ...commandDraft,
-      selectedCommandType: commandType,
-      selectedPlayerId: playerAccess.playerId,
-    }
-
-    try {
-      const payload: CommandRequest =
-        commandType === 'PLAY_CARD'
-          ? {
-              type: commandType,
-              expectedVersion: session.version,
-              playerId: playerAccess.playerId,
-              cardId,
-              targets: filteredTargets.length > 0 ? filteredTargets : undefined,
-              discardIds: filteredDiscardIds.length > 0 ? filteredDiscardIds : undefined,
-              selectedIds: filteredSelectedIds.length > 0 ? filteredSelectedIds : undefined,
-            }
-          : {
-              type: commandType,
-              expectedVersion: session.version,
-              playerId: playerAccess.playerId,
-              targets: filteredTargets.length > 0 ? filteredTargets : undefined,
-            }
-
-      const response = await executeSessionCommand(
-        requestedSessionCode,
-        payload,
-        playerAccess,
-      )
-
-      if (!response.accepted) {
-        handleRejectedCommandResponse(
-          commandType,
-          `${commandType} was rejected by the engine.`,
-          response.errors,
-          response.state,
-          response.events,
-        )
-        return
-      }
-
-      syncEngineResponseSuccess(commandType, response.state, response.events)
-    } catch (error) {
-      commandErrorMessage = getApiErrorMessage(error, `Unable to execute the ${commandType} command.`)
-    } finally {
-      commandPending = null
-    }
-  }
-
-  async function handlePendingDecisionCommand() {
-    if (!requestedSessionCode || !session || commandPending) {
-      return
-    }
-
-    if (!isStoredPlayerSessionAccess(runtimeAccess)) {
-      commandErrorMessage = 'Player token access is required before a pending decision can be sent.'
-      return
-    }
-
-    if (!commandGuards.canResolvePendingCommand || !runtimePendingDecision?.type) {
-      commandErrorMessage = 'A supported pending decision is required before this command can be sent.'
-      return
-    }
-
-    const unsupportedMessage = unsupportedPendingDecisionMessage
-
-    if (unsupportedMessage) {
-      commandRejectedMessage = unsupportedMessage
-      commandErrorMessage = null
-      commandSuccessMessage = null
-      return
-    }
-
-    const payloadBase = {
-      type: runtimePendingDecision.type,
-      expectedVersion: session.version,
-      playerId: runtimeAccess.playerId,
-      reason: commandDraft.selectedReason || runtimePendingDecision.reason,
-    } as const
-
-    let payload: CommandRequest | null = null
-
-    switch (runtimePendingDecision.type) {
-      case 'HAND_SWAP': {
-        const discardIds = selectedDiscardIdsFromHand
-
-        if (discardIds.length !== 1) {
-          commandErrorMessage = 'Select exactly one hand card before resolving HAND_SWAP.'
-          return
-        }
-        payload = {
-          ...payloadBase,
-          discardIds,
-        }
-        break
-      }
-      case 'DISCARD_TO_HAND_LIMIT': {
-        const discardIds = selectedDiscardIdsFromHand
-
-        if (discardIds.length === 0) {
-          commandErrorMessage = 'Select hand cards to discard before resolving DISCARD_TO_HAND_LIMIT.'
-          return
-        }
-        payload = {
-          ...payloadBase,
-          discardIds,
-        }
-        break
-      }
-      case 'SEARCH_PICK':
-      case 'RESOLVE_SEARCH_PICK':
-        if (pendingCandidateIds.length === 0) {
-          commandErrorMessage = 'Select candidate ids before resolving this decision.'
-          return
-        }
-        if (
-          typeof runtimePendingDecision.pickCount === 'number' &&
-          runtimePendingDecision.pickCount > 0 &&
-          pendingCandidateIds.length !== runtimePendingDecision.pickCount
-        ) {
-          commandErrorMessage = `Select exactly ${runtimePendingDecision.pickCount} candidate ids before resolving this decision.`
-          return
-        }
-        payload = {
-          ...payloadBase,
-          selectedIds: pendingCandidateIds,
-        }
-        break
-      case 'RESOLVE_INITIATIVE_TIE': {
-        const orderedActorKeys =
-          orderedTieActorKeys.length > 0
-            ? orderedTieActorKeys
-            : runtimePendingDecision.actorKeys
-
-        if (orderedActorKeys.length !== runtimePendingDecision.actorKeys.length) {
-          commandErrorMessage = 'Order all actor keys in the tie group before resolving the initiative tie.'
-          return
-        }
-
-        payload = {
-          ...payloadBase,
-          tieGroupIndex: runtimePendingDecision.groupIndex,
-          orderedActorKeys,
-        }
-        break
-      }
-      default:
-        commandRejectedMessage = `${runtimePendingDecision.type} is not supported in this step yet.`
-        return
-    }
-
-    clearCommandMessages()
-    commandPending = runtimePendingDecision.type
-    commandDraft = {
-      ...commandDraft,
-      selectedCommandType: runtimePendingDecision.type,
-      selectedPlayerId: runtimeAccess.playerId,
-    }
-
-    try {
-      if (!payload) {
-        commandErrorMessage = 'Pending decision payload could not be built.'
-        return
-      }
-
-      const response = await executeSessionCommand(
-        requestedSessionCode,
-        payload,
-        {
-          role: 'player',
-          playerToken: runtimeAccess.playerToken,
-          playerId: runtimeAccess.playerId,
+      const response = await getScreen<CombatScreenResponse>('Combat', { code: nextRequestedCode }, {
+        query: {
+          eventLimit: COMBAT_SIDEBAR_EVENT_LIMIT,
         },
-      )
+      })
 
-      if (!response.accepted) {
-        handleRejectedCommandResponse(
-          runtimePendingDecision.type,
-          `${runtimePendingDecision.type} was rejected by the engine.`,
-          response.errors,
-          response.state,
-          response.events,
-        )
+      if (requestId !== requestSequence) {
         return
       }
 
-      syncEngineResponseSuccess(runtimePendingDecision.type, response.state, response.events)
+      notFound = false
+      errorMessage = null
+      refreshErrorMessage = null
+      applyScreen(response)
+      startPolling()
     } catch (error) {
-      commandErrorMessage = getApiErrorMessage(
-        error,
-        `Unable to resolve ${runtimePendingDecision.type}.`,
-      )
+      if (requestId !== requestSequence) {
+        return
+      }
+
+      stopPolling()
+
+      if (error instanceof ApiError && (error.status === 404 || error.code === 'not_found')) {
+        notFound = true
+        screen = null
+        refreshErrorMessage = null
+      } else {
+        const message = getApiErrorMessage(error, 'Unable to restore the current combat screen.')
+        if (showLoading || !screen) {
+          errorMessage = message
+        } else {
+          refreshErrorMessage = message
+        }
+      }
     } finally {
-      commandPending = null
+      if (requestId === requestSequence && showLoading) {
+        loading = false
+      }
     }
   }
 
-  onMount(() => {
-    void loadCombatState()
-    void loadCardCatalog()
-    void loadCombatSidebarData()
-    window.addEventListener('popstate', handleWindowStateChange)
+  function startPolling() {
+    stopPolling()
 
-    return () => {
-      combatPage.dispose()
-      invalidateCombatSidebarRequests()
-      window.removeEventListener('popstate', handleWindowStateChange)
+    if (typeof window === 'undefined' || !screen) {
+      return
     }
-  })
 
-  const routeSessionCode = $derived.by(() => readSessionCodeFromRoute('combat'))
-  const requestedSessionCode = $derived.by(() =>
-    readRequestedSessionCodeFromAccessOrHandoff({
-      pageKey: 'combat',
-      storedAccess: runtimeAccess,
-      preferStoredAccess: false,
-    }).code,
-  )
-  const combatState = $derived.by(() => session?.combat ?? null)
-  const runState = $derived.by(() => session?.run ?? null)
-  const statusView = $derived.by(() => buildStatusViewModel(session))
-  const commandGuards = $derived.by(() => buildCombatCommandGuards(session, runtimeAccess))
-  const accessRoleLabel = $derived.by(() => {
-    if (isStoredGmSessionAccess(runtimeAccess)) {
+    pollingHandle = startTimedPolling({
+      intervalMs: POLLING_INTERVAL_MS,
+      onPoll: async () => {
+        if (pendingActionId || !screen) {
+          return
+        }
+
+        const response = await getScreen<CombatScreenResponse>('Combat', { code: screen.sessionCode }, {
+          query: {
+            afterVersion: screen.version,
+            eventLimit: COMBAT_SIDEBAR_EVENT_LIMIT,
+          },
+        })
+
+        if (!response.changed) {
+          return
+        }
+
+        applyScreen(response)
+      },
+      onError: (error) => {
+        refreshErrorMessage = getApiErrorMessage(error, 'Unable to refresh the current combat screen.')
+      },
+    })
+  }
+
+  function getAccessRoleLabel(screenModel: CombatScreenResponse | null) {
+    if (!screenModel) {
+      return 'Read-only shell'
+    }
+
+    if (screenModel.access.role === 'gm') {
       return 'GM access'
     }
 
-    if (isStoredPlayerSessionAccess(runtimeAccess)) {
-      return `Player ${runtimeAccess.playerId}`
+    if (screenModel.access.role === 'player' && screenModel.access.runtimePlayerId) {
+      return `Player ${screenModel.access.runtimePlayerId}`
     }
 
     return 'Read-only shell'
-  })
-  const playerViews = $derived.by(() =>
-    session ? Object.values(session.players).map((player) => buildPlayerViewModel(player)) : [],
-  )
-  const enemyViews = $derived.by(() =>
-    combatState ? combatState.enemies.map((enemy) => buildEnemyViewModel(enemy)) : [],
-  )
-  const summonViews = $derived.by(() =>
-    combatState ? combatState.summons.map((summon) => buildSummonViewModel(summon)) : [],
-  )
-  const visiblePlayerView = $derived.by(() => {
-    const playerAccess = isStoredPlayerSessionAccess(runtimeAccess) ? runtimeAccess : null
+  }
 
-    if (playerAccess) {
-      return playerViews.find((player) => player.playerId === playerAccess.playerId) ?? playerViews[0] ?? null
+  function getCurrentTurnStateLabel(screenModel: CombatScreenResponse | null) {
+    const kind = screenModel?.status.currentActor?.kind
+
+    if (kind === 'enemy') {
+      return 'Enemy acting'
     }
 
-    return playerViews[0] ?? null
-  })
-  const runtimePendingDecision = $derived.by(() => {
-    if (isStoredPlayerSessionAccess(runtimeAccess) && session) {
-      return session.players[runtimeAccess.playerId]?.pendingDecision ?? null
+    if (kind === 'player') {
+      return 'Player acting'
     }
 
-    return null
-  })
-  const unsupportedPendingDecisionMessage = $derived.by(() =>
-    getUnsupportedPendingDecisionMessage(runtimePendingDecision),
-  )
-  const currentTurnActor = $derived.by(() => parseCombatActor(combatState?.currentTurnPlayer ?? null))
-  const currentEnemyView = $derived.by(() =>
-    currentTurnActor.kind === 'enemy' && currentTurnActor.id
-      ? enemyViews.find((enemy) => enemy.enemyId === currentTurnActor.id) ?? null
-      : null,
-  )
-  const latestRecentResult = $derived.by(() => recentResults?.recentResults[0] ?? null)
-  const selectedEnemyView = $derived.by(() =>
-    commandDraft.selectedEnemyId
-      ? enemyViews.find((enemy) => enemy.enemyId === commandDraft.selectedEnemyId) ?? null
-      : null,
-  )
-  const selectedCardView = $derived.by(() =>
-    commandDraft.selectedCardId && visiblePlayerView
-      ? visiblePlayerView.handCards.find((card) => card.instanceId === commandDraft.selectedCardId) ?? null
-      : null,
-  )
-  const runtimePlayerState = $derived.by(() => {
-    if (isStoredPlayerSessionAccess(runtimeAccess) && session) {
-      return session.players[runtimeAccess.playerId] ?? null
-    }
+    return 'Turn pending'
+  }
 
-    return null
-  })
-  const runtimeExCardView = $derived.by(() =>
-    runtimePlayerState?.exCard ? resolveCombatCard(runtimePlayerState.exCard) : null,
-  )
-  const selectedCommandDefId = $derived.by(() => {
-    if (commandDraft.selectedCommandType === 'PLAY_CARD') {
-      return getCardDefIdFromInstanceId(commandDraft.selectedCardId)
-    }
-
-    if (commandDraft.selectedCommandType === 'USE_EX') {
-      return getCardDefIdFromInstanceId(runtimePlayerState?.exCard ?? null)
-    }
-
-    return null
-  })
-  const selectedCommandDetail = $derived.by(() => getCardDetail(selectedCommandDefId))
-  const selectedCommandDetailLoading = $derived.by(() =>
-    selectedCommandDefId ? cardDetailLoadingIds.includes(selectedCommandDefId) : false,
-  )
-  const selectedCommandDetailError = $derived.by(() =>
-    selectedCommandDefId ? cardDetailErrors[selectedCommandDefId] ?? null : null,
-  )
-  const selectedCommandPlaySpec = $derived.by(() =>
-    normalizePlaySpec(selectedCommandDetail?.playSpec ?? null),
-  )
-  const selectedCommandSourceLabel = $derived.by(() => {
-    if (commandDraft.selectedCommandType === 'PLAY_CARD') {
-      return selectedCardView?.title ?? null
-    }
-
-    if (commandDraft.selectedCommandType === 'USE_EX') {
-      return runtimeExCardView?.title ?? null
-    }
-
-    return null
-  })
-  const selectedDiscardIdsFromHand = $derived.by(() =>
-    getSelectedDiscardIdsFromHand(runtimePlayerState, commandDraft.selectedDiscardIds),
-  )
-  const selectedFieldIds = $derived.by(() =>
-    getSelectedFieldIds(runtimePlayerState, commandDraft.selectedIds),
-  )
-  const pendingCandidateIds = $derived.by(() =>
-    getPendingCandidateIds(runtimePendingDecision, commandDraft.selectedIds),
-  )
-  const orderedTieActorKeys = $derived.by(() =>
-    getOrderedTieActorKeys(runtimePendingDecision, commandDraft.orderedActorKeys),
-  )
-  const selectedCommandRequirementView = $derived.by(() => {
-    if (!commandDraft.selectedCommandType || !selectedCommandSourceLabel) {
+  function getRequirementLocalBlock(requirement: CombatRequirementViewDto | null | undefined) {
+    if (!requirement) {
       return null
     }
 
-    return buildCommandRequirementViewModel(
-      selectedCommandSourceLabel,
-      selectedCommandPlaySpec,
-    )
-  })
-  const mergedEventItems = $derived.by(() => mergeEventItems(recentCommandEvents, eventItems))
-  const commandOptions = $derived.by(
-    () =>
-      [
-        {
-          id: 'DRAW',
-          title: 'Draw',
-          note: commandGuards.canIssuePlayerCommand
-            ? 'Draw is available for the runtime player on the current turn.'
-            : 'Requires the runtime player to own the current turn.',
-          disabled: !commandGuards.canIssuePlayerCommand,
-        },
-        {
-          id: 'END_TURN',
-          title: 'End turn',
-          note: commandGuards.canIssuePlayerCommand
-            ? 'Available when the runtime player owns the current turn.'
-            : 'Requires the runtime player to own the current turn.',
-          disabled: !commandGuards.canIssuePlayerCommand,
-        },
-        {
-          id: 'CLEAR_RECENT_RESULTS',
-          title: 'Clear recent results',
-          note: commandGuards.canClearRecentResultsCommand
-            ? 'Connected as a player-side utility command that clears the recent result stack.'
-            : 'Requires player token access for the current session.',
-          disabled: !commandGuards.canClearRecentResultsCommand,
-        },
-        {
-          id: 'PLAY_CARD',
-          title: 'Play selected card',
-          note: commandDraft.selectedCardId
-            ? 'Uses the selected hand card instance as the next command source.'
-            : 'Select a hand card first to prepare a play-card command.',
-          disabled: !commandGuards.canIssuePlayerCommand || !commandDraft.selectedCardId,
-        },
-        {
-          id: 'USE_EX',
-          title: 'Use EX',
-          note: commandGuards.exAvailable
-            ? 'EX is available for the runtime player.'
-            : 'Requires a runtime player with EX available and not on cooldown.',
-          disabled: !commandGuards.canIssuePlayerCommand || !commandGuards.exAvailable,
-        },
-        {
-          id: 'RESOLVE_PENDING',
-          title: 'Resolve pending decision',
-          note: commandGuards.hasPendingDecision
-            ? 'A pending decision is present for the runtime player.'
-            : 'Requires a pending decision on the runtime player state.',
-          disabled: !commandGuards.canIssuePlayerCommand || !commandGuards.hasPendingDecision,
-        },
-        {
-          id: 'GM_REVIEW',
-          title: 'GM review',
-          note: 'Reserved for a later GM-only command step.',
-          disabled: true,
-        },
-      ] satisfies CommandOptionViewModel[],
-  )
+    if (requirement.unsupportedReason) {
+      return requirement.unsupportedReason
+    }
 
-  const currentTurnStateLabel = $derived.by(() =>
-    currentTurnActor.kind === 'enemy'
-      ? 'Enemy acting'
-      : currentTurnActor.kind === 'player'
-        ? 'Player acting'
-        : 'Turn pending',
-  )
-  const selectedTargetLabels = $derived.by(() =>
-    commandDraft.selectedTargets.map((target) => formatTargetSelectionLabel(target)),
-  )
-  const commandGuardMessage = $derived.by(
-    () =>
-      `Expected version ${commandGuards.expectedVersion ?? 'N/A'} | Current actor ${statusView?.currentTurnLabel ?? 'Unavailable'} | Runtime role ${commandGuards.role}`,
-  )
-  const eventFeedEntries = $derived.by(
-    () =>
-      mergedEventItems.map((event) => ({
-        title: event.type,
-        lines: [
-          `Version ${event.version} | Cursor ${event.cursor}`,
-          formatSidebarTimestamp(event.timestamp),
-        ],
-      })) satisfies CombatFeedEntry[],
-  )
-  const logFeedEntries = $derived.by(
-    () =>
-      logItems.map((log) => ({
-        title: log.type,
-        lines: [log.message, `Version ${log.version} | ${formatSidebarTimestamp(log.timestamp)}`],
-      })) satisfies CombatFeedEntry[],
-  )
-  const recentResultEntries = $derived.by(
-    () =>
-      (recentResults?.recentResults ?? []).map((result) => ({
-        title: result.title,
-        summary: result.summary,
-        meta: `${result.type} | ${result.at ?? 'Time unavailable'}`,
-      })) satisfies CombatRecentResultEntry[],
-  )
-  const runNodeSummary = $derived.by(
-    () =>
-      `Run node: ${runState?.currentNode?.name ?? 'Unavailable'} | Result pending: ${runState?.resultPending ? 'Yes' : 'No'}`,
-  )
+    if (requirement.targetRule?.requiredSelection && selectedTargetKeys.length === 0) {
+      return requirement.targetSummary
+    }
 
-  function handleCommandButtonClick(commandType: string) {
-    const nextCommandType = commandType as CombatCommandType
+    if (requirement.discardRequirement) {
+      const expectedCount = requirement.discardRequirement.count
+      if (selectedDiscardIds.length < expectedCount) {
+        return requirement.discardSummary
+      }
+      if (selectedDiscardIds.length > expectedCount) {
+        return `Select only ${expectedCount} discard card${expectedCount === 1 ? '' : 's'}.`
+      }
+    }
 
-    handleSelectCommand(nextCommandType)
+    if (requirement.selectedIdsRequirement) {
+      const { minSelections, maxSelections } = requirement.selectedIdsRequirement
+      if (selectedFieldIds.length < minSelections) {
+        return requirement.selectedIdsSummary
+      }
+      if (selectedFieldIds.length > maxSelections) {
+        return `Select at most ${maxSelections} field card id${maxSelections === 1 ? '' : 's'}.`
+      }
+    }
 
-    if (
-      nextCommandType === 'END_TURN' ||
-      nextCommandType === 'DRAW' ||
-      nextCommandType === 'CLEAR_RECENT_RESULTS'
-    ) {
-      void handleSimpleCommand(nextCommandType)
-    } else if (nextCommandType === 'PLAY_CARD' || nextCommandType === 'USE_EX') {
-      void handlePlayerCardCommand(nextCommandType)
+    if (requirement.pendingChoiceSchema) {
+      return requirement.choiceSummary
+    }
+
+    return null
+  }
+
+  function getPendingLocalBlock(metadata: CombatPendingActionMetadataDto | null) {
+    if (!metadata) {
+      return null
+    }
+
+    if (metadata.unsupportedReason) {
+      return metadata.unsupportedReason
+    }
+
+    const schema = metadata.schema
+    if (!schema) {
+      return metadata.blocked ? 'Pending decision schema is unavailable.' : null
+    }
+
+    switch (schema.type) {
+      case 'DISCARD_TO_HAND_LIMIT':
+        if ((schema.discardCount ?? 0) !== selectedDiscardIds.length) {
+          return `Select ${schema.discardCount ?? 0} discard card${schema.discardCount === 1 ? '' : 's'} to resolve the pending decision.`
+        }
+        return null
+      case 'SEARCH_PICK':
+        if ((schema.pickCount ?? 0) !== selectedPendingIds.length) {
+          return `Select ${schema.pickCount ?? 0} candidate id${schema.pickCount === 1 ? '' : 's'} to resolve the pending decision.`
+        }
+        return null
+      case 'INITIATIVE_TIE_ORDER':
+        if ((schema.actorKeys?.length ?? 0) !== orderedActorKeys.length) {
+          return 'Order all tie-group actor keys before resolving the pending decision.'
+        }
+        return null
+      default:
+        return null
     }
   }
 
-  $effect(() => {
-    if (selectedCommandDefId) {
-      void ensureCardDetail(selectedCommandDefId)
+  function getActionPresentationBlock(action: CombatScreenAction | null) {
+    if (!action) {
+      return 'Combat action is unavailable.'
     }
+
+    if (!action.enabled) {
+      return action.disabledReason?.userMessage ?? `${action.label} is currently disabled.`
+    }
+
+    if (!action.metadata) {
+      return null
+    }
+
+    if (action.metadata.kind === 'playCard') {
+      if (!selectedCardId) {
+        return 'Select a hand card first.'
+      }
+
+      const selectedSource = action.metadata.sourceOptions.find((option) => option.instanceId === selectedCardId)
+      if (!selectedSource) {
+        return 'Selected hand card is no longer available.'
+      }
+
+      if (!selectedSource.supported) {
+        return selectedSource.unsupportedReason ?? 'Selected card is not supported in this combat step yet.'
+      }
+
+      return getRequirementLocalBlock(selectedSource.requirementView)
+    }
+
+    if (action.metadata.kind === 'useEx') {
+      if (!action.metadata.supported) {
+        return action.metadata.unsupportedReason ?? 'EX action is not supported in this combat step yet.'
+      }
+
+      return getRequirementLocalBlock(action.metadata.requirementView)
+    }
+
+    if (action.metadata.kind === 'pendingDecision') {
+      return getPendingLocalBlock(action.metadata)
+    }
+
+    return null
+  }
+
+  function getPendingDecisionView(metadata: CombatPendingActionMetadataDto | null): PendingDecisionDto | null {
+    if (!metadata?.pendingDecisionType) {
+      return null
+    }
+
+    const schema = metadata.schema
+
+    return {
+      type: metadata.pendingDecisionType,
+      reason: schema?.reason ?? null,
+      limit: schema?.discardCount ?? null,
+      pickCount: schema?.pickCount ?? null,
+      candidateIds: schema?.candidateIds ?? [],
+      destination: schema?.destination ?? null,
+      shuffleAfterPick: schema?.shuffleAfterPick ?? null,
+      groupIndex: schema?.groupIndex ?? null,
+      actorKeys: schema?.actorKeys ?? [],
+    }
+  }
+
+  function buildActionBody(action: CombatScreenAction) {
+    const basePayload = buildScreenActionPayload(action, {})
+
+    switch (action.id) {
+      case 'combat.draw':
+        return {
+          ...basePayload,
+          count: selectedCount ?? 1,
+          reason: normalizeOptionalText(selectedReason),
+        }
+      case 'combat.endTurn':
+      case 'combat.clearRecentResults':
+        return {
+          ...basePayload,
+          reason: normalizeOptionalText(selectedReason),
+        }
+      case 'combat.playCard':
+        return {
+          ...basePayload,
+          cardId: selectedCardId ?? '',
+          discardIds: selectedDiscardIds,
+          selectedIds: selectedFieldIds,
+          targets: buildTargetRefs(selectedTargetKeys),
+          reason: normalizeOptionalText(selectedReason),
+        }
+      case 'combat.useEx':
+        return {
+          ...basePayload,
+          targets: buildTargetRefs(selectedTargetKeys),
+          reason: normalizeOptionalText(selectedReason),
+        }
+      case 'combat.resolvePending': {
+        const metadata = action.metadata
+        const schema = metadata && metadata.kind === 'pendingDecision' ? metadata.schema : null
+        const selectedIdsField = schema?.selectedIdsField
+        return {
+          ...basePayload,
+          discardIds: selectedIdsField === 'discardIds' ? selectedDiscardIds : [],
+          selectedIds: selectedIdsField === 'selectedIds' ? selectedPendingIds : [],
+          orderedActorKeys: selectedIdsField === 'orderedActorKeys' ? orderedActorKeys : [],
+          tieGroupIndex: schema?.groupIndex ?? basePayload.tieGroupIndex ?? null,
+          reason: normalizeOptionalText(selectedReason),
+        }
+      }
+      default:
+        return basePayload
+    }
+  }
+
+  async function executeAction(actionId: CombatActionId) {
+    if (!screen) {
+      return
+    }
+
+    const action = findCombatAction(screen, actionId)
+    const blockedMessage = getActionPresentationBlock(action)
+
+    if (!action || blockedMessage) {
+      actionErrorMessage = blockedMessage
+      actionSuccessMessage = null
+      return
+    }
+
+    pendingActionId = action.id
+    actionErrorMessage = null
+    actionSuccessMessage = null
+
+    try {
+      const response = await invokeScreenAction<CombatScreenResponse, CombatScreenActionResponse>(action, {
+        body: buildActionBody(action),
+      })
+
+      if (response.latestScreen) {
+        applyScreen(response.latestScreen)
+      } else if (response.latestVersion && screen.version !== response.latestVersion) {
+        await refreshCombatScreen('action')
+      }
+
+      if (response.success) {
+        actionSuccessMessage = response.message ?? `${action.label} completed.`
+        actionErrorMessage = null
+      } else {
+        actionErrorMessage =
+          response.message ??
+          response.disabledReason?.userMessage ??
+          `${action.label} could not be completed.`
+        actionSuccessMessage = null
+      }
+    } catch (error) {
+      actionErrorMessage = getApiErrorMessage(error, `Unable to execute ${action.label}.`)
+      actionSuccessMessage = null
+    } finally {
+      pendingActionId = null
+    }
+  }
+
+  function handleCommandButtonClick(actionId: string) {
+    if (!screen) {
+      return
+    }
+
+    const normalizedActionId = actionId as CombatActionId
+    selectedActionId = normalizedActionId
+
+    if (
+      normalizedActionId === 'combat.draw' ||
+      normalizedActionId === 'combat.endTurn' ||
+      normalizedActionId === 'combat.clearRecentResults'
+    ) {
+      void executeAction(normalizedActionId)
+      return
+    }
+
+    if (normalizedActionId === 'combat.useEx' && !getActionPresentationBlock(findCombatAction(screen, normalizedActionId))) {
+      void executeAction(normalizedActionId)
+    }
+  }
+
+  function handleSelectPlayer(playerId: string) {
+    selectedPlayerId = playerId
+  }
+
+  function handleToggleTargetPlayer(playerId: string) {
+    selectedTargetKeys = toggleIdentifier(selectedTargetKeys, targetKeyForPlayer(playerId))
+  }
+
+  function handleToggleTargetEnemy(enemyId: string) {
+    selectedTargetKeys = toggleIdentifier(selectedTargetKeys, targetKeyForEnemy(enemyId))
+  }
+
+  function handleToggleTargetSummon(owner: string, summonId: string) {
+    selectedTargetKeys = toggleIdentifier(selectedTargetKeys, targetKeyForSummon(owner, summonId))
+  }
+
+  function handleSelectHandCard(instanceId: string) {
+    selectedCardId = selectedCardId === instanceId ? null : instanceId
+    selectedActionId = 'combat.playCard'
+  }
+
+  function handleToggleDiscard(instanceId: string) {
+    selectedDiscardIds = toggleIdentifier(selectedDiscardIds, instanceId)
+  }
+
+  function handleToggleFieldId(instanceId: string) {
+    selectedFieldIds = toggleIdentifier(selectedFieldIds, instanceId)
+  }
+
+  function handleTogglePendingSelectedId(value: string) {
+    selectedPendingIds = toggleIdentifier(selectedPendingIds, value)
+  }
+
+  function handleToggleOrderedActorKey(actorKey: string) {
+    if (orderedActorKeys.includes(actorKey)) {
+      orderedActorKeys = orderedActorKeys.filter((value) => value !== actorKey)
+      return
+    }
+
+    orderedActorKeys = [...orderedActorKeys, actorKey]
+  }
+
+  function handleSelectedCountChange(value: string) {
+    selectedCount = normalizePositiveInteger(value) ?? 1
+  }
+
+  function handleSelectedReasonChange(value: string) {
+    selectedReason = value
+  }
+
+  function handleClearSelectedTargets() {
+    selectedTargetKeys = []
+  }
+
+  function handleClearSelectionInputs() {
+    selectedDiscardIds = []
+    selectedFieldIds = []
+    selectedPendingIds = []
+    orderedActorKeys = []
+  }
+
+  function handleResolvePendingDecision() {
+    selectedActionId = 'combat.resolvePending'
+    void executeAction('combat.resolvePending')
+  }
+
+  function handlePopState() {
+    void refreshCombatScreen('route-change')
+  }
+
+  onMount(() => {
+    void refreshCombatScreen('initial-load')
+    window.addEventListener('popstate', handlePopState)
+  })
+
+  onDestroy(() => {
+    stopPolling()
+    window.removeEventListener('popstate', handlePopState)
+  })
+
+  const requestedSessionCode = $derived.by(() => getRequestedSessionCode(runtimeAccess))
+  const playerViews = $derived.by(() => (screen ? screen.actors.players.map((player) => toPlayerView(player)) : []))
+  const enemyViews = $derived.by(() => (screen ? screen.actors.enemies.map((enemy) => toEnemyView(enemy)) : []))
+  const summonViews = $derived.by(() => (screen ? screen.actors.summons.map((summon) => toSummonView(summon)) : []))
+  const visiblePlayerView = $derived.by(() => {
+    if (!screen) {
+      return null
+    }
+
+    return (
+      playerViews.find((player) => player.playerId === screen.zones.visiblePlayerId) ??
+      playerViews[0] ??
+      null
+    )
+  })
+  const selectedCardView = $derived.by(() =>
+    selectedCardId ? (visiblePlayerView?.handCards.find((card) => card.instanceId === selectedCardId) ?? null) : null,
+  )
+  const selectedPlayCardSource = $derived.by(() => findSelectedPlayCardSource(screen, selectedCardId))
+  const pendingActionMetadata = $derived.by(() => getPendingMetadata(screen))
+  const pendingDecision = $derived.by(() => getPendingDecisionView(pendingActionMetadata))
+  const pendingLocalBlock = $derived.by(() => getPendingLocalBlock(pendingActionMetadata))
+  const selectedAction = $derived.by(() =>
+    screen && selectedActionId ? findCombatAction(screen, selectedActionId) : null,
+  )
+  const selectedActionLocalBlock = $derived.by(() => getActionPresentationBlock(selectedAction))
+  const selectedRequirementView = $derived.by(() => {
+    if (!selectedAction?.metadata) {
+      return null
+    }
+
+    if (selectedAction.metadata.kind === 'playCard') {
+      return toRequirementView(selectedPlayCardSource?.requirementView ?? null)
+    }
+
+    if (selectedAction.metadata.kind === 'useEx') {
+      return toRequirementView(selectedAction.metadata.requirementView)
+    }
+
+    return null
+  })
+  const selectedSourceLabel = $derived.by(() => {
+    if (!selectedAction?.metadata) {
+      return null
+    }
+
+    if (selectedAction.metadata.kind === 'playCard') {
+      return selectedPlayCardSource?.sourceCard?.title ?? selectedCardView?.title ?? null
+    }
+
+    if (selectedAction.metadata.kind === 'useEx') {
+      return selectedAction.metadata.sourceCard?.title ?? null
+    }
+
+    return null
+  })
+  const statusView = $derived.by(() => {
+    if (!screen) {
+      return null
+    }
+
+    return {
+      sessionCode: screen.sessionCode,
+      version: screen.version,
+      round: screen.status.round,
+      currentTurnPlayer: screen.status.currentActor?.raw ?? null,
+      phase: screen.status.phase,
+      currentTurnLabel: screen.status.currentActor?.label ?? 'No active turn',
+      currentTurnTone: normalizeTone(screen.status.currentActor?.tone),
+      currentTurnNote: screen.status.currentActor?.note ?? 'Combat turn owner is not available in the current state.',
+      turnOrderSummary: screen.status.turnOrderSummary,
+      battlefieldSummary: screen.status.battlefieldSummary,
+      runSummary: screen.status.runSummary,
+      initiativeSummary: screen.status.currentActor?.note ?? 'Initiative summary unavailable.',
+      tieGroupSummary: screen.status.tieGroupSummary ?? 'No initiative tie group is active.',
+    } satisfies CombatStatusViewModel
+  })
+  const accessRoleLabel = $derived.by(() => getAccessRoleLabel(screen))
+  const currentTurnStateLabel = $derived.by(() => getCurrentTurnStateLabel(screen))
+  const currentEnemyView = $derived.by(() =>
+    screen?.status.currentActor?.kind === 'enemy' && screen.status.currentActor.id
+      ? (enemyViews.find((enemy) => enemy.enemyId === screen.status.currentActor?.id) ?? null)
+      : null,
+  )
+  const selectedEnemyView = $derived.by(() => {
+    const selectedEnemyKey = selectedTargetKeys.find((key) => key.startsWith('enemy:'))
+    if (!selectedEnemyKey) {
+      return null
+    }
+
+    const enemyId = selectedEnemyKey.slice('enemy:'.length)
+    return enemyViews.find((enemy) => enemy.enemyId === enemyId) ?? null
+  })
+  const selectedTargets = $derived.by(() => buildTargetRefs(selectedTargetKeys))
+  const selectedTargetLabels = $derived.by(() => {
+    if (!screen) {
+      return []
+    }
+
+    const labels: string[] = []
+    for (const key of selectedTargetKeys) {
+      if (key.startsWith('player:')) {
+        const playerId = key.slice('player:'.length)
+        const player = screen.actors.players.find((entry) => entry.playerId === playerId)
+        labels.push(player ? `Player ${player.playerId}` : playerId)
+        continue
+      }
+
+      if (key.startsWith('enemy:')) {
+        const enemyId = key.slice('enemy:'.length)
+        const enemy = screen.actors.enemies.find((entry) => entry.enemyId === enemyId)
+        labels.push(enemy ? `Enemy ${enemy.enemyId}` : enemyId)
+        continue
+      }
+
+      if (key.startsWith('summon:')) {
+        const [, owner, summonId] = key.split(':')
+        labels.push(owner && summonId ? `Summon ${summonId} (${owner})` : key)
+      }
+    }
+
+    return labels
+  })
+  const commandOptions = $derived.by(() => {
+    if (!screen) {
+      return [] as CommandOptionViewModel[]
+    }
+
+    return screen.possibleActions.map((action) => {
+      const presentationBlock = getActionPresentationBlock(action)
+      const metadataNote = action.metadata && 'note' in action.metadata ? action.metadata.note : null
+      return {
+        id: action.id,
+        title: action.label,
+        note: presentationBlock ?? metadataNote ?? action.disabledReason?.userMessage ?? action.label,
+        disabled: Boolean(presentationBlock),
+      }
+    }) satisfies CommandOptionViewModel[]
+  })
+  const commandGuardMessage = $derived.by(() => {
+    if (!screen) {
+      return 'Combat access is unavailable.'
+    }
+
+    return `Expected version ${screen.access.expectedVersion} | Runtime role ${screen.access.role} | Current actor ${screen.status.currentActor?.label ?? 'Unavailable'}`
+  })
+  const eventFeedEntries = $derived.by(() => (screen?.sidebar.events ?? []) satisfies CombatFeedEntry[])
+  const logFeedEntries = $derived.by(() => (screen?.sidebar.logs ?? []) satisfies CombatFeedEntry[])
+  const recentResultEntries = $derived.by(
+    () => (screen?.sidebar.recentResults ?? []) satisfies CombatRecentResultEntry[],
+  )
+  const latestRecentResult = $derived.by(() => {
+    const latest = screen?.sidebar.recentResults[0]
+    if (!latest) {
+      return null
+    }
+
+    return {
+      id: `${screen?.sessionCode ?? 'combat'}:${latest.title}`,
+      type: 'Combat',
+      title: latest.title,
+      summary: latest.summary,
+      detail: null,
+      source: null,
+      at: latest.meta,
+    } satisfies RunRecentResultDto
+  })
+  const accessNoticeMessage = $derived.by(() =>
+    screen?.uiNotices.length ? screen.uiNotices.join(' ') : null,
+  )
+  const pendingCandidateIds = $derived.by(() => selectedPendingIds)
+  const canResolvePendingCommand = $derived.by(() => {
+    const action = screen ? findCombatAction(screen, 'combat.resolvePending') : null
+    return Boolean(action?.enabled) && !pendingLocalBlock
   })
 </script>
 
@@ -1708,19 +1003,19 @@
   {#if loading}
     <SectionFrame
       eyebrow="Combat Status"
-      title="Loading combat shell"
-      description="Restoring the current combat session state from the live session API."
+      title="Loading combat screen"
+      description="Restoring the current combat screen model from the Screen API."
     >
       <ContentStatePanel
-        title={sessionPageStateCopy.loading.title}
-        message="Fetching the current combat shell by session code."
+        title="Loading combat"
+        message="Fetching the current combat screen by session code."
       />
     </SectionFrame>
   {:else if invalidAccessMessage}
     <SectionFrame
       eyebrow="Combat Access"
-      title="Combat shell is unavailable"
-      description="This page needs a session code first, then it can restore the live combat shell."
+      title="Combat screen is unavailable"
+      description="This page needs a session code first, then it can restore the combat screen model."
     >
       <ContentStatePanel title="Combat code required" message={invalidAccessMessage} tone="error">
         <p>Open the session entry screen or a lobby route first, then return with a session code.</p>
@@ -1735,15 +1030,14 @@
     <SectionFrame
       eyebrow="Session Missing"
       title="Combat session not found"
-      description="The requested combat code did not resolve to a live session."
+      description="The requested combat code did not resolve to a live combat screen."
     >
       <ContentStatePanel
-        title={sessionPageStateCopy.notFound.title}
-        message={sessionPageStateCopy.notFound.message}
+        title="Combat session not found"
+        message="Check the current session code and reopen the combat route."
         tone="error"
       >
         <p>Requested code: {requestedSessionCode ?? 'Unavailable'}</p>
-        <p>Check the current session code and reopen the combat route.</p>
       </ContentStatePanel>
       <div class="combat-page__action-buttons">
         <a class="combat-page__nav-link" data-nav href={pathBuilders.sessionEntry()}>
@@ -1754,15 +1048,15 @@
   {:else if errorMessage}
     <SectionFrame
       eyebrow="Combat Status"
-      title="Combat shell could not be loaded"
-      description="The session code was valid, but the live combat shell could not be restored."
+      title="Combat screen could not be loaded"
+      description="The session code was valid, but the combat screen could not be restored."
     >
       <ContentStatePanel
-        title="Unable to load combat shell"
+        title="Unable to load combat screen"
         message={errorMessage}
         tone="error"
         actionLabel="Retry load"
-        onAction={() => void loadCombatState()}
+        onAction={() => void refreshCombatScreen('retry-load')}
       />
       <div class="combat-page__action-buttons">
         <a class="combat-page__nav-link" data-nav href={pathBuilders.sessionEntry()}>
@@ -1770,22 +1064,22 @@
         </a>
       </div>
     </SectionFrame>
-  {:else if session && statusView}
+  {:else if screen && statusView}
     <CombatLayout>
       {#snippet header()}
         <CombatHeader
           {statusView}
           {accessRoleLabel}
-          combatStateLive={Boolean(combatState)}
+          combatStateLive={screen.access.guards.hasCombatState}
           currentTurnStateLabel={currentTurnStateLabel}
-          {recentResultsLoading}
-          {recentResultsErrorMessage}
+          recentResultsLoading={false}
+          recentResultsErrorMessage={null}
           {latestRecentResult}
           {accessNoticeMessage}
-          {catalogErrorMessage}
-          {commandErrorMessage}
-          {commandRejectedMessage}
-          {commandSuccessMessage}
+          catalogErrorMessage={null}
+          commandErrorMessage={actionErrorMessage ?? refreshErrorMessage ?? selectedActionLocalBlock}
+          commandRejectedMessage={null}
+          commandSuccessMessage={actionSuccessMessage}
         />
       {/snippet}
 
@@ -1794,14 +1088,14 @@
           {playerViews}
           {enemyViews}
           {summonViews}
-          currentTurnPlayerId={currentTurnActor.kind === 'player' ? currentTurnActor.id : null}
+          currentTurnPlayerId={screen.status.currentActor?.kind === 'player' ? screen.status.currentActor.id : null}
           currentEnemyId={currentEnemyView?.enemyId ?? null}
           visiblePlayerId={visiblePlayerView?.playerId ?? null}
-          selectedPlayerId={commandDraft.selectedPlayerId}
-          selectedTargets={commandDraft.selectedTargets}
+          {selectedPlayerId}
+          {selectedTargets}
           onSelectPlayer={handleSelectPlayer}
           onToggleTargetPlayer={handleToggleTargetPlayer}
-          onToggleTargetEnemy={handleSelectEnemy}
+          onToggleTargetEnemy={handleToggleTargetEnemy}
           onToggleTargetSummon={handleToggleTargetSummon}
         />
       {/snippet}
@@ -1809,74 +1103,74 @@
       {#snippet sidebar()}
         <CombatSidebar
           {commandOptions}
-          commandPending={commandPending}
-          selectedCommandType={commandDraft.selectedCommandType}
-          commandGuardMessage={commandGuardMessage}
-          isCurrentTurnPlayer={commandGuards.isCurrentTurnPlayer}
-          hasPendingDecision={commandGuards.hasPendingDecision}
-          exAvailable={commandGuards.exAvailable}
-          recentCommandEventCount={recentCommandEvents.length}
-          requirementView={selectedCommandRequirementView}
-          sourceLabel={selectedCommandSourceLabel}
-          detailLoading={selectedCommandDetailLoading}
-          detailError={selectedCommandDetailError}
-          selectedTargetLabels={selectedTargetLabels}
-          selectedDiscardIds={selectedDiscardIdsFromHand}
-          selectedFieldIds={selectedFieldIds}
-          pendingDecision={runtimePendingDecision}
-          unsupportedPendingDecisionMessage={unsupportedPendingDecisionMessage}
+          commandPending={pendingActionId}
+          selectedCommandType={selectedActionId}
+          {commandGuardMessage}
+          isCurrentTurnPlayer={screen.access.guards.isCurrentTurnPlayer}
+          hasPendingDecision={screen.access.guards.hasPendingDecision}
+          exAvailable={screen.access.guards.exAvailable}
+          recentCommandEventCount={0}
+          requirementView={selectedRequirementView}
+          sourceLabel={selectedSourceLabel}
+          detailLoading={false}
+          detailError={null}
+          {selectedTargetLabels}
+          {selectedDiscardIds}
+          {selectedFieldIds}
+          {pendingDecision}
+          unsupportedPendingDecisionMessage={pendingActionMetadata?.unsupportedReason ?? pendingLocalBlock}
           {pendingCandidateIds}
-          {orderedTieActorKeys}
-          canResolvePendingCommand={commandGuards.canResolvePendingCommand}
+          {orderedActorKeys}
+          {canResolvePendingCommand}
           {visiblePlayerView}
           eventEntries={eventFeedEntries}
-          {eventsLoading}
-          {eventsErrorMessage}
+          eventsLoading={false}
+          eventsErrorMessage={null}
           logEntries={logFeedEntries}
-          {logsLoading}
-          {logsErrorMessage}
+          logsLoading={false}
+          logsErrorMessage={null}
           recentResultEntries={recentResultEntries}
-          {recentResultsLoading}
-          {recentResultsErrorMessage}
+          recentResultsLoading={false}
+          recentResultsErrorMessage={null}
           onCommandButtonClick={handleCommandButtonClick}
           onClearTargets={handleClearSelectedTargets}
           onClearSelectionInputs={handleClearSelectionInputs}
           onTogglePendingSelectedId={handleTogglePendingSelectedId}
           onToggleOrderedActorKey={handleToggleOrderedActorKey}
-          onResolvePendingDecision={() => void handlePendingDecisionCommand()}
-          onToggleSelectedId={handleToggleSelectedId}
-          onRetryEvents={() => void loadCombatEvents()}
-          onRetryLogs={() => void loadCombatLogs()}
-          onRetryResults={() => void loadCombatRecentResults()}
+          onResolvePendingDecision={handleResolvePendingDecision}
+          onToggleSelectedId={handleToggleFieldId}
+          onRetryEvents={() => void refreshCombatScreen('action')}
+          onRetryLogs={() => void refreshCombatScreen('action')}
+          onRetryResults={() => void refreshCombatScreen('action')}
         />
       {/snippet}
 
       {#snippet hand()}
         <HandBar
           handCards={visiblePlayerView?.handCards ?? []}
-          selectedCardId={commandDraft.selectedCardId}
-          selectedDiscardIds={selectedDiscardIdsFromHand}
-          selectedCommandType={commandDraft.selectedCommandType}
-          expectedVersion={commandGuards.expectedVersion}
+          {selectedCardId}
+          {selectedDiscardIds}
+          selectedCommandType={selectedActionId}
+          expectedVersion={screen.access.expectedVersion}
           currentActorLabel={statusView.currentTurnLabel}
           visibleHandOwner={visiblePlayerView?.playerId ?? null}
-          selectedActor={commandDraft.selectedPlayerId}
+          selectedActor={selectedPlayerId}
           selectedEnemyId={selectedEnemyView?.enemyId ?? null}
-          selectedCardLabel={selectedCardView?.title ?? commandDraft.selectedCardId ?? null}
-          pendingDecisionType={runtimePendingDecision?.type ?? null}
-          selectedTargetCount={commandDraft.selectedTargets.length}
-          selectedIdCount={commandDraft.selectedIds.length}
-          orderedActorKeysSummary={commandDraft.orderedActorKeys.join(', ') || 'None'}
-          targetRefSummary={formatTargetRefSummary(commandDraft.selectedTargets)}
-          selectedDiscardCount={selectedDiscardIdsFromHand.length}
+          selectedCardLabel={selectedCardView?.title ?? selectedCardId}
+          pendingDecisionType={pendingDecision?.type ?? null}
+          selectedTargetCount={selectedTargetKeys.length}
+          selectedIdCount={selectedFieldIds.length}
+          orderedActorKeysSummary={orderedActorKeys.join(', ') || 'None'}
+          targetRefSummary={selectedTargetLabels.join(', ') || 'None'}
+          selectedDiscardCount={selectedDiscardIds.length}
           selectedFieldCount={selectedFieldIds.length}
-          selectedCount={commandDraft.selectedCount}
-          pendingCandidateCount={pendingCandidateIds.length}
-          bufferedEventCount={recentCommandEvents.length}
-          runNodeSummary={runNodeSummary}
-          selectedReason={commandDraft.selectedReason}
-          {catalogLoading}
-          emptyMessage="Visible hand cards will render here once the current player has hand instances in the live state."
+          {selectedCount}
+          pendingCandidateCount={selectedPendingIds.length}
+          bufferedEventCount={screen.sidebar.events.length}
+          runNodeSummary={screen.status.runSummary}
+          {selectedReason}
+          catalogLoading={false}
+          emptyMessage="Visible hand cards will render here once the current visible player has hand instances in the combat screen."
           onSelectHandCard={handleSelectHandCard}
           onToggleDiscard={handleToggleDiscard}
           onSelectedCountChange={handleSelectedCountChange}

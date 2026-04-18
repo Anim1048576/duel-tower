@@ -1,7 +1,6 @@
 <script lang="ts">
   import SectionFrame from '../SectionFrame.svelte'
   import type { PendingDecisionDto } from '../../api/sessionTypes'
-  import type { CombatCommandType } from '../../session/combatCommandDraft'
   import CombatLogPanel from './CombatLogPanel.svelte'
   import CombatResultsPanel from './CombatResultsPanel.svelte'
   import CommandActionPanel from './CommandActionPanel.svelte'
@@ -17,7 +16,7 @@
   type Props = {
     commandOptions: readonly CommandOptionViewModel[]
     commandPending: string | null
-    selectedCommandType: CombatCommandType | null
+    selectedCommandType: string | null
     commandGuardMessage: string
     isCurrentTurnPlayer: boolean
     hasPendingDecision: boolean
