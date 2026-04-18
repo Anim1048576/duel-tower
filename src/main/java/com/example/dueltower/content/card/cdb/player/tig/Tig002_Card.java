@@ -31,7 +31,7 @@ public class Tig002_Card implements CardBlueprint {
                 false,
                 """
                         아군 1명의 체력을 자신의 {치유력}만큼 회복시킨다.
-                        극복이 3이상인 경우, 1장 드로우 한다.
+                        극복이 3이상인 경우, [스킬 카드]를 1장 뽑는다.
                         """
         );
     }
