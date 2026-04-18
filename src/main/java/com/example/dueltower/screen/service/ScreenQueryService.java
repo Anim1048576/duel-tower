@@ -1,5 +1,6 @@
 package com.example.dueltower.screen.service;
 
+import com.example.dueltower.screen.dto.CombatScreenResponse;
 import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
 import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatActionRequest;
@@ -41,11 +42,13 @@ public class ScreenQueryService {
         return sessionScreenService.getGmLobby(code, gmTokenHeader, playerTokenHeader, authentication);
     }
 
-    public Object getCombat(String code,
-                            String gmTokenHeader,
-                            String playerTokenHeader,
-                            Authentication authentication) {
-        return sessionScreenService.getCombat(code, gmTokenHeader, playerTokenHeader, authentication);
+    public CombatScreenResponse getCombat(String code,
+                                          Long afterVersion,
+                                          Integer eventLimit,
+                                          String gmTokenHeader,
+                                          String playerTokenHeader,
+                                          Authentication authentication) {
+        return sessionScreenService.getCombat(code, afterVersion, eventLimit, gmTokenHeader, playerTokenHeader, authentication);
     }
 
     public GmLobbyStartCombatActionResponse startGmLobbyCombat(String code,

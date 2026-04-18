@@ -581,6 +581,135 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     @Test
+    void combatScreenReturnsComposedReadModelEnvelope() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-gm", "combat-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-p1", "combat-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-p1", characterId);
+        markPlayerReady(session.code(), "combat-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-p1");
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/combat", session.code())
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "Combat");
+        assertThat(body.path("sessionCode").asText()).isEqualTo(session.code());
+        assertThat(body.path("version").asLong()).isGreaterThan(0L);
+        assertThat(body.path("changed").asBoolean()).isTrue();
+        assertThat(body.path("status").isObject()).isTrue();
+        assertThat(body.path("access").isObject()).isTrue();
+        assertThat(body.path("actors").isObject()).isTrue();
+        assertThat(body.path("zones").isObject()).isTrue();
+        assertThat(body.path("sidebar").isObject()).isTrue();
+        assertThat(body.path("possibleActions").isArray()).isTrue();
+        assertThat(body.path("uiNotices")).isNotEmpty();
+    }
+
+    @Test
+    void combatScreenIncludesRequiredStatusActorsZonesAndSidebarFields() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-fields-gm", "combat-fields-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-fields-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-fields-p1", "combat-fields-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-fields-p1", characterId);
+        markPlayerReady(session.code(), "combat-fields-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-fields-p1");
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/combat", session.code())
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "Combat");
+        assertThat(body.path("status").path("round").isInt()).isTrue();
+        assertThat(body.path("status").path("phase").asText()).isNotBlank();
+        assertThat(body.path("status").path("currentActor").path("label").asText()).isNotBlank();
+        assertThat(body.path("status").path("turnOrderSummary").asText()).isNotBlank();
+        assertThat(body.path("status").path("battlefieldSummary").asText()).contains("players");
+        assertThat(body.path("status").path("runSummary").asText()).isNotBlank();
+        assertThat(body.path("access").path("role").asText()).isEqualTo("player");
+        assertThat(body.path("access").path("runtimePlayerId").asText()).isEqualTo("combat-fields-p1");
+        assertThat(body.path("access").path("expectedVersion").asLong()).isEqualTo(body.path("version").asLong());
+        assertThat(body.path("access").path("guards").path("canClearRecentResultsCommand").isBoolean()).isTrue();
+        assertThat(body.path("actors").path("players")).isNotEmpty();
+        assertThat(body.path("actors").path("players").get(0).path("playerId").asText()).isEqualTo("combat-fields-p1");
+        assertThat(body.path("actors").path("players").get(0).path("metrics")).isNotEmpty();
+        assertThat(body.path("actors").path("enemies").isArray()).isTrue();
+        assertThat(body.path("actors").path("summons").isArray()).isTrue();
+        assertThat(body.path("zones").path("visiblePlayerId").asText()).isEqualTo("combat-fields-p1");
+        assertThat(body.path("zones").path("hand").isArray()).isTrue();
+        assertThat(body.path("zones").path("field").isArray()).isTrue();
+        assertThat(body.path("zones").path("grave").isArray()).isTrue();
+        assertThat(body.path("zones").path("excluded").isArray()).isTrue();
+        assertThat(body.path("sidebar").path("events").isArray()).isTrue();
+        assertThat(body.path("sidebar").path("logs").isArray()).isTrue();
+        assertThat(body.path("sidebar").path("recentResults").isArray()).isTrue();
+    }
+
+    @Test
+    void combatScreenMarksChangedFalseWhenAfterVersionMatchesCurrentVersion() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-changed-gm", "combat-changed-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-changed-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-changed-p1", "combat-changed-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-changed-p1", characterId);
+        markPlayerReady(session.code(), "combat-changed-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-changed-p1");
+
+        JsonNode initialBody = assertBaseScreenContract(
+                mockMvc.perform(get("/api/screens/sessions/{code}/combat", session.code())
+                                .header("X-Player-Token", playerToken))
+                        .andExpect(status().isOk())
+                        .andReturn(),
+                "Combat"
+        );
+
+        long currentVersion = initialBody.path("version").asLong();
+
+        MvcResult unchanged = mockMvc.perform(get("/api/screens/sessions/{code}/combat", session.code())
+                        .header("X-Player-Token", playerToken)
+                        .param("afterVersion", String.valueOf(currentVersion)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode unchangedBody = assertBaseScreenContract(unchanged, "Combat");
+        assertThat(unchangedBody.path("version").asLong()).isEqualTo(currentVersion);
+        assertThat(unchangedBody.path("changed").asBoolean()).isFalse();
+    }
+
+    @Test
+    void combatScreenResolvesCardItemsForVisibleZones() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-card-gm", "combat-card-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-card-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-card-p1", "combat-card-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-card-p1", characterId);
+        markPlayerReady(session.code(), "combat-card-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-card-p1");
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/combat", session.code())
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "Combat");
+        assertThat(body.path("zones").path("hand")).isNotEmpty();
+
+        JsonNode card = body.path("zones").path("hand").get(0);
+        assertThat(card.path("instanceId").asText()).isNotBlank();
+        assertThat(card.path("defId").asText()).isNotBlank();
+        assertThat(card.path("title").asText()).isNotBlank();
+        assertThat(card.path("title").asText()).isNotEqualTo(card.path("defId").asText());
+        assertThat(card.path("subtitle").asText()).isNotBlank();
+        assertThat(card.path("unresolved").asBoolean()).isFalse();
+        assertThat(card.path("tags")).isNotEmpty();
+        assertThat(card.path("meta").asText()).contains("Instance");
+    }
+
+    @Test
     void newDeckEditorScreenReturnsCreateModeDraftValidationAndAction() throws Exception {
         MockHttpSession session = signUpAndLogin("deck-user", "deck-user@example.com", "password123");
 
@@ -810,6 +939,39 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
 
         JsonNode node = JSON.readTree(result.getResponse().getContentAsString());
         return node.path("playerToken").asText();
+    }
+
+    private void markPlayerReady(String code, String playerId, String playerToken) throws Exception {
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, playerId)
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    private void startCombat(String code, String gmToken, String playerId) throws Exception {
+        long expectedVersion = readJson(mockMvc.perform(get("/api/sessions/{code}", code))
+                        .andExpect(status().isOk())
+                        .andReturn())
+                .path("version")
+                .asLong();
+
+        mockMvc.perform(post("/api/sessions/{code}/command", code)
+                        .header("X-GM-Token", gmToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "START_COMBAT",
+                                  "expectedVersion": %d,
+                                  "playerId": "%s"
+                                }
+                                """.formatted(expectedVersion, playerId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accepted").value(true));
     }
 
     private long createCharacter() {

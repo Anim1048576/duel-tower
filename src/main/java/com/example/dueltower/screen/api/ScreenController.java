@@ -1,5 +1,6 @@
 package com.example.dueltower.screen.api;
 
+import com.example.dueltower.screen.dto.CombatScreenResponse;
 import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
 import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatActionRequest;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @RequestMapping("/api/screens")
@@ -52,11 +54,13 @@ public class ScreenController {
     }
 
     @GetMapping("/sessions/{code}/combat")
-    public Object combat(@PathVariable String code,
-                         @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
-                         @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
-                         Authentication authentication) {
-        return screenQueryService.getCombat(code, gmTokenHeader, playerTokenHeader, authentication);
+    public CombatScreenResponse combat(@PathVariable String code,
+                                       @RequestParam(required = false) Long afterVersion,
+                                       @RequestParam(required = false) Integer eventLimit,
+                                       @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                       @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                       Authentication authentication) {
+        return screenQueryService.getCombat(code, afterVersion, eventLimit, gmTokenHeader, playerTokenHeader, authentication);
     }
 
     @GetMapping("/decks/new/editor")
