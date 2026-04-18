@@ -88,7 +88,7 @@
   let selectedCount = $state<number | null>(1)
   let selectedReason = $state('')
   let activeSidebarTab = $state<CombatSidebarTab>('command')
-  let headerExpanded = $state(true)
+  let headerExpanded = $state(false)
   let hoveredEntity = $state<CombatInspectorEntityReference | null>(null)
   let pinnedEntity = $state<CombatInspectorEntityReference | null>(null)
   let hoveredHandCard = $state<string | null>(null)

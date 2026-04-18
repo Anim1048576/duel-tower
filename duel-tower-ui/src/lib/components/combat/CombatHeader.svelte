@@ -88,12 +88,12 @@
 <SectionFrame
   eyebrow="Combat Status"
   title="Combat HUD"
-  description="Always-visible status stays thin. Overview and recent feedback are available on demand."
+  description="Core turn state stays visible. Extended overview opens on demand."
 >
   <div class="combat-header" class:combat-header--readonly={accessRoleLabel === 'Read-only shell'}>
     <div class="combat-header__always-visible">
       <div class="combat-header__status-bar">
-        <div class="combat-header__status-strip">
+        <div class="combat-header__primary-row">
           <div class="combat-header__phase-block">
             <span>Phase</span>
             <strong>{statusView.phase ?? 'Pending'}</strong>
@@ -103,7 +103,7 @@
             <StatBlock
               value={statusView.round ?? 'Pending'}
               label="Round"
-              note={statusView.round !== null ? 'Current combat round' : 'Combat state not active yet'}
+              note={statusView.round !== null ? 'Current combat round' : 'Combat not active'}
             />
             <StatBlock
               value={statusView.currentTurnLabel}
@@ -113,21 +113,30 @@
           </div>
         </div>
 
-        <div class="combat-header__flow-summary">
-          <strong>{currentTurnStateLabel}</strong>
-          <p>{statusView.initiativeSummary}</p>
-          <p>{statusView.turnOrderSummary}</p>
+        <div class="combat-header__summary-block">
+          <strong class="combat-header__summary-label">Turn flow</strong>
+          <p class="combat-header__summary-headline">{currentTurnStateLabel}</p>
+          <p class="combat-header__summary-copy">{statusView.initiativeSummary}</p>
+          <p class="combat-header__summary-copy">{statusView.turnOrderSummary}</p>
         </div>
 
-        <div class="combat-header__status-meta">
+        <div class="combat-header__utility-row">
           <div class="combat-header__status-tags">
             <TagChip label={currentTurnStateLabel} tone={statusView.currentTurnTone} />
-            <TagChip label={combatStateLive ? 'Live combat' : 'Pre-combat'} tone={combatStateLive ? 'warning' : 'muted'} />
+            <TagChip
+              label={combatStateLive ? 'Live combat' : 'Pre-combat'}
+              tone={combatStateLive ? 'warning' : 'muted'}
+            />
             <TagChip label={accessRoleLabel} tone={accessRoleLabel === 'Read-only shell' ? 'muted' : 'success'} />
           </div>
 
-          <button type="button" class="combat-header__overview-toggle" onclick={() => onToggleExpanded()}>
-            {headerExpanded ? 'Hide overview' : 'Show overview'}
+          <button
+            type="button"
+            class="combat-header__overview-toggle"
+            aria-expanded={headerExpanded}
+            onclick={() => onToggleExpanded()}
+          >
+            {headerExpanded ? 'Hide details' : 'Show details'}
           </button>
         </div>
       </div>
@@ -140,7 +149,7 @@
         />
       {:else if secondaryMessage}
         <div class="combat-header__inline-message">
-          <strong>Latest notice</strong>
+          <strong>Status</strong>
           <p>{secondaryMessage}</p>
         </div>
       {/if}
@@ -150,7 +159,7 @@
       <div class="combat-header__expandable-overview">
         <div class="combat-header__overview-grid">
           <article class="combat-header__spotlight-card">
-            <strong>Battlefield overview</strong>
+            <strong>Battlefield</strong>
             <h3>{statusView.battlefieldSummary}</h3>
             <p>{statusView.runSummary}</p>
             <p>{statusView.tieGroupSummary}</p>
@@ -191,46 +200,54 @@
   .combat-header__always-visible,
   .combat-header__expandable-overview,
   .combat-header__status-bar,
-  .combat-header__status-strip,
-  .combat-header__status-meta,
+  .combat-header__primary-row,
+  .combat-header__utility-row,
   .combat-header__status-tags,
   .combat-header__inline-stats,
-  .combat-header__flow-summary,
+  .combat-header__summary-block,
   .combat-header__overview-grid,
   .combat-header__inline-message {
     display: grid;
-    gap: 0.6rem;
+    gap: 0.5rem;
   }
 
   .combat-header {
     position: relative;
   }
 
+  .combat-header__always-visible {
+    gap: 0.5rem;
+  }
+
   .combat-header__status-bar {
-    grid-template-columns: minmax(13rem, 0.8fr) minmax(0, 1fr) auto;
-    align-items: center;
-    padding: 0.7rem 0.85rem;
+    grid-template-columns: minmax(18rem, 1.05fr) minmax(15rem, 1fr) auto;
+    align-items: stretch;
+    gap: 0.65rem;
+    padding: 0.55rem 0.7rem;
     border: 1px solid rgba(226, 193, 155, 0.18);
     background: linear-gradient(90deg, rgba(21, 19, 17, 0.94), rgba(44, 41, 39, 0.72));
     box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
   }
 
-  .combat-header__status-strip {
+  .combat-header__primary-row {
     grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: 0.8rem;
+    align-items: stretch;
+    gap: 0.65rem;
+    min-width: 0;
   }
 
   .combat-header__phase-block {
     display: grid;
-    gap: 0.12rem;
-    padding-left: 0.8rem;
+    align-content: center;
+    gap: 0.05rem;
+    min-width: 0;
+    padding: 0.45rem 0 0.45rem 0.7rem;
     border-left: 3px solid var(--combat-secondary, var(--color-accent));
   }
 
   .combat-header__phase-block span,
   .combat-header__spotlight-card strong {
-    font-size: 0.68rem;
+    font-size: 0.64rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
@@ -241,59 +258,81 @@
 
   .combat-header__phase-block strong {
     font-family: var(--font-display);
-    font-size: clamp(1rem, 1.5vw, 1.35rem);
+    font-size: clamp(0.96rem, 1.3vw, 1.2rem);
+    line-height: 1.05;
+    overflow-wrap: anywhere;
     color: var(--combat-text, var(--color-text));
   }
 
   .combat-header__inline-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.55rem;
+    gap: 0.45rem;
+    min-width: 0;
   }
 
-  .combat-header__flow-summary strong,
-  .combat-header__flow-summary p,
+  .combat-header__summary-block strong,
+  .combat-header__summary-block p,
   .combat-header__inline-message strong,
   .combat-header__inline-message p {
     margin: 0;
   }
 
-  .combat-header__flow-summary strong,
+  .combat-header__summary-label,
   .combat-header__inline-message strong {
     color: var(--combat-secondary, var(--color-accent));
-    font-size: 0.68rem;
+    font-size: 0.64rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 
-  .combat-header__flow-summary p,
+  .combat-header__summary-block {
+    min-width: 0;
+    align-content: center;
+    padding: 0.45rem 0.1rem;
+  }
+
+  .combat-header__summary-headline {
+    color: var(--combat-text, var(--color-text));
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.15;
+  }
+
+  .combat-header__summary-copy,
   .combat-header__inline-message p {
     color: var(--combat-text-soft, var(--color-text-soft));
-    line-height: 1.35;
-    font-size: 0.84rem;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    word-break: keep-all;
   }
 
   .combat-header__status-tags {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
+    gap: 0.35rem;
   }
 
-  .combat-header__status-meta {
+  .combat-header__utility-row {
+    min-width: 0;
     justify-items: end;
-    align-content: space-between;
+    align-content: center;
+    gap: 0.45rem;
   }
 
   .combat-header__overview-grid {
     grid-template-columns: minmax(14rem, 1fr) minmax(14rem, 1fr) minmax(16rem, 1.15fr);
-    gap: 0.75rem;
+    gap: 0.6rem;
   }
 
   .combat-header__overview-toggle {
-    min-height: 2.1rem;
-    padding: 0.4rem 0.7rem;
+    min-height: 1.95rem;
+    padding: 0.32rem 0.65rem;
     border: 1px solid rgba(226, 193, 155, 0.42);
     background: rgba(226, 193, 155, 0.1);
     color: var(--combat-text, var(--color-text));
+    white-space: nowrap;
   }
 
   .combat-header__spotlight-card {
@@ -303,9 +342,9 @@
     background:
       linear-gradient(160deg, rgba(44, 41, 39, 0.92), rgba(21, 19, 17, 0.86)),
       rgba(12, 11, 10, 0.28);
-    padding: 0.85rem;
+    padding: 0.72rem 0.78rem;
     display: grid;
-    gap: 0.35rem;
+    gap: 0.28rem;
   }
 
   .combat-header__spotlight-card::before {
@@ -350,17 +389,20 @@
 
   .combat-header__spotlight-card h3 {
     font-family: var(--font-display);
-    font-size: clamp(1rem, 1.6vw, 1.25rem);
+    font-size: clamp(0.96rem, 1.35vw, 1.15rem);
+    line-height: 1.12;
+    overflow-wrap: anywhere;
   }
 
   .combat-header__spotlight-card p {
     color: var(--combat-text-soft, var(--color-text-soft));
-    line-height: 1.45;
-    font-size: 0.84rem;
+    line-height: 1.35;
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
   }
 
   .combat-header__inline-message {
-    padding: 0.55rem 0.8rem;
+    padding: 0.42rem 0.7rem;
     border: 1px solid rgba(152, 143, 135, 0.24);
     background: rgba(16, 14, 12, 0.54);
   }
@@ -371,7 +413,8 @@
       grid-template-columns: 1fr;
     }
 
-    .combat-header__status-meta {
+    .combat-header__summary-block,
+    .combat-header__utility-row {
       justify-items: start;
     }
 
@@ -381,9 +424,14 @@
   }
 
   @media (max-width: 720px) {
-    .combat-header__status-strip,
+    .combat-header__primary-row,
     .combat-header__inline-stats {
       grid-template-columns: 1fr;
+    }
+
+    .combat-header__phase-block,
+    .combat-header__summary-block {
+      padding-inline: 0;
     }
   }
 </style>
