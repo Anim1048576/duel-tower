@@ -130,3 +130,31 @@ npm test
 npm run check
 npm run build
 ```
+
+## Combat Verification
+
+Combat 화면은 Screen API 기준으로 검증한다.
+
+- 서버가 담당하는 것: `status`, `access`, `actors`, `zones`, `sidebar`, `possibleActions`, `uiNotices`, command enabled/disabled 판단, requirement view, pending decision metadata, screen action 결과와 `latestScreen`
+- 프론트 local state가 담당하는 것: `selectedCard`, `selectedTargets`, `selectedDiscardIds`, `selectedFieldIds`, pending choice 입력, 현재 열린 action/panel 같은 경량 입력 상태
+- 프론트는 카드 정의 resolve, actor/status/sidebar 병합, command guard 계산을 다시 하지 않는다.
+- polling과 action 후 반영은 같은 Combat screen refresh 경로를 사용한다. polling은 `afterVersion` 기준 delta fetch를 우선 사용하고, action 성공은 `latestScreen` 우선 반영 후 필요 시 같은 경로로 refresh 한다.
+
+수동 검증 시나리오:
+
+- Combat 진입 시 카드/상태/sidebar/action 목록이 별도 raw session/card/event fetch 없이 한 화면 모델로 보이는지 확인한다.
+- 주기적 refresh 중 `selectedCard`/target/discard/pending 입력이 유효한 범위에서는 유지되고, 선택한 카드가 사라지거나 pending decision이 바뀌면 필요한 입력만 정리되는지 확인한다.
+- disabled action은 버튼/메시지에 screen metadata 이유가 보이고, 실행 후 실패는 action response 메시지로 구분되는지 확인한다.
+- draw/end turn/play card/use EX/pending resolve/recent result clear 이후 `latestScreen` 또는 follow-up refresh로 최신 combat 화면이 바로 반영되는지 확인한다.
+- access 오류나 세션 코드 오류 시 polling이 멈추고 Combat access/not found 상태가 보이는지 확인한다.
+
+권장 검증 명령:
+
+```bash
+cd duel-tower-ui
+npm test
+npm run check
+npm run build
+cd ..
+./gradlew test
+```
