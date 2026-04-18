@@ -9,6 +9,7 @@ import com.example.dueltower.content.deck.repository.DeckRepository;
 import com.example.dueltower.member.MemberRepository;
 import com.example.dueltower.preset.domain.Preset;
 import com.example.dueltower.preset.repository.PresetRepository;
+import com.example.dueltower.screen.dto.GmLobbyStartCombatActionRequest;
 import com.example.dueltower.screen.support.ScreenApiContractTestSupport;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
@@ -156,6 +157,17 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     void sessionScreenAllowsLoginFallbackForRelatedUser() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
         SessionInfo session = createSession(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("gm-fallback-p1", "gm-fallback-p1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, session.code(), "gm-fallback-p1");
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", session.code(), "gm-fallback-p1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
 
         MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/gm-lobby", session.code())
                         .session(gmSession))
@@ -165,6 +177,10 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         var body = assertBaseScreenContract(result, "GmLobby");
         assertThat(body.path("routeTemplate").asText()).isEqualTo("/api/screens/sessions/{code}/gm-lobby");
         assertThat(body.path("policyGroup").asText()).isEqualTo("SESSION_READABLE");
+        JsonNode startCombatAction = findAction(body, "gmLobby.startCombat");
+        assertThat(startCombatAction.path("enabled").asBoolean()).isTrue();
+        assertThat(startCombatAction.path("auth").asText()).isEqualTo("loginCookie");
+        assertThat(startCombatAction.path("href").asText()).isEqualTo("/api/screens/sessions/" + session.code() + "/gm-lobby/start-combat");
     }
 
     @Test
@@ -288,7 +304,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(resetAction.path("enabled").asBoolean()).isTrue();
         assertThat(startCombatAction.path("enabled").asBoolean()).isTrue();
         assertThat(startCombatAction.path("auth").asText()).isEqualTo("gmToken");
-        assertThat(startCombatAction.path("payloadTemplate").path("type").asText()).isEqualTo("START_COMBAT");
+        assertThat(startCombatAction.path("href").asText()).isEqualTo("/api/screens/sessions/" + session.code() + "/gm-lobby/start-combat");
         assertThat(startCombatAction.path("payloadTemplate").path("expectedVersion").asLong()).isEqualTo(body.path("version").asLong());
         assertThat(startCombatAction.path("payloadTemplate").path("playerId").asText()).isEqualTo("gm-screen-p1");
     }
@@ -367,7 +383,174 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertDisabledActionContract(startCombatAction);
         assertThat(kickAction.path("disabledReason").path("code").asText()).isEqualTo("GM_TOKEN_REQUIRED");
         assertThat(resetAction.path("disabledReason").path("code").asText()).isEqualTo("GM_TOKEN_REQUIRED");
-        assertThat(startCombatAction.path("disabledReason").path("code").asText()).isEqualTo("GM_TOKEN_REQUIRED");
+        assertThat(startCombatAction.path("disabledReason").path("code").asText()).isEqualTo("GM_ACCESS_REQUIRED");
+    }
+
+    @Test
+    void gmLobbyStartCombatActionRestoresGmAccessAndStartsCombat() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-action", "gm-action@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-action");
+        MockHttpSession playerSession = signUpAndLogin("gm-action-p1", "gm-action-p1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, session.code(), "gm-action-p1");
+
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", session.code(), "gm-action-p1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        MvcResult result = mockMvc.perform(post("/api/screens/sessions/{code}/gm-lobby/start-combat", session.code())
+                        .session(gmSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JSON.writeValueAsString(new GmLobbyStartCombatActionRequest(null, "gm-action-p1"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = readJson(result);
+        assertThat(body.path("success").asBoolean()).isTrue();
+        assertThat(body.path("outcome").asText()).isEqualTo("STARTED");
+        assertThat(body.path("gmAccessRestored").asBoolean()).isTrue();
+        assertThat(body.path("restoredGmToken").asText()).isEqualTo(session.gmToken());
+        assertThat(body.path("retryUsed").asBoolean()).isFalse();
+        assertThat(body.path("nextRoute").asText()).isEqualTo("/sessions/" + session.code() + "/combat");
+        assertThat(body.path("combatEntryHint").asText()).isEqualTo("navigate");
+        assertThat(body.path("disabledReason").isNull()).isTrue();
+        assertThat(body.path("latestScreen").isNull()).isTrue();
+    }
+
+    @Test
+    void gmLobbyStartCombatActionFailsWhenGmAccessCannotBeRestored() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-action-fail", "gm-action-fail@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-action-fail");
+        MockHttpSession playerSession = signUpAndLogin("gm-action-fail-p1", "gm-action-fail-p1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, session.code(), "gm-action-fail-p1");
+
+        MvcResult result = mockMvc.perform(post("/api/screens/sessions/{code}/gm-lobby/start-combat", session.code())
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "gm-action-fail-p1"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = readJson(result);
+        assertThat(body.path("success").asBoolean()).isFalse();
+        assertThat(body.path("outcome").asText()).isEqualTo("GM_ACCESS_REQUIRED");
+        assertThat(body.path("disabledReason").path("code").asText()).isEqualTo("GM_ACCESS_RESTORE_FAILED");
+        assertThat(body.path("nextRoute").isNull()).isTrue();
+        assertThat(body.path("latestScreen").path("screenKey").asText()).isEqualTo("GmLobby");
+    }
+
+    @Test
+    void gmLobbyStartCombatActionRetriesOnceOnVersionMismatch() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-action-retry", "gm-action-retry@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-action-retry");
+        MockHttpSession playerSession = signUpAndLogin("gm-action-retry-p1", "gm-action-retry-p1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, session.code(), "gm-action-retry-p1");
+
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", session.code(), "gm-action-retry-p1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        MvcResult result = mockMvc.perform(post("/api/screens/sessions/{code}/gm-lobby/start-combat", session.code())
+                        .header("X-GM-Token", session.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedVersion": -1,
+                                  "playerId": "gm-action-retry-p1"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = readJson(result);
+        assertThat(body.path("success").asBoolean()).isTrue();
+        assertThat(body.path("outcome").asText()).isEqualTo("STARTED");
+        assertThat(body.path("retryUsed").asBoolean()).isTrue();
+        assertThat(body.path("nextRoute").asText()).isEqualTo("/sessions/" + session.code() + "/combat");
+    }
+
+    @Test
+    void gmLobbyStartCombatActionTreatsAlreadyStartedCombatAsTransition() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-action-active", "gm-action-active@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-action-active");
+        MockHttpSession playerSession = signUpAndLogin("gm-action-active-p1", "gm-action-active-p1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, session.code(), "gm-action-active-p1");
+
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", session.code(), "gm-action-active-p1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/screens/sessions/{code}/gm-lobby/start-combat", session.code())
+                        .header("X-GM-Token", session.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "gm-action-active-p1"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        MvcResult result = mockMvc.perform(post("/api/screens/sessions/{code}/gm-lobby/start-combat", session.code())
+                        .header("X-GM-Token", session.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "gm-action-active-p1"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = readJson(result);
+        assertThat(body.path("success").asBoolean()).isTrue();
+        assertThat(body.path("outcome").asText()).isEqualTo("ALREADY_ACTIVE");
+        assertThat(body.path("nextRoute").asText()).isEqualTo("/sessions/" + session.code() + "/combat");
+    }
+
+    @Test
+    void gmLobbyStartCombatActionReturnsBlockedStateWhenLobbyCannotStart() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-action-blocked", "gm-action-blocked@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-action-blocked");
+        MockHttpSession playerSession = signUpAndLogin("gm-action-blocked-p1", "gm-action-blocked-p1@example.com", "password123");
+        joinAsPlayer(playerSession, session.code(), "gm-action-blocked-p1");
+
+        MvcResult result = mockMvc.perform(post("/api/screens/sessions/{code}/gm-lobby/start-combat", session.code())
+                        .header("X-GM-Token", session.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "gm-action-blocked-p1"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = readJson(result);
+        assertThat(body.path("success").asBoolean()).isFalse();
+        assertThat(body.path("outcome").asText()).isEqualTo("BLOCKED");
+        assertThat(body.path("disabledReason").path("code").asText()).isEqualTo("READY_PARTICIPANT_REQUIRED");
+        assertThat(body.path("latestScreen").path("screenKey").asText()).isEqualTo("GmLobby");
     }
 
     @Test

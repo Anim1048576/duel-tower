@@ -56,6 +56,7 @@ public class SecurityConfig {
                                 SecurityPaths.SCREEN_READ_METHOD,
                                 SecurityPaths.SCREEN_AUTH_REQUIRED
                         ).authenticated()
+                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.SCREEN_SESSION_ACTIONS).permitAll()
                         .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.PLAYER_SELF_POST).permitAll()
                         .requestMatchers(SecurityPaths.SESSION_UPDATE_METHOD, SecurityPaths.PLAYER_SELF_PUT).permitAll()
                         .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.GM_ONLY_POST).permitAll()

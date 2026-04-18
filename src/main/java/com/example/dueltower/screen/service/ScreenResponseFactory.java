@@ -58,7 +58,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -194,12 +193,11 @@ public class ScreenResponseFactory {
                                          List<String> uiNotices) {
         List<PlayerStateDto> sortedPlayers = gmLobbySortedPlayers(state);
         GmLobbyStartCombatDto startCombat = gmLobbyStartCombat(state, sortedPlayers);
-        boolean gmActionAllowed = accessDecision.source() == SessionAccessDecision.SessionAccessSource.GM_TOKEN;
         return new GmLobbyScreenResponse(
                 route.screenKey(),
                 OffsetDateTime.now(),
                 uiNotices,
-                gmLobbyActions(state, sortedPlayers, startCombat, gmActionAllowed),
+                gmLobbyActions(state, sortedPlayers, startCombat, accessDecision),
                 state.sessionCode(),
                 state.version(),
                 route.routeTemplate(),
@@ -319,11 +317,12 @@ public class ScreenResponseFactory {
     private List<ScreenActionDto> gmLobbyActions(SessionStateDto state,
                                                  List<PlayerStateDto> sortedPlayers,
                                                  GmLobbyStartCombatDto startCombat,
-                                                 boolean gmActionAllowed) {
+                                                 SessionAccessDecision accessDecision) {
         List<ScreenActionDto> actions = new ArrayList<>();
-        actions.add(gmLobbyKickAction(state, sortedPlayers, gmActionAllowed));
-        actions.add(gmLobbyResetAction(state.sessionCode(), gmActionAllowed));
-        actions.add(gmLobbyStartCombatAction(state, startCombat, gmActionAllowed));
+        boolean gmTokenAvailable = accessDecision.source() == SessionAccessDecision.SessionAccessSource.GM_TOKEN;
+        actions.add(gmLobbyKickAction(state, sortedPlayers, gmTokenAvailable));
+        actions.add(gmLobbyResetAction(state.sessionCode(), gmTokenAvailable));
+        actions.add(gmLobbyStartCombatAction(state, startCombat, accessDecision));
         return List.copyOf(actions);
     }
 
@@ -579,20 +578,36 @@ public class ScreenResponseFactory {
 
     private ScreenActionDto gmLobbyStartCombatAction(SessionStateDto state,
                                                      GmLobbyStartCombatDto startCombat,
-                                                     boolean gmActionAllowed) {
-        DisabledReasonDto disabledReason = gmActionAllowed
-                ? startCombat.blockedReason()
-                : gmTokenRequiredReason("start combat");
+                                                     SessionAccessDecision accessDecision) {
+        DisabledReasonDto disabledReason = null;
+        ScreenActionAuth auth = switch (accessDecision.source()) {
+            case GM_TOKEN -> ScreenActionAuth.GM_TOKEN;
+            case AUTHENTICATED_GM -> ScreenActionAuth.LOGIN_COOKIE;
+            default -> ScreenActionAuth.GM_TOKEN;
+        };
+        if (accessDecision.source() != SessionAccessDecision.SessionAccessSource.GM_TOKEN
+                && accessDecision.source() != SessionAccessDecision.SessionAccessSource.AUTHENTICATED_GM) {
+            disabledReason = new DisabledReasonDto(
+                    "GM_ACCESS_REQUIRED",
+                    "AUTH",
+                    "GM access is required to start combat from the GM lobby.",
+                    "current access source cannot restore GM access",
+                    Map.of("source", accessDecision.source().name()),
+                    403,
+                    null
+            );
+        } else {
+            disabledReason = startCombat.blockedReason();
+        }
         Map<String, Object> payloadTemplate = new LinkedHashMap<>();
-        payloadTemplate.put("type", "START_COMBAT");
         payloadTemplate.put("expectedVersion", state.version());
         payloadTemplate.put("playerId", safeTrim(startCombat.recommendedStartPlayerId()));
         return ScreenActionDto.of(
                 "gmLobby.startCombat",
                 "Start combat",
                 "POST",
-                "/api/sessions/" + state.sessionCode() + "/command",
-                ScreenActionAuth.GM_TOKEN,
+                "/api/screens/sessions/" + state.sessionCode() + "/gm-lobby/start-combat",
+                auth,
                 disabledReason == null,
                 disabledReason,
                 payloadTemplate

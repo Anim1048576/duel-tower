@@ -2,6 +2,8 @@ package com.example.dueltower.screen.service;
 
 import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
 import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
+import com.example.dueltower.screen.dto.GmLobbyStartCombatActionRequest;
+import com.example.dueltower.screen.dto.GmLobbyStartCombatActionResponse;
 import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
 import com.example.dueltower.screen.dto.PresetEditorScreenResponse;
 import org.springframework.security.core.Authentication;
@@ -13,13 +15,16 @@ public class ScreenQueryService {
     private final SessionScreenService sessionScreenService;
     private final DeckEditorScreenService deckEditorScreenService;
     private final PresetEditorScreenService presetEditorScreenService;
+    private final GmLobbyStartCombatActionService gmLobbyStartCombatActionService;
 
     public ScreenQueryService(SessionScreenService sessionScreenService,
                               DeckEditorScreenService deckEditorScreenService,
-                              PresetEditorScreenService presetEditorScreenService) {
+                              PresetEditorScreenService presetEditorScreenService,
+                              GmLobbyStartCombatActionService gmLobbyStartCombatActionService) {
         this.sessionScreenService = sessionScreenService;
         this.deckEditorScreenService = deckEditorScreenService;
         this.presetEditorScreenService = presetEditorScreenService;
+        this.gmLobbyStartCombatActionService = gmLobbyStartCombatActionService;
     }
 
     public PlayerLobbyScreenResponse getPlayerLobby(String code,
@@ -41,6 +46,14 @@ public class ScreenQueryService {
                             String playerTokenHeader,
                             Authentication authentication) {
         return sessionScreenService.getCombat(code, gmTokenHeader, playerTokenHeader, authentication);
+    }
+
+    public GmLobbyStartCombatActionResponse startGmLobbyCombat(String code,
+                                                               String gmTokenHeader,
+                                                               String playerTokenHeader,
+                                                               Authentication authentication,
+                                                               GmLobbyStartCombatActionRequest request) {
+        return gmLobbyStartCombatActionService.startCombat(code, gmTokenHeader, playerTokenHeader, authentication, request);
     }
 
     public DeckEditorScreenResponse getDeckEditor(long deckId, Authentication authentication) {

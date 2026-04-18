@@ -71,6 +71,10 @@ public final class SecurityPaths {
             "/api/screens/sessions/*/combat"
     };
 
+    public static final String[] SCREEN_SESSION_ACTIONS = {
+            "/api/screens/sessions/*/gm-lobby/start-combat"
+    };
+
     /**
      * Screen editor reads use the authenticated web session.
      */

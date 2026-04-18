@@ -51,14 +51,14 @@ public class GmLobbyScreenService {
                                            String gmTokenHeader,
                                            String playerTokenHeader,
                                            Authentication authentication) {
-        return sessionLifecycleService.withLockedSession(code, rt -> buildScreen(rt, gmTokenHeader, playerTokenHeader, authentication));
+        return sessionLifecycleService.withLockedSession(code, rt -> {
+            SessionAccessDecision decision = sessionAccessResolver.requireSessionReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+            return buildScreen(rt, decision);
+        });
     }
 
-    private GmLobbyScreenResponse buildScreen(SessionRuntime rt,
-                                              String gmTokenHeader,
-                                              String playerTokenHeader,
-                                              Authentication authentication) {
-        SessionAccessDecision decision = sessionAccessResolver.requireSessionReadable(rt, gmTokenHeader, playerTokenHeader, authentication);
+    GmLobbyScreenResponse buildScreen(SessionRuntime rt,
+                                      SessionAccessDecision decision) {
         SessionStateDto state = StateMapper.toDto(rt.code(), rt.state());
         List<CharacterProfileResponse> characters = characterProfileService.list();
         List<CardDefinition> exCards = cardService.list(CardType.EX);
@@ -80,7 +80,7 @@ public class GmLobbyScreenService {
         List<String> notices = new ArrayList<>();
         notices.add(GM_LOBBY_NOTICE);
         if (decision.source() == SessionAccessDecision.SessionAccessSource.AUTHENTICATED_GM) {
-            notices.add("Current access is login fallback. GM-only actions remain disabled until a valid X-GM-Token is restored.");
+            notices.add("Current access is login fallback. START_COMBAT can restore GM access server-side, while other GM-only actions still require a valid X-GM-Token.");
         } else if (decision.source() != SessionAccessDecision.SessionAccessSource.GM_TOKEN) {
             notices.add("Current access can read the GM lobby, but GM-only actions remain disabled without a valid X-GM-Token.");
         }
