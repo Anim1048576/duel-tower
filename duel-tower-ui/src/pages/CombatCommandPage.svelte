@@ -7,13 +7,10 @@
     type CombatActionId,
     type CombatCardDto,
     type CombatPendingActionMetadataDto,
-    type CombatPendingDecisionSchemaDto,
-    type CombatPlayCardActionMetadataDto,
     type CombatRequirementViewDto,
     type CombatScreenAction,
     type CombatScreenActionResponse,
     type CombatScreenResponse,
-    type CombatUseExActionMetadataDto,
   } from '../lib/api/screenTypes'
   import type { PendingDecisionDto, RunRecentResultDto, TargetRefDto } from '../lib/api/sessionTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
@@ -37,18 +34,24 @@
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import { pathBuilders } from '../lib/navigation'
+  import { readStoredSessionAccess, type StoredSessionAccess } from '../lib/session/access'
   import {
-    isStoredGmSessionAccess,
-    isStoredPlayerSessionAccess,
-    readStoredSessionAccess,
-    type StoredSessionAccess,
-  } from '../lib/session/access'
+    reconcileCombatLocalSelectionState,
+    resolveCombatScreenRefreshPlan,
+  } from '../lib/session/combatScreenRefresh.js'
   import { startTimedPolling, type TimedPollingHandle } from '../lib/session/liveSessionPolling'
   import { readRequestedSessionCodeFromAccessOrHandoff, readSessionCodeFromRoute } from '../lib/session/sessionRoute'
   import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
 
   const POLLING_INTERVAL_MS = 4000
   const COMBAT_SIDEBAR_EVENT_LIMIT = 12
+  type CombatRefreshReason =
+    | 'initial-load'
+    | 'retry-load'
+    | 'route-change'
+    | 'polling'
+    | 'action-success'
+    | 'action-failure'
 
   let loading = $state(true)
   let notFound = $state(false)
@@ -132,6 +135,34 @@
   function clearActionFeedback() {
     actionErrorMessage = null
     actionSuccessMessage = null
+  }
+
+  function readLocalSelectionState() {
+    return {
+      selectedActionId,
+      selectedPlayerId,
+      selectedCardId,
+      selectedTargetKeys: [...selectedTargetKeys],
+      selectedDiscardIds: [...selectedDiscardIds],
+      selectedFieldIds: [...selectedFieldIds],
+      selectedPendingIds: [...selectedPendingIds],
+      orderedActorKeys: [...orderedActorKeys],
+      selectedCount,
+      selectedReason,
+    }
+  }
+
+  function writeLocalSelectionState(nextState: ReturnType<typeof readLocalSelectionState>) {
+    selectedActionId = nextState.selectedActionId
+    selectedPlayerId = nextState.selectedPlayerId
+    selectedCardId = nextState.selectedCardId
+    selectedTargetKeys = [...nextState.selectedTargetKeys]
+    selectedDiscardIds = [...nextState.selectedDiscardIds]
+    selectedFieldIds = [...nextState.selectedFieldIds]
+    selectedPendingIds = [...nextState.selectedPendingIds]
+    orderedActorKeys = [...nextState.orderedActorKeys]
+    selectedCount = nextState.selectedCount
+    selectedReason = nextState.selectedReason
   }
 
   function toCardView(card: CombatCardDto | null | undefined): ResolvedCombatCardViewModel | null {
@@ -302,105 +333,124 @@
     return metadata
   }
 
-  function normalizeSelections(nextScreen: CombatScreenResponse) {
-    const handIds = new Set(nextScreen.zones.hand.map((card) => card.instanceId))
-    const fieldIds = new Set(nextScreen.zones.field.map((card) => card.instanceId))
-    const targetKeys = new Set<string>()
-
-    for (const player of nextScreen.actors.players) {
-      targetKeys.add(targetKeyForPlayer(player.playerId))
-    }
-
-    for (const enemy of nextScreen.actors.enemies) {
-      targetKeys.add(targetKeyForEnemy(enemy.enemyId))
-    }
-
-    for (const summon of nextScreen.actors.summons) {
-      targetKeys.add(targetKeyForSummon(summon.owner, summon.summonId))
-    }
-
-    const pendingMetadata = getPendingMetadata(nextScreen)
-    const pendingSchema = pendingMetadata?.schema
-    const pendingCandidateIds = new Set(pendingSchema?.candidateIds ?? [])
-    const pendingActorKeys = new Set(pendingSchema?.actorKeys ?? [])
-
-    selectedCardId = selectedCardId && handIds.has(selectedCardId) ? selectedCardId : null
-    selectedDiscardIds = selectedDiscardIds.filter((id) => handIds.has(id))
-    selectedFieldIds = selectedFieldIds.filter((id) => fieldIds.has(id))
-    selectedTargetKeys = selectedTargetKeys.filter((key) => targetKeys.has(key))
-    selectedPendingIds = selectedPendingIds.filter((id) => pendingCandidateIds.has(id))
-    orderedActorKeys = orderedActorKeys.filter((actorKey) => pendingActorKeys.has(actorKey))
-    selectedActionId =
-      selectedActionId && nextScreen.possibleActions.some((action) => action.id === selectedActionId)
-        ? selectedActionId
-        : null
-    selectedPlayerId =
-      selectedPlayerId && nextScreen.actors.players.some((player) => player.playerId === selectedPlayerId)
-        ? selectedPlayerId
-        : nextScreen.zones.visiblePlayerId
-  }
-
-  function applyScreen(nextScreen: CombatScreenResponse) {
+  function applyScreen(nextScreen: CombatScreenResponse, reason: CombatRefreshReason) {
+    const previousScreen = screen
     screen = nextScreen
     syncSessionSelectionHandoff(nextScreen.sessionCode)
-    normalizeSelections(nextScreen)
+    writeLocalSelectionState(
+      reconcileCombatLocalSelectionState(nextScreen, readLocalSelectionState(), {
+        reason,
+        previousScreen,
+      }),
+    )
 
     if (!getRouteSessionCode() && nextScreen.sessionCode) {
       navigateTo(pathBuilders.combat(nextScreen.sessionCode), true)
     }
   }
 
-  async function refreshCombatScreen(
-    reason: 'initial-load' | 'retry-load' | 'route-change' | 'polling' | 'action',
-  ) {
-    const requestId = ++requestSequence
+  async function requestCombatScreen(reason: CombatRefreshReason) {
+    const plan = resolveCombatScreenRefreshPlan(reason)
     const nextAccess = readStoredSessionAccess()
     const nextRequestedCode = getRequestedSessionCode(nextAccess)
     const nextInvalidAccessMessage = getInvalidCombatAccessMessage(nextRequestedCode)
-    const showLoading = reason !== 'polling' && reason !== 'action'
 
     runtimeAccess = nextAccess
     invalidAccessMessage = nextInvalidAccessMessage
 
-    if (showLoading) {
+    if (!nextRequestedCode || nextInvalidAccessMessage) {
+      return {
+        kind: 'invalid-access' as const,
+      }
+    }
+
+    const query: Record<string, number> = {
+      eventLimit: COMBAT_SIDEBAR_EVENT_LIMIT,
+    }
+
+    if (plan.useAfterVersion && screen?.version != null) {
+      query.afterVersion = screen.version
+    }
+
+    const response = await getScreen<CombatScreenResponse>('Combat', { code: nextRequestedCode }, {
+      query,
+    })
+
+    if (plan.useAfterVersion && response.changed === false) {
+      if (reason === 'action-success') {
+        return {
+          kind: 'screen' as const,
+          screen: await getScreen<CombatScreenResponse>('Combat', { code: nextRequestedCode }, {
+            query: {
+              eventLimit: COMBAT_SIDEBAR_EVENT_LIMIT,
+            },
+          }),
+        }
+      }
+
+      return {
+        kind: 'unchanged' as const,
+      }
+    }
+
+    return {
+      kind: 'screen' as const,
+      screen: response,
+    }
+  }
+
+  async function refreshCombatScreen(reason: CombatRefreshReason) {
+    const requestId = ++requestSequence
+    const plan = resolveCombatScreenRefreshPlan(reason)
+
+    if (plan.showLoading) {
       loading = true
       notFound = false
       errorMessage = null
       refreshErrorMessage = null
-      clearActionFeedback()
-    }
-
-    if (!nextRequestedCode || nextInvalidAccessMessage) {
-      stopPolling()
-      screen = null
-      if (showLoading) {
-        loading = false
+      if (plan.clearActionFeedback) {
+        clearActionFeedback()
       }
-      return
     }
 
     try {
-      const response = await getScreen<CombatScreenResponse>('Combat', { code: nextRequestedCode }, {
-        query: {
-          eventLimit: COMBAT_SIDEBAR_EVENT_LIMIT,
-        },
-      })
+      const result = await requestCombatScreen(reason)
 
       if (requestId !== requestSequence) {
+        return
+      }
+
+      if (result.kind === 'invalid-access') {
+        stopPolling()
+        screen = null
+        notFound = false
+        refreshErrorMessage = null
+        if (plan.showLoading) {
+          loading = false
+        }
+        return
+      }
+
+      if (result.kind === 'unchanged') {
+        refreshErrorMessage = null
         return
       }
 
       notFound = false
       errorMessage = null
       refreshErrorMessage = null
-      applyScreen(response)
-      startPolling()
+      applyScreen(result.screen, reason)
+      if (reason !== 'polling') {
+        startPolling()
+      }
     } catch (error) {
       if (requestId !== requestSequence) {
         return
       }
 
-      stopPolling()
+      if (reason === 'polling' && error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        stopPolling()
+      }
 
       if (error instanceof ApiError && (error.status === 404 || error.code === 'not_found')) {
         notFound = true
@@ -408,14 +458,14 @@
         refreshErrorMessage = null
       } else {
         const message = getApiErrorMessage(error, 'Unable to restore the current combat screen.')
-        if (showLoading || !screen) {
+        if (plan.showLoading || !screen) {
           errorMessage = message
         } else {
           refreshErrorMessage = message
         }
       }
     } finally {
-      if (requestId === requestSequence && showLoading) {
+      if (requestId === requestSequence && plan.showLoading) {
         loading = false
       }
     }
@@ -435,18 +485,7 @@
           return
         }
 
-        const response = await getScreen<CombatScreenResponse>('Combat', { code: screen.sessionCode }, {
-          query: {
-            afterVersion: screen.version,
-            eventLimit: COMBAT_SIDEBAR_EVENT_LIMIT,
-          },
-        })
-
-        if (!response.changed) {
-          return
-        }
-
-        applyScreen(response)
+        await refreshCombatScreen('polling')
       },
       onError: (error) => {
         refreshErrorMessage = getApiErrorMessage(error, 'Unable to refresh the current combat screen.')
@@ -697,9 +736,9 @@
       })
 
       if (response.latestScreen) {
-        applyScreen(response.latestScreen)
+        applyScreen(response.latestScreen, response.success ? 'action-success' : 'action-failure')
       } else if (response.latestVersion && screen.version !== response.latestVersion) {
-        await refreshCombatScreen('action')
+        await refreshCombatScreen(response.success ? 'action-success' : 'action-failure')
       }
 
       if (response.success) {
