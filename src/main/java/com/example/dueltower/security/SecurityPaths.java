@@ -72,7 +72,8 @@ public final class SecurityPaths {
     };
 
     public static final String[] SCREEN_SESSION_ACTIONS = {
-            "/api/screens/sessions/*/gm-lobby/start-combat"
+            "/api/screens/sessions/*/gm-lobby/start-combat",
+            "/api/screens/sessions/*/combat/actions/*"
     };
 
     /**

@@ -768,6 +768,189 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     @Test
+    void combatDrawActionSucceedsAndReturnsLatestScreen() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-draw-gm", "combat-draw-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-draw-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-draw-p1", "combat-draw-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-draw-p1", characterId);
+        markPlayerReady(session.code(), "combat-draw-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-draw-p1");
+
+        JsonNode currentScreen = getCombatScreen(session.code(), playerToken);
+        long beforeVersion = currentScreen.path("version").asLong();
+
+        JsonNode body = executeCombatAction(session.code(), "combat.draw", playerToken, "{}");
+        assertCombatActionResponseContract(body);
+        assertThat(body.path("success").asBoolean()).isTrue();
+        assertThat(body.path("outcome").asText()).isEqualTo("SUCCEEDED");
+        assertThat(body.path("message").asText()).isEqualTo("Draw completed.");
+        assertThat(body.path("disabledReason").isNull()).isTrue();
+        assertThat(body.path("latestVersion").asLong()).isGreaterThan(beforeVersion);
+        assertThat(body.path("resultSummary").path("actionId").asText()).isEqualTo("combat.draw");
+        assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("DRAW");
+        assertThat(body.path("serverNotices")).isNotEmpty();
+        assertBaseScreenContract(body.path("latestScreen"), "Combat", true);
+        assertThat(body.path("latestScreen").path("version").asLong()).isEqualTo(body.path("latestVersion").asLong());
+    }
+
+    @Test
+    void combatUseExActionSucceedsAndReturnsLatestScreen() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-ex-gm", "combat-ex-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-ex-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-ex-p1", "combat-ex-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-ex-p1", characterId);
+        markPlayerReady(session.code(), "combat-ex-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-ex-p1");
+
+        JsonNode currentScreen = getCombatScreen(session.code(), playerToken);
+        long beforeVersion = currentScreen.path("version").asLong();
+
+        JsonNode body = executeCombatAction(
+                session.code(),
+                "combat.useEx",
+                playerToken,
+                """
+                {
+                  "targets": [
+                    {
+                      "playerId": "combat-ex-p1"
+                    }
+                  ]
+                }
+                """
+        );
+
+        assertCombatActionResponseContract(body);
+        assertThat(body.path("success").asBoolean()).isTrue();
+        assertThat(body.path("outcome").asText()).isEqualTo("SUCCEEDED");
+        assertThat(body.path("resultSummary").path("actionId").asText()).isEqualTo("combat.useEx");
+        assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("USE_EX");
+        assertThat(body.path("latestVersion").asLong()).isGreaterThan(beforeVersion);
+        assertBaseScreenContract(body.path("latestScreen"), "Combat", true);
+    }
+
+    @Test
+    void combatPlayCardActionReturnsStructuredFailureWhenEngineRejects() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-play-fail-gm", "combat-play-fail-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-play-fail-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-play-fail-p1", "combat-play-fail-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-play-fail-p1", characterId);
+        markPlayerReady(session.code(), "combat-play-fail-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-play-fail-p1");
+
+        JsonNode body = executeCombatAction(
+                session.code(),
+                "combat.playCard",
+                playerToken,
+                """
+                {
+                  "cardId": "00000000-0000-0000-0000-000000000000"
+                }
+                """
+        );
+
+        assertCombatActionResponseContract(body);
+        assertThat(body.path("success").asBoolean()).isFalse();
+        assertThat(body.path("outcome").asText()).isEqualTo("FAILED");
+        assertDisabledReasonContract(body.path("disabledReason"));
+        assertThat(body.path("resultSummary").path("actionId").asText()).isEqualTo("combat.playCard");
+        assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("PLAY_CARD");
+        assertBaseScreenContract(body.path("latestScreen"), "Combat", true);
+        assertThat(body.path("latestVersion").asLong()).isEqualTo(body.path("latestScreen").path("version").asLong());
+    }
+
+    @Test
+    void combatResolvePendingActionSucceedsForSupportedDecision() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-pending-ok-gm", "combat-pending-ok-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-pending-ok-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-pending-ok-p1", "combat-pending-ok-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-pending-ok-p1", characterId);
+        markPlayerReady(session.code(), "combat-pending-ok-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-pending-ok-p1");
+
+        String discardId = sessionLifecycleService.withLockedSession(session.code(), rt -> {
+            var player = rt.state().player(new Ids.PlayerId("combat-pending-ok-p1"));
+            int discardLimit = Math.max(0, player.hand().size() - 1);
+            player.pendingDecision(new PendingDecision.DiscardToHandLimit("manual test", discardLimit));
+            return player.hand().get(0).value().toString();
+        });
+
+        JsonNode body = executeCombatAction(
+                session.code(),
+                "combat.resolvePending",
+                playerToken,
+                """
+                {
+                  "discardIds": ["%s"]
+                }
+                """.formatted(discardId)
+        );
+
+        assertCombatActionResponseContract(body);
+        assertThat(body.path("success").asBoolean()).isTrue();
+        assertThat(body.path("outcome").asText()).isEqualTo("SUCCEEDED");
+        assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("DISCARD_TO_HAND_LIMIT");
+        assertThat(body.path("latestScreen").path("access").path("guards").path("hasPendingDecision").asBoolean()).isFalse();
+    }
+
+    @Test
+    void combatClearRecentResultsActionSucceedsAndClearsSidebarEntries() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-results-gm", "combat-results-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-results-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-results-p1", "combat-results-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-results-p1", characterId);
+        markPlayerReady(session.code(), "combat-results-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-results-p1");
+
+        sessionLifecycleService.withLockedSession(session.code(), rt -> {
+            rt.state().runState().appendRecentResult(
+                    "TEST",
+                    "Synthetic result",
+                    "Clear me",
+                    "Inserted by screen contract test",
+                    "screen-test"
+            );
+            return null;
+        });
+
+        JsonNode before = getCombatScreen(session.code(), playerToken);
+        assertThat(before.path("sidebar").path("recentResults")).isNotEmpty();
+
+        JsonNode body = executeCombatAction(session.code(), "combat.clearRecentResults", playerToken, "{}");
+        assertCombatActionResponseContract(body);
+        assertThat(body.path("success").asBoolean()).isTrue();
+        assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("CLEAR_RECENT_RESULTS");
+        assertThat(body.path("latestScreen").path("sidebar").path("recentResults")).isEmpty();
+    }
+
+    @Test
+    void combatActionReturnsCurrentScreenWhenBlockedByScreenMetadata() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-blocked-gm", "combat-blocked-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-blocked-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-blocked-p1", "combat-blocked-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-blocked-p1", characterId);
+        markPlayerReady(session.code(), "combat-blocked-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-blocked-p1");
+
+        JsonNode currentScreen = getCombatScreen(session.code(), playerToken);
+
+        JsonNode body = executeCombatAction(session.code(), "combat.resolvePending", playerToken, "{}");
+        assertCombatActionResponseContract(body);
+        assertThat(body.path("success").asBoolean()).isFalse();
+        assertThat(body.path("outcome").asText()).isEqualTo("BLOCKED");
+        assertDisabledReasonContract(body.path("disabledReason"));
+        assertThat(body.path("disabledReason").path("code").asText()).isEqualTo("PENDING_DECISION_REQUIRED");
+        assertThat(body.path("latestVersion").asLong()).isEqualTo(currentScreen.path("version").asLong());
+        assertThat(body.path("latestScreen").path("version").asLong()).isEqualTo(currentScreen.path("version").asLong());
+    }
+
+    @Test
     void newDeckEditorScreenReturnsCreateModeDraftValidationAndAction() throws Exception {
         MockHttpSession session = signUpAndLogin("deck-user", "deck-user@example.com", "password123");
 
@@ -1030,6 +1213,39 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                                 """.formatted(expectedVersion, playerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accepted").value(true));
+    }
+
+    private JsonNode getCombatScreen(String code, String playerToken) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/combat", code)
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        return assertBaseScreenContract(result, "Combat");
+    }
+
+    private JsonNode executeCombatAction(String code,
+                                         String actionId,
+                                         String playerToken,
+                                         String payload) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/screens/sessions/{code}/combat/actions/{actionId}", code, actionId)
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andReturn();
+        return readJson(result);
+    }
+
+    private void assertCombatActionResponseContract(JsonNode body) {
+        assertThat(body.path("success").isBoolean()).isTrue();
+        assertThat(body.path("outcome").isTextual()).isTrue();
+        assertThat(body.path("message").isTextual()).isTrue();
+        assertThat(body.has("disabledReason")).isTrue();
+        assertThat(body.path("latestVersion").isNumber() || body.path("latestVersion").isNull()).isTrue();
+        assertThat(body.path("serverNotices").isArray()).isTrue();
+        assertThat(body.path("resultSummary").isObject()).isTrue();
+        assertThat(body.has("latestScreen")).isTrue();
+        assertThat(body.path("latestScreen").isObject()).isTrue();
     }
 
     private long createCharacter() {

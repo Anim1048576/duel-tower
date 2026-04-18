@@ -1,12 +1,14 @@
 package com.example.dueltower.screen.api;
 
 import com.example.dueltower.screen.dto.CombatScreenResponse;
+import com.example.dueltower.screen.dto.CombatScreenActionResponse;
 import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
 import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatActionRequest;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatActionResponse;
 import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
 import com.example.dueltower.screen.dto.PresetEditorScreenResponse;
+import com.example.dueltower.session.dto.CommandRequest;
 import com.example.dueltower.screen.service.ScreenQueryService;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,6 +63,16 @@ public class ScreenController {
                                        @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                        Authentication authentication) {
         return screenQueryService.getCombat(code, afterVersion, eventLimit, gmTokenHeader, playerTokenHeader, authentication);
+    }
+
+    @PostMapping("/sessions/{code}/combat/actions/{actionId:.+}")
+    public CombatScreenActionResponse executeCombatAction(@PathVariable String code,
+                                                          @PathVariable String actionId,
+                                                          @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                                          @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                                          @RequestBody(required = false) CommandRequest request,
+                                                          Authentication authentication) {
+        return screenQueryService.executeCombatAction(code, actionId, gmTokenHeader, playerTokenHeader, authentication, request);
     }
 
     @GetMapping("/decks/new/editor")

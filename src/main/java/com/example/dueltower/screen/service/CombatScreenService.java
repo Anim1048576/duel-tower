@@ -546,7 +546,7 @@ public class CombatScreenService {
                 id,
                 label,
                 "POST",
-                "/api/sessions/" + sessionCode + "/command",
+                "/api/screens/sessions/" + sessionCode + "/combat/actions/" + id,
                 ScreenActionAuth.PLAYER_TOKEN,
                 enabled,
                 disabledReason,
