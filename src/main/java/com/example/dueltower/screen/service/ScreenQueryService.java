@@ -1,6 +1,7 @@
 package com.example.dueltower.screen.service;
 
 import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
+import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
 import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
 import com.example.dueltower.screen.dto.PresetEditorScreenResponse;
 import org.springframework.security.core.Authentication;
@@ -28,10 +29,10 @@ public class ScreenQueryService {
         return sessionScreenService.getPlayerLobby(code, gmTokenHeader, playerTokenHeader, authentication);
     }
 
-    public Object getGmLobby(String code,
-                             String gmTokenHeader,
-                             String playerTokenHeader,
-                             Authentication authentication) {
+    public GmLobbyScreenResponse getGmLobby(String code,
+                                            String gmTokenHeader,
+                                            String playerTokenHeader,
+                                            Authentication authentication) {
         return sessionScreenService.getGmLobby(code, gmTokenHeader, playerTokenHeader, authentication);
     }
 

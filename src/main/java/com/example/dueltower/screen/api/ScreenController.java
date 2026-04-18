@@ -1,6 +1,7 @@
 package com.example.dueltower.screen.api;
 
 import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
+import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
 import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
 import com.example.dueltower.screen.dto.PresetEditorScreenResponse;
 import com.example.dueltower.screen.service.ScreenQueryService;
@@ -30,10 +31,10 @@ public class ScreenController {
     }
 
     @GetMapping("/sessions/{code}/gm-lobby")
-    public Object gmLobby(@PathVariable String code,
-                          @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
-                          @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
-                          Authentication authentication) {
+    public GmLobbyScreenResponse gmLobby(@PathVariable String code,
+                                         @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                         @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                         Authentication authentication) {
         return screenQueryService.getGmLobby(code, gmTokenHeader, playerTokenHeader, authentication);
     }
 

@@ -3,6 +3,7 @@ package com.example.dueltower.screen.service;
 import com.example.dueltower.session.dto.SessionStateDto;
 import com.example.dueltower.session.runtime.StateMapper;
 import com.example.dueltower.session.service.SessionQueryService;
+import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
 import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -19,13 +20,16 @@ public class SessionScreenService {
     private final SessionQueryService sessionQueryService;
     private final ScreenResponseFactory screenResponseFactory;
     private final PlayerLobbyScreenService playerLobbyScreenService;
+    private final GmLobbyScreenService gmLobbyScreenService;
 
     public SessionScreenService(SessionQueryService sessionQueryService,
                                 ScreenResponseFactory screenResponseFactory,
-                                PlayerLobbyScreenService playerLobbyScreenService) {
+                                PlayerLobbyScreenService playerLobbyScreenService,
+                                GmLobbyScreenService gmLobbyScreenService) {
         this.sessionQueryService = sessionQueryService;
         this.screenResponseFactory = screenResponseFactory;
         this.playerLobbyScreenService = playerLobbyScreenService;
+        this.gmLobbyScreenService = gmLobbyScreenService;
     }
 
     public PlayerLobbyScreenResponse getPlayerLobby(String code,
@@ -35,17 +39,11 @@ public class SessionScreenService {
         return playerLobbyScreenService.getScreen(code, gmTokenHeader, playerTokenHeader, authentication);
     }
 
-    public Object getGmLobby(String code,
-                             String gmTokenHeader,
-                             String playerTokenHeader,
-                             Authentication authentication) {
-        return getSessionReadableScreen(
-                ScreenRouteSpec.GM_LOBBY,
-                code,
-                gmTokenHeader,
-                playerTokenHeader,
-                authentication
-        );
+    public GmLobbyScreenResponse getGmLobby(String code,
+                                            String gmTokenHeader,
+                                            String playerTokenHeader,
+                                            Authentication authentication) {
+        return gmLobbyScreenService.getScreen(code, gmTokenHeader, playerTokenHeader, authentication);
     }
 
     public Object getCombat(String code,

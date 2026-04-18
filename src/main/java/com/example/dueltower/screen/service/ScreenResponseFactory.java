@@ -13,6 +13,11 @@ import com.example.dueltower.screen.dto.DeckEditorDraftDto;
 import com.example.dueltower.screen.dto.DeckEditorScreenResponse;
 import com.example.dueltower.screen.dto.DeckEditorValidationDto;
 import com.example.dueltower.screen.dto.DisabledReasonDto;
+import com.example.dueltower.screen.dto.GmLobbyParticipantCardDto;
+import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
+import com.example.dueltower.screen.dto.GmLobbySelectableStartPlayerDto;
+import com.example.dueltower.screen.dto.GmLobbyStartCombatDto;
+import com.example.dueltower.screen.dto.GmLobbyTagDto;
 import com.example.dueltower.screen.dto.PlayerLobbyDraftFlagsDto;
 import com.example.dueltower.screen.dto.PlayerLobbyLoadoutDto;
 import com.example.dueltower.screen.dto.PlayerLobbyMeDto;
@@ -46,17 +51,21 @@ import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.dto.PlayerStateDto;
 import com.example.dueltower.session.dto.SessionStateDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
+import com.example.dueltower.session.service.SessionAccessDecision;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Component
 public class ScreenResponseFactory {
@@ -175,6 +184,32 @@ public class ScreenResponseFactory {
         );
     }
 
+    public GmLobbyScreenResponse gmLobby(ScreenRouteSpec route,
+                                         SessionStateDto state,
+                                         SessionRuntime runtime,
+                                         SessionAccessDecision accessDecision,
+                                         List<com.example.dueltower.character.dto.CharacterProfileResponse> characters,
+                                         List<CardDefinition> exCards,
+                                         List<PassiveDefinition> passives,
+                                         List<String> uiNotices) {
+        List<PlayerStateDto> sortedPlayers = gmLobbySortedPlayers(state);
+        GmLobbyStartCombatDto startCombat = gmLobbyStartCombat(state, sortedPlayers);
+        boolean gmActionAllowed = accessDecision.source() == SessionAccessDecision.SessionAccessSource.GM_TOKEN;
+        return new GmLobbyScreenResponse(
+                route.screenKey(),
+                OffsetDateTime.now(),
+                uiNotices,
+                gmLobbyActions(state, sortedPlayers, startCombat, gmActionAllowed),
+                state.sessionCode(),
+                state.version(),
+                route.routeTemplate(),
+                route.readAuth().policyGroup(),
+                route.readAuth().requiredAuth().wireValue(),
+                gmLobbyParticipantCards(state, runtime, sortedPlayers, characters, exCards, passives),
+                startCombat
+        );
+    }
+
     public DeckEditorDraftDto deckEditorDraft(DeckResponse deck) {
         return new DeckEditorDraftDto(
                 deck.name(),
@@ -278,6 +313,17 @@ public class ScreenResponseFactory {
         actions.add(leavePlayerLobbyAction(sessionCode));
         actions.add(saveLoadoutAction(sessionCode, me.playerId(), loadout));
         actions.add(applyPresetAction(sessionCode, me.playerId(), selectedPresetId));
+        return List.copyOf(actions);
+    }
+
+    private List<ScreenActionDto> gmLobbyActions(SessionStateDto state,
+                                                 List<PlayerStateDto> sortedPlayers,
+                                                 GmLobbyStartCombatDto startCombat,
+                                                 boolean gmActionAllowed) {
+        List<ScreenActionDto> actions = new ArrayList<>();
+        actions.add(gmLobbyKickAction(state, sortedPlayers, gmActionAllowed));
+        actions.add(gmLobbyResetAction(state.sessionCode(), gmActionAllowed));
+        actions.add(gmLobbyStartCombatAction(state, startCombat, gmActionAllowed));
         return List.copyOf(actions);
     }
 
@@ -484,6 +530,72 @@ public class ScreenResponseFactory {
                         null
                 ),
                 Map.of("presetId", selectedPresetId == null ? 0L : selectedPresetId)
+        );
+    }
+
+    private ScreenActionDto gmLobbyKickAction(SessionStateDto state,
+                                              List<PlayerStateDto> sortedPlayers,
+                                              boolean gmActionAllowed) {
+        PlayerStateDto selectedPlayer = sortedPlayers.isEmpty() ? null : sortedPlayers.get(0);
+        DisabledReasonDto disabledReason = gmActionAllowed
+                ? gmKickBlockedReason(state, selectedPlayer)
+                : gmTokenRequiredReason("kick");
+        boolean enabled = disabledReason == null;
+
+        Map<String, Object> payloadTemplate = new LinkedHashMap<>();
+        payloadTemplate.put("playerId", selectedPlayer == null ? "" : selectedPlayer.playerId());
+        payloadTemplate.put("reason", "");
+
+        return ScreenActionDto.of(
+                "gmLobby.kick",
+                "Kick player",
+                "POST",
+                "/api/sessions/" + state.sessionCode() + "/players/" + (selectedPlayer == null ? "<playerId>" : selectedPlayer.playerId()) + "/kick",
+                ScreenActionAuth.GM_TOKEN,
+                enabled,
+                disabledReason,
+                payloadTemplate
+        );
+    }
+
+    private ScreenActionDto gmLobbyResetAction(String sessionCode,
+                                               boolean gmActionAllowed) {
+        DisabledReasonDto disabledReason = gmActionAllowed ? null : gmTokenRequiredReason("reset");
+        Map<String, Object> payloadTemplate = new LinkedHashMap<>();
+        payloadTemplate.put("keepPlayers", true);
+        payloadTemplate.put("keepLoadouts", true);
+        payloadTemplate.put("newSeed", null);
+        return ScreenActionDto.of(
+                "gmLobby.reset",
+                "Reset session",
+                "POST",
+                "/api/sessions/" + sessionCode + "/reset",
+                ScreenActionAuth.GM_TOKEN,
+                disabledReason == null,
+                disabledReason,
+                payloadTemplate
+        );
+    }
+
+    private ScreenActionDto gmLobbyStartCombatAction(SessionStateDto state,
+                                                     GmLobbyStartCombatDto startCombat,
+                                                     boolean gmActionAllowed) {
+        DisabledReasonDto disabledReason = gmActionAllowed
+                ? startCombat.blockedReason()
+                : gmTokenRequiredReason("start combat");
+        Map<String, Object> payloadTemplate = new LinkedHashMap<>();
+        payloadTemplate.put("type", "START_COMBAT");
+        payloadTemplate.put("expectedVersion", state.version());
+        payloadTemplate.put("playerId", safeTrim(startCombat.recommendedStartPlayerId()));
+        return ScreenActionDto.of(
+                "gmLobby.startCombat",
+                "Start combat",
+                "POST",
+                "/api/sessions/" + state.sessionCode() + "/command",
+                ScreenActionAuth.GM_TOKEN,
+                disabledReason == null,
+                disabledReason,
+                payloadTemplate
         );
     }
 
@@ -722,6 +834,353 @@ public class ScreenResponseFactory {
                         "Passive reference could not be restored",
                         List.of(new PlayerLobbyTagDto("Unresolved", "warning"))
                 ));
+    }
+
+    private List<PlayerStateDto> gmLobbySortedPlayers(SessionStateDto state) {
+        return state.players().values().stream()
+                .sorted(Comparator.comparing(PlayerStateDto::ready).reversed()
+                        .thenComparing(PlayerStateDto::playerId))
+                .toList();
+    }
+
+    private List<GmLobbyParticipantCardDto> gmLobbyParticipantCards(SessionStateDto state,
+                                                                    SessionRuntime runtime,
+                                                                    List<PlayerStateDto> sortedPlayers,
+                                                                    List<com.example.dueltower.character.dto.CharacterProfileResponse> characters,
+                                                                    List<CardDefinition> exCards,
+                                                                    List<PassiveDefinition> passives) {
+        List<GmLobbyParticipantCardDto> cards = new ArrayList<>();
+        for (int index = 0; index < sortedPlayers.size(); index++) {
+            PlayerStateDto player = sortedPlayers.get(index);
+            String exCardId = safeTrim(resolvePlayerExCardId(runtime, player));
+            cards.add(new GmLobbyParticipantCardDto(
+                    "P" + (index + 1),
+                    player.playerId(),
+                    player.ready() ? "Ready" : "Not ready",
+                    player.ready() ? "success" : "muted",
+                    gmLobbyCharacterSummary(player, state, runtime, characters),
+                    gmLobbyExSummary(exCardId, exCards),
+                    gmLobbyPassiveSummary(player, passives),
+                    gmLobbyDeckSummary(player),
+                    gmLobbyDetailTags(player, exCardId, characters)
+            ));
+        }
+        return List.copyOf(cards);
+    }
+
+    private GmLobbyStartCombatDto gmLobbyStartCombat(SessionStateDto state,
+                                                     List<PlayerStateDto> sortedPlayers) {
+        String recommendedStartPlayerId = sortedPlayers.stream()
+                .filter(PlayerStateDto::ready)
+                .map(PlayerStateDto::playerId)
+                .findFirst()
+                .orElse(null);
+
+        DisabledReasonDto blockedReason = null;
+        if (state.combat() != null && state.combat().phase() != null && !"END".equals(state.combat().phase())) {
+            blockedReason = new DisabledReasonDto(
+                    "COMBAT_ALREADY_ACTIVE",
+                    "RULE",
+                    "Combat is already active for this session.",
+                    "session.combat.phase != END",
+                    Map.of("phase", state.combat().phase()),
+                    null,
+                    null
+            );
+        } else if (sortedPlayers.isEmpty()) {
+            blockedReason = new DisabledReasonDto(
+                    "PARTICIPANT_REQUIRED",
+                    "RULE",
+                    "At least one participant must join before combat can start.",
+                    "state.players is empty",
+                    null,
+                    null,
+                    null
+            );
+        } else if (recommendedStartPlayerId == null || recommendedStartPlayerId.isBlank()) {
+            blockedReason = new DisabledReasonDto(
+                    "READY_PARTICIPANT_REQUIRED",
+                    "RULE",
+                    "Mark at least one participant ready before combat starts from the GM lobby.",
+                    "no ready participant available for recommendedStartPlayerId",
+                    null,
+                    null,
+                    null
+            );
+        }
+
+        List<GmLobbySelectableStartPlayerDto> selectable = new ArrayList<>();
+        for (int index = 0; index < sortedPlayers.size(); index++) {
+            PlayerStateDto player = sortedPlayers.get(index);
+            selectable.add(new GmLobbySelectableStartPlayerDto(
+                    player.playerId(),
+                    "P" + (index + 1),
+                    player.playerId() + (player.ready() ? " | ready" : " | not ready"),
+                    player.ready()
+            ));
+        }
+
+        return new GmLobbyStartCombatDto(
+                recommendedStartPlayerId,
+                blockedReason,
+                selectable
+        );
+    }
+
+    private String gmLobbyCharacterSummary(PlayerStateDto player,
+                                           SessionStateDto state,
+                                           SessionRuntime runtime,
+                                           List<com.example.dueltower.character.dto.CharacterProfileResponse> characters) {
+        Long boundCharacterId = runtime.findCharacterIdByPlayerId(player.playerId());
+        if (boundCharacterId != null) {
+            String resolved = resolveCharacterLabel(boundCharacterId);
+            if (!resolved.contains("(unresolved)")) {
+                return resolved;
+            }
+        }
+
+        String resolvedExCardId = safeTrim(resolvePlayerExCardId(runtime, player));
+        Set<String> deckCardIds = new HashSet<>(gmLobbyResolvedDeckCardIds(player));
+        com.example.dueltower.character.dto.CharacterProfileResponse bestMatch = null;
+        int bestScore = 0;
+        boolean bestExMatched = false;
+        boolean ambiguous = false;
+
+        for (com.example.dueltower.character.dto.CharacterProfileResponse character : characters) {
+            String characterExCardId = normalizeCharacterExCardId(character.exCard());
+            boolean exMatched = !resolvedExCardId.isBlank() && resolvedExCardId.equals(characterExCardId);
+            int deckOverlap = 0;
+            if (character.currentSkillDeck() != null) {
+                for (String cardId : character.currentSkillDeck()) {
+                    if (deckCardIds.contains(safeTrim(cardId))) {
+                        deckOverlap++;
+                    }
+                }
+            }
+            int score = (exMatched ? 100 : 0) + deckOverlap;
+            if (score <= 0) {
+                continue;
+            }
+            if (bestMatch == null || score > bestScore) {
+                bestMatch = character;
+                bestScore = score;
+                bestExMatched = exMatched;
+                ambiguous = false;
+                continue;
+            }
+            if (score == bestScore) {
+                ambiguous = true;
+            }
+        }
+
+        if (bestMatch == null) {
+            return "Unavailable from current session data";
+        }
+        if (bestExMatched && !ambiguous) {
+            return bestMatch.name() + " #" + bestMatch.id();
+        }
+        if (!ambiguous) {
+            return "Likely " + bestMatch.name() + " #" + bestMatch.id();
+        }
+        return "Multiple character candidates";
+    }
+
+    private String gmLobbyExSummary(String exCardId,
+                                    List<CardDefinition> exCards) {
+        if (exCardId.isBlank()) {
+            return "No EX configured";
+        }
+        return exCards.stream()
+                .filter(card -> exCardId.equals(card.id().value()))
+                .findFirst()
+                .map(card -> card.name() + " (" + card.id().value() + ")")
+                .orElse(exCardId);
+    }
+
+    private String gmLobbyPassiveSummary(PlayerStateDto player,
+                                         List<PassiveDefinition> passives) {
+        if (player.passiveIds().isEmpty()) {
+            return "No passives equipped";
+        }
+        List<String> labels = player.passiveIds().stream()
+                .map(passiveId -> resolvePassiveLabel(passiveId, passives))
+                .filter(label -> !label.isBlank())
+                .distinct()
+                .limit(3)
+                .toList();
+        return player.passiveIds().size()
+                + " equipped | "
+                + formatPreviewList(labels, player.passiveIds().stream()
+                .map(passiveId -> resolvePassiveLabel(passiveId, passives))
+                .filter(label -> !label.isBlank())
+                .distinct()
+                .count());
+    }
+
+    private String gmLobbyDeckSummary(PlayerStateDto player) {
+        List<String> deckCardIds = gmLobbyResolvedDeckCardIds(player);
+        if (deckCardIds.isEmpty()) {
+            return "No deck cards selected";
+        }
+
+        List<String> previewLabels = deckCardIds.stream()
+                .map(cardId -> resolveCard(cardId)
+                        .map(CardDefinition::name)
+                        .orElse(cardId))
+                .distinct()
+                .limit(3)
+                .toList();
+        long uniqueCount = deckCardIds.stream().distinct().count();
+        return deckCardIds.size()
+                + " cards | "
+                + uniqueCount
+                + " unique | "
+                + formatPreviewList(previewLabels, uniqueCount);
+    }
+
+    private List<GmLobbyTagDto> gmLobbyDetailTags(PlayerStateDto player,
+                                                  String exCardId,
+                                                  List<com.example.dueltower.character.dto.CharacterProfileResponse> characters) {
+        List<GmLobbyTagDto> tags = new ArrayList<>();
+        tags.add(new GmLobbyTagDto(
+                player.deckOwnedCardIds().size() + " deck cards",
+                player.deckOwnedCardIds().isEmpty() ? "muted" : "accent"
+        ));
+        tags.add(new GmLobbyTagDto(
+                player.passiveIds().size() + " passives",
+                player.passiveIds().isEmpty() ? "muted" : "success"
+        ));
+        tags.add(new GmLobbyTagDto(
+                exCardId.isBlank() ? "No EX" : "EX linked",
+                exCardId.isBlank() ? "muted" : "warning"
+        ));
+        String characterHint = gmLobbyCharacterHint(player, exCardId, characters);
+        if (!characterHint.isBlank()) {
+            tags.add(new GmLobbyTagDto(characterHint, "muted"));
+        }
+        return List.copyOf(tags);
+    }
+
+    private String gmLobbyCharacterHint(PlayerStateDto player,
+                                        String exCardId,
+                                        List<com.example.dueltower.character.dto.CharacterProfileResponse> characters) {
+        if (exCardId.isBlank()) {
+            return "";
+        }
+        long exMatchCount = characters.stream()
+                .map(com.example.dueltower.character.dto.CharacterProfileResponse::exCard)
+                .map(this::normalizeCharacterExCardId)
+                .filter(exCardId::equals)
+                .count();
+        if (exMatchCount == 1L) {
+            return "Unique EX match";
+        }
+        if (exMatchCount > 1L) {
+            return "Shared EX match";
+        }
+        if (!player.passiveIds().isEmpty()) {
+            return "Passive-led estimate";
+        }
+        return "";
+    }
+
+    private DisabledReasonDto gmKickBlockedReason(SessionStateDto state,
+                                                  PlayerStateDto selectedPlayer) {
+        if (state.combat() != null && state.combat().phase() != null && !"END".equals(state.combat().phase())) {
+            return new DisabledReasonDto(
+                    "PLAYER_MANAGEMENT_UNAVAILABLE_DURING_COMBAT",
+                    "RULE",
+                    "Kick is unavailable while combat is active.",
+                    "session combat is active",
+                    Map.of("phase", state.combat().phase()),
+                    null,
+                    null
+            );
+        }
+        if (selectedPlayer == null) {
+            return new DisabledReasonDto(
+                    "PLAYER_REQUIRED",
+                    "RULE",
+                    "Choose a participant before using kick.",
+                    "gmLobby kick requires at least one joined player",
+                    null,
+                    null,
+                    null
+            );
+        }
+        return null;
+    }
+
+    private DisabledReasonDto gmTokenRequiredReason(String actionName) {
+        return new DisabledReasonDto(
+                "GM_TOKEN_REQUIRED",
+                "AUTH",
+                "Restore GM token access before using " + actionName + ".",
+                "gmLobby action requires X-GM-Token",
+                null,
+                null,
+                null
+        );
+    }
+
+    private List<String> gmLobbyResolvedDeckCardIds(PlayerStateDto player) {
+        return player.deckOwnedCardIds().stream()
+                .map(ownedCardId -> player.ownedCards().stream()
+                        .filter(entry -> ownedCardId.equals(entry.ownedCardId()))
+                        .map(OwnedCardDto::cardId)
+                        .findFirst()
+                        .orElse(ownedCardId))
+                .map(this::safeTrim)
+                .filter(cardId -> !cardId.isBlank())
+                .toList();
+    }
+
+    private String resolvePassiveLabel(String passiveId,
+                                       List<PassiveDefinition> passives) {
+        String normalizedPassiveId = safeTrim(passiveId);
+        if (normalizedPassiveId.isBlank()) {
+            return "";
+        }
+        return passives.stream()
+                .filter(passive -> normalizedPassiveId.equals(passive.id()))
+                .findFirst()
+                .map(PassiveDefinition::name)
+                .orElse(normalizedPassiveId);
+    }
+
+    private String normalizeCharacterExCardId(String rawExCard) {
+        String normalized = safeTrim(rawExCard);
+        if (normalized.isBlank()) {
+            return "";
+        }
+        int idKey = normalized.indexOf("\"id\"");
+        if (idKey >= 0) {
+            int colon = normalized.indexOf(':', idKey);
+            if (colon >= 0) {
+                String suffix = normalized.substring(colon + 1).trim();
+                suffix = suffix.replace("{", "").replace("}", "").replace("\"", "").trim();
+                if (!suffix.isBlank()) {
+                    String[] parts = suffix.split(",", 2);
+                    return safeTrim(parts[0]);
+                }
+            }
+        }
+        return normalized;
+    }
+
+    private String formatPreviewList(List<String> preview,
+                                     long totalCount) {
+        List<String> filtered = preview.stream()
+                .map(this::safeTrim)
+                .filter(value -> !value.isBlank())
+                .toList();
+        if (filtered.isEmpty()) {
+            return "";
+        }
+        long hiddenCount = Math.max(totalCount - filtered.size(), 0);
+        return hiddenCount > 0
+                ? String.join(", ", filtered) + " +" + hiddenCount + " more"
+                : String.join(", ", filtered);
     }
 
     private String deriveTitle(String mode, DeckResponse sourceDeck, DeckEditorDraftDto draft) {

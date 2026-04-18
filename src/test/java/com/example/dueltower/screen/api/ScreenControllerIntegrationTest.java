@@ -233,6 +233,144 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     @Test
+    void gmLobbyScreenWithGmTokenReturnsCuratedParticipantCardsAndEnabledActions() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-screen", "gm-screen@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-screen");
+        MockHttpSession player1Session = signUpAndLogin("gm-screen-p1", "gm-screen-p1@example.com", "password123");
+        MockHttpSession player2Session = signUpAndLogin("gm-screen-p2", "gm-screen-p2@example.com", "password123");
+        long characterId = createCharacter();
+        String player1Token = joinAsPlayer(player1Session, session.code(), "gm-screen-p1", characterId);
+        joinAsPlayer(player2Session, session.code(), "gm-screen-p2", characterId);
+
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", session.code(), "gm-screen-p1")
+                        .header("X-Player-Token", player1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/gm-lobby", session.code())
+                        .header("X-GM-Token", session.gmToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "GmLobby");
+        assertThat(body.path("sessionCode").asText()).isEqualTo(session.code());
+        assertThat(body.path("version").asLong()).isGreaterThanOrEqualTo(0L);
+        assertThat(body.path("routeTemplate").asText()).isEqualTo("/api/screens/sessions/{code}/gm-lobby");
+        assertThat(body.path("policyGroup").asText()).isEqualTo("SESSION_READABLE");
+        assertThat(body.path("auth").asText()).isEqualTo("sessionReadable");
+        assertThat(body.path("participantCards")).hasSize(2);
+        assertThat(body.path("participantCards").get(0).path("slot").asText()).isEqualTo("P1");
+        assertThat(body.path("participantCards").get(0).path("name").asText()).isEqualTo("gm-screen-p1");
+        assertThat(body.path("participantCards").get(0).path("readyLabel").asText()).isEqualTo("Ready");
+        assertThat(body.path("participantCards").get(0).path("readyTone").asText()).isEqualTo("success");
+        assertThat(body.path("participantCards").get(0).path("characterSummary").asText()).contains("#" + characterId);
+        assertThat(body.path("participantCards").get(0).path("exSummary").asText()).contains("EX901");
+        assertThat(body.path("participantCards").get(0).path("passiveSummary").asText()).isNotBlank();
+        assertThat(body.path("participantCards").get(0).path("deckSummary").asText()).isNotBlank();
+        assertThat(body.path("participantCards").get(0).path("detailTags").isArray()).isTrue();
+        assertThat(body.path("startCombat").path("recommendedStartPlayerId").asText()).isEqualTo("gm-screen-p1");
+        assertThat(body.path("startCombat").path("blockedReason").isNull()).isTrue();
+        assertThat(body.path("startCombat").path("selectableStartPlayers")).hasSize(2);
+
+        JsonNode kickAction = findAction(body, "gmLobby.kick");
+        JsonNode resetAction = findAction(body, "gmLobby.reset");
+        JsonNode startCombatAction = findAction(body, "gmLobby.startCombat");
+        assertThat(body.path("possibleActions")).hasSize(3);
+        assertActionContract(kickAction);
+        assertActionContract(resetAction);
+        assertActionContract(startCombatAction);
+        assertThat(kickAction.path("enabled").asBoolean()).isTrue();
+        assertThat(resetAction.path("enabled").asBoolean()).isTrue();
+        assertThat(startCombatAction.path("enabled").asBoolean()).isTrue();
+        assertThat(startCombatAction.path("auth").asText()).isEqualTo("gmToken");
+        assertThat(startCombatAction.path("payloadTemplate").path("type").asText()).isEqualTo("START_COMBAT");
+        assertThat(startCombatAction.path("payloadTemplate").path("expectedVersion").asLong()).isEqualTo(body.path("version").asLong());
+        assertThat(startCombatAction.path("payloadTemplate").path("playerId").asText()).isEqualTo("gm-screen-p1");
+    }
+
+    @Test
+    void gmLobbyScreenBlocksStartWhenNoParticipantsJoined() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-empty", "gm-empty@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-empty");
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/gm-lobby", session.code())
+                        .header("X-GM-Token", session.gmToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "GmLobby");
+        assertThat(body.path("participantCards")).hasSize(0);
+        assertThat(body.path("startCombat").path("recommendedStartPlayerId").isNull()).isTrue();
+        assertThat(body.path("startCombat").path("selectableStartPlayers")).hasSize(0);
+        assertThat(body.path("startCombat").path("blockedReason").path("code").asText()).isEqualTo("PARTICIPANT_REQUIRED");
+
+        JsonNode kickAction = findAction(body, "gmLobby.kick");
+        JsonNode resetAction = findAction(body, "gmLobby.reset");
+        JsonNode startCombatAction = findAction(body, "gmLobby.startCombat");
+        assertDisabledActionContract(kickAction);
+        assertThat(kickAction.path("disabledReason").path("code").asText()).isEqualTo("PLAYER_REQUIRED");
+        assertThat(resetAction.path("enabled").asBoolean()).isTrue();
+        assertDisabledActionContract(startCombatAction);
+        assertThat(startCombatAction.path("disabledReason").path("code").asText()).isEqualTo("PARTICIPANT_REQUIRED");
+    }
+
+    @Test
+    void gmLobbyScreenBlocksStartWhenNoParticipantIsReady() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-unready", "gm-unready@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-unready");
+        MockHttpSession playerSession = signUpAndLogin("gm-unready-p1", "gm-unready-p1@example.com", "password123");
+        joinAsPlayer(playerSession, session.code(), "gm-unready-p1");
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/gm-lobby", session.code())
+                        .header("X-GM-Token", session.gmToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "GmLobby");
+        assertThat(body.path("participantCards")).hasSize(1);
+        assertThat(body.path("participantCards").get(0).path("readyLabel").asText()).isEqualTo("Not ready");
+        assertThat(body.path("startCombat").path("recommendedStartPlayerId").isNull()).isTrue();
+        assertThat(body.path("startCombat").path("blockedReason").path("code").asText()).isEqualTo("READY_PARTICIPANT_REQUIRED");
+        assertThat(body.path("startCombat").path("selectableStartPlayers")).hasSize(1);
+        assertThat(body.path("startCombat").path("selectableStartPlayers").get(0).path("ready").asBoolean()).isFalse();
+
+        JsonNode startCombatAction = findAction(body, "gmLobby.startCombat");
+        assertDisabledActionContract(startCombatAction);
+        assertThat(startCombatAction.path("disabledReason").path("code").asText()).isEqualTo("READY_PARTICIPANT_REQUIRED");
+    }
+
+    @Test
+    void gmLobbyScreenAllowsReadAccessButDisablesGmActionsWithoutGmToken() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-readonly", "gm-readonly@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-readonly");
+        MockHttpSession playerSession = signUpAndLogin("gm-readonly-p1", "gm-readonly-p1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, session.code(), "gm-readonly-p1");
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/gm-lobby", session.code())
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "GmLobby");
+        assertThat(body.path("participantCards")).hasSize(1);
+
+        JsonNode kickAction = findAction(body, "gmLobby.kick");
+        JsonNode resetAction = findAction(body, "gmLobby.reset");
+        JsonNode startCombatAction = findAction(body, "gmLobby.startCombat");
+        assertDisabledActionContract(kickAction);
+        assertDisabledActionContract(resetAction);
+        assertDisabledActionContract(startCombatAction);
+        assertThat(kickAction.path("disabledReason").path("code").asText()).isEqualTo("GM_TOKEN_REQUIRED");
+        assertThat(resetAction.path("disabledReason").path("code").asText()).isEqualTo("GM_TOKEN_REQUIRED");
+        assertThat(startCombatAction.path("disabledReason").path("code").asText()).isEqualTo("GM_TOKEN_REQUIRED");
+    }
+
+    @Test
     void deckEditorScreenRequiresLogin() throws Exception {
         Deck deck = createDeck("screen-deck", DeckType.PLAYER, Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
 
