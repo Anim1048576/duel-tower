@@ -20,10 +20,13 @@
   import CombatSidebar from '../lib/components/combat/CombatSidebar.svelte'
   import HandBar from '../lib/components/combat/HandBar.svelte'
   import type {
+    CombatInspectorEntityReference,
+    CombatPresentationState,
     CombatEnemyViewModel,
     CombatFeedEntry,
     CombatPlayerViewModel,
     CombatRecentResultEntry,
+    CombatSidebarTab,
     CombatStatusViewModel,
     CombatSummonViewModel,
     CombatTag,
@@ -80,9 +83,26 @@
   let orderedActorKeys = $state<string[]>([])
   let selectedCount = $state<number | null>(1)
   let selectedReason = $state('')
+  let activeSidebarTab = $state<CombatSidebarTab>('command')
+  let headerExpanded = $state(true)
+  let hoveredEntity = $state<CombatInspectorEntityReference | null>(null)
+  let pinnedEntity = $state<CombatInspectorEntityReference | null>(null)
+  let hoveredHandCard = $state<string | null>(null)
+  let pinnedHandCard = $state<string | null>(null)
+  let handExpanded = $state(true)
   let requestSequence = 0
   let pollingHandle: TimedPollingHandle | null = null
   type CombatLocalSelectionState = ReturnType<typeof readLocalSelectionState>
+
+  const combatPresentationState = $derived<CombatPresentationState>({
+    activeSidebarTab,
+    headerExpanded,
+    hoveredEntity,
+    pinnedEntity,
+    hoveredHandCard,
+    pinnedHandCard,
+    handExpanded,
+  })
 
   function normalizeTone(value: string | null | undefined): CombatTone {
     switch (value) {
@@ -143,6 +163,14 @@
   function clearActionFeedback() {
     actionErrorMessage = null
     actionSuccessMessage = null
+  }
+
+  function setActiveSidebarTab(nextTab: CombatSidebarTab) {
+    activeSidebarTab = nextTab
+  }
+
+  function toggleHeaderExpanded() {
+    headerExpanded = !headerExpanded
   }
 
   function readLocalSelectionState() {
@@ -1130,6 +1158,7 @@
         <CombatHeader
           {statusView}
           {accessRoleLabel}
+          headerExpanded={combatPresentationState.headerExpanded}
           combatStateLive={screen?.access.guards.hasCombatState ?? false}
           currentTurnStateLabel={currentTurnStateLabel}
           recentResultsLoading={false}
@@ -1140,6 +1169,7 @@
           commandErrorMessage={actionErrorMessage ?? refreshErrorMessage ?? selectedActionLocalBlock}
           commandRejectedMessage={null}
           commandSuccessMessage={actionSuccessMessage}
+          onToggleExpanded={toggleHeaderExpanded}
         />
       {/snippet}
 
@@ -1162,6 +1192,7 @@
 
       {#snippet sidebar()}
         <CombatSidebar
+          activeTab={combatPresentationState.activeSidebarTab}
           {commandOptions}
           commandPending={pendingActionId}
           selectedCommandType={selectedActionId}
@@ -1192,6 +1223,9 @@
           recentResultEntries={recentResultEntries}
           recentResultsLoading={false}
           recentResultsErrorMessage={null}
+          inspectorPlaceholderEntity={combatPresentationState.pinnedEntity ?? combatPresentationState.hoveredEntity}
+          inspectorPlaceholderCardId={combatPresentationState.pinnedHandCard ?? combatPresentationState.hoveredHandCard}
+          onTabChange={setActiveSidebarTab}
           onCommandButtonClick={handleCommandButtonClick}
           onClearTargets={handleClearSelectedTargets}
           onClearSelectionInputs={handleClearSelectionInputs}

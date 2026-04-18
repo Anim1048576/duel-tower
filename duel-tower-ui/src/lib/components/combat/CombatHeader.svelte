@@ -9,6 +9,7 @@
   type Props = {
     statusView: CombatStatusViewModel
     accessRoleLabel: string
+    headerExpanded: boolean
     combatStateLive: boolean
     currentTurnStateLabel: string
     recentResultsLoading: boolean
@@ -19,11 +20,13 @@
     commandErrorMessage: string | null
     commandRejectedMessage: string | null
     commandSuccessMessage: string | null
+    onToggleExpanded: () => void
   }
 
   let {
     statusView,
     accessRoleLabel,
+    headerExpanded,
     combatStateLive,
     currentTurnStateLabel,
     recentResultsLoading,
@@ -34,6 +37,7 @@
     commandErrorMessage,
     commandRejectedMessage,
     commandSuccessMessage,
+    onToggleExpanded,
   }: Props = $props()
 </script>
 
@@ -43,96 +47,111 @@
   description="The combat shell now emphasizes the current turn owner, battlefield pressure, and recent combat feedback before deeper command controls."
 >
   <div class="combat-header" class:combat-header--readonly={accessRoleLabel === 'Read-only shell'}>
-    <div class="combat-header__status-bar">
-      <div class="combat-header__turn-ribbon">
-        <span>Phase</span>
-        <strong>{statusView.phase ?? 'Pending'}</strong>
-        <small>{statusView.turnOrderSummary}</small>
+    <div class="combat-header__always-visible">
+      <div class="combat-header__status-bar">
+        <div class="combat-header__turn-ribbon">
+          <span>Phase</span>
+          <strong>{statusView.phase ?? 'Pending'}</strong>
+          <small>{statusView.turnOrderSummary}</small>
+        </div>
+
+        <div class="combat-header__status-stats">
+          <StatBlock
+            value={statusView.round ?? 'Pending'}
+            label="Round"
+            note={statusView.round !== null ? 'Current combat round' : 'Combat state not active yet'}
+          />
+          <StatBlock
+            value={statusView.currentTurnLabel}
+            label="Current Turn"
+            note={statusView.currentTurnNote}
+          />
+          <StatBlock
+            value={statusView.version}
+            label="Version"
+            note={statusView.battlefieldSummary}
+          />
+        </div>
+
+        <div class="combat-header__status-meta">
+          <div class="combat-header__status-tags">
+            <TagChip label={statusView.sessionCode} tone="accent" />
+            <TagChip label={accessRoleLabel} tone={accessRoleLabel === 'Read-only shell' ? 'muted' : 'success'} />
+            <TagChip label={combatStateLive ? 'Combat state live' : 'Pre-combat state'} tone={combatStateLive ? 'warning' : 'muted'} />
+            <TagChip label={currentTurnStateLabel} tone={statusView.currentTurnTone} />
+          </div>
+
+          <button type="button" class="combat-header__overview-toggle" onclick={() => onToggleExpanded()}>
+            {headerExpanded ? 'Collapse overview' : 'Expand overview'}
+          </button>
+        </div>
       </div>
 
-      <div class="combat-header__status-stats">
-        <StatBlock
-          value={statusView.round ?? 'Pending'}
-          label="Round"
-          note={statusView.round !== null ? 'Current combat round' : 'Combat state not active yet'}
-        />
-        <StatBlock
-          value={statusView.currentTurnLabel}
-          label="Current Turn"
-          note={statusView.currentTurnNote}
-        />
-        <StatBlock
-          value={statusView.version}
-          label="Version"
-          note={statusView.battlefieldSummary}
-        />
-      </div>
-
-      <div class="combat-header__status-tags">
-        <TagChip label={statusView.sessionCode} tone="accent" />
-        <TagChip label={accessRoleLabel} tone={accessRoleLabel === 'Read-only shell' ? 'muted' : 'success'} />
-        <TagChip label={combatStateLive ? 'Combat state live' : 'Pre-combat state'} tone={combatStateLive ? 'warning' : 'muted'} />
-        <TagChip label={currentTurnStateLabel} tone={statusView.currentTurnTone} />
-      </div>
-    </div>
-
-    <div class="combat-header__overview-grid">
-      <article class={`combat-header__spotlight-card combat-header__spotlight-card--${statusView.currentTurnTone}`}>
-        <strong>Current turn</strong>
-        <h3>{statusView.currentTurnLabel}</h3>
-        <p>{statusView.currentTurnNote}</p>
-        <p>Turn order: {statusView.turnOrderSummary}</p>
-      </article>
-
-      <article class="combat-header__spotlight-card">
-        <strong>Battlefield</strong>
-        <h3>{statusView.battlefieldSummary}</h3>
-        <p>{statusView.initiativeSummary} | {statusView.tieGroupSummary}</p>
-        <p>{statusView.runSummary}</p>
-      </article>
-
-      <article class="combat-header__spotlight-card combat-header__spotlight-card--feedback">
-        <strong>Recent feedback</strong>
-        {#if recentResultsLoading}
-          <h3>Loading recent results</h3>
-          <p>Restoring the latest combat-facing result summary.</p>
-        {:else if recentResultsErrorMessage}
-          <h3>Recent result unavailable</h3>
-          <p>{recentResultsErrorMessage}</p>
-        {:else if latestRecentResult}
-          <h3>{latestRecentResult.title}</h3>
-          <p>{latestRecentResult.summary}</p>
-          <p>{latestRecentResult.type} | {latestRecentResult.at ?? 'Time unavailable'}</p>
-        {:else}
-          <h3>No recent result yet</h3>
-          <p>The current combat flow has not produced a recent-result summary yet.</p>
+      <div class="combat-header__message-stack">
+        {#if accessNoticeMessage}
+          <ContentStatePanel title="Combat access status" message={accessNoticeMessage} />
         {/if}
-      </article>
+
+        {#if catalogErrorMessage}
+          <ContentStatePanel title="Card archive unavailable" message={catalogErrorMessage} />
+        {/if}
+
+        {#if commandErrorMessage}
+          <ContentStatePanel title="Command request failed" message={commandErrorMessage} tone="error" />
+        {:else if commandRejectedMessage}
+          <ContentStatePanel title="Command rejected" message={commandRejectedMessage} tone="error" />
+        {:else if commandSuccessMessage}
+          <ContentStatePanel title="Command accepted" message={commandSuccessMessage} />
+        {/if}
+      </div>
     </div>
 
-    <div class="combat-header__message-stack">
-      {#if accessNoticeMessage}
-        <ContentStatePanel title="Combat access status" message={accessNoticeMessage} />
-      {/if}
+    {#if headerExpanded}
+      <div class="combat-header__expandable-overview">
+        <div class="combat-header__overview-grid">
+          <article class={`combat-header__spotlight-card combat-header__spotlight-card--${statusView.currentTurnTone}`}>
+            <strong>Current turn</strong>
+            <h3>{statusView.currentTurnLabel}</h3>
+            <p>{statusView.currentTurnNote}</p>
+            <p>Turn order: {statusView.turnOrderSummary}</p>
+          </article>
 
-      {#if catalogErrorMessage}
-        <ContentStatePanel title="Card archive unavailable" message={catalogErrorMessage} />
-      {/if}
+          <article class="combat-header__spotlight-card">
+            <strong>Battlefield</strong>
+            <h3>{statusView.battlefieldSummary}</h3>
+            <p>{statusView.initiativeSummary} | {statusView.tieGroupSummary}</p>
+            <p>{statusView.runSummary}</p>
+          </article>
 
-      {#if commandErrorMessage}
-        <ContentStatePanel title="Command request failed" message={commandErrorMessage} tone="error" />
-      {:else if commandRejectedMessage}
-        <ContentStatePanel title="Command rejected" message={commandRejectedMessage} tone="error" />
-      {:else if commandSuccessMessage}
-        <ContentStatePanel title="Command accepted" message={commandSuccessMessage} />
-      {/if}
-    </div>
+          <article class="combat-header__spotlight-card combat-header__spotlight-card--feedback">
+            <strong>Recent feedback</strong>
+            {#if recentResultsLoading}
+              <h3>Loading recent results</h3>
+              <p>Restoring the latest combat-facing result summary.</p>
+            {:else if recentResultsErrorMessage}
+              <h3>Recent result unavailable</h3>
+              <p>{recentResultsErrorMessage}</p>
+            {:else if latestRecentResult}
+              <h3>{latestRecentResult.title}</h3>
+              <p>{latestRecentResult.summary}</p>
+              <p>{latestRecentResult.type} | {latestRecentResult.at ?? 'Time unavailable'}</p>
+            {:else}
+              <h3>No recent result yet</h3>
+              <p>The current combat flow has not produced a recent-result summary yet.</p>
+            {/if}
+          </article>
+        </div>
+      </div>
+    {/if}
   </div>
 </SectionFrame>
 
 <style>
   .combat-header,
+  .combat-header__always-visible,
+  .combat-header__expandable-overview,
   .combat-header__status-bar,
+  .combat-header__status-meta,
   .combat-header__status-stats,
   .combat-header__status-tags,
   .combat-header__overview-grid,
@@ -193,8 +212,21 @@
     flex-wrap: wrap;
   }
 
+  .combat-header__status-meta {
+    justify-items: end;
+    align-content: space-between;
+  }
+
   .combat-header__overview-grid {
     grid-template-columns: minmax(14rem, 1fr) minmax(14rem, 1fr) minmax(16rem, 1.15fr);
+  }
+
+  .combat-header__overview-toggle {
+    min-height: 2.5rem;
+    padding: 0.55rem 0.9rem;
+    border: 1px solid rgba(226, 193, 155, 0.42);
+    background: rgba(226, 193, 155, 0.1);
+    color: var(--combat-text, var(--color-text));
   }
 
   .combat-header__spotlight-card {
@@ -263,6 +295,10 @@
     .combat-header__status-bar,
     .combat-header__overview-grid {
       grid-template-columns: 1fr;
+    }
+
+    .combat-header__status-meta {
+      justify-items: start;
     }
 
     .combat-header__status-tags {

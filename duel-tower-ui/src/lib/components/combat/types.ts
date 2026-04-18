@@ -1,5 +1,34 @@
 export type CombatTone = 'accent' | 'muted' | 'success' | 'warning'
 
+export const COMBAT_SIDEBAR_TABS = ['command', 'log', 'result', 'inspector'] as const
+
+export type CombatSidebarTab = (typeof COMBAT_SIDEBAR_TABS)[number]
+
+export type CombatInspectorEntityReference =
+  | {
+      kind: 'player'
+      id: string
+    }
+  | {
+      kind: 'enemy'
+      id: string
+    }
+  | {
+      kind: 'summon'
+      id: string
+      owner: string
+    }
+
+export type CombatPresentationState = {
+  activeSidebarTab: CombatSidebarTab
+  headerExpanded: boolean
+  hoveredEntity: CombatInspectorEntityReference | null
+  pinnedEntity: CombatInspectorEntityReference | null
+  hoveredHandCard: string | null
+  pinnedHandCard: string | null
+  handExpanded: boolean
+}
+
 export type CombatMetric = {
   label: string
   value: string | number
