@@ -177,6 +177,15 @@
     headerExpanded = !headerExpanded
   }
 
+  function toggleHandExpanded() {
+    handExpanded = !handExpanded
+
+    if (!handExpanded) {
+      hoveredHandCard = null
+      pinnedHandCard = null
+    }
+  }
+
   function isSameEntityReference(
     left: CombatInspectorEntityReference | null,
     right: CombatInspectorEntityReference | null,
@@ -1361,9 +1370,11 @@
           visibleHandOwner={visiblePlayerView?.playerId ?? null}
           {selectedCardView}
           pendingDecisionType={pendingDecision?.type ?? null}
+          handExpanded={combatPresentationState.handExpanded}
           catalogLoading={false}
           emptyMessage="Visible hand cards will render here once the current visible player has hand instances in the combat screen."
           onCommandButtonClick={handleCommandButtonClick}
+          onToggleExpanded={toggleHandExpanded}
           onSelectHandCard={handleSelectHandCard}
           onToggleDiscard={handleToggleDiscard}
           onHoverHandCard={setHoveredHandCard}

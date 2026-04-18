@@ -15,9 +15,11 @@
     visibleHandOwner: string | null
     selectedCardView: ResolvedCombatCardViewModel | null
     pendingDecisionType: string | null
+    handExpanded: boolean
     catalogLoading: boolean
     emptyMessage: string
     onCommandButtonClick: (commandType: string) => void
+    onToggleExpanded: () => void
     onSelectHandCard: (instanceId: string) => void
     onToggleDiscard: (instanceId: string) => void
     onHoverHandCard: (instanceId: string | null) => void
@@ -36,30 +38,79 @@
     visibleHandOwner,
     selectedCardView,
     pendingDecisionType,
+    handExpanded,
     catalogLoading,
     emptyMessage,
     onCommandButtonClick,
+    onToggleExpanded,
     onSelectHandCard,
     onToggleDiscard,
     onHoverHandCard,
     onPinHandCard,
     resolveInspectState,
   }: Props = $props()
+
+  function resolvePreviewCard() {
+    return handCards.find((card) => resolveInspectState(card.instanceId) !== 'idle') ?? null
+  }
+
+  function resolveCardCostBadge(card: ResolvedCombatCardViewModel) {
+    const tags = card.tags.map((tag) => tag.label)
+    const costTag =
+      tags.find((label) => /\b(cost|ap|mana|ex)\b/i.test(label)) ??
+      tags.find((label) => /^\d+$/.test(label.trim())) ??
+      tags.find((label) => /\d/.test(label))
+
+    return costTag ?? null
+  }
+
+  const previewCard = $derived.by(() => resolvePreviewCard())
 </script>
 
 <SectionFrame
   title="Hand dock"
   description="Fast hand actions and selected-card context."
 >
-  <div class="hand-bar">
-    <div class="hand-bar__dock-meta">
-      <div class="hand-bar__selected-card">
-        <strong>Selected</strong>
-        <p>{selectedCardView?.title ?? 'No card'}</p>
-        <span>{selectedCardView?.subtitle ?? visibleHandOwner ?? currentActorLabel}</span>
-        {#if pendingDecisionType}
-          <small>{pendingDecisionType}</small>
+  <div class="hand-bar" class:hand-bar--collapsed={!handExpanded}>
+    {#if previewCard && handExpanded}
+      <section class="hand-bar__preview" aria-label="Card detail preview">
+        <div class="hand-bar__preview-head">
+          <strong>{previewCard.title}</strong>
+          {#if resolveCardCostBadge(previewCard)}
+            <span>{resolveCardCostBadge(previewCard)}</span>
+          {/if}
+        </div>
+
+        <p>{previewCard.description || previewCard.subtitle}</p>
+
+        {#if previewCard.meta}
+          <small>{previewCard.meta}</small>
         {/if}
+
+        {#if previewCard.tags.length > 0}
+          <div class="hand-bar__preview-tags">
+            {#each previewCard.tags.slice(0, 4) as tag}
+              <span>{tag.label}</span>
+            {/each}
+          </div>
+        {/if}
+      </section>
+    {/if}
+
+    <div class="hand-bar__dock-meta">
+      <div class="hand-bar__summary-strip">
+        <button type="button" class="hand-bar__toggle" onclick={() => onToggleExpanded()}>
+          {handExpanded ? 'Hide hand' : 'Show hand'}
+        </button>
+
+        <div class="hand-bar__selected-card">
+          <strong>Selected</strong>
+          <p>{selectedCardView?.title ?? 'No card'}</p>
+          <span>{selectedCardView?.subtitle ?? visibleHandOwner ?? currentActorLabel}</span>
+          {#if pendingDecisionType}
+            <small>{pendingDecisionType}</small>
+          {/if}
+        </div>
       </div>
 
       <div class="hand-bar__quick-actions">
@@ -80,35 +131,40 @@
       </div>
     </div>
 
-    <div class="hand-bar__cards" role="list" aria-label="Visible hand cards">
-      {#if handCards.length > 0}
-        {#each handCards as card}
-          <CombatHandCard
-            {card}
-            selected={selectedCardId === card.instanceId}
-            discardSelected={selectedDiscardIds.includes(card.instanceId)}
-            inspectState={resolveInspectState(card.instanceId)}
-            onInspectHoverStart={() => onHoverHandCard(card.instanceId)}
-            onInspectHoverEnd={() => onHoverHandCard(null)}
-            onInspectPin={() => onPinHandCard(card.instanceId)}
-            onSelect={onSelectHandCard}
-            onToggleDiscard={onToggleDiscard}
+    {#if handExpanded}
+      <div class="hand-bar__cards" role="list" aria-label="Visible hand cards">
+        {#if handCards.length > 0}
+          {#each handCards as card}
+            <CombatHandCard
+              {card}
+              selected={selectedCardId === card.instanceId}
+              discardSelected={selectedDiscardIds.includes(card.instanceId)}
+              inspectState={resolveInspectState(card.instanceId)}
+              onInspectHoverStart={() => onHoverHandCard(card.instanceId)}
+              onInspectHoverEnd={() => onHoverHandCard(null)}
+              onInspectPin={() => onPinHandCard(card.instanceId)}
+              onSelect={onSelectHandCard}
+              onToggleDiscard={onToggleDiscard}
+            />
+          {/each}
+        {:else}
+          <ContentStatePanel
+            title="No visible hand yet"
+            message={catalogLoading
+              ? 'Loading the card archive before resolving live hand cards.'
+              : emptyMessage}
           />
-        {/each}
-      {:else}
-        <ContentStatePanel
-          title="No visible hand yet"
-          message={catalogLoading
-            ? 'Loading the card archive before resolving live hand cards.'
-            : emptyMessage}
-        />
-      {/if}
-    </div>
+        {/if}
+      </div>
+    {/if}
   </div>
 </SectionFrame>
 
 <style>
   .hand-bar,
+  .hand-bar__summary-strip,
+  .hand-bar__preview,
+  .hand-bar__preview-tags,
   .hand-bar__cards,
   .hand-bar__dock-meta,
   .hand-bar__selected-card {
@@ -117,6 +173,7 @@
   }
 
   .hand-bar {
+    position: relative;
     gap: 0.55rem;
     padding: 0.55rem 0.65rem;
     border: 1px solid rgba(226, 193, 155, 0.2);
@@ -127,14 +184,82 @@
   }
 
   .hand-bar__dock-meta {
-    grid-template-columns: minmax(11rem, auto) minmax(0, 1fr);
+    grid-template-columns: minmax(13rem, auto) minmax(0, 1fr);
     align-items: center;
     gap: 0.55rem;
   }
 
+  .hand-bar__summary-strip {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+
+  .hand-bar__preview {
+    position: absolute;
+    left: 0.7rem;
+    bottom: calc(100% + 0.45rem);
+    width: min(22rem, calc(100vw - 2rem));
+    padding: 0.55rem 0.65rem;
+    border: 1px solid rgba(226, 193, 155, 0.28);
+    background: rgba(18, 16, 14, 0.96);
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.28);
+    z-index: 4;
+    pointer-events: none;
+  }
+
+  .hand-bar__preview-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    align-items: baseline;
+  }
+
+  .hand-bar__preview-head strong,
+  .hand-bar__preview-head span,
+  .hand-bar__preview p,
+  .hand-bar__preview small {
+    margin: 0;
+  }
+
+  .hand-bar__preview-head strong {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+  }
+
+  .hand-bar__preview-head span {
+    padding: 0.12rem 0.35rem;
+    border: 1px solid rgba(226, 193, 155, 0.24);
+    color: var(--combat-secondary, var(--color-accent));
+    font-size: 0.68rem;
+    white-space: nowrap;
+  }
+
+  .hand-bar__preview p,
+  .hand-bar__preview small {
+    color: var(--combat-text-soft, var(--color-text-soft));
+    font-size: 0.76rem;
+    line-height: 1.3;
+  }
+
+  .hand-bar__preview-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .hand-bar__preview-tags span {
+    padding: 0.1rem 0.35rem;
+    border: 1px solid rgba(152, 143, 135, 0.24);
+    color: var(--combat-text-soft, var(--color-text-soft));
+    font-size: 0.64rem;
+    text-transform: uppercase;
+  }
+
   .hand-bar__cards {
     grid-auto-flow: column;
-    grid-auto-columns: minmax(8.2rem, 9rem);
+    grid-auto-columns: minmax(5.6rem, 6.4rem);
     overflow-x: auto;
     overflow-y: hidden;
     padding-bottom: 0.1rem;
@@ -149,10 +274,19 @@
     align-items: center;
   }
 
+  .hand-bar__toggle,
   .hand-bar__selected-card,
   .hand-bar__quick-actions button {
     border: 1px solid var(--combat-border, var(--color-border));
     background: rgba(16, 14, 12, 0.58);
+  }
+
+  .hand-bar__toggle {
+    min-height: 1.85rem;
+    padding: 0.35rem 0.55rem;
+    color: var(--combat-text, var(--color-text));
+    font-size: 0.74rem;
+    white-space: nowrap;
   }
 
   .hand-bar__empty-chip {
@@ -211,6 +345,10 @@
     justify-self: end;
   }
 
+  .hand-bar--collapsed {
+    gap: 0;
+  }
+
   .hand-bar__quick-actions button {
     min-height: 1.85rem;
     padding: 0.35rem 0.55rem;
@@ -242,12 +380,19 @@
       grid-template-columns: 1fr;
     }
 
+    .hand-bar__summary-strip,
     .hand-bar__selected-card {
       grid-template-columns: 1fr;
     }
 
     .hand-bar__selected-card small {
       justify-self: start;
+    }
+
+    .hand-bar__preview {
+      left: 0.55rem;
+      right: 0.55rem;
+      width: auto;
     }
   }
 
@@ -257,7 +402,7 @@
     }
 
     .hand-bar__cards {
-      grid-auto-columns: minmax(7.4rem, 8.2rem);
+      grid-auto-columns: minmax(5.15rem, 5.8rem);
     }
 
     .hand-bar__quick-actions {
