@@ -240,6 +240,9 @@
 
   .combat-sidebar {
     gap: 0.75rem;
+    min-height: 0;
+    height: 100%;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .combat-sidebar__tab-list {
@@ -267,14 +270,19 @@
 
   .combat-sidebar__tab-panel {
     min-height: 0;
-    max-height: min(58vh, 42rem);
+    height: 100%;
     overflow: auto;
     padding: 0.8rem;
     scrollbar-width: thin;
     scrollbar-color: rgba(226, 193, 155, 0.42) rgba(16, 14, 12, 0.7);
   }
 
-  @media (max-width: 1080px) {
+  .combat-sidebar__tab-stack {
+    min-height: 0;
+    align-content: start;
+  }
+
+  @media (max-width: 1200px) {
     .combat-sidebar__tab-panel {
       max-height: min(40rem, 60vh);
     }

@@ -134,6 +134,10 @@ img {
   gap: 1.5rem;
 }
 
+.app-main:has(.combat-page) {
+  --content-width: 1520px;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

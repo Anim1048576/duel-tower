@@ -18,21 +18,25 @@
     </div>
   {/if}
 
-  <div class="combat-layout__main">
-    <div class="combat-layout__field">
-      {@render field?.()}
+  <div class="combat-layout__stage">
+    <div class="combat-layout__main" class:combat-layout__main--with-sidebar={Boolean(sidebar)}>
+      <div class="combat-layout__field">
+        {@render field?.()}
+      </div>
+
+      {#if hand}
+        <div class="combat-layout__hand">
+          {@render hand()}
+        </div>
+      {/if}
     </div>
 
-    <div class="combat-layout__sidebar">
-      {@render sidebar?.()}
-    </div>
+    {#if sidebar}
+      <aside class="combat-layout__sidebar" aria-label="Combat context panel">
+        {@render sidebar()}
+      </aside>
+    {/if}
   </div>
-
-  {#if hand}
-    <div class="combat-layout__hand">
-      {@render hand()}
-    </div>
-  {/if}
 </div>
 
 <style>
@@ -57,7 +61,9 @@
 
     position: relative;
     isolation: isolate;
-    overflow: hidden;
+    overflow: visible;
+    --combat-stage-gap: clamp(1rem, 2vw, 1.4rem);
+    --combat-context-width: clamp(22rem, 25vw, 28rem);
     min-height: calc(100vh - 4rem);
     padding: clamp(1rem, 1.8vw, 1.5rem);
     color: var(--combat-text);
@@ -96,37 +102,71 @@
   }
 
   .combat-layout,
+  .combat-layout__stage,
   .combat-layout__field,
   .combat-layout__sidebar,
   .combat-layout__main,
   .combat-layout__hand {
     display: grid;
-    gap: 0.8rem;
+    gap: var(--combat-stage-gap);
   }
 
   .combat-layout__header,
+  .combat-layout__stage,
   .combat-layout__main,
-  .combat-layout__hand {
+  .combat-layout__hand,
+  .combat-layout__sidebar {
     position: relative;
     z-index: 1;
   }
 
+  .combat-layout__stage {
+    min-height: clamp(36rem, calc(100vh - 16rem), 58rem);
+  }
+
   .combat-layout__main {
-    grid-template-columns: minmax(0, 1.85fr) minmax(20rem, 0.82fr);
-    align-items: start;
-    min-height: 30rem;
+    min-width: 0;
+    min-height: inherit;
+    align-content: start;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .combat-layout__main--with-sidebar {
+    padding-inline-end: calc(var(--combat-context-width) + var(--combat-stage-gap));
+  }
+
+  .combat-layout__field {
+    min-width: 0;
+    min-height: 0;
   }
 
   .combat-layout__sidebar {
-    position: sticky;
-    top: 0.8rem;
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: var(--combat-context-width);
+    min-width: 0;
     min-height: 0;
+    align-content: start;
   }
 
   .combat-layout__hand {
     position: sticky;
     bottom: 0.8rem;
     z-index: 2;
+  }
+
+  .combat-layout__sidebar :global(.section-frame) {
+    position: sticky;
+    top: 0.8rem;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    max-height: calc(100vh - 6.4rem);
+    overflow: hidden;
+  }
+
+  .combat-layout__sidebar :global(.section-frame__body) {
+    display: grid;
+    min-height: 0;
   }
 
   .combat-layout :global(.section-frame) {
@@ -190,14 +230,29 @@
     background: rgba(16, 14, 12, 0.48);
   }
 
-  @media (max-width: 1080px) {
+  @media (max-width: 1200px) {
+    .combat-layout__stage,
     .combat-layout__main {
-      grid-template-columns: 1fr;
+      min-height: auto;
+    }
+
+    .combat-layout__main--with-sidebar {
+      padding-inline-end: 0;
     }
 
     .combat-layout__sidebar,
     .combat-layout__hand {
       position: static;
+    }
+
+    .combat-layout__sidebar {
+      inset: auto;
+      width: 100%;
+    }
+
+    .combat-layout__sidebar :global(.section-frame) {
+      position: static;
+      max-height: none;
     }
   }
 

@@ -243,19 +243,19 @@
 
   .battlefield-panel {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: center;
-    gap: clamp(0.85rem, 3vw, 2rem);
-    min-height: 28rem;
+    align-items: start;
+    gap: clamp(1rem, 2.8vw, 2.4rem);
+    min-height: clamp(28rem, 48vh, 40rem);
   }
 
   .battlefield-panel__side--players {
-    justify-self: start;
-    width: min(100%, 31rem);
+    justify-self: stretch;
+    width: 100%;
   }
 
   .battlefield-panel__side--enemies {
-    justify-self: end;
-    width: min(100%, 32rem);
+    justify-self: stretch;
+    width: 100%;
   }
 
   .battlefield-panel__unit-list--players,
