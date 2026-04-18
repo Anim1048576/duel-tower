@@ -278,11 +278,13 @@ export type GmLobbyTagDto = {
 
 /**
  * Server-curated GM participant card.
+ * playerId is the stable action target, while name is display-only.
  * Character / EX / passive / deck summaries and detail tags are already
  * resolved for the GM card UI and should not be recomputed on the frontend.
  */
 export type GmLobbyParticipantCardDto = {
   slot: string
+  playerId: string
   name: string
   readyLabel: string
   readyTone: 'accent' | 'muted' | 'success' | 'warning'

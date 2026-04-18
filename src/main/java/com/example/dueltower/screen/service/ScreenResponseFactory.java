@@ -871,6 +871,7 @@ public class ScreenResponseFactory {
             cards.add(new GmLobbyParticipantCardDto(
                     "P" + (index + 1),
                     player.playerId(),
+                    player.playerId(),
                     player.ready() ? "Ready" : "Not ready",
                     player.ready() ? "success" : "muted",
                     gmLobbyCharacterSummary(player, state, runtime, characters),

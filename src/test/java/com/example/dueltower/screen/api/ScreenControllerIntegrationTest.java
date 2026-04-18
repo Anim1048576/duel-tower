@@ -281,6 +281,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("auth").asText()).isEqualTo("sessionReadable");
         assertThat(body.path("participantCards")).hasSize(2);
         assertThat(body.path("participantCards").get(0).path("slot").asText()).isEqualTo("P1");
+        assertThat(body.path("participantCards").get(0).path("playerId").asText()).isEqualTo("gm-screen-p1");
         assertThat(body.path("participantCards").get(0).path("name").asText()).isEqualTo("gm-screen-p1");
         assertThat(body.path("participantCards").get(0).path("readyLabel").asText()).isEqualTo("Ready");
         assertThat(body.path("participantCards").get(0).path("readyTone").asText()).isEqualTo("success");
@@ -356,6 +357,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
 
         JsonNode body = assertBaseScreenContract(result, "GmLobby");
         assertThat(body.path("participantCards")).hasSize(1);
+        assertThat(body.path("participantCards").get(0).path("playerId").asText()).isEqualTo("gm-unready-p1");
         assertThat(body.path("participantCards").get(0).path("readyLabel").asText()).isEqualTo("Not ready");
         assertThat(body.path("startCombat").path("recommendedStartPlayerId").isNull()).isTrue();
         assertThat(body.path("startCombat").path("blockedReason").path("code").asText()).isEqualTo("READY_PARTICIPANT_REQUIRED");

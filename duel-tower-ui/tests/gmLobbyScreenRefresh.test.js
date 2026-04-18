@@ -16,8 +16,8 @@ function runTest(name, fn) {
 
 const sampleScreen = {
   participantCards: [
-    { name: 'p1' },
-    { name: 'p2' },
+    { playerId: 'p1', name: 'Alpha' },
+    { playerId: 'p2', name: 'Bravo' },
   ],
   startCombat: {
     recommendedStartPlayerId: 'p1',
@@ -62,6 +62,20 @@ runTest('polling and non-start actions keep lightweight local selection state wh
     {
       selectedKickPlayerId: 'p2',
       selectedStartPlayerId: 'p2',
+    },
+  )
+})
+
+runTest('kick target selection uses playerId even when display name differs', () => {
+  assert.deepEqual(
+    resolveGmLobbySelections(sampleScreen, {
+      selectedKickPlayerId: 'p2',
+      selectedStartPlayerId: 'p1',
+      preserveStartPlayerSelection: true,
+    }),
+    {
+      selectedKickPlayerId: 'p2',
+      selectedStartPlayerId: 'p1',
     },
   )
 })

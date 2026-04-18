@@ -5,11 +5,13 @@ import java.util.List;
 /**
  * Participant card already curated for the GM lobby UI.
  *
- * <p>characterSummary / exSummary / passiveSummary / deckSummary / detailTags
- * are server-owned presentation data, not frontend-derived estimates.</p>
+ * <p>{@code playerId} is the stable action target. {@code name} is display-only.
+ * characterSummary / exSummary / passiveSummary / deckSummary / detailTags are
+ * server-owned presentation data, not frontend-derived estimates.</p>
  */
 public record GmLobbyParticipantCardDto(
         String slot,
+        String playerId,
         String name,
         String readyLabel,
         String readyTone,

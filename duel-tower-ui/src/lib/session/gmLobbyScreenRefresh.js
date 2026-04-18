@@ -41,7 +41,7 @@ export function resolveGmLobbyScreenRefreshPlan(reason) {
 
 /**
  * @param {{
- *   participantCards: { name: string }[]
+ *   participantCards: { playerId: string }[]
  *   startCombat: {
  *     recommendedStartPlayerId: string | null
  *     selectableStartPlayers: { playerId: string }[]
@@ -54,7 +54,7 @@ export function resolveGmLobbyScreenRefreshPlan(reason) {
  * }} current
  */
 export function resolveGmLobbySelections(screen, current) {
-  const participantIds = screen.participantCards.map((participant) => participant.name)
+  const participantIds = screen.participantCards.map((participant) => participant.playerId)
   const selectableStartPlayerIds = screen.startCombat.selectableStartPlayers.map((player) => player.playerId)
   const recommendedStartPlayerId = screen.startCombat.recommendedStartPlayerId ?? ''
 

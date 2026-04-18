@@ -6,6 +6,7 @@
     findGmLobbyAction,
     type GmLobbyActionId,
     type GmLobbyActionResponseById,
+    type GmLobbyKickAction,
     type GmLobbyScreenAction,
     type GmLobbyScreenResponse,
   } from '../lib/api/screenTypes'
@@ -240,7 +241,7 @@
     return Number.isInteger(parsed) ? parsed : null
   }
 
-  function buildKickAction(selectedAction: GmLobbyScreenAction, playerId: string) {
+  function buildKickAction(selectedAction: GmLobbyKickAction, playerId: string) {
     const nextHref = selectedAction.href.replace(/\/players\/[^/]+\/kick$/, `/players/${encodeURIComponent(playerId)}/kick`)
     return {
       ...selectedAction,
@@ -285,7 +286,11 @@
       )
       kickReason = ''
       await refreshAfterAction('action-kick')
-      actionSuccessMessage = `${gmLobbyStateCopy.playerRemovedFeedback.message} (${selectedKickPlayerId})`
+      const removedParticipant = screen.participantCards.find((participant) => participant.playerId === selectedKickPlayerId)
+      const removedParticipantLabel = removedParticipant
+        ? `${removedParticipant.name} (${removedParticipant.playerId})`
+        : selectedKickPlayerId
+      actionSuccessMessage = `${gmLobbyStateCopy.playerRemovedFeedback.message} (${removedParticipantLabel})`
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to remove the selected player.')
     } finally {
@@ -623,7 +628,7 @@
             >
               <option value="">Select player</option>
               {#each screen.participantCards as participant}
-                <option value={participant.name}>
+                <option value={participant.playerId}>
                   {participant.slot} | {participant.name}
                 </option>
               {/each}
