@@ -28,11 +28,20 @@
     type SessionPageFeedback,
   } from '../lib/session/pageState'
   import { resolveGmLobbyScreenRefreshPlan, resolveGmLobbySelections } from '../lib/session/gmLobbyScreenRefresh.js'
+  import { resolveGmLobbyStartCombatFollowUp } from '../lib/session/gmLobbyStartCombatAction.js'
   import { readSessionCodeFromRoute } from '../lib/session/sessionRoute'
   import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
   import { startTimedPolling, type TimedPollingHandle } from '../lib/session/liveSessionPolling'
 
   const POLLING_INTERVAL_MS = 4000
+
+  /**
+   * GmLobby responsibility boundary:
+   * - Backend owns participantCards, startCombat blocked/recommended state,
+   *   and start-combat procedure/action contracts.
+   * - Frontend keeps only lightweight local inputs such as selected player,
+   *   reset options, and refresh/action feedback around the current screen.
+   */
 
   let loading = $state(true)
   let notFound = $state(false)
@@ -209,7 +218,7 @@
     void refreshGmLobbyScreen('retry-load')
   }
 
-  function findAction(actionId: GmLobbyActionId) {
+  function findAction<TActionId extends GmLobbyActionId>(actionId: TActionId) {
     return screen ? findGmLobbyAction(screen, actionId) : null
   }
 
@@ -346,40 +355,31 @@
 
       updateStoredGmAccess(response.latestScreen, response.restoredGmToken)
 
-      if (response.latestScreen) {
+      const followUp = resolveGmLobbyStartCombatFollowUp(response)
+
+      if (followUp.shouldApplyLatestScreen && response.latestScreen) {
         clearRefreshError()
         applyScreen(response.latestScreen, {
-          preserveStartPlayerSelection: !response.success,
+          preserveStartPlayerSelection: followUp.preserveStartPlayerSelection,
         })
       }
 
-      if (response.success) {
-        if (response.nextRoute) {
-          navigateTo(response.nextRoute)
-          return
-        }
-
-        if (!response.latestScreen) {
-          await refreshAfterAction('action-start-combat-success')
-        }
-        actionSuccessMessage = response.message || 'Combat start completed.'
+      if (followUp.shouldNavigate && followUp.nextRoute) {
+        navigateTo(followUp.nextRoute)
         return
       }
 
-      if (!response.latestScreen) {
-        await refreshAfterAction('action-start-combat-failed')
+      if (followUp.refreshReason) {
+        await refreshAfterAction(followUp.refreshReason)
       }
 
-      actionErrorTitle =
-        response.outcome === 'BLOCKED'
-          ? 'Combat start unavailable'
-          : response.outcome === 'GM_ACCESS_REQUIRED'
-            ? 'GM access restore failed'
-            : 'Combat start failed'
-      actionErrorMessage =
-        response.disabledReason?.userMessage ||
-        response.message ||
-        'Unable to start combat from the current GM lobby.'
+      if (followUp.successMessage) {
+        actionSuccessMessage = followUp.successMessage
+        return
+      }
+
+      actionErrorTitle = followUp.errorTitle ?? 'Combat start failed'
+      actionErrorMessage = followUp.errorMessage
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to start combat from the current GM lobby.')
     } finally {

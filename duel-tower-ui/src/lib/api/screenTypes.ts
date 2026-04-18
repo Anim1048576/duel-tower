@@ -124,6 +124,13 @@ export type GmLobbyActionId =
   | 'gmLobby.reset'
   | 'gmLobby.startCombat'
 
+export type GmLobbyStartCombatOutcome =
+  | 'STARTED'
+  | 'ALREADY_ACTIVE'
+  | 'BLOCKED'
+  | 'GM_ACCESS_REQUIRED'
+  | 'FAILED'
+
 export type DeckEditorDraftCardDto = {
   key: string
   cardId: string
@@ -269,6 +276,11 @@ export type GmLobbyTagDto = {
   tone: 'accent' | 'muted' | 'success' | 'warning'
 }
 
+/**
+ * Server-curated GM participant card.
+ * Character / EX / passive / deck summaries and detail tags are already
+ * resolved for the GM card UI and should not be recomputed on the frontend.
+ */
 export type GmLobbyParticipantCardDto = {
   slot: string
   name: string
@@ -281,6 +293,10 @@ export type GmLobbyParticipantCardDto = {
   detailTags: GmLobbyTagDto[]
 }
 
+/**
+ * Start-combat option as curated by the server for the GM lobby.
+ * playerId is the command target, while label/slot/ready are presentation data.
+ */
 export type GmLobbySelectableStartPlayerDto = {
   playerId: string
   slot: string
@@ -288,6 +304,11 @@ export type GmLobbySelectableStartPlayerDto = {
   ready: boolean
 }
 
+/**
+ * Server-owned GM start-combat summary.
+ * blockedReason and recommendedStartPlayerId come from the backend so the page
+ * does not reinterpret lobby readiness or combat-start rules locally.
+ */
 export type GmLobbyStartCombatDto = {
   recommendedStartPlayerId: string | null
   blockedReason: DisabledReasonDto | null
@@ -526,9 +547,25 @@ export type PlayerLobbyScreenAction = ScreenActionDto<PlayerLobbyActionPayload> 
   id: PlayerLobbyActionId
 }
 
-export type GmLobbyScreenAction = ScreenActionDto<GmLobbyActionPayload> & {
-  id: GmLobbyActionId
+export type GmLobbyKickAction = ScreenActionDto<GmLobbyKickPayload> & {
+  id: 'gmLobby.kick'
+  auth: 'gmToken'
 }
+
+export type GmLobbyResetAction = ScreenActionDto<GmLobbyResetPayload> & {
+  id: 'gmLobby.reset'
+  auth: 'gmToken'
+}
+
+export type GmLobbyStartCombatAction = ScreenActionDto<GmLobbyStartCombatPayload> & {
+  id: 'gmLobby.startCombat'
+  auth: 'gmToken' | 'loginCookie'
+}
+
+export type GmLobbyScreenAction =
+  | GmLobbyKickAction
+  | GmLobbyResetAction
+  | GmLobbyStartCombatAction
 
 export type ScreenResponseBase<TAction extends ScreenActionDto = ScreenActionDto> = {
   screenKey: string
@@ -582,6 +619,12 @@ export type PlayerLobbyScreenResponse = ScreenResponseBase<PlayerLobbyScreenActi
   presets: PlayerLobbyServerPresets
 }
 
+/**
+ * GmLobby screen contract.
+ * The backend owns participant-card curation, start-combat blocked state,
+ * recommended start-player selection, and action enablement. The frontend keeps
+ * only lightweight selection inputs and refresh/action feedback around it.
+ */
 export type GmLobbyScreenResponse = ScreenResponseBase<GmLobbyScreenAction> & {
   sessionCode: string
   version: number
@@ -615,7 +658,7 @@ export type PlayerLobbyActionResponseById = {
 
 export type GmLobbyStartCombatActionResponse = {
   success: boolean
-  outcome: string
+  outcome: GmLobbyStartCombatOutcome
   message: string | null
   disabledReason: DisabledReasonDto | null
   nextRoute: string | null
@@ -695,11 +738,16 @@ export function findPlayerLobbyAction(
   return screen.possibleActions.find((action) => action.id === actionId) ?? null
 }
 
-export function findGmLobbyAction(
+export function findGmLobbyAction<TActionId extends GmLobbyActionId>(
   screen: Pick<GmLobbyScreenResponse, 'possibleActions'>,
-  actionId: GmLobbyActionId,
+  actionId: TActionId,
 ) {
-  return screen.possibleActions.find((action) => action.id === actionId) ?? null
+  return (
+    screen.possibleActions.find((action) => action.id === actionId) as Extract<
+      GmLobbyScreenAction,
+      { id: TActionId }
+    > | null
+  ) ?? null
 }
 
 export function buildScreenActionPayload<TPayloadTemplate extends ScreenActionPayloadTemplate>(

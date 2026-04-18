@@ -64,3 +64,21 @@ npm run build
 Current frontend tests cover:
 - PlayerLobby local dirty, summary, deck lock, and preset preview freshness reactions
 - PlayerLobby screen refresh policy after polling and player actions
+
+## GmLobby Verification
+
+After changing GmLobby screen contracts, start-combat action follow-up, or GM lobby refresh policy, run:
+
+```bash
+npm test
+npm run check
+npm run build
+```
+
+Current frontend tests cover:
+- GmLobby screen refresh policy and local selection retention/reset rules
+- GmLobby start-combat action follow-up for latest screen vs next route vs refresh
+
+GmLobby responsibility boundary:
+- Backend owns `participantCards`, `startCombat.blockedReason`, recommended start player, and start-combat procedure.
+- Frontend keeps only lightweight local selection/input state and renders the returned screen/action contract.

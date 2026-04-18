@@ -2,6 +2,12 @@ package com.example.dueltower.screen.dto;
 
 import java.util.List;
 
+/**
+ * Participant card already curated for the GM lobby UI.
+ *
+ * <p>characterSummary / exSummary / passiveSummary / deckSummary / detailTags
+ * are server-owned presentation data, not frontend-derived estimates.</p>
+ */
 public record GmLobbyParticipantCardDto(
         String slot,
         String name,

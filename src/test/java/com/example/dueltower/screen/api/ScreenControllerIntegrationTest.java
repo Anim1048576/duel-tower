@@ -289,9 +289,16 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("participantCards").get(0).path("passiveSummary").asText()).isNotBlank();
         assertThat(body.path("participantCards").get(0).path("deckSummary").asText()).isNotBlank();
         assertThat(body.path("participantCards").get(0).path("detailTags").isArray()).isTrue();
+        assertThat(body.path("participantCards").get(0).path("detailTags")).isNotEmpty();
+        assertThat(body.path("participantCards").get(0).path("detailTags").get(0).path("label").asText()).isNotBlank();
+        assertThat(body.path("participantCards").get(0).path("detailTags").get(0).path("tone").asText()).isNotBlank();
         assertThat(body.path("startCombat").path("recommendedStartPlayerId").asText()).isEqualTo("gm-screen-p1");
         assertThat(body.path("startCombat").path("blockedReason").isNull()).isTrue();
         assertThat(body.path("startCombat").path("selectableStartPlayers")).hasSize(2);
+        assertThat(body.path("startCombat").path("selectableStartPlayers").get(0).path("playerId").asText()).isEqualTo("gm-screen-p1");
+        assertThat(body.path("startCombat").path("selectableStartPlayers").get(0).path("slot").asText()).isEqualTo("P1");
+        assertThat(body.path("startCombat").path("selectableStartPlayers").get(0).path("label").asText()).contains("ready");
+        assertThat(body.path("startCombat").path("selectableStartPlayers").get(0).path("ready").asBoolean()).isTrue();
 
         JsonNode kickAction = findAction(body, "gmLobby.kick");
         JsonNode resetAction = findAction(body, "gmLobby.reset");
@@ -446,6 +453,10 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("disabledReason").path("code").asText()).isEqualTo("GM_ACCESS_RESTORE_FAILED");
         assertThat(body.path("nextRoute").isNull()).isTrue();
         assertThat(body.path("latestScreen").path("screenKey").asText()).isEqualTo("GmLobby");
+        assertThat(body.path("latestScreen").path("startCombat").path("blockedReason").path("code").asText())
+                .isEqualTo("READY_PARTICIPANT_REQUIRED");
+        assertThat(findAction(body.path("latestScreen"), "gmLobby.startCombat").path("disabledReason").path("code").asText())
+                .isEqualTo("GM_ACCESS_REQUIRED");
     }
 
     @Test
@@ -551,6 +562,10 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("outcome").asText()).isEqualTo("BLOCKED");
         assertThat(body.path("disabledReason").path("code").asText()).isEqualTo("READY_PARTICIPANT_REQUIRED");
         assertThat(body.path("latestScreen").path("screenKey").asText()).isEqualTo("GmLobby");
+        assertThat(body.path("latestScreen").path("participantCards")).hasSize(1);
+        assertThat(body.path("latestScreen").path("startCombat").path("blockedReason").path("code").asText())
+                .isEqualTo("READY_PARTICIPANT_REQUIRED");
+        assertThat(findAction(body.path("latestScreen"), "gmLobby.startCombat").path("enabled").asBoolean()).isFalse();
     }
 
     @Test

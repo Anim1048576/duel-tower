@@ -46,6 +46,14 @@ Mixed token rule:
 - `SecurityPaths.AUTHENTICATED_SESSION_ENTRY` requires login at the filter layer.
 - `SecurityPaths.SESSION_READABLE`, `SecurityPaths.PLAYER_SELF_POST`, `SecurityPaths.PLAYER_SELF_PUT`, `SecurityPaths.GM_ONLY_POST`, `SecurityPaths.GM_ONLY_DELETE`, and `SecurityPaths.SESSION_COMMAND` are `permitAll` at the filter layer and are enforced inside controller/service authorization code.
 
+## Screen API Mapping
+
+- `GET /api/screens/sessions/{code}/player-lobby`, `GET /api/screens/sessions/{code}/gm-lobby`, and `GET /api/screens/sessions/{code}/combat` follow `SESSION_READABLE`.
+- `POST /api/screens/sessions/{code}/gm-lobby/start-combat` is a GM-lobby screen action:
+  it can execute with a valid `X-GM-Token`, or with authenticated GM login fallback when the backend can restore GM access.
+- For GmLobby specifically:
+  participant summary curation, start blocked-state evaluation, and start-combat procedure belong to the server-side Screen API / screen action layer, not the frontend page.
+
 ## Controller And Service Ownership
 
 - `SessionController.create` and `SessionController.join` enforce `AUTHENTICATED_SESSION_ENTRY`.

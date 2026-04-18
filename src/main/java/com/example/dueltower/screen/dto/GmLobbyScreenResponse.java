@@ -3,6 +3,13 @@ package com.example.dueltower.screen.dto;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+/**
+ * Server-curated GM lobby screen.
+ *
+ * <p>The backend owns participant card summaries, start-combat blocked state,
+ * recommended start-player selection, and action enablement so the frontend can
+ * render the GM dashboard without reinterpreting session state.</p>
+ */
 public class GmLobbyScreenResponse extends ScreenResponseBase {
     private final String sessionCode;
     private final long version;
