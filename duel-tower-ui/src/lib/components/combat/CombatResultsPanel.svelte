@@ -34,7 +34,7 @@
         <article class="combat-results-panel__feed-card">
           <strong>{entry.title}</strong>
           <p>{entry.summary}</p>
-          <p>{entry.meta}</p>
+          <small>{entry.meta}</small>
         </article>
       {/each}
     </div>
@@ -50,7 +50,7 @@
   .combat-results-panel,
   .combat-results-panel__feed-list {
     display: grid;
-    gap: 1rem;
+    gap: 0.75rem;
   }
 
   .combat-results-panel strong {
@@ -63,12 +63,12 @@
   }
 
   .combat-results-panel__feed-card {
-    padding: 0.9rem;
+    padding: 0.7rem 0.8rem;
     border: 1px solid var(--combat-border, var(--color-border));
     border-left: 3px solid rgba(188, 204, 173, 0.58);
     background: rgba(16, 14, 12, 0.64);
     display: grid;
-    gap: 0.3rem;
+    gap: 0.22rem;
     transition:
       transform 120ms ease,
       border-color 120ms ease,
@@ -82,12 +82,15 @@
   }
 
   .combat-results-panel__feed-card strong,
-  .combat-results-panel__feed-card p {
+  .combat-results-panel__feed-card p,
+  .combat-results-panel__feed-card small {
     margin: 0;
   }
 
-  .combat-results-panel__feed-card p {
+  .combat-results-panel__feed-card p,
+  .combat-results-panel__feed-card small {
     color: var(--combat-text-soft, var(--color-text-soft));
-    line-height: 1.6;
+    line-height: 1.4;
+    font-size: 0.84rem;
   }
 </style>

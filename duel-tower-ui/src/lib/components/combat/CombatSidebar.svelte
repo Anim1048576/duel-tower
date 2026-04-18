@@ -126,8 +126,8 @@
 </script>
 
 <SectionFrame
-  title="Combat context and command"
-  description="The sidebar now separates command, history, results, and future inspector context without changing the command flow."
+  title="Context panel"
+  description="Command, inspector, logs, and results stay in tabs so the battlefield remains primary."
 >
   <div class="combat-sidebar">
     <div class="combat-sidebar__tab-list" role="tablist" aria-label="Combat sidebar tabs">
@@ -233,18 +233,13 @@
 
 <style>
   .combat-sidebar,
-  .combat-sidebar__tab-panel,
   .combat-sidebar__tab-stack {
     display: grid;
     gap: 1rem;
   }
 
   .combat-sidebar {
-    max-height: calc(100vh - 8rem);
-    overflow: auto;
-    padding-right: 0.2rem;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(226, 193, 155, 0.42) rgba(16, 14, 12, 0.7);
+    gap: 0.75rem;
   }
 
   .combat-sidebar__tab-list {
@@ -260,8 +255,8 @@
   }
 
   .combat-sidebar__tab-button {
-    min-height: 2.5rem;
-    padding: 0.55rem 0.9rem;
+    min-height: 2.15rem;
+    padding: 0.42rem 0.72rem;
     color: var(--combat-text, var(--color-text));
   }
 
@@ -270,11 +265,18 @@
     background: rgba(226, 193, 155, 0.12);
   }
 
+  .combat-sidebar__tab-panel {
+    min-height: 0;
+    max-height: min(58vh, 42rem);
+    overflow: auto;
+    padding: 0.8rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(226, 193, 155, 0.42) rgba(16, 14, 12, 0.7);
+  }
+
   @media (max-width: 1080px) {
-    .combat-sidebar {
-      max-height: none;
-      overflow: visible;
-      padding-right: 0;
+    .combat-sidebar__tab-panel {
+      max-height: min(40rem, 60vh);
     }
   }
 </style>

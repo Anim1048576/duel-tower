@@ -39,88 +39,128 @@
     commandSuccessMessage,
     onToggleExpanded,
   }: Props = $props()
+
+  const priorityMessage = $derived.by(() => {
+    if (commandErrorMessage) {
+      return {
+        title: 'Command request failed',
+        message: commandErrorMessage,
+        tone: 'error' as const,
+      }
+    }
+
+    if (commandRejectedMessage) {
+      return {
+        title: 'Command rejected',
+        message: commandRejectedMessage,
+        tone: 'error' as const,
+      }
+    }
+
+    if (accessNoticeMessage) {
+      return {
+        title: 'Combat access status',
+        message: accessNoticeMessage,
+        tone: undefined,
+      }
+    }
+
+    if (catalogErrorMessage) {
+      return {
+        title: 'Card archive unavailable',
+        message: catalogErrorMessage,
+        tone: undefined,
+      }
+    }
+
+    return null
+  })
+
+  const secondaryMessage = $derived.by(() => {
+    if (priorityMessage) {
+      return commandSuccessMessage
+    }
+
+    return commandSuccessMessage ?? accessNoticeMessage ?? catalogErrorMessage
+  })
 </script>
 
 <SectionFrame
   eyebrow="Combat Status"
-  title="Combat Command"
-  description="The combat shell now emphasizes the current turn owner, battlefield pressure, and recent combat feedback before deeper command controls."
+  title="Combat HUD"
+  description="Always-visible status stays thin. Overview and recent feedback are available on demand."
 >
   <div class="combat-header" class:combat-header--readonly={accessRoleLabel === 'Read-only shell'}>
     <div class="combat-header__always-visible">
       <div class="combat-header__status-bar">
-        <div class="combat-header__turn-ribbon">
-          <span>Phase</span>
-          <strong>{statusView.phase ?? 'Pending'}</strong>
-          <small>{statusView.turnOrderSummary}</small>
+        <div class="combat-header__status-strip">
+          <div class="combat-header__phase-block">
+            <span>Phase</span>
+            <strong>{statusView.phase ?? 'Pending'}</strong>
+          </div>
+
+          <div class="combat-header__inline-stats">
+            <StatBlock
+              value={statusView.round ?? 'Pending'}
+              label="Round"
+              note={statusView.round !== null ? 'Current combat round' : 'Combat state not active yet'}
+            />
+            <StatBlock
+              value={statusView.currentTurnLabel}
+              label="Current Turn"
+              note={statusView.currentTurnNote}
+            />
+          </div>
         </div>
 
-        <div class="combat-header__status-stats">
-          <StatBlock
-            value={statusView.round ?? 'Pending'}
-            label="Round"
-            note={statusView.round !== null ? 'Current combat round' : 'Combat state not active yet'}
-          />
-          <StatBlock
-            value={statusView.currentTurnLabel}
-            label="Current Turn"
-            note={statusView.currentTurnNote}
-          />
-          <StatBlock
-            value={statusView.version}
-            label="Version"
-            note={statusView.battlefieldSummary}
-          />
+        <div class="combat-header__flow-summary">
+          <strong>{currentTurnStateLabel}</strong>
+          <p>{statusView.initiativeSummary}</p>
+          <p>{statusView.turnOrderSummary}</p>
         </div>
 
         <div class="combat-header__status-meta">
           <div class="combat-header__status-tags">
-            <TagChip label={statusView.sessionCode} tone="accent" />
-            <TagChip label={accessRoleLabel} tone={accessRoleLabel === 'Read-only shell' ? 'muted' : 'success'} />
-            <TagChip label={combatStateLive ? 'Combat state live' : 'Pre-combat state'} tone={combatStateLive ? 'warning' : 'muted'} />
             <TagChip label={currentTurnStateLabel} tone={statusView.currentTurnTone} />
+            <TagChip label={combatStateLive ? 'Live combat' : 'Pre-combat'} tone={combatStateLive ? 'warning' : 'muted'} />
+            <TagChip label={accessRoleLabel} tone={accessRoleLabel === 'Read-only shell' ? 'muted' : 'success'} />
           </div>
 
           <button type="button" class="combat-header__overview-toggle" onclick={() => onToggleExpanded()}>
-            {headerExpanded ? 'Collapse overview' : 'Expand overview'}
+            {headerExpanded ? 'Hide overview' : 'Show overview'}
           </button>
         </div>
       </div>
 
-      <div class="combat-header__message-stack">
-        {#if accessNoticeMessage}
-          <ContentStatePanel title="Combat access status" message={accessNoticeMessage} />
-        {/if}
-
-        {#if catalogErrorMessage}
-          <ContentStatePanel title="Card archive unavailable" message={catalogErrorMessage} />
-        {/if}
-
-        {#if commandErrorMessage}
-          <ContentStatePanel title="Command request failed" message={commandErrorMessage} tone="error" />
-        {:else if commandRejectedMessage}
-          <ContentStatePanel title="Command rejected" message={commandRejectedMessage} tone="error" />
-        {:else if commandSuccessMessage}
-          <ContentStatePanel title="Command accepted" message={commandSuccessMessage} />
-        {/if}
-      </div>
+      {#if priorityMessage}
+        <ContentStatePanel
+          title={priorityMessage.title}
+          message={priorityMessage.message}
+          tone={priorityMessage.tone}
+        />
+      {:else if secondaryMessage}
+        <div class="combat-header__inline-message">
+          <strong>Latest notice</strong>
+          <p>{secondaryMessage}</p>
+        </div>
+      {/if}
     </div>
 
     {#if headerExpanded}
       <div class="combat-header__expandable-overview">
         <div class="combat-header__overview-grid">
-          <article class={`combat-header__spotlight-card combat-header__spotlight-card--${statusView.currentTurnTone}`}>
-            <strong>Current turn</strong>
-            <h3>{statusView.currentTurnLabel}</h3>
-            <p>{statusView.currentTurnNote}</p>
-            <p>Turn order: {statusView.turnOrderSummary}</p>
+          <article class="combat-header__spotlight-card">
+            <strong>Battlefield overview</strong>
+            <h3>{statusView.battlefieldSummary}</h3>
+            <p>{statusView.runSummary}</p>
+            <p>{statusView.tieGroupSummary}</p>
           </article>
 
-          <article class="combat-header__spotlight-card">
-            <strong>Battlefield</strong>
-            <h3>{statusView.battlefieldSummary}</h3>
-            <p>{statusView.initiativeSummary} | {statusView.tieGroupSummary}</p>
-            <p>{statusView.runSummary}</p>
+          <article class={`combat-header__spotlight-card combat-header__spotlight-card--${statusView.currentTurnTone}`}>
+            <strong>Turn detail</strong>
+            <h3>{statusView.currentTurnLabel}</h3>
+            <p>{statusView.currentTurnNote}</p>
+            <p>Session {statusView.sessionCode} | Version {statusView.version}</p>
           </article>
 
           <article class="combat-header__spotlight-card combat-header__spotlight-card--feedback">
@@ -151,13 +191,15 @@
   .combat-header__always-visible,
   .combat-header__expandable-overview,
   .combat-header__status-bar,
+  .combat-header__status-strip,
   .combat-header__status-meta,
-  .combat-header__status-stats,
   .combat-header__status-tags,
+  .combat-header__inline-stats,
+  .combat-header__flow-summary,
   .combat-header__overview-grid,
-  .combat-header__message-stack {
+  .combat-header__inline-message {
     display: grid;
-    gap: 1rem;
+    gap: 0.6rem;
   }
 
   .combat-header {
@@ -165,51 +207,75 @@
   }
 
   .combat-header__status-bar {
-    grid-template-columns: minmax(14rem, 0.72fr) minmax(0, 1fr) auto;
-    align-items: start;
-    padding: 1rem;
+    grid-template-columns: minmax(13rem, 0.8fr) minmax(0, 1fr) auto;
+    align-items: center;
+    padding: 0.7rem 0.85rem;
     border: 1px solid rgba(226, 193, 155, 0.18);
     background: linear-gradient(90deg, rgba(21, 19, 17, 0.94), rgba(44, 41, 39, 0.72));
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.26);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
   }
 
-  .combat-header__turn-ribbon {
+  .combat-header__status-strip {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .combat-header__phase-block {
     display: grid;
-    gap: 0.2rem;
-    padding: 0.7rem 1rem;
-    border-left: 4px solid var(--combat-secondary, var(--color-accent));
-    background: rgba(16, 14, 12, 0.62);
+    gap: 0.12rem;
+    padding-left: 0.8rem;
+    border-left: 3px solid var(--combat-secondary, var(--color-accent));
   }
 
-  .combat-header__turn-ribbon span,
-  .combat-header__turn-ribbon small,
+  .combat-header__phase-block span,
   .combat-header__spotlight-card strong {
-    font-size: 0.72rem;
-    letter-spacing: 0.14em;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 
-  .combat-header__turn-ribbon span {
+  .combat-header__phase-block span {
     color: var(--combat-secondary, var(--color-accent));
   }
 
-  .combat-header__turn-ribbon strong {
+  .combat-header__phase-block strong {
     font-family: var(--font-display);
-    font-size: clamp(1.2rem, 2.2vw, 1.9rem);
+    font-size: clamp(1rem, 1.5vw, 1.35rem);
     color: var(--combat-text, var(--color-text));
   }
 
-  .combat-header__turn-ribbon small {
-    color: var(--combat-text-soft, var(--color-text-soft));
+  .combat-header__inline-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
   }
 
-  .combat-header__status-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .combat-header__flow-summary strong,
+  .combat-header__flow-summary p,
+  .combat-header__inline-message strong,
+  .combat-header__inline-message p {
+    margin: 0;
+  }
+
+  .combat-header__flow-summary strong,
+  .combat-header__inline-message strong {
+    color: var(--combat-secondary, var(--color-accent));
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .combat-header__flow-summary p,
+  .combat-header__inline-message p {
+    color: var(--combat-text-soft, var(--color-text-soft));
+    line-height: 1.35;
+    font-size: 0.84rem;
   }
 
   .combat-header__status-tags {
     display: flex;
     flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .combat-header__status-meta {
@@ -219,11 +285,12 @@
 
   .combat-header__overview-grid {
     grid-template-columns: minmax(14rem, 1fr) minmax(14rem, 1fr) minmax(16rem, 1.15fr);
+    gap: 0.75rem;
   }
 
   .combat-header__overview-toggle {
-    min-height: 2.5rem;
-    padding: 0.55rem 0.9rem;
+    min-height: 2.1rem;
+    padding: 0.4rem 0.7rem;
     border: 1px solid rgba(226, 193, 155, 0.42);
     background: rgba(226, 193, 155, 0.1);
     color: var(--combat-text, var(--color-text));
@@ -236,9 +303,9 @@
     background:
       linear-gradient(160deg, rgba(44, 41, 39, 0.92), rgba(21, 19, 17, 0.86)),
       rgba(12, 11, 10, 0.28);
-    padding: 1rem;
+    padding: 0.85rem;
     display: grid;
-    gap: 0.45rem;
+    gap: 0.35rem;
   }
 
   .combat-header__spotlight-card::before {
@@ -283,12 +350,19 @@
 
   .combat-header__spotlight-card h3 {
     font-family: var(--font-display);
-    font-size: clamp(1.2rem, 2vw, 1.6rem);
+    font-size: clamp(1rem, 1.6vw, 1.25rem);
   }
 
   .combat-header__spotlight-card p {
     color: var(--combat-text-soft, var(--color-text-soft));
-    line-height: 1.65;
+    line-height: 1.45;
+    font-size: 0.84rem;
+  }
+
+  .combat-header__inline-message {
+    padding: 0.55rem 0.8rem;
+    border: 1px solid rgba(152, 143, 135, 0.24);
+    background: rgba(16, 14, 12, 0.54);
   }
 
   @media (max-width: 1180px) {
@@ -307,7 +381,8 @@
   }
 
   @media (max-width: 720px) {
-    .combat-header__status-stats {
+    .combat-header__status-strip,
+    .combat-header__inline-stats {
       grid-template-columns: 1fr;
     }
   }

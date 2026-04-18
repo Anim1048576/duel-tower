@@ -29,6 +29,10 @@
     entries,
     onRetry,
   }: Props = $props()
+
+  function previewLines(lines: readonly string[]) {
+    return lines.slice(0, 2)
+  }
 </script>
 
 <div class="combat-log-panel">
@@ -49,9 +53,12 @@
       {#each entries as entry}
         <article class="combat-log-panel__feed-card">
           <strong>{entry.title}</strong>
-          {#each entry.lines as line}
+          {#each previewLines(entry.lines) as line}
             <p>{line}</p>
           {/each}
+          {#if entry.lines.length > 2}
+            <small>+{entry.lines.length - 2} more lines</small>
+          {/if}
         </article>
       {/each}
     </div>
@@ -64,7 +71,7 @@
   .combat-log-panel,
   .combat-log-panel__feed-list {
     display: grid;
-    gap: 1rem;
+    gap: 0.75rem;
   }
 
   .combat-log-panel strong {
@@ -77,12 +84,12 @@
   }
 
   .combat-log-panel__feed-card {
-    padding: 0.9rem;
+    padding: 0.7rem 0.8rem;
     border: 1px solid var(--combat-border, var(--color-border));
     border-left: 3px solid rgba(255, 179, 175, 0.54);
     background: rgba(16, 14, 12, 0.64);
     display: grid;
-    gap: 0.3rem;
+    gap: 0.22rem;
     transition:
       transform 120ms ease,
       border-color 120ms ease,
@@ -96,12 +103,15 @@
   }
 
   .combat-log-panel__feed-card strong,
-  .combat-log-panel__feed-card p {
+  .combat-log-panel__feed-card p,
+  .combat-log-panel__feed-card small {
     margin: 0;
   }
 
-  .combat-log-panel__feed-card p {
+  .combat-log-panel__feed-card p,
+  .combat-log-panel__feed-card small {
     color: var(--combat-text-soft, var(--color-text-soft));
-    line-height: 1.6;
+    line-height: 1.4;
+    font-size: 0.84rem;
   }
 </style>

@@ -101,7 +101,7 @@
   .combat-layout__main,
   .combat-layout__hand {
     display: grid;
-    gap: 1rem;
+    gap: 0.8rem;
   }
 
   .combat-layout__header,
@@ -114,17 +114,18 @@
   .combat-layout__main {
     grid-template-columns: minmax(0, 1.85fr) minmax(20rem, 0.82fr);
     align-items: start;
-    min-height: 34rem;
+    min-height: 30rem;
   }
 
   .combat-layout__sidebar {
     position: sticky;
-    top: 1rem;
+    top: 0.8rem;
+    min-height: 0;
   }
 
   .combat-layout__hand {
     position: sticky;
-    bottom: 1rem;
+    bottom: 0.8rem;
     z-index: 2;
   }
 
