@@ -28,9 +28,13 @@
     pendingCandidateIds: readonly string[]
     orderedTieActorKeys: readonly string[]
     canResolvePendingCommand: boolean
+    selectedCount: number | null
+    selectedReason: string
     onCommandButtonClick: (commandType: string) => void
     onClearTargets: () => void
     onClearSelectionInputs: () => void
+    onSelectedCountChange: (value: string) => void
+    onSelectedReasonChange: (value: string) => void
     onTogglePendingSelectedId: (value: string) => void
     onToggleOrderedActorKey: (actorKey: string) => void
     onResolvePendingDecision: () => void
@@ -57,13 +61,27 @@
     pendingCandidateIds,
     orderedTieActorKeys,
     canResolvePendingCommand,
+    selectedCount,
+    selectedReason,
     onCommandButtonClick,
     onClearTargets,
     onClearSelectionInputs,
+    onSelectedCountChange,
+    onSelectedReasonChange,
     onTogglePendingSelectedId,
     onToggleOrderedActorKey,
     onResolvePendingDecision,
   }: Props = $props()
+
+  function handleCountInput(event: Event) {
+    const target = event.currentTarget as HTMLInputElement
+    onSelectedCountChange(target.value)
+  }
+
+  function handleReasonInput(event: Event) {
+    const target = event.currentTarget as HTMLTextAreaElement
+    onSelectedReasonChange(target.value)
+  }
 </script>
 
 <div
@@ -112,6 +130,33 @@
       onClearTargets={onClearTargets}
       onClearSelectionInputs={onClearSelectionInputs}
     />
+  </div>
+
+  <div class="command-action-panel__zone-panel">
+    <strong>Command helper inputs</strong>
+    <label class="command-action-panel__field-control">
+      <span>Selected count</span>
+      <input type="number" min="1" value={selectedCount ?? 1} oninput={handleCountInput} />
+    </label>
+
+    <label class="command-action-panel__field-control">
+      <span>Selected reason</span>
+      <textarea
+        rows="3"
+        value={selectedReason}
+        placeholder="Reason for the next command or pending resolution"
+        oninput={handleReasonInput}
+      ></textarea>
+    </label>
+
+    <div class="command-action-panel__actions">
+      <button type="button" onclick={() => onClearTargets()}>
+        Clear targets
+      </button>
+      <button type="button" onclick={() => onClearSelectionInputs()}>
+        Clear helper inputs
+      </button>
+    </div>
   </div>
 
   {#if pendingDecision}
@@ -181,7 +226,8 @@
   .command-action-panel,
   .command-action-panel__heading,
   .command-action-panel__command-list,
-  .command-action-panel__zone-panel {
+  .command-action-panel__zone-panel,
+  .command-action-panel__field-control {
     display: grid;
     gap: 1rem;
   }
@@ -203,7 +249,9 @@
 
   .command-action-panel__command-list button,
   .command-action-panel__inline-button,
-  .command-action-panel__actions button {
+  .command-action-panel__actions button,
+  .command-action-panel__field-control input,
+  .command-action-panel__field-control textarea {
     border: 1px solid var(--combat-border, var(--color-border));
     background: rgba(16, 14, 12, 0.58);
     color: var(--combat-text, var(--color-text));
@@ -267,7 +315,8 @@
   }
 
   .command-action-panel__command-list button small,
-  .command-action-panel__zone-panel p {
+  .command-action-panel__zone-panel p,
+  .command-action-panel__field-control span {
     color: var(--combat-text-soft, var(--color-text-soft));
     line-height: 1.6;
   }
@@ -283,6 +332,19 @@
   .command-action-panel__zone-panel strong,
   .command-action-panel__zone-panel p {
     margin: 0;
+  }
+
+  .command-action-panel__field-control input,
+  .command-action-panel__field-control textarea {
+    width: 100%;
+    padding: 0.75rem 0.85rem;
+    outline: none;
+  }
+
+  .command-action-panel__field-control input:focus,
+  .command-action-panel__field-control textarea:focus {
+    border-color: rgba(226, 193, 155, 0.5);
+    box-shadow: 0 0 0 1px rgba(226, 193, 155, 0.16);
   }
 
   .command-action-panel__zone-panel--pending {

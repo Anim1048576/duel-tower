@@ -39,6 +39,8 @@
     pendingCandidateIds: readonly string[]
     orderedTieActorKeys: readonly string[]
     canResolvePendingCommand: boolean
+    selectedCount: number | null
+    selectedReason: string
     visiblePlayerView: CombatPlayerViewModel | null
     eventEntries: readonly CombatFeedEntry[]
     eventsLoading: boolean
@@ -54,6 +56,8 @@
     onCommandButtonClick: (commandType: string) => void
     onClearTargets: () => void
     onClearSelectionInputs: () => void
+    onSelectedCountChange: (value: string) => void
+    onSelectedReasonChange: (value: string) => void
     onTogglePendingSelectedId: (value: string) => void
     onToggleOrderedActorKey: (actorKey: string) => void
     onResolvePendingDecision: () => void
@@ -85,6 +89,8 @@
     pendingCandidateIds,
     orderedTieActorKeys,
     canResolvePendingCommand,
+    selectedCount,
+    selectedReason,
     visiblePlayerView,
     eventEntries,
     eventsLoading,
@@ -100,6 +106,8 @@
     onCommandButtonClick,
     onClearTargets,
     onClearSelectionInputs,
+    onSelectedCountChange,
+    onSelectedReasonChange,
     onTogglePendingSelectedId,
     onToggleOrderedActorKey,
     onResolvePendingDecision,
@@ -161,9 +169,13 @@
             pendingCandidateIds={pendingCandidateIds}
             orderedTieActorKeys={orderedTieActorKeys}
             canResolvePendingCommand={canResolvePendingCommand}
+            {selectedCount}
+            {selectedReason}
             onCommandButtonClick={onCommandButtonClick}
             onClearTargets={onClearTargets}
             onClearSelectionInputs={onClearSelectionInputs}
+            onSelectedCountChange={onSelectedCountChange}
+            onSelectedReasonChange={onSelectedReasonChange}
             onTogglePendingSelectedId={onTogglePendingSelectedId}
             onToggleOrderedActorKey={onToggleOrderedActorKey}
             onResolvePendingDecision={onResolvePendingDecision}

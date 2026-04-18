@@ -199,6 +199,14 @@
         : nextEntity
   }
 
+  function setHoveredHandCard(nextCardId: string | null) {
+    hoveredHandCard = nextCardId
+  }
+
+  function setPinnedHandCard(nextCardId: string | null) {
+    pinnedHandCard = pinnedHandCard === nextCardId ? null : nextCardId
+  }
+
   function readLocalSelectionState() {
     return {
       selectedActionId,
@@ -1260,6 +1268,8 @@
           {pendingCandidateIds}
           orderedTieActorKeys={orderedActorKeys}
           {canResolvePendingCommand}
+          {selectedCount}
+          {selectedReason}
           {visiblePlayerView}
           eventEntries={eventFeedEntries}
           eventsLoading={false}
@@ -1275,6 +1285,8 @@
           onCommandButtonClick={handleCommandButtonClick}
           onClearTargets={handleClearSelectedTargets}
           onClearSelectionInputs={handleClearSelectionInputs}
+          onSelectedCountChange={handleSelectedCountChange}
+          onSelectedReasonChange={handleSelectedReasonChange}
           onTogglePendingSelectedId={handleTogglePendingSelectedId}
           onToggleOrderedActorKey={handleToggleOrderedActorKey}
           onResolvePendingDecision={handleResolvePendingDecision}
@@ -1288,35 +1300,22 @@
       {#snippet hand()}
         <HandBar
           handCards={visiblePlayerView?.handCards ?? []}
+          {commandOptions}
+          commandPending={pendingActionId}
           {selectedCardId}
           {selectedDiscardIds}
           selectedCommandType={selectedActionId}
-          expectedVersion={screen?.access.expectedVersion ?? null}
           currentActorLabel={statusView.currentTurnLabel}
           visibleHandOwner={visiblePlayerView?.playerId ?? null}
-          selectedActor={selectedPlayerId}
-          selectedEnemyId={selectedEnemyView?.enemyId ?? null}
-          selectedCardLabel={selectedCardView?.title ?? selectedCardId}
+          {selectedCardView}
           pendingDecisionType={pendingDecision?.type ?? null}
-          selectedTargetCount={selectedTargetKeys.length}
-          selectedIdCount={selectedFieldIds.length}
-          orderedActorKeysSummary={orderedActorKeys.join(', ') || 'None'}
-          targetRefSummary={selectedTargetLabels.join(', ') || 'None'}
-          selectedDiscardCount={selectedDiscardIds.length}
-          selectedFieldCount={selectedFieldIds.length}
-          {selectedCount}
-          pendingCandidateCount={selectedPendingIds.length}
-          bufferedEventCount={screen?.sidebar.events.length ?? 0}
-          runNodeSummary={screen?.status.runSummary ?? 'Run summary unavailable.'}
-          {selectedReason}
           catalogLoading={false}
           emptyMessage="Visible hand cards will render here once the current visible player has hand instances in the combat screen."
+          onCommandButtonClick={handleCommandButtonClick}
           onSelectHandCard={handleSelectHandCard}
           onToggleDiscard={handleToggleDiscard}
-          onSelectedCountChange={handleSelectedCountChange}
-          onSelectedReasonChange={handleSelectedReasonChange}
-          onClearTargets={handleClearSelectedTargets}
-          onClearSelectionInputs={handleClearSelectionInputs}
+          onHoverHandCard={setHoveredHandCard}
+          onPinHandCard={setPinnedHandCard}
         />
       {/snippet}
     </CombatLayout>
