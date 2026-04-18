@@ -27,6 +27,7 @@
     sessionPageStateCopy,
     type SessionPageFeedback,
   } from '../lib/session/pageState'
+  import { resolveGmLobbyScreenRefreshPlan, resolveGmLobbySelections } from '../lib/session/gmLobbyScreenRefresh.js'
   import { readSessionCodeFromRoute } from '../lib/session/sessionRoute'
   import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
   import { startTimedPolling, type TimedPollingHandle } from '../lib/session/liveSessionPolling'
@@ -36,6 +37,7 @@
   let loading = $state(true)
   let notFound = $state(false)
   let errorMessage = $state<string | null>(null)
+  let refreshErrorMessage = $state<string | null>(null)
   let invalidAccessMessage = $state<string | null>(null)
   let actionErrorTitle = $state('GM action failed')
   let actionErrorMessage = $state<string | null>(null)
@@ -50,7 +52,6 @@
   let resetKeepPlayers = $state(true)
   let resetKeepLoadouts = $state(true)
   let resetSeedInput = $state('')
-  let requestedSessionCode = $state<string | null>(null)
   let requestSequence = 0
   let pollingHandle: TimedPollingHandle | null = null
 
@@ -76,29 +77,32 @@
     actionSuccessMessage = null
   }
 
+  function clearRefreshError() {
+    refreshErrorMessage = null
+  }
+
   function stopPolling() {
     pollingHandle?.stop()
     pollingHandle = null
   }
 
-  function syncSelections(nextScreen: GmLobbyScreenResponse) {
-    const participantIds = nextScreen.participantCards.map((participant) => participant.name)
-    const selectableStartPlayerIds = nextScreen.startCombat.selectableStartPlayers.map((player) => player.playerId)
-    const recommendedStartPlayerId = nextScreen.startCombat.recommendedStartPlayerId ?? ''
-
-    if (!participantIds.includes(selectedKickPlayerId)) {
-      selectedKickPlayerId = participantIds[0] ?? ''
-    }
-
-    if (!selectableStartPlayerIds.includes(selectedStartPlayerId)) {
-      selectedStartPlayerId = recommendedStartPlayerId || selectableStartPlayerIds[0] || ''
-    }
-  }
-
-  function applyScreen(nextScreen: GmLobbyScreenResponse) {
+  function applyScreen(
+    nextScreen: GmLobbyScreenResponse,
+    options: {
+      preserveStartPlayerSelection: boolean
+    },
+  ) {
     screen = nextScreen
     syncSessionSelectionHandoff(nextScreen.sessionCode)
-    syncSelections(nextScreen)
+
+    const nextSelections = resolveGmLobbySelections(nextScreen, {
+      selectedKickPlayerId,
+      selectedStartPlayerId,
+      preserveStartPlayerSelection: options.preserveStartPlayerSelection,
+    })
+
+    selectedKickPlayerId = nextSelections.selectedKickPlayerId
+    selectedStartPlayerId = nextSelections.selectedStartPlayerId
   }
 
   function updateStoredGmAccess(nextScreen: GmLobbyScreenResponse | null, restoredGmToken?: string | null) {
@@ -113,27 +117,40 @@
     })
   }
 
-  async function refreshGmLobbyScreen(reason: 'initial-load' | 'retry-load' | 'route-change' | 'polling' | 'action-refresh') {
+  async function refreshGmLobbyScreen(
+    reason:
+      | 'initial-load'
+      | 'retry-load'
+      | 'route-change'
+      | 'polling'
+      | 'action-kick'
+      | 'action-reset'
+      | 'action-start-combat-success'
+      | 'action-start-combat-failed',
+  ) {
+    const plan = resolveGmLobbyScreenRefreshPlan(reason)
     const requestId = ++requestSequence
     const nextRouteCode = getRouteSessionCode()
     const nextAccess = readStoredSessionAccess()
     const nextInvalidAccessMessage = getInvalidAccessMessage(nextRouteCode)
-    const showLoading = reason !== 'polling' && reason !== 'action-refresh'
 
     runtimeAccess = nextAccess
     invalidAccessMessage = nextInvalidAccessMessage
-    requestedSessionCode = nextRouteCode
 
-    if (showLoading) {
+    if (plan.showLoading) {
       loading = true
       notFound = false
       errorMessage = null
+      clearRefreshError()
       clearActionFeedback()
     }
 
     if (!nextRouteCode || nextInvalidAccessMessage) {
       stopPolling()
-      if (showLoading) loading = false
+      screen = null
+      notFound = false
+      clearRefreshError()
+      if (plan.showLoading) loading = false
       return
     }
 
@@ -142,7 +159,10 @@
       if (requestId !== requestSequence) return
       notFound = false
       errorMessage = null
-      applyScreen(response)
+      clearRefreshError()
+      applyScreen(response, {
+        preserveStartPlayerSelection: plan.preserveStartPlayerSelection,
+      })
       startPolling()
     } catch (error) {
       if (requestId !== requestSequence) return
@@ -151,11 +171,18 @@
       if (error instanceof ApiError && (error.status === 404 || error.code === 'not_found')) {
         notFound = true
         screen = null
+        clearRefreshError()
       } else {
-        errorMessage = getApiErrorMessage(error, 'Unable to restore the current GM lobby screen.')
+        const message = getApiErrorMessage(error, 'Unable to restore the current GM lobby screen.')
+        if (plan.showLoading || !screen) {
+          errorMessage = message
+          clearRefreshError()
+        } else {
+          refreshErrorMessage = message
+        }
       }
     } finally {
-      if (requestId === requestSequence && showLoading) {
+      if (requestId === requestSequence && plan.showLoading) {
         loading = false
       }
     }
@@ -173,7 +200,7 @@
         }
       },
       onError: (error) => {
-        errorMessage = getApiErrorMessage(error, 'Unable to refresh the current GM lobby screen.')
+        refreshErrorMessage = getApiErrorMessage(error, 'Unable to refresh the current GM lobby screen.')
       },
     })
   }
@@ -221,6 +248,12 @@
     return typeof value === 'string' ? value : ''
   }
 
+  async function refreshAfterAction(
+    reason: 'action-kick' | 'action-reset' | 'action-start-combat-success' | 'action-start-combat-failed',
+  ) {
+    await refreshGmLobbyScreen(reason)
+  }
+
   async function runKick() {
     if (!screen) return
     const action = findAction('gmLobby.kick')
@@ -242,7 +275,7 @@
         },
       )
       kickReason = ''
-      await refreshGmLobbyScreen('action-refresh')
+      await refreshAfterAction('action-kick')
       actionSuccessMessage = `${gmLobbyStateCopy.playerRemovedFeedback.message} (${selectedKickPlayerId})`
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to remove the selected player.')
@@ -276,7 +309,7 @@
           newSeed: parsedSeed,
         }),
       })
-      await refreshGmLobbyScreen('action-refresh')
+      await refreshAfterAction('action-reset')
       actionSuccessMessage = gmLobbyStateCopy.sessionResetFeedback.message
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to reset the current session.')
@@ -314,7 +347,10 @@
       updateStoredGmAccess(response.latestScreen, response.restoredGmToken)
 
       if (response.latestScreen) {
-        applyScreen(response.latestScreen)
+        clearRefreshError()
+        applyScreen(response.latestScreen, {
+          preserveStartPlayerSelection: !response.success,
+        })
       }
 
       if (response.success) {
@@ -323,8 +359,15 @@
           return
         }
 
+        if (!response.latestScreen) {
+          await refreshAfterAction('action-start-combat-success')
+        }
         actionSuccessMessage = response.message || 'Combat start completed.'
         return
+      }
+
+      if (!response.latestScreen) {
+        await refreshAfterAction('action-start-combat-failed')
       }
 
       actionErrorTitle =
@@ -484,6 +527,10 @@
 
       {#if screen.uiNotices.length > 0}
         <ContentStatePanel title="Screen notices" message={screen.uiNotices.join(' ')} />
+      {/if}
+
+      {#if refreshErrorMessage}
+        <ContentStatePanel title="Refresh delayed" message={refreshErrorMessage} tone="error" />
       {/if}
 
       {#if actionErrorMessage}
