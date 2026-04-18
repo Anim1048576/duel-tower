@@ -38,7 +38,6 @@ public class Tig008_Card implements CardBlueprint {
         );
     }
 
-
     @Override
     public CardPlaySpec playSpec() {
         return new CardPlaySpec(

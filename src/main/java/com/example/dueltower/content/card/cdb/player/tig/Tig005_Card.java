@@ -50,7 +50,6 @@ public class Tig005_Card implements CardBlueprint {
                 : currentCost;
     }
 
-
     @Override
     public CardPlaySpec playSpec() {
         return new CardPlaySpec(
