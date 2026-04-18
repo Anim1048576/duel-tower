@@ -2,6 +2,7 @@
   import SectionFrame from '../SectionFrame.svelte'
   import type { PendingDecisionDto } from '../../api/sessionTypes'
   import CombatLogPanel from './CombatLogPanel.svelte'
+  import CombatInspectorPanel from './CombatInspectorPanel.svelte'
   import CombatResultsPanel from './CombatResultsPanel.svelte'
   import CommandActionPanel from './CommandActionPanel.svelte'
   import CombatZoneSummary from './CombatZoneSummary.svelte'
@@ -9,7 +10,7 @@
   import type {
     CombatCommandRequirementViewModel,
     CombatFeedEntry,
-    CombatInspectorEntityReference,
+    CombatInspectorViewModel,
     CombatPlayerViewModel,
     CombatRecentResultEntry,
     CombatSidebarTab,
@@ -48,8 +49,7 @@
     recentResultEntries: readonly CombatRecentResultEntry[]
     recentResultsLoading: boolean
     recentResultsErrorMessage: string | null
-    inspectorPlaceholderEntity: CombatInspectorEntityReference | null
-    inspectorPlaceholderCardId: string | null
+    inspectorView: CombatInspectorViewModel | null
     onTabChange: (tab: CombatSidebarTab) => void
     onCommandButtonClick: (commandType: string) => void
     onClearTargets: () => void
@@ -95,8 +95,7 @@
     recentResultEntries,
     recentResultsLoading,
     recentResultsErrorMessage,
-    inspectorPlaceholderEntity,
-    inspectorPlaceholderCardId,
+    inspectorView,
     onTabChange,
     onCommandButtonClick,
     onClearTargets,
@@ -115,18 +114,6 @@
     log: 'Log',
     result: 'Result',
     inspector: 'Inspector',
-  }
-
-  function inspectorPlaceholderSummary(entity: CombatInspectorEntityReference | null) {
-    if (!entity) {
-      return 'No hovered or pinned entity yet.'
-    }
-
-    if (entity.kind === 'summon') {
-      return `Summon ${entity.id} owned by ${entity.owner}`
-    }
-
-    return `${entity.kind === 'player' ? 'Player' : 'Enemy'} ${entity.id}`
   }
 </script>
 
@@ -226,12 +213,7 @@
           onRetry={onRetryResults}
         />
       {:else}
-        <div class="combat-sidebar__inspector-placeholder">
-          <strong>Inspector placeholder</strong>
-          <p>Hover and pin driven inspector content will mount here in a later step.</p>
-          <p>Entity focus: {inspectorPlaceholderSummary(inspectorPlaceholderEntity)}</p>
-          <p>Hand card focus: {inspectorPlaceholderCardId ?? 'No hovered or pinned hand card yet.'}</p>
-        </div>
+        <CombatInspectorPanel {inspectorView} />
       {/if}
     </div>
   </div>
@@ -240,8 +222,7 @@
 <style>
   .combat-sidebar,
   .combat-sidebar__tab-panel,
-  .combat-sidebar__tab-stack,
-  .combat-sidebar__inspector-placeholder {
+  .combat-sidebar__tab-stack {
     display: grid;
     gap: 1rem;
   }
@@ -261,7 +242,7 @@
   }
 
   .combat-sidebar__tab-button,
-  .combat-sidebar__inspector-placeholder {
+  .combat-sidebar__tab-panel {
     border: 1px solid var(--combat-border, var(--color-border));
     background: rgba(16, 14, 12, 0.58);
   }
@@ -275,27 +256,6 @@
   .combat-sidebar__tab-button--active {
     border-color: rgba(226, 193, 155, 0.42);
     background: rgba(226, 193, 155, 0.12);
-  }
-
-  .combat-sidebar__inspector-placeholder {
-    padding: 1rem;
-  }
-
-  .combat-sidebar__inspector-placeholder strong,
-  .combat-sidebar__inspector-placeholder p {
-    margin: 0;
-  }
-
-  .combat-sidebar__inspector-placeholder strong {
-    color: var(--combat-secondary, var(--color-accent));
-    font-size: 0.74rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .combat-sidebar__inspector-placeholder p {
-    color: var(--combat-text-soft, var(--color-text-soft));
-    line-height: 1.6;
   }
 
   @media (max-width: 1080px) {

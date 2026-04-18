@@ -16,6 +16,10 @@
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import BattlefieldPanel from '../lib/components/combat/BattlefieldPanel.svelte'
   import CombatHeader from '../lib/components/combat/CombatHeader.svelte'
+  import {
+    buildCombatInspectorViewModel,
+    resolveCombatInspectorTarget,
+  } from '../lib/components/combat/combatInspector'
   import CombatLayout from '../lib/components/combat/CombatLayout.svelte'
   import CombatSidebar from '../lib/components/combat/CombatSidebar.svelte'
   import HandBar from '../lib/components/combat/HandBar.svelte'
@@ -1033,6 +1037,25 @@
 
     return labels
   })
+  const activeInspectorTarget = $derived.by(() =>
+    resolveCombatInspectorTarget({
+      pinnedEntity,
+      pinnedHandCard,
+      hoveredEntity,
+      hoveredHandCard,
+    }),
+  )
+  const inspectorView = $derived.by(() =>
+    activeInspectorTarget
+      ? buildCombatInspectorViewModel({
+          screen,
+          target: activeInspectorTarget.target,
+          source: activeInspectorTarget.source,
+          selectedCardId,
+          selectedDiscardIds,
+        })
+      : null,
+  )
   const commandOptions = $derived.by(() => {
     if (!screen) {
       return [] as CommandOptionViewModel[]
@@ -1223,8 +1246,7 @@
           recentResultEntries={recentResultEntries}
           recentResultsLoading={false}
           recentResultsErrorMessage={null}
-          inspectorPlaceholderEntity={combatPresentationState.pinnedEntity ?? combatPresentationState.hoveredEntity}
-          inspectorPlaceholderCardId={combatPresentationState.pinnedHandCard ?? combatPresentationState.hoveredHandCard}
+          {inspectorView}
           onTabChange={setActiveSidebarTab}
           onCommandButtonClick={handleCommandButtonClick}
           onClearTargets={handleClearSelectedTargets}

@@ -29,6 +29,61 @@ export type CombatPresentationState = {
   handExpanded: boolean
 }
 
+export type CombatInspectorInteractionSource = 'hovered' | 'pinned'
+
+export type CombatInspectorTarget =
+  | {
+      kind: 'player'
+      playerId: string
+    }
+  | {
+      kind: 'enemy'
+      enemyId: string
+    }
+  | {
+      kind: 'handCard'
+      instanceId: string
+    }
+
+export type CombatInspectorSelectionSummary = {
+  label: string
+  tone: CombatTone
+}
+
+export type CombatInspectorEntityViewModel = {
+  kind: 'entity'
+  source: CombatInspectorInteractionSource
+  target: CombatInspectorTarget
+  title: string
+  subtitle: string
+  categoryLabel: string
+  portraitLabel: string | null
+  portraitVariant: 'default' | 'enemy'
+  metrics: CombatMetric[]
+  statusTags: CombatTag[]
+  summaryLines: string[]
+  detailLines: string[]
+}
+
+export type CombatInspectorCardViewModel = {
+  kind: 'handCard'
+  source: CombatInspectorInteractionSource
+  target: CombatInspectorTarget
+  title: string
+  subtitle: string
+  categoryLabel: string
+  portraitLabel: string | null
+  costOrType: string
+  description: string
+  keywordTags: CombatTag[]
+  ruleLines: string[]
+  selectionSummaries: CombatInspectorSelectionSummary[]
+}
+
+export type CombatInspectorViewModel =
+  | CombatInspectorEntityViewModel
+  | CombatInspectorCardViewModel
+
 export type CombatMetric = {
   label: string
   value: string | number
