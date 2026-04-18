@@ -90,7 +90,7 @@
   <div class="battlefield-panel__side battlefield-panel__side--players">
     <SectionFrame
       title="Player side"
-      description="Player cards highlight live zones, EX state, passives, and pending decisions. Player HP/AP is not exposed in the current player session payload."
+      description="Live player state and target controls."
     >
       {#if playerViews.length > 0}
         <div class="battlefield-panel__unit-list battlefield-panel__unit-list--players">
@@ -116,14 +116,14 @@
                 onInspectPin={() => pinEntity({ kind: 'player', id: player.playerId })}
                 actionButtons={[
                   {
-                    label: selectedPlayerId === player.playerId ? 'Selected actor' : 'Select actor',
+                    label: selectedPlayerId === player.playerId ? 'Selected' : 'Select',
                     selected: selectedPlayerId === player.playerId,
                     onClick: () => onSelectPlayer(player.playerId),
                   },
                   {
                     label: selectedTargets.some((target) => target.playerId === player.playerId)
-                      ? 'Targeted player'
-                      : 'Target player',
+                      ? 'Targeted'
+                      : 'Target',
                     selected: selectedTargets.some((target) => target.playerId === player.playerId),
                     onClick: () => onToggleTargetPlayer(player.playerId),
                   },
@@ -144,7 +144,7 @@
   <div class="battlefield-panel__side battlefield-panel__side--enemies">
     <SectionFrame
       title="Enemy side"
-      description="Enemy cards surface combat HP/AP and status pressure first, with summons grouped below the main enemy roster."
+      description="Enemy state, pressure, and summons."
     >
       {#if enemyViews.length > 0}
         <div class="battlefield-panel__unit-list battlefield-panel__unit-list--enemies">
@@ -171,8 +171,8 @@
                 actionButtons={[
                   {
                     label: selectedTargets.some((target) => target.enemyId === enemy.enemyId)
-                      ? 'Targeted enemy'
-                      : 'Target enemy',
+                      ? 'Targeted'
+                      : 'Target',
                     selected: selectedTargets.some((target) => target.enemyId === enemy.enemyId),
                     onClick: () => onToggleTargetEnemy(enemy.enemyId),
                   },
@@ -212,8 +212,8 @@
                         target.summonOwnerPlayerId === summon.owner &&
                         target.summonInstanceId === summon.summonId,
                     )
-                      ? 'Targeted summon'
-                      : 'Target summon',
+                      ? 'Targeted'
+                      : 'Target',
                     selected: selectedTargets.some(
                       (target) =>
                         target.summonOwnerPlayerId === summon.owner &&
@@ -238,14 +238,14 @@
   .battlefield-panel__summon-section,
   .timeline-offset {
     display: grid;
-    gap: 0.75rem;
+    gap: 0.55rem;
   }
 
   .battlefield-panel {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: start;
-    gap: clamp(1rem, 2.8vw, 2.4rem);
-    min-height: clamp(28rem, 48vh, 40rem);
+    gap: clamp(0.8rem, 2vw, 1.8rem);
+    min-height: clamp(24rem, 42vh, 34rem);
   }
 
   .battlefield-panel__side--players {
@@ -260,7 +260,7 @@
 
   .battlefield-panel__unit-list--players,
   .battlefield-panel__unit-list--enemies {
-    gap: 0.75rem;
+    gap: 0.55rem;
   }
 
   .battlefield-panel__unit-list--enemies {
@@ -277,11 +277,11 @@
 
   .battlefield-panel__summon-section > strong {
     color: var(--combat-tertiary, var(--color-success));
-    font-size: 0.74rem;
+    font-size: 0.68rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     border-bottom: 1px solid rgba(188, 204, 173, 0.22);
-    padding-bottom: 0.4rem;
+    padding-bottom: 0.28rem;
   }
 
   @media (max-width: 1080px) {

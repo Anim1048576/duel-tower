@@ -49,16 +49,16 @@
 
 <SectionFrame
   title="Hand dock"
-  description="The bottom dock keeps hand actions fast and pushes detailed reading toward the inspector and command context."
+  description="Fast hand actions and selected-card context."
 >
   <div class="hand-bar">
     <div class="hand-bar__dock-meta">
       <div class="hand-bar__selected-card">
-        <strong>Selected card</strong>
-        <p>{selectedCardView?.title ?? 'No card selected'}</p>
-        <span>{selectedCardView?.subtitle ?? `${visibleHandOwner ?? 'No visible owner'} | ${currentActorLabel}`}</span>
+        <strong>Selected</strong>
+        <p>{selectedCardView?.title ?? 'No card'}</p>
+        <span>{selectedCardView?.subtitle ?? visibleHandOwner ?? currentActorLabel}</span>
         {#if pendingDecisionType}
-          <small>Pending: {pendingDecisionType}</small>
+          <small>{pendingDecisionType}</small>
         {/if}
       </div>
 
@@ -113,12 +113,12 @@
   .hand-bar__dock-meta,
   .hand-bar__selected-card {
     display: grid;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   .hand-bar {
-    gap: 0.85rem;
-    padding: 0.85rem;
+    gap: 0.55rem;
+    padding: 0.55rem 0.65rem;
     border: 1px solid rgba(226, 193, 155, 0.2);
     background:
       linear-gradient(180deg, rgba(21, 19, 17, 0.96), rgba(16, 14, 12, 0.95)),
@@ -127,16 +127,17 @@
   }
 
   .hand-bar__dock-meta {
-    grid-template-columns: minmax(15rem, 0.9fr) minmax(0, 1.8fr);
+    grid-template-columns: minmax(11rem, auto) minmax(0, 1fr);
     align-items: center;
+    gap: 0.55rem;
   }
 
   .hand-bar__cards {
     grid-auto-flow: column;
-    grid-auto-columns: minmax(8.75rem, 10rem);
+    grid-auto-columns: minmax(8.2rem, 9rem);
     overflow-x: auto;
     overflow-y: hidden;
-    padding-bottom: 0.2rem;
+    padding-bottom: 0.1rem;
     align-items: stretch;
     scrollbar-width: thin;
   }
@@ -144,7 +145,8 @@
   .hand-bar__quick-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.35rem;
+    align-items: center;
   }
 
   .hand-bar__selected-card,
@@ -161,7 +163,11 @@
   }
 
   .hand-bar__selected-card {
-    padding: 0.7rem 0.85rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.6rem;
+    min-width: 0;
   }
 
   .hand-bar__selected-card strong,
@@ -175,25 +181,42 @@
   .hand-bar__selected-card span,
   .hand-bar__selected-card small {
     color: var(--combat-text-soft, var(--color-text-soft));
-    line-height: 1.4;
+    line-height: 1.2;
   }
 
   .hand-bar__selected-card strong {
     color: var(--combat-secondary, var(--color-accent));
-    font-size: 0.74rem;
+    font-size: 0.68rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 
   .hand-bar__selected-card p {
     font-family: var(--font-display);
-    font-size: 1.05rem;
+    font-size: 0.92rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hand-bar__selected-card span,
+  .hand-bar__selected-card small {
+    font-size: 0.72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hand-bar__selected-card small {
+    justify-self: end;
   }
 
   .hand-bar__quick-actions button {
-    min-height: 2.1rem;
-    padding: 0.45rem 0.7rem;
+    min-height: 1.85rem;
+    padding: 0.35rem 0.55rem;
     color: var(--combat-text, var(--color-text));
+    font-size: 0.78rem;
+    white-space: nowrap;
     transition:
       transform 120ms ease,
       border-color 120ms ease,
@@ -218,15 +241,23 @@
     .hand-bar__dock-meta {
       grid-template-columns: 1fr;
     }
+
+    .hand-bar__selected-card {
+      grid-template-columns: 1fr;
+    }
+
+    .hand-bar__selected-card small {
+      justify-self: start;
+    }
   }
 
   @media (max-width: 720px) {
     .hand-bar {
-      padding: 0.7rem;
+      padding: 0.5rem 0.55rem;
     }
 
     .hand-bar__cards {
-      grid-auto-columns: minmax(7.6rem, 8.6rem);
+      grid-auto-columns: minmax(7.4rem, 8.2rem);
     }
 
     .hand-bar__quick-actions {

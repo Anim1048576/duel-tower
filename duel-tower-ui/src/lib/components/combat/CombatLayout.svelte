@@ -62,7 +62,7 @@
     position: relative;
     isolation: isolate;
     overflow: visible;
-    --combat-stage-gap: clamp(1rem, 2vw, 1.4rem);
+    --combat-stage-gap: clamp(0.7rem, 1.4vw, 1rem);
     --combat-context-width: clamp(22rem, 25vw, 28rem);
     min-height: calc(100vh - 4rem);
     padding: clamp(1rem, 1.8vw, 1.5rem);

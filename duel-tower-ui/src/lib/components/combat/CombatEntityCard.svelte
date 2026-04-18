@@ -62,7 +62,7 @@
 
   const compactPrimaryMetric = $derived(metrics[0] ?? null)
   const compactSecondaryMetrics = $derived(metrics.slice(1, compactMetrics ? 2 : 3))
-  const compactStatusTags = $derived(tagRows.flat().slice(0, 3))
+  const compactStatusTags = $derived(tagRows.flat().slice(0, 2))
   const compactOverflowTagCount = $derived(Math.max(0, tagRows.flat().length - compactStatusTags.length))
 </script>
 
@@ -211,7 +211,7 @@
     position: relative;
     display: flex;
     gap: 1rem;
-    padding: 1rem;
+    padding: 0.9rem;
     overflow: hidden;
     transition:
       transform 150ms ease,
@@ -299,7 +299,7 @@
     min-width: 0;
     flex: 1 1 auto;
     display: grid;
-    gap: 0.7rem;
+    gap: 0.5rem;
   }
 
   .combat-entity-card__head {
@@ -338,12 +338,12 @@
   .combat-entity-card__compact-metrics {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.65rem;
+    gap: 0.5rem;
   }
 
   .combat-entity-card__compact-shell {
     display: grid;
-    gap: 0.5rem;
+    gap: 0.35rem;
   }
 
   .combat-entity-card__compact-head {
@@ -354,6 +354,7 @@
   .combat-entity-card__compact-main {
     align-items: center;
     justify-content: space-between;
+    gap: 0.5rem;
   }
 
   .combat-entity-card__title-block h3,
@@ -361,27 +362,42 @@
     margin: 0;
   }
 
+  .combat-entity-card__title-block {
+    min-width: 0;
+  }
+
+  .combat-entity-card__title-block h3 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .combat-entity-card__title-block p {
     color: var(--combat-text-soft, var(--color-text-muted));
-    line-height: 1.4;
-    font-size: 0.82rem;
+    line-height: 1.2;
+    font-size: 0.76rem;
+    display: -webkit-box;
+    line-clamp: 1;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .combat-entity-card__primary-metric {
-    min-width: min(100%, 9rem);
+    min-width: min(100%, 7.6rem);
     display: grid;
-    gap: 0.3rem;
+    gap: 0.2rem;
   }
 
   .combat-entity-card__compact-metrics {
-    gap: 0.45rem;
+    gap: 0.35rem;
   }
 
   .combat-entity-card__compact-metric-pill {
     display: grid;
     gap: 0.08rem;
-    min-width: 4.5rem;
-    padding: 0.45rem 0.55rem;
+    min-width: 4rem;
+    padding: 0.32rem 0.45rem;
     border: 1px solid rgba(226, 193, 155, 0.14);
     background: rgba(16, 14, 12, 0.48);
   }
@@ -394,13 +410,13 @@
 
   .combat-entity-card__compact-metric-pill strong {
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: 0.92rem;
     line-height: 1;
   }
 
   .combat-entity-card__compact-metric-pill span {
     color: var(--combat-text-soft, var(--color-text-muted));
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
@@ -462,9 +478,10 @@
   }
 
   .combat-entity-card__action-buttons button {
-    min-height: 2.15rem;
-    padding: 0.48rem 0.7rem;
+    min-height: 1.9rem;
+    padding: 0.38rem 0.58rem;
     color: var(--combat-text, var(--color-text));
+    font-size: 0.78rem;
     transition:
       transform 120ms ease,
       border-color 120ms ease,
@@ -486,29 +503,31 @@
   }
 
   .combat-entity-card--compact {
-    gap: 0.75rem;
-    padding: 0.75rem;
+    gap: 0.55rem;
+    padding: 0.58rem 0.62rem;
     align-items: center;
   }
 
   .combat-entity-card--compact .combat-entity-card__portrait {
-    flex-basis: 3.8rem;
-    min-height: 4.5rem;
-    font-size: 1rem;
+    flex-basis: 3.15rem;
+    min-height: 3.7rem;
+    font-size: 0.88rem;
   }
 
   .combat-entity-card--compact .combat-entity-card__head h3,
   .combat-entity-card--compact .combat-entity-card__title-block h3 {
-    font-size: 1rem;
+    font-size: 0.92rem;
+    line-height: 1.05;
   }
 
   .combat-entity-card__tag-row--compact {
-    gap: 0.4rem;
+    gap: 0.3rem;
   }
 
   .combat-entity-card--compact :global(.tag-chip) {
-    min-height: 1.3rem;
-    font-size: 0.66rem;
+    min-height: 1.15rem;
+    padding-inline: 0.42rem;
+    font-size: 0.6rem;
   }
 
   @media (max-width: 620px) {
