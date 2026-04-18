@@ -1,10 +1,16 @@
 package com.example.dueltower.screen.service;
 
 import com.example.dueltower.content.card.dto.CardDetailResponse;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.ChoiceRequirement;
+import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
+import com.example.dueltower.content.card.model.playspec.ExtraPlayRequirement;
+import com.example.dueltower.content.card.model.playspec.SelectFieldCardsRequirement;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.Ids.CardDefId;
+import com.example.dueltower.session.dto.PendingDecisionDto;
 import com.example.dueltower.screen.dto.CombatScreenResponse;
 import com.example.dueltower.screen.dto.DisabledReasonDto;
 import com.example.dueltower.screen.dto.ScreenActionAuth;
@@ -28,6 +34,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
@@ -351,6 +358,26 @@ public class CombatScreenService {
         boolean canClearRecentResults = hasPlayerToken && runtimePlayerId != null;
         boolean hasPendingDecision = runtimePlayer != null && runtimePlayer.pendingDecision() != null;
         boolean exAvailable = runtimePlayer != null && runtimePlayer.exCard() != null && !runtimePlayer.exOnCooldown();
+        List<Map<String, Object>> playCardSourceOptions = runtimePlayer == null
+                ? List.of()
+                : runtimePlayer.hand().stream()
+                .map(instanceId -> playCardSourceOption(instanceId, state))
+                .toList();
+        Map<String, Object> playCardMetadata = new LinkedHashMap<>();
+        playCardMetadata.put("kind", "playCard");
+        playCardMetadata.put("note", "Server-calculated command support and requirement views for each playable hand card.");
+        playCardMetadata.put("localSelection", Map.of("requiresSelectedCard", true, "sourceType", "handCard"));
+        playCardMetadata.put("sourceOptions", playCardSourceOptions);
+
+        Map<String, Object> useExMetadata = new LinkedHashMap<>();
+        useExMetadata.put("kind", "useEx");
+        useExMetadata.put("note", "Server-calculated EX command requirement view.");
+        useExMetadata.put("sourceCard", runtimePlayer == null ? null : cardView(runtimePlayer.exCard(), state, cardService.asMap()));
+        RequirementMetadata useExRequirement = runtimePlayer == null ? RequirementMetadata.empty(null)
+                : requirementMetadataForInstance(runtimePlayer.exCard(), state);
+        useExMetadata.put("requirementView", useExRequirement.view());
+        useExMetadata.put("supported", useExRequirement.supported());
+        useExMetadata.put("unsupportedReason", useExRequirement.unsupportedReason());
 
         List<ScreenActionDto> actions = new ArrayList<>();
         actions.add(playerCommandAction(
@@ -359,6 +386,12 @@ public class CombatScreenService {
                 "Draw",
                 canIssuePlayerCommand,
                 playerCommandDisabledReason(runtimePlayerId, canIssuePlayerCommand),
+                Map.of(
+                        "kind", "simple",
+                        "note", canIssuePlayerCommand
+                                ? "Draw is available for the runtime player on the current turn."
+                                : "Requires player-token turn ownership."
+                ),
                 Map.of(
                         "type", "DRAW",
                         "expectedVersion", state.version(),
@@ -373,6 +406,12 @@ public class CombatScreenService {
                 canIssuePlayerCommand,
                 playerCommandDisabledReason(runtimePlayerId, canIssuePlayerCommand),
                 Map.of(
+                        "kind", "simple",
+                        "note", canIssuePlayerCommand
+                                ? "End turn is available for the runtime player on the current turn."
+                                : "Requires player-token turn ownership."
+                ),
+                Map.of(
                         "type", "END_TURN",
                         "expectedVersion", state.version(),
                         "playerId", runtimePlayerId == null ? "" : runtimePlayerId
@@ -385,6 +424,12 @@ public class CombatScreenService {
                 canClearRecentResults,
                 canClearRecentResults ? null : playerTokenRequiredReason("clear recent results"),
                 Map.of(
+                        "kind", "utility",
+                        "note", canClearRecentResults
+                                ? "Player-side utility command that clears the recent result stack."
+                                : "Requires X-Player-Token for the current runtime player."
+                ),
+                Map.of(
                         "type", "CLEAR_RECENT_RESULTS",
                         "expectedVersion", state.version(),
                         "playerId", runtimePlayerId == null ? "" : runtimePlayerId
@@ -396,6 +441,7 @@ public class CombatScreenService {
                 "Play selected card",
                 canIssuePlayerCommand,
                 playerCommandDisabledReason(runtimePlayerId, canIssuePlayerCommand),
+                playCardMetadata,
                 new LinkedHashMap<>(Map.of(
                         "type", "PLAY_CARD",
                         "expectedVersion", state.version(),
@@ -410,12 +456,15 @@ public class CombatScreenService {
                 state.sessionCode(),
                 "combat.useEx",
                 "Use EX",
-                canIssuePlayerCommand && exAvailable,
+                canIssuePlayerCommand && exAvailable && useExRequirement.supported(),
                 runtimePlayerId == null
                         ? playerTokenRequiredReason("use EX")
                         : canIssuePlayerCommand
-                        ? (exAvailable ? null : exUnavailableReason())
+                        ? (exAvailable
+                        ? (useExRequirement.supported() ? null : unsupportedRequirementReason(useExRequirement.unsupportedReason()))
+                        : exUnavailableReason())
                         : playerTurnRequiredReason(),
+                useExMetadata,
                 new LinkedHashMap<>(Map.of(
                         "type", "USE_EX",
                         "expectedVersion", state.version(),
@@ -424,25 +473,31 @@ public class CombatScreenService {
                 ))
         ));
 
-        if (hasPendingDecision) {
-            actions.add(resolvePendingAction(state, runtimePlayerId, runtimePlayer));
-        }
+        actions.add(resolvePendingAction(state, runtimePlayerId, runtimePlayer, hasPlayerToken, hasPendingDecision));
 
         return List.copyOf(actions);
     }
 
     private ScreenActionDto resolvePendingAction(SessionStateDto state,
                                                  String runtimePlayerId,
-                                                 PlayerStateDto runtimePlayer) {
-        String pendingType = runtimePlayer.pendingDecision().type();
-        String commandType = switch (pendingType) {
-            case "DISCARD_TO_HAND_LIMIT" -> "DISCARD_TO_HAND_LIMIT";
-            case "SEARCH_PICK" -> "SEARCH_PICK";
-            case "INITIATIVE_TIE_ORDER" -> "RESOLVE_INITIATIVE_TIE";
-            case "JUDGEMENT" -> "RESOLVE_JUDGEMENT";
-            default -> null;
-        };
-        boolean enabled = commandType != null;
+                                                 PlayerStateDto runtimePlayer,
+                                                 boolean hasPlayerToken,
+                                                 boolean hasPendingDecision) {
+        PendingDecisionDto pendingDecision = runtimePlayer == null ? null : runtimePlayer.pendingDecision();
+        String pendingType = pendingDecision == null ? null : pendingDecision.type();
+        String commandType;
+        if (pendingType == null || pendingType.isBlank()) {
+            commandType = null;
+        } else {
+            commandType = switch (pendingType) {
+                case "DISCARD_TO_HAND_LIMIT" -> "DISCARD_TO_HAND_LIMIT";
+                case "SEARCH_PICK" -> "SEARCH_PICK";
+                case "INITIATIVE_TIE_ORDER" -> "RESOLVE_INITIATIVE_TIE";
+                default -> null;
+            };
+        }
+        boolean supported = commandType != null;
+        boolean enabled = hasPlayerToken && hasPendingDecision && supported;
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("expectedVersion", state.version());
         payload.put("playerId", runtimePlayerId == null ? "" : runtimePlayerId);
@@ -451,16 +506,31 @@ public class CombatScreenService {
         payload.put("selectedIds", List.of());
         payload.put("orderedActorKeys", List.of());
         payload.put("choiceId", "");
-        if (runtimePlayer.pendingDecision().groupIndex() != null) {
-            payload.put("tieGroupIndex", runtimePlayer.pendingDecision().groupIndex());
+        if (pendingDecision != null && pendingDecision.groupIndex() != null) {
+            payload.put("tieGroupIndex", pendingDecision.groupIndex());
         }
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("kind", "pendingDecision");
+        metadata.put("note", "Server-calculated pending decision support and input schema.");
+        metadata.put("supported", supported);
+        metadata.put("unsupportedReason", pendingUnsupportedReason(pendingType));
+        metadata.put("pendingDecisionType", pendingType);
+        metadata.put("schema", pendingDecisionSchema(pendingDecision));
+        metadata.put("blocked", !enabled);
 
         return playerCommandAction(
                 state.sessionCode(),
                 "combat.resolvePending",
                 "Resolve pending decision",
                 enabled,
-                enabled ? null : unsupportedPendingReason(pendingType),
+                !hasPlayerToken
+                        ? playerTokenRequiredReason("resolve the pending decision")
+                        : !hasPendingDecision
+                        ? pendingDecisionRequiredReason()
+                        : supported
+                        ? null
+                        : unsupportedPendingReason(pendingType),
+                metadata,
                 payload
         );
     }
@@ -470,6 +540,7 @@ public class CombatScreenService {
                                                 String label,
                                                 boolean enabled,
                                                 DisabledReasonDto disabledReason,
+                                                Map<String, Object> metadata,
                                                 Map<String, Object> payloadTemplate) {
         return ScreenActionDto.of(
                 id,
@@ -479,7 +550,8 @@ public class CombatScreenService {
                 ScreenActionAuth.PLAYER_TOKEN,
                 enabled,
                 disabledReason,
-                payloadTemplate
+                payloadTemplate,
+                metadata
         );
     }
 
@@ -492,6 +564,158 @@ public class CombatScreenService {
             return playerTokenRequiredReason("use this action");
         }
         return playerTurnRequiredReason();
+    }
+
+    private Map<String, Object> playCardSourceOption(String instanceId,
+                                                     SessionStateDto state) {
+        CombatScreenResponse.CardView sourceCard = cardView(instanceId, state, cardService.asMap());
+        RequirementMetadata requirement = requirementMetadataForInstance(instanceId, state);
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("instanceId", instanceId);
+        metadata.put("title", sourceCard == null ? instanceId : sourceCard.title());
+        metadata.put("sourceCard", sourceCard);
+        metadata.put("requirementView", requirement.view());
+        metadata.put("supported", requirement.supported());
+        metadata.put("unsupportedReason", requirement.unsupportedReason());
+        return metadata;
+    }
+
+    private RequirementMetadata requirementMetadataForInstance(String instanceId,
+                                                               SessionStateDto state) {
+        if (instanceId == null || instanceId.isBlank()) {
+            return RequirementMetadata.empty(null);
+        }
+        var instance = state.cards().get(instanceId);
+        if (instance == null || instance.defId() == null || instance.defId().isBlank()) {
+            return RequirementMetadata.empty("The selected source card could not be resolved.");
+        }
+        CardPlaySpec playSpec = cardService.playSpec(new CardDefId(instance.defId()));
+        CombatScreenResponse.CardView sourceCard = cardView(instanceId, state, cardService.asMap());
+        String sourceLabel = sourceCard == null ? instanceId : sourceCard.title();
+        return requirementMetadata(playSpec, sourceLabel);
+    }
+
+    private RequirementMetadata requirementMetadata(CardPlaySpec playSpec,
+                                                    String sourceLabel) {
+        Map<String, Object> view = requirementView(playSpec, sourceLabel);
+        ChoiceRequirement choiceRequirement = firstRequirement(playSpec, ChoiceRequirement.class);
+        String unsupportedReason = choiceRequirement == null
+                ? null
+                : sourceLabel + " has a choice-based follow-up that is not supported in this combat step yet.";
+        return new RequirementMetadata(view, unsupportedReason == null, unsupportedReason);
+    }
+
+    private Map<String, Object> requirementView(CardPlaySpec playSpec,
+                                                String sourceLabel) {
+        DiscardFromHandRequirement discardRequirement = firstRequirement(playSpec, DiscardFromHandRequirement.class);
+        SelectFieldCardsRequirement selectedIdsRequirement = firstRequirement(playSpec, SelectFieldCardsRequirement.class);
+        ChoiceRequirement choiceRequirement = firstRequirement(playSpec, ChoiceRequirement.class);
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("sourceLabel", sourceLabel);
+        view.put("targetSummary", describeTargetRequirement(playSpec));
+        view.put("discardSummary", discardRequirement == null
+                ? "No extra hand discard required"
+                : "Select " + discardRequirement.count() + " hand discard" + (discardRequirement.count() > 1 ? "s" : "")
+                + (discardRequirement.excludeSourceCard() ? " excluding the source card" : ""));
+        view.put("selectedIdsSummary", selectedIdsRequirement == null
+                ? "No extra field selection required"
+                : "Select " + selectedIdsRequirement.minSelections() + "-" + selectedIdsRequirement.maxSelections() + " field card ids");
+        view.put("choiceSummary", choiceRequirement == null
+                ? "No explicit choice requirement"
+                : choiceRequirement.label() + " (" + choiceRequirement.options().stream().map(option -> option.label()).toList() + ")");
+        view.put("targetRule", Map.of(
+                "target", playSpec.target().target().name(),
+                "requiredSelection", playSpec.target().requiredSelection()
+        ));
+        view.put("discardRequirement", discardRequirement == null ? null : Map.of(
+                "count", discardRequirement.count(),
+                "excludeSourceCard", discardRequirement.excludeSourceCard(),
+                "filter", discardRequirement.filter().name()
+        ));
+        view.put("selectedIdsRequirement", selectedIdsRequirement == null ? null : Map.of(
+                "minSelections", selectedIdsRequirement.minSelections(),
+                "maxSelections", selectedIdsRequirement.maxSelections(),
+                "scope", selectedIdsRequirement.scope().name(),
+                "filter", selectedIdsRequirement.filter().name(),
+                "excludeSourceCard", selectedIdsRequirement.excludeSourceCard()
+        ));
+        view.put("pendingChoiceSchema", choiceRequirement == null ? null : Map.of(
+                "id", choiceRequirement.id(),
+                "label", choiceRequirement.label(),
+                "minSelections", choiceRequirement.minSelections(),
+                "maxSelections", choiceRequirement.maxSelections(),
+                "options", choiceRequirement.options().stream()
+                        .map(option -> Map.of(
+                                "id", option.id(),
+                                "label", option.label(),
+                                "description", option.description() == null ? "" : option.description()
+                        ))
+                        .toList()
+        ));
+        view.put("unsupportedReason", choiceRequirement == null
+                ? null
+                : sourceLabel + " has a choice-based follow-up that is not supported in this combat step yet.");
+        return view;
+    }
+
+    private String describeTargetRequirement(CardPlaySpec playSpec) {
+        if (playSpec == null || !playSpec.target().requiredSelection() || playSpec.target().target() == com.example.dueltower.engine.model.Target.NONE) {
+            return "No manual target required";
+        }
+
+        return switch (playSpec.target().target()) {
+            case ENEMY_ONE -> "Select exactly one enemy or summon target";
+            case ALLY_ONE -> "Select exactly one ally player or summon target";
+            case ANY_ONE -> "Select exactly one target";
+            case SELF -> "Self-targeted automatically";
+            case ENEMY_ALL, ENEMY_SIDE -> "Enemy-side target is resolved automatically";
+            case ALLY_ALL, ALLY_SIDE -> "Ally-side target is resolved automatically";
+            default -> "Target rule: " + playSpec.target().target().name();
+        };
+    }
+
+    private <T extends ExtraPlayRequirement> T firstRequirement(CardPlaySpec playSpec,
+                                                                Class<T> requirementType) {
+        if (playSpec == null || playSpec.extraRequirements() == null) {
+            return null;
+        }
+        return playSpec.extraRequirements().stream()
+                .filter(requirementType::isInstance)
+                .map(requirementType::cast)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private Map<String, Object> pendingDecisionSchema(PendingDecisionDto pendingDecision) {
+        if (pendingDecision == null || pendingDecision.type() == null || pendingDecision.type().isBlank()) {
+            return null;
+        }
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", pendingDecision.type());
+        schema.put("reason", pendingDecision.reason());
+        switch (pendingDecision.type()) {
+            case "DISCARD_TO_HAND_LIMIT" -> {
+                schema.put("discardCount", pendingDecision.limit());
+                schema.put("selectedIdsField", "discardIds");
+            }
+            case "SEARCH_PICK" -> {
+                schema.put("pickCount", pendingDecision.pickCount());
+                schema.put("candidateIds", pendingDecision.candidateIds());
+                schema.put("destination", pendingDecision.destination());
+                schema.put("shuffleAfterPick", pendingDecision.shuffleAfterPick());
+                schema.put("selectedIdsField", "selectedIds");
+            }
+            case "INITIATIVE_TIE_ORDER" -> {
+                schema.put("groupIndex", pendingDecision.groupIndex());
+                schema.put("actorKeys", pendingDecision.actorKeys());
+                schema.put("selectedIdsField", "orderedActorKeys");
+            }
+            default -> {
+                schema.put("candidateIds", pendingDecision.candidateIds());
+                schema.put("actorKeys", pendingDecision.actorKeys());
+            }
+        }
+        return schema;
     }
 
     private String visiblePlayerId(SessionStateDto state,
@@ -695,6 +919,30 @@ public class CombatScreenService {
         );
     }
 
+    private DisabledReasonDto unsupportedRequirementReason(String reason) {
+        return new DisabledReasonDto(
+                "ACTION_REQUIREMENT_UNSUPPORTED",
+                "RULE",
+                nullSafe(reason, "This action requirement is not supported in this combat step."),
+                reason,
+                null,
+                null,
+                null
+        );
+    }
+
+    private DisabledReasonDto pendingDecisionRequiredReason() {
+        return new DisabledReasonDto(
+                "PENDING_DECISION_REQUIRED",
+                "RULE",
+                "A pending decision is required before this action becomes available.",
+                "runtime player has no pending decision",
+                null,
+                null,
+                null
+        );
+    }
+
     private DisabledReasonDto unsupportedPendingReason(String pendingType) {
         return new DisabledReasonDto(
                 "PENDING_DECISION_UNSUPPORTED",
@@ -705,6 +953,16 @@ public class CombatScreenService {
                 null,
                 null
         );
+    }
+
+    private String pendingUnsupportedReason(String pendingType) {
+        if (pendingType == null || pendingType.isBlank()) {
+            return "Pending decision type is missing.";
+        }
+        return switch (pendingType) {
+            case "DISCARD_TO_HAND_LIMIT", "SEARCH_PICK", "INITIATIVE_TIE_ORDER" -> null;
+            default -> pendingType + " is not supported in this combat step yet.";
+        };
     }
 
     private static String cardTypeLabel(CardType type) {
@@ -755,5 +1013,15 @@ public class CombatScreenService {
             throw new ResponseStatusException(BAD_REQUEST, "eventLimit must be > 0");
         }
         return Math.min(normalized, MAX_EVENT_LIMIT);
+    }
+
+    private record RequirementMetadata(
+            Map<String, Object> view,
+            boolean supported,
+            String unsupportedReason
+    ) {
+        private static RequirementMetadata empty(String unsupportedReason) {
+            return new RequirementMetadata(null, unsupportedReason == null, unsupportedReason);
+        }
     }
 }

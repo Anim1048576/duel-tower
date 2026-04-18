@@ -18,7 +18,8 @@ public record ScreenActionDto(
         String auth,
         boolean enabled,
         DisabledReasonDto disabledReason,
-        Map<String, Object> payloadTemplate
+        Map<String, Object> payloadTemplate,
+        Map<String, Object> metadata
 ) {
     public ScreenActionDto {
         id = requireText(id, "id");
@@ -27,6 +28,7 @@ public record ScreenActionDto(
         href = requireText(href, "href");
         auth = ScreenActionAuth.fromWireValue(requireText(auth, "auth")).wireValue();
         payloadTemplate = immutablePayloadTemplate(payloadTemplate);
+        metadata = immutablePayloadTemplate(metadata);
     }
 
     public static ScreenActionDto of(String id,
@@ -37,6 +39,18 @@ public record ScreenActionDto(
                                      boolean enabled,
                                      DisabledReasonDto disabledReason,
                                      Map<String, Object> payloadTemplate) {
+        return of(id, label, method, href, auth, enabled, disabledReason, payloadTemplate, null);
+    }
+
+    public static ScreenActionDto of(String id,
+                                     String label,
+                                     String method,
+                                     String href,
+                                     ScreenActionAuth auth,
+                                     boolean enabled,
+                                     DisabledReasonDto disabledReason,
+                                     Map<String, Object> payloadTemplate,
+                                     Map<String, Object> metadata) {
         return new ScreenActionDto(
                 id,
                 label,
@@ -45,7 +59,8 @@ public record ScreenActionDto(
                 auth.wireValue(),
                 enabled,
                 disabledReason,
-                payloadTemplate
+                payloadTemplate,
+                metadata
         );
     }
 

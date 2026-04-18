@@ -35,6 +35,9 @@ class ScreenResponseSerializationContractTest extends ScreenApiContractTestSuppo
                         "status": null,
                         "path": null
                       },
+                      "metadata": {
+                        "kind": "mutation"
+                      },
                       "payloadTemplate": {
                         "name": "<deck-name>",
                         "type": "PLAYER",
@@ -50,6 +53,7 @@ class ScreenResponseSerializationContractTest extends ScreenApiContractTestSuppo
         JsonNode action = findAction(body, "deckEditor.create");
         assertDisabledActionContract(action);
         assertThat(action.path("auth").asText()).isEqualTo("loginCookie");
+        assertThat(action.path("metadata").path("kind").asText()).isEqualTo("mutation");
         assertThat(body.path("possibleActions").size()).isEqualTo(1);
     }
 }

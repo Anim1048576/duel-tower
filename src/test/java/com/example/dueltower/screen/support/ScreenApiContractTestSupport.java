@@ -58,7 +58,9 @@ public abstract class ScreenApiContractTestSupport {
         Assertions.assertThat(action.path("enabled").isBoolean()).isTrue();
         Assertions.assertThat(action.has("disabledReason")).isTrue();
         Assertions.assertThat(action.has("payloadTemplate")).isTrue();
+        Assertions.assertThat(action.has("metadata")).isTrue();
         Assertions.assertThat(action.path("payloadTemplate").isObject() || action.path("payloadTemplate").isNull()).isTrue();
+        Assertions.assertThat(action.path("metadata").isObject() || action.path("metadata").isNull()).isTrue();
     }
 
     protected void assertDisabledActionContract(JsonNode action) {

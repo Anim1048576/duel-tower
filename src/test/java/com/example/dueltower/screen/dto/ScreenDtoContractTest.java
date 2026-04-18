@@ -62,6 +62,7 @@ class ScreenDtoContractTest {
         assertThat(action.method()).isEqualTo("POST");
         assertThat(action.auth()).isEqualTo("gmToken");
         assertThat(action.payloadTemplate()).containsEntry("startPlayerId", "p1");
+        assertThat(action.metadata()).isNull();
         assertThatThrownBy(() -> action.payloadTemplate().put("startPlayerId", "p2"))
                 .isInstanceOf(UnsupportedOperationException.class);
     }

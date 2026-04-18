@@ -6,11 +6,14 @@ import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.deck.domain.Deck;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.repository.DeckRepository;
+import com.example.dueltower.engine.model.Ids;
+import com.example.dueltower.engine.model.PendingDecision;
 import com.example.dueltower.member.MemberRepository;
 import com.example.dueltower.preset.domain.Preset;
 import com.example.dueltower.preset.repository.PresetRepository;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatActionRequest;
 import com.example.dueltower.screen.support.ScreenApiContractTestSupport;
+import com.example.dueltower.session.service.SessionLifecycleService;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +61,9 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
 
     @Autowired
     private PresetRepository presetRepository;
+
+    @Autowired
+    private SessionLifecycleService sessionLifecycleService;
 
     @BeforeEach
     void setUp() {
@@ -606,6 +612,10 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("sidebar").isObject()).isTrue();
         assertThat(body.path("possibleActions").isArray()).isTrue();
         assertThat(body.path("uiNotices")).isNotEmpty();
+        JsonNode drawAction = findAction(body, "combat.draw");
+        assertActionContract(drawAction);
+        assertThat(drawAction.path("enabled").asBoolean()).isTrue();
+        assertThat(drawAction.path("metadata").path("kind").asText()).isEqualTo("simple");
     }
 
     @Test
@@ -647,6 +657,11 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("sidebar").path("events").isArray()).isTrue();
         assertThat(body.path("sidebar").path("logs").isArray()).isTrue();
         assertThat(body.path("sidebar").path("recentResults").isArray()).isTrue();
+        JsonNode resolvePendingAction = findAction(body, "combat.resolvePending");
+        assertDisabledActionContract(resolvePendingAction);
+        assertThat(resolvePendingAction.path("disabledReason").path("code").asText()).isEqualTo("PENDING_DECISION_REQUIRED");
+        assertThat(resolvePendingAction.path("metadata").path("kind").asText()).isEqualTo("pendingDecision");
+        assertThat(resolvePendingAction.path("metadata").path("supported").asBoolean()).isFalse();
     }
 
     @Test
@@ -707,6 +722,49 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(card.path("unresolved").asBoolean()).isFalse();
         assertThat(card.path("tags")).isNotEmpty();
         assertThat(card.path("meta").asText()).contains("Instance");
+
+        JsonNode playCardAction = findAction(body, "combat.playCard");
+        JsonNode useExAction = findAction(body, "combat.useEx");
+        assertActionContract(playCardAction);
+        assertActionContract(useExAction);
+        assertThat(playCardAction.path("metadata").path("kind").asText()).isEqualTo("playCard");
+        assertThat(playCardAction.path("metadata").path("sourceOptions")).isNotEmpty();
+        assertThat(playCardAction.path("metadata").path("sourceOptions").get(0).path("requirementView").path("targetSummary").asText()).isNotBlank();
+        assertThat(playCardAction.path("metadata").path("sourceOptions").get(0).path("requirementView").has("discardRequirement")).isTrue();
+        assertThat(useExAction.path("metadata").path("kind").asText()).isEqualTo("useEx");
+        assertThat(useExAction.path("metadata").path("requirementView").path("targetSummary").asText()).isNotBlank();
+    }
+
+    @Test
+    void combatScreenShowsUnsupportedPendingDecisionMetadataAndDisabledReason() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-pending-gm", "combat-pending-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-pending-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-pending-p1", "combat-pending-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-pending-p1", characterId);
+        markPlayerReady(session.code(), "combat-pending-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-pending-p1");
+
+        sessionLifecycleService.withLockedSession(session.code(), rt -> {
+            rt.state()
+                    .player(new Ids.PlayerId("combat-pending-p1"))
+                    .pendingDecision(new PendingDecision.JudgementChoice("manual test", List.of("BODY", "WILL")));
+            return null;
+        });
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/combat", session.code())
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "Combat");
+        JsonNode resolvePendingAction = findAction(body, "combat.resolvePending");
+        assertDisabledActionContract(resolvePendingAction);
+        assertThat(resolvePendingAction.path("disabledReason").path("code").asText()).isEqualTo("PENDING_DECISION_UNSUPPORTED");
+        assertThat(resolvePendingAction.path("metadata").path("pendingDecisionType").asText()).isEqualTo("JUDGEMENT");
+        assertThat(resolvePendingAction.path("metadata").path("supported").asBoolean()).isFalse();
+        assertThat(resolvePendingAction.path("metadata").path("unsupportedReason").asText()).contains("not supported");
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("type").asText()).isEqualTo("JUDGEMENT");
     }
 
     @Test
