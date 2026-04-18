@@ -1,33 +1,24 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import type { CharacterProfileResponse } from '../lib/api/characterTypes'
-  import type { CardDefinition, PassiveDefinition } from '../lib/api/contentTypes'
+  import { onDestroy, onMount } from 'svelte'
+  import { getScreen, invokeScreenAction } from '../lib/api/screens'
   import {
-    executeSessionCommand,
-    getSessionState,
-    kickPlayer,
-    resetSession,
-    restoreGmAccess,
-  } from '../lib/api/sessions'
-  import type { PlayerStateDto, SessionStateDto } from '../lib/api/sessionTypes'
-  import { getApiErrorMessage } from '../lib/api/types'
+    buildScreenActionPayload,
+    findGmLobbyAction,
+    type GmLobbyActionId,
+    type GmLobbyActionResponseById,
+    type GmLobbyScreenAction,
+    type GmLobbyScreenResponse,
+  } from '../lib/api/screenTypes'
+  import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
-  import {
-    buildGmLobbyParticipantItems,
-    getPreferredReadyPlayerId,
-    sortPlayersByReady,
-  } from '../features/session/lobby/shared/participantList'
-  import { loadLobbyReferenceCatalogs } from '../features/session/lobby/shared/referenceCatalog'
   import { pathBuilders } from '../lib/navigation'
   import {
-    hasStoredSessionCode,
     isStoredGmSessionAccess,
     readStoredSessionAccess,
     setStoredSessionAccess,
-    toGmReadAccess,
     type StoredSessionAccess,
   } from '../lib/session/access'
   import {
@@ -36,30 +27,11 @@
     sessionPageStateCopy,
     type SessionPageFeedback,
   } from '../lib/session/pageState'
-  import {
-    createLiveSessionPage,
-  } from '../lib/session/liveSessionPage'
-  import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
   import { readSessionCodeFromRoute } from '../lib/session/sessionRoute'
-  import { resolveSessionLoadoutExCardId } from '../lib/session/loadoutEditor'
+  import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
+  import { startTimedPolling, type TimedPollingHandle } from '../lib/session/liveSessionPolling'
 
-  type TagTone = 'accent' | 'muted' | 'success' | 'warning'
-
-  type LobbyParticipantItem = {
-    id: string
-    slot: string
-    name: string
-    readyLabel: string
-    readyTone: TagTone
-    characterSummary: string
-    exSummary: string
-    passiveSummary: string
-    deckSummary: string
-    detailTags: {
-      label: string
-      tone: TagTone
-    }[]
-  }
+  const POLLING_INTERVAL_MS = 4000
 
   let loading = $state(true)
   let notFound = $state(false)
@@ -69,661 +41,342 @@
   let actionErrorMessage = $state<string | null>(null)
   let actionSuccessMessage = $state<string | null>(null)
   let feedback = $state<SessionPageFeedback | null>(null)
-  let session = $state<SessionStateDto | null>(null)
+  let screen = $state<GmLobbyScreenResponse | null>(null)
   let runtimeAccess = $state<StoredSessionAccess | null>(null)
-  let actionPending = $state<'kick' | 'reset' | 'start' | null>(null)
-  let referenceLoading = $state(true)
-  let referenceErrorMessage = $state<string | null>(null)
-  let characters = $state<CharacterProfileResponse[]>([])
-  let cards = $state<CardDefinition[]>([])
-  let passives = $state<PassiveDefinition[]>([])
+  let pendingActionId = $state<GmLobbyActionId | null>(null)
   let kickReason = $state('')
   let selectedKickPlayerId = $state('')
   let selectedStartPlayerId = $state('')
   let resetKeepPlayers = $state(true)
   let resetKeepLoadouts = $state(true)
   let resetSeedInput = $state('')
+  let requestedSessionCode = $state<string | null>(null)
+  let requestSequence = 0
+  let pollingHandle: TimedPollingHandle | null = null
+
+  function getRouteSessionCode() {
+    return readSessionCodeFromRoute('gm-lobby')
+  }
 
   function getInvalidAccessMessage(nextRouteCode: string | null) {
     if (!nextRouteCode) {
       return 'No session code is present in the current GM lobby URL.'
     }
-
     return null
   }
 
   function navigateTo(path: string, replace = false) {
-    if (typeof window === 'undefined') {
-      return
-    }
-
+    if (typeof window === 'undefined') return
     window.history[replace ? 'replaceState' : 'pushState']({}, '', path)
     window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
-  async function loadReferenceCatalogs() {
-    referenceLoading = true
-    const result = await loadLobbyReferenceCatalogs({
-      unavailableMessage: (errors) =>
-        `Some reference data could not be restored: ${errors.join(', ')}. Participant summaries will fall back to ids.`,
-    })
-
-    characters = result.characters
-    cards = result.cards
-    passives = result.passives
-    referenceErrorMessage = result.errorMessage
-    referenceLoading = false
+  function clearActionFeedback() {
+    actionErrorMessage = null
+    actionSuccessMessage = null
   }
 
-  function normalizeContentId(value: string | null | undefined) {
-    const normalized = value?.trim()
-    return normalized ? normalized : ''
+  function stopPolling() {
+    pollingHandle?.stop()
+    pollingHandle = null
   }
 
-  function getResolvedCard(cardId: string | null | undefined) {
-    const normalized = normalizeContentId(cardId)
-    return normalized ? cards.find((card) => card.id === normalized) ?? null : null
-  }
+  function syncSelections(nextScreen: GmLobbyScreenResponse) {
+    const participantIds = nextScreen.participantCards.map((participant) => participant.name)
+    const selectableStartPlayerIds = nextScreen.startCombat.selectableStartPlayers.map((player) => player.playerId)
+    const recommendedStartPlayerId = nextScreen.startCombat.recommendedStartPlayerId ?? ''
 
-  function getResolvedPassive(passiveId: string | null | undefined) {
-    const normalized = normalizeContentId(passiveId)
-    return normalized ? passives.find((passive) => passive.id === normalized) ?? null : null
-  }
-
-  function getDeckCardEntries(player: PlayerStateDto) {
-    return player.deckOwnedCardIds.map((ownedCardId) => {
-      const ownedCard = player.ownedCards.find((entry) => entry.ownedCardId === ownedCardId) ?? null
-      const cardId = normalizeContentId(ownedCard?.cardId)
-      const resolvedCard = cardId ? getResolvedCard(cardId) : null
-
-      return {
-        key: cardId || ownedCardId,
-        cardId,
-        label: resolvedCard?.name ?? (cardId || ownedCardId),
-      }
-    })
-  }
-
-  function getPlayerDeckCardIds(player: PlayerStateDto) {
-    return getDeckCardEntries(player)
-      .map((entry) => entry.cardId)
-      .filter(Boolean)
-  }
-
-  function formatPreviewList(values: readonly string[], totalCount = values.length) {
-    const preview = values.filter(Boolean)
-
-    if (preview.length === 0) {
-      return ''
+    if (!participantIds.includes(selectedKickPlayerId)) {
+      selectedKickPlayerId = participantIds[0] ?? ''
     }
 
-    const hiddenCount = totalCount - preview.length
-    return hiddenCount > 0 ? `${preview.join(', ')} +${hiddenCount} more` : preview.join(', ')
+    if (!selectableStartPlayerIds.includes(selectedStartPlayerId)) {
+      selectedStartPlayerId = recommendedStartPlayerId || selectableStartPlayerIds[0] || ''
+    }
   }
 
-  function buildCharacterSummary(player: PlayerStateDto, nextSession: SessionStateDto | null) {
-    if (referenceLoading) {
-      return 'Loading character summary...'
-    }
-
-    const resolvedExCardId = resolveSessionLoadoutExCardId(player, nextSession)
-    const deckCardIds = new Set(getPlayerDeckCardIds(player))
-    let bestMatch:
-      | {
-          character: CharacterProfileResponse
-          score: number
-          exMatched: boolean
-        }
-      | null = null
-    let ambiguous = false
-
-    for (const character of characters) {
-      const exMatched =
-        !!resolvedExCardId && normalizeContentId(character.exCard) === normalizeContentId(resolvedExCardId)
-      const deckOverlap = (character.currentSkillDeck ?? []).reduce(
-        (count, cardId) => count + (deckCardIds.has(normalizeContentId(cardId)) ? 1 : 0),
-        0,
-      )
-      const score = (exMatched ? 100 : 0) + deckOverlap
-
-      if (score <= 0) {
-        continue
-      }
-
-      if (!bestMatch || score > bestMatch.score) {
-        bestMatch = { character, score, exMatched }
-        ambiguous = false
-        continue
-      }
-
-      if (score === bestMatch.score) {
-        ambiguous = true
-      }
-    }
-
-    if (!bestMatch) {
-      return 'Unavailable from current session data'
-    }
-
-    if (bestMatch.exMatched && !ambiguous) {
-      return `${bestMatch.character.name} #${bestMatch.character.id}`
-    }
-
-    if (!ambiguous) {
-      return `Likely ${bestMatch.character.name} #${bestMatch.character.id}`
-    }
-
-    return 'Multiple character candidates'
+  function applyScreen(nextScreen: GmLobbyScreenResponse) {
+    screen = nextScreen
+    syncSessionSelectionHandoff(nextScreen.sessionCode)
+    syncSelections(nextScreen)
   }
 
-  function buildExSummary(player: PlayerStateDto, nextSession: SessionStateDto | null) {
-    const resolvedExCardId = resolveSessionLoadoutExCardId(player, nextSession)
+  function updateStoredGmAccess(nextScreen: GmLobbyScreenResponse | null, restoredGmToken?: string | null) {
+    const routeCode = nextScreen?.sessionCode ?? getRouteSessionCode()
+    const normalizedToken = restoredGmToken?.trim()
+    if (!routeCode || !normalizedToken) return
 
-    if (!resolvedExCardId) {
-      return 'No EX configured'
-    }
-
-    const resolvedCard = getResolvedCard(resolvedExCardId)
-    return resolvedCard ? `${resolvedCard.name} (${resolvedCard.id})` : resolvedExCardId
-  }
-
-  function buildPassiveSummary(player: PlayerStateDto) {
-    if (player.passiveIds.length === 0) {
-      return 'No passives equipped'
-    }
-
-    const labels = [...new Set(
-      player.passiveIds
-        .map((passiveId) => getResolvedPassive(passiveId)?.name ?? normalizeContentId(passiveId))
-        .filter(Boolean),
-    )]
-
-    return `${player.passiveIds.length} equipped | ${formatPreviewList(labels.slice(0, 3), labels.length)}`
-  }
-
-  function buildDeckSummary(player: PlayerStateDto) {
-    const deckEntries = getDeckCardEntries(player)
-
-    if (deckEntries.length === 0) {
-      return 'No deck cards selected'
-    }
-
-    const uniqueEntries = deckEntries.filter((entry, index, entries) => {
-      return entries.findIndex((candidate) => candidate.key === entry.key) === index
-    })
-    const previewLabels = uniqueEntries.slice(0, 3).map((entry) => entry.label)
-
-    return [
-      `${deckEntries.length} cards`,
-      `${uniqueEntries.length} unique`,
-      formatPreviewList(previewLabels, uniqueEntries.length),
-    ]
-      .filter(Boolean)
-      .join(' | ')
-  }
-
-  function buildParticipantTags(
-    player: PlayerStateDto,
-    nextSession: SessionStateDto | null,
-  ): LobbyParticipantItem['detailTags'] {
-    const resolvedExCardId = resolveSessionLoadoutExCardId(player, nextSession)
-
-    return [
-      {
-        label: `${player.deckOwnedCardIds.length} deck cards`,
-        tone: player.deckOwnedCardIds.length > 0 ? 'accent' : 'muted',
-      },
-      {
-        label: `${player.passiveIds.length} passives`,
-        tone: player.passiveIds.length > 0 ? 'success' : 'muted',
-      },
-      {
-        label: resolvedExCardId ? 'EX linked' : 'No EX',
-        tone: resolvedExCardId ? 'warning' : 'muted',
-      },
-    ]
-  }
-
-  function getSortedPlayers(nextSession: SessionStateDto | null) {
-    if (!nextSession) {
-      return [] as PlayerStateDto[]
-    }
-
-    return sortPlayersByReady(Object.values(nextSession.players))
-  }
-
-  function getPreferredStartPlayerId(nextSession: SessionStateDto | null) {
-    return getPreferredReadyPlayerId(getSortedPlayers(nextSession))
-  }
-
-  function buildParticipantItems(nextSession: SessionStateDto | null) {
-    if (!nextSession) {
-      return [] as LobbyParticipantItem[]
-    }
-
-    return buildGmLobbyParticipantItems({
-      players: getSortedPlayers(nextSession),
-      buildDetails: (player) => ({
-        characterSummary: buildCharacterSummary(player, nextSession),
-        exSummary: buildExSummary(player, nextSession),
-        passiveSummary: buildPassiveSummary(player),
-        deckSummary: buildDeckSummary(player),
-        detailTags: buildParticipantTags(player, nextSession),
-      }),
+    runtimeAccess = setStoredSessionAccess({
+      code: routeCode,
+      role: 'gm',
+      gmToken: normalizedToken,
     })
   }
 
-  function syncLobbyState(nextSession: SessionStateDto) {
-    session = nextSession
-    syncSessionSelectionHandoff(nextSession.sessionCode)
+  async function refreshGmLobbyScreen(reason: 'initial-load' | 'retry-load' | 'route-change' | 'polling' | 'action-refresh') {
+    const requestId = ++requestSequence
+    const nextRouteCode = getRouteSessionCode()
+    const nextAccess = readStoredSessionAccess()
+    const nextInvalidAccessMessage = getInvalidAccessMessage(nextRouteCode)
+    const showLoading = reason !== 'polling' && reason !== 'action-refresh'
 
-    const remainingPlayerIds = Object.keys(nextSession.players)
-    const preferredStartPlayerId = getPreferredStartPlayerId(nextSession)
+    runtimeAccess = nextAccess
+    invalidAccessMessage = nextInvalidAccessMessage
+    requestedSessionCode = nextRouteCode
 
-    if (!remainingPlayerIds.includes(selectedKickPlayerId)) {
-      selectedKickPlayerId = remainingPlayerIds[0] ?? ''
-    }
-
-    if (!remainingPlayerIds.includes(selectedStartPlayerId)) {
-      selectedStartPlayerId = preferredStartPlayerId
-    }
-  }
-
-  const gmLobbyPage = createLiveSessionPage<StoredSessionAccess | null>({
-    readCode: () => routeSessionCode,
-    readAccess: () => readStoredSessionAccess(),
-    getInvalidMessage: (code) => getInvalidAccessMessage(code),
-    loadState: getSessionState,
-    getPollingAccess: toGmReadAccess,
-    canPoll: ({ code, access, state }) =>
-      state.sessionCode === code &&
-      isStoredGmSessionAccess(access) &&
-      hasStoredSessionCode(access, code),
-    onBeforeLoad: ({ access, invalidMessage }) => {
-      runtimeAccess = access
-      invalidAccessMessage = invalidMessage
+    if (showLoading) {
       loading = true
       notFound = false
       errorMessage = null
-      actionErrorMessage = null
-      actionSuccessMessage = null
-      session = null
-    },
-    onLoaded: (response) => {
-      syncLobbyState(response)
-    },
-    onPolled: (nextSession, { access }) => {
-      runtimeAccess = access
-      syncLobbyState(nextSession)
-    },
-    onNotFound: () => {
-      notFound = true
-    },
-    onError: (error) => {
-      errorMessage = getApiErrorMessage(error, 'Unable to restore the current GM lobby.')
-    },
-    onLoadSettled: () => {
-      loading = false
-    },
-  })
+      clearActionFeedback()
+    }
 
-  function stopGmLobbyPolling() {
-    gmLobbyPage.stopPolling()
-  }
-
-  function updateGmLobbyPollingVersion(nextSession: SessionStateDto) {
-    gmLobbyPage.updatePollingVersion(nextSession.version)
-  }
-
-  function startGmLobbyPolling(
-    nextCode: string | null,
-    nextAccess: StoredSessionAccess | null,
-    nextSession: SessionStateDto,
-  ) {
-    gmLobbyPage.startPolling(nextSession, {
-      code: nextCode,
-      access: nextAccess,
-    })
-  }
-
-  async function loadGmLobbyState() {
-    await gmLobbyPage.load()
-  }
-
-  async function handleKickPlayer() {
-    if (
-      loading ||
-      actionPending ||
-      !routeSessionCode ||
-      !selectedKickPlayerId ||
-      !isStoredGmSessionAccess(runtimeAccess)
-    ) {
+    if (!nextRouteCode || nextInvalidAccessMessage) {
+      stopPolling()
+      if (showLoading) loading = false
       return
     }
 
-    actionPending = 'kick'
+    try {
+      const response = await getScreen<GmLobbyScreenResponse>('GmLobby', { code: nextRouteCode })
+      if (requestId !== requestSequence) return
+      notFound = false
+      errorMessage = null
+      applyScreen(response)
+      startPolling()
+    } catch (error) {
+      if (requestId !== requestSequence) return
+      stopPolling()
+
+      if (error instanceof ApiError && (error.status === 404 || error.code === 'not_found')) {
+        notFound = true
+        screen = null
+      } else {
+        errorMessage = getApiErrorMessage(error, 'Unable to restore the current GM lobby screen.')
+      }
+    } finally {
+      if (requestId === requestSequence && showLoading) {
+        loading = false
+      }
+    }
+  }
+
+  function startPolling() {
+    stopPolling()
+    if (typeof window === 'undefined' || !screen) return
+
+    pollingHandle = startTimedPolling({
+      intervalMs: POLLING_INTERVAL_MS,
+      onPoll: async () => {
+        if (!pendingActionId) {
+          await refreshGmLobbyScreen('polling')
+        }
+      },
+      onError: (error) => {
+        errorMessage = getApiErrorMessage(error, 'Unable to refresh the current GM lobby screen.')
+      },
+    })
+  }
+
+  function retryLoad() {
+    void refreshGmLobbyScreen('retry-load')
+  }
+
+  function findAction(actionId: GmLobbyActionId) {
+    return screen ? findGmLobbyAction(screen, actionId) : null
+  }
+
+  function getPendingActionLabel(actionId: GmLobbyActionId) {
+    switch (actionId) {
+      case 'gmLobby.kick':
+        return 'Removing player...'
+      case 'gmLobby.reset':
+        return 'Resetting session...'
+      case 'gmLobby.startCombat':
+        return 'Starting combat...'
+    }
+  }
+
+  function toNullableInteger(value: string) {
+    const normalized = value.trim()
+    if (!normalized) return null
+    const parsed = Number(normalized)
+    return Number.isInteger(parsed) ? parsed : null
+  }
+
+  function buildKickAction(selectedAction: GmLobbyScreenAction, playerId: string) {
+    const nextHref = selectedAction.href.replace(/\/players\/[^/]+\/kick$/, `/players/${encodeURIComponent(playerId)}/kick`)
+    return {
+      ...selectedAction,
+      href: nextHref,
+    }
+  }
+
+  function readStartCombatTemplatePlayerId(action: GmLobbyScreenAction | null) {
+    if (!action?.payloadTemplate || !('playerId' in action.payloadTemplate)) {
+      return ''
+    }
+
+    const value = action.payloadTemplate.playerId
+    return typeof value === 'string' ? value : ''
+  }
+
+  async function runKick() {
+    if (!screen) return
+    const action = findAction('gmLobby.kick')
+    if (!action?.enabled || pendingActionId || !selectedKickPlayerId) return
+
+    pendingActionId = action.id
     actionErrorTitle = 'Kick failed'
-    actionErrorMessage = null
-    actionSuccessMessage = null
+    clearActionFeedback()
 
     try {
-      const response = await kickPlayer(
-        routeSessionCode,
-        selectedKickPlayerId,
+      const resolvedAction = buildKickAction(action, selectedKickPlayerId)
+      await invokeScreenAction<GmLobbyScreenResponse, GmLobbyActionResponseById['gmLobby.kick']>(
+        resolvedAction,
         {
-          reason: kickReason.trim() || null,
+          body: buildScreenActionPayload(action, {
+            playerId: selectedKickPlayerId,
+            reason: kickReason.trim() || null,
+          }),
         },
-        runtimeAccess.gmToken,
       )
-
-      syncLobbyState(response)
-      updateGmLobbyPollingVersion(response)
       kickReason = ''
+      await refreshGmLobbyScreen('action-refresh')
       actionSuccessMessage = `${gmLobbyStateCopy.playerRemovedFeedback.message} (${selectedKickPlayerId})`
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to remove the selected player.')
     } finally {
-      actionPending = null
+      pendingActionId = null
     }
   }
 
-  async function handleResetSession() {
-    if (loading || actionPending || !routeSessionCode || !isStoredGmSessionAccess(runtimeAccess)) {
-      return
-    }
+  async function runReset() {
+    if (!screen) return
+    const action = findAction('gmLobby.reset')
+    if (!action?.enabled || pendingActionId) return
 
-    const normalizedSeed = resetSeedInput.trim()
-    const parsedSeed = normalizedSeed ? Number(normalizedSeed) : null
-
-    if (normalizedSeed && !Number.isInteger(parsedSeed)) {
+    const parsedSeed = toNullableInteger(resetSeedInput)
+    if (resetSeedInput.trim() && parsedSeed === null) {
       actionErrorTitle = 'Reset failed'
       actionErrorMessage = 'New seed must be an integer when provided.'
       actionSuccessMessage = null
       return
     }
 
-    actionPending = 'reset'
+    pendingActionId = action.id
     actionErrorTitle = 'Reset failed'
-    actionErrorMessage = null
-    actionSuccessMessage = null
+    clearActionFeedback()
 
     try {
-      const response = await resetSession(
-        routeSessionCode,
-        {
+      await invokeScreenAction<GmLobbyScreenResponse, GmLobbyActionResponseById['gmLobby.reset']>(action, {
+        body: buildScreenActionPayload(action, {
           keepPlayers: resetKeepPlayers,
           keepLoadouts: resetKeepLoadouts,
           newSeed: parsedSeed,
-        },
-        runtimeAccess.gmToken,
-      )
-
-      syncLobbyState(response)
-      updateGmLobbyPollingVersion(response)
+        }),
+      })
+      await refreshGmLobbyScreen('action-refresh')
       actionSuccessMessage = gmLobbyStateCopy.sessionResetFeedback.message
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to reset the current session.')
     } finally {
-      actionPending = null
+      pendingActionId = null
     }
   }
 
-  async function handleStartCombat() {
-    if (loading || actionPending || !routeSessionCode || !session || !selectedStartPlayerId) {
-      return
-    }
+  async function runStartCombat() {
+    if (!screen) return
+    const action = findAction('gmLobby.startCombat')
+    if (!action?.enabled || pendingActionId) return
 
-    if (session.combat && session.combat.phase !== 'END') {
-      actionErrorTitle = 'Combat start unavailable'
-      actionErrorMessage = 'Combat is already active for this session.'
-      actionSuccessMessage = null
-      return
-    }
-
-    actionPending = 'start'
+    pendingActionId = action.id
     actionErrorTitle = 'Combat start failed'
-    actionErrorMessage = null
-    actionSuccessMessage = null
+    clearActionFeedback()
 
-    let activeSession = session
-    let activeGmToken = isStoredGmSessionAccess(runtimeAccess) ? runtimeAccess.gmToken : null
-    let restoredGmAccess = false
-    let versionRetryUsed = false
-
-    const syncResponseState = (nextState: SessionStateDto | null) => {
-      if (!nextState) {
-        return null
-      }
-
-      syncLobbyState(nextState)
-      updateGmLobbyPollingVersion(nextState)
-      activeSession = nextState
-      return nextState
-    }
-
-    const navigateToCombat = (nextState: SessionStateDto | null) => {
-      navigateTo(pathBuilders.combat(nextState?.sessionCode ?? routeSessionCode))
-    }
-
-    const isVersionMismatch = (message: string) => message.toLowerCase().includes('version mismatch')
-    const isCombatAlreadyStarted = (message: string) => message.toLowerCase().includes('combat already started')
-    const isGmAuthorizationFailure = (message: string) =>
-      message.toLowerCase().includes('gm authorization required')
-    const getRejectedMessage = (errors: string[]) =>
-      errors.length > 0 ? errors.join(', ') : 'START_COMBAT was rejected by the engine.'
-
-    const syncRestoredGmAccess = (response: Awaited<ReturnType<typeof restoreGmAccess>>) => {
-      const nextAccess = setStoredSessionAccess({
-        code: response.code,
-        role: 'gm',
-        gmToken: response.gmToken,
-      })
-
-      runtimeAccess = nextAccess
-      syncLobbyState(response.state)
-      updateGmLobbyPollingVersion(response.state)
-      startGmLobbyPolling(routeSessionCode, nextAccess, response.state)
-      activeSession = response.state
-      return response
-    }
-
-    const restoreGmSessionAccess = async () => {
-      const restored = syncRestoredGmAccess(await restoreGmAccess(routeSessionCode))
-      activeGmToken = restored.gmToken
-      restoredGmAccess = true
-      return restored
-    }
-
-    const executeStartCombat = (expectedVersion: number, gmToken: string) =>
-      executeSessionCommand(
-        routeSessionCode,
-        {
-          type: 'START_COMBAT',
-          playerId: selectedStartPlayerId,
-          expectedVersion,
-        },
-        {
-          role: 'gm' as const,
-          gmToken,
-        },
-      )
-
-    const handleRejectedStartCombat = async (
-      response: Awaited<ReturnType<typeof executeStartCombat>>,
-      gmToken: string,
-    ) => {
-      const syncedState = syncResponseState(response.state)
-      const rejectionMessage = getRejectedMessage(response.errors)
-
-        if (isCombatAlreadyStarted(rejectionMessage)) {
-          actionErrorTitle = 'Combat already in progress'
-          actionErrorMessage =
-            'Combat had already started in this session, so you were moved to the combat screen.'
-          navigateToCombat(syncedState)
-          return true
-        }
-
-      if (!versionRetryUsed && syncedState && isVersionMismatch(rejectionMessage)) {
-        versionRetryUsed = true
-        const retryResponse = await executeStartCombat(syncedState.version, gmToken)
-        const retryState = syncResponseState(retryResponse.state)
-
-        if (retryResponse.accepted) {
-          actionSuccessMessage = restoredGmAccess
-            ? 'GM access was restored, the lobby synced to the latest session state, and combat started.'
-            : 'The GM lobby synced to the latest session state and retried START_COMBAT once before combat started.'
-          navigateToCombat(retryState)
-          return true
-        }
-
-        const retryMessage = getRejectedMessage(retryResponse.errors)
-
-        if (isCombatAlreadyStarted(retryMessage)) {
-          actionErrorTitle = 'Combat already in progress'
-          actionErrorMessage = restoredGmAccess
-            ? 'GM access was restored, but combat had already started, so you were moved to the combat screen.'
-            : 'After syncing the latest session state, the lobby detected that combat had already started and moved you to the combat screen.'
-          navigateToCombat(retryState)
-          return true
-        }
-
-        actionErrorTitle = 'Combat start rejected'
-        actionErrorMessage = isVersionMismatch(retryMessage)
-          ? 'The GM lobby synced to the latest session state and retried START_COMBAT once, but the version changed again before combat could start. Try once more after the lobby settles.'
-          : retryMessage
-        return true
-      }
-
-      actionErrorTitle = 'Combat start rejected'
-      actionErrorMessage = isVersionMismatch(rejectionMessage)
-        ? 'The GM lobby synced to the latest session state, but START_COMBAT still could not be applied with the refreshed version.'
-        : rejectionMessage
-      return true
-    }
+    const requestedPlayerId =
+      selectedStartPlayerId ||
+      screen.startCombat.recommendedStartPlayerId ||
+      readStartCombatTemplatePlayerId(action) ||
+      ''
 
     try {
-      if (!activeGmToken) {
-        try {
-          await restoreGmSessionAccess()
-        } catch (restoreError) {
-          actionErrorTitle = 'GM access restore failed'
-          actionErrorMessage = getApiErrorMessage(
-            restoreError,
-            'Unable to restore GM access for this session. Sign in as the original GM again or return to session entry and reopen the session.',
-          )
+      const response = await invokeScreenAction<
+        GmLobbyScreenResponse,
+        GmLobbyActionResponseById['gmLobby.startCombat']
+      >(action, {
+        body: buildScreenActionPayload(action, {
+          expectedVersion: screen.version,
+          playerId: requestedPlayerId,
+        }),
+      })
+
+      updateStoredGmAccess(response.latestScreen, response.restoredGmToken)
+
+      if (response.latestScreen) {
+        applyScreen(response.latestScreen)
+      }
+
+      if (response.success) {
+        if (response.nextRoute) {
+          navigateTo(response.nextRoute)
           return
         }
-      }
 
-      if (!activeGmToken) {
-        actionErrorTitle = 'GM access restore failed'
-        actionErrorMessage = 'GM access could not be restored for the current session.'
+        actionSuccessMessage = response.message || 'Combat start completed.'
         return
       }
 
-      const response = await executeStartCombat(activeSession.version, activeGmToken)
-
-      if (!response.accepted) {
-        await handleRejectedStartCombat(response, activeGmToken)
-        return
-      }
-
-      const nextState = syncResponseState(response.state)
-      if (restoredGmAccess) {
-        actionSuccessMessage = 'GM access was restored from the logged-in account and combat started.'
-      }
-      navigateToCombat(nextState)
+      actionErrorTitle =
+        response.outcome === 'BLOCKED'
+          ? 'Combat start unavailable'
+          : response.outcome === 'GM_ACCESS_REQUIRED'
+            ? 'GM access restore failed'
+            : 'Combat start failed'
+      actionErrorMessage =
+        response.disabledReason?.userMessage ||
+        response.message ||
+        'Unable to start combat from the current GM lobby.'
     } catch (error) {
-      const status =
-        typeof error === 'object' && error && 'status' in error && typeof error.status === 'number'
-          ? error.status
-          : null
-      const errorMessage = getApiErrorMessage(error, 'Unable to start combat from the current GM lobby.')
-
-      if ((status === 401 || isGmAuthorizationFailure(errorMessage)) && !restoredGmAccess) {
-        try {
-          const restored = await restoreGmSessionAccess()
-          const retryResponse = await executeStartCombat(restored.state.version, restored.gmToken)
-
-          if (!retryResponse.accepted) {
-            await handleRejectedStartCombat(retryResponse, restored.gmToken)
-            return
-          }
-
-          const retryState = syncResponseState(retryResponse.state)
-          actionSuccessMessage =
-            'GM access was restored from the logged-in account and START_COMBAT succeeded with the refreshed session state.'
-          navigateToCombat(retryState)
-          return
-        } catch (restoreError) {
-          actionErrorTitle = 'GM access restore failed'
-          actionErrorMessage = getApiErrorMessage(
-            restoreError,
-            'Unable to restore GM access for this session. Sign in as the original GM again or return to session entry and reopen the session.',
-          )
-          return
-        }
-      }
-
-      actionErrorMessage = errorMessage
+      actionErrorMessage = getApiErrorMessage(error, 'Unable to start combat from the current GM lobby.')
     } finally {
-      actionPending = null
+      pendingActionId = null
     }
   }
 
-  function handleWindowStateChange() {
-    void loadGmLobbyState()
+  function handlePopState() {
+    void refreshGmLobbyScreen('route-change')
   }
 
   onMount(() => {
     feedback = readSessionPageFeedback()
-    void loadReferenceCatalogs()
-    void loadGmLobbyState()
-    window.addEventListener('popstate', handleWindowStateChange)
-
-    return () => {
-      gmLobbyPage.dispose()
-      window.removeEventListener('popstate', handleWindowStateChange)
-    }
+    void refreshGmLobbyScreen('initial-load')
+    window.addEventListener('popstate', handlePopState)
   })
 
-  const routeSessionCode = $derived.by(() => readSessionCodeFromRoute('gm-lobby'))
-  const participantItems = $derived.by(() => buildParticipantItems(session))
-  const participantCount = $derived.by(() => (session ? Object.keys(session.players).length : 0))
+  onDestroy(() => {
+    stopPolling()
+    window.removeEventListener('popstate', handlePopState)
+  })
+
+  const routeSessionCode = $derived.by(() => getRouteSessionCode())
+  const participantCount = $derived.by(() => screen?.participantCards.length ?? 0)
   const readyCount = $derived.by(() =>
-    session ? Object.values(session.players).filter((player) => player.ready).length : 0,
+    screen?.participantCards.filter((participant) => participant.readyLabel === 'Ready').length ?? 0,
   )
-  const gmAccessLabel = $derived.by(() =>
-    isStoredGmSessionAccess(runtimeAccess) ? 'GM token ready' : 'GM token missing',
-  )
-  const kickActionLabel = $derived.by(() =>
-    actionPending === 'kick' ? 'Removing player...' : 'Remove selected player',
-  )
-  const resetActionLabel = $derived.by(() =>
-    actionPending === 'reset' ? 'Resetting session...' : 'Reset session',
-  )
-  const startActionLabel = $derived.by(() =>
-    actionPending === 'start' ? 'Starting combat...' : 'Start combat',
-  )
-  const startBlockedMessage = $derived.by(() => {
-    if (!session) {
-      return 'Session state is unavailable.'
-    }
-
-    if (participantCount === 0) {
-      return 'At least one participant must join before combat can start.'
-    }
-
-    if (!selectedStartPlayerId) {
-      return 'Select the playerId to attach to START_COMBAT.'
-    }
-
-    if (session.combat && session.combat.phase !== 'END') {
-      return 'Combat is already active for this session.'
-    }
-
-    return null
+  const kickAction = $derived.by(() => (screen ? findGmLobbyAction(screen, 'gmLobby.kick') : null))
+  const resetAction = $derived.by(() => (screen ? findGmLobbyAction(screen, 'gmLobby.reset') : null))
+  const startCombatAction = $derived.by(() => (screen ? findGmLobbyAction(screen, 'gmLobby.startCombat') : null))
+  const gmAccessLabel = $derived.by(() => {
+    if (startCombatAction?.auth === 'loginCookie' && startCombatAction.enabled) return 'GM restore available'
+    if (isStoredGmSessionAccess(runtimeAccess)) return 'GM token ready'
+    return 'GM token missing'
   })
+  const startBlockedMessage = $derived.by(() => screen?.startCombat.blockedReason?.userMessage ?? null)
+  const selectedStartPlayerLabel = $derived.by(() =>
+    screen?.startCombat.selectableStartPlayers.find((player) => player.playerId === selectedStartPlayerId)?.label ??
+    '',
+  )
 </script>
 
 <div class="gm-lobby-page">
@@ -731,18 +384,18 @@
     <SectionFrame
       eyebrow="Session Summary"
       title="Loading GM lobby"
-      description="Restoring the current session state from the live session API."
+      description="Resolving the current GM lobby screen from the URL."
     >
       <ContentStatePanel
         title={sessionPageStateCopy.loading.title}
-        message="Fetching the current GM lobby by session code."
+        message="Fetching the current GM lobby screen by session code."
       />
     </SectionFrame>
   {:else if invalidAccessMessage}
     <SectionFrame
       eyebrow="Session Route"
       title="GM lobby route is unavailable"
-      description="This page needs a valid session code in the URL before it can restore the current GM lobby."
+      description="This page needs a valid session code in the URL before it can restore the GM lobby."
     >
       <ContentStatePanel
         title="Session code is missing"
@@ -784,14 +437,14 @@
     <SectionFrame
       eyebrow="Session Summary"
       title="GM lobby could not be loaded"
-      description="The session code was valid, but the current GM lobby state could not be restored."
+      description="The session code was valid, but the current GM lobby screen could not be restored."
     >
       <ContentStatePanel
         title="Unable to load GM lobby"
         message={errorMessage}
         tone="error"
         actionLabel="Retry load"
-        onAction={() => void loadGmLobbyState()}
+        onAction={retryLoad}
       />
 
       <div class="gm-lobby-page__actions">
@@ -800,72 +453,54 @@
         </a>
       </div>
     </SectionFrame>
-  {:else if session}
+  {:else if screen}
     <SectionFrame
       eyebrow="Session Summary"
-      title={`Session ${session.sessionCode}`}
-      description="GM lobby restores the current session from the URL code and uses stored GM access only for authorized actions."
+      title={`Session ${screen.sessionCode}`}
+      description="GM lobby now renders the server-provided screen model and keeps only selection inputs and action feedback in the browser."
     >
       <div class="gm-lobby-page__summary">
         <div class="gm-lobby-page__summary-copy">
           <p>GM lobby</p>
-          <h3>Code: {session.sessionCode}</h3>
-          <span class="gm-lobby-page__summary-meta">
-            Session ID {session.sessionId} | Seed {session.seed}
-          </span>
+          <h3>Code: {screen.sessionCode}</h3>
         </div>
 
         <div class="gm-lobby-page__summary-tags">
           <TagChip label="GM View" tone="warning" />
-          <TagChip label={gmAccessLabel} tone="success" />
+          <TagChip label={gmAccessLabel} tone={gmAccessLabel === 'GM token ready' ? 'success' : 'accent'} />
           <TagChip label={`${readyCount} / ${participantCount} ready`} tone="accent" />
         </div>
       </div>
 
       <div class="gm-lobby-page__stats">
-        <StatBlock value={participantCount} label="Joined" note="Current live participants" />
-        <StatBlock value={readyCount} label="Ready" note="Players marked ready in the current state" />
-        <StatBlock value={session.version} label="Version" note="Current session state version" />
+        <StatBlock value={participantCount} label="Joined" note="Current participant cards from the GM lobby screen" />
+        <StatBlock value={readyCount} label="Ready" note="Players marked ready in the current screen response" />
+        <StatBlock value={screen.version} label="Version" note="Current GM lobby screen version" />
       </div>
 
       {#if feedback}
         <ContentStatePanel title={feedback.title} message={feedback.message} />
       {/if}
 
+      {#if screen.uiNotices.length > 0}
+        <ContentStatePanel title="Screen notices" message={screen.uiNotices.join(' ')} />
+      {/if}
+
       {#if actionErrorMessage}
-        <ContentStatePanel
-          title={actionErrorTitle}
-          message={actionErrorMessage}
-          tone="error"
-        />
+        <ContentStatePanel title={actionErrorTitle} message={actionErrorMessage} tone="error" />
       {:else if actionSuccessMessage}
-        <ContentStatePanel
-          title="GM action completed"
-          message={actionSuccessMessage}
-        />
+        <ContentStatePanel title="GM action completed" message={actionSuccessMessage} />
       {/if}
     </SectionFrame>
 
     <div class="gm-lobby-page__main">
       <SectionFrame
         title="Participant slots"
-        description="The live participant list now keeps ready state and loadout context readable without changing the surrounding GM lobby shell."
+        description="Participant cards render directly from the server-curated GM lobby screen."
       >
-        {#if referenceLoading}
-          <ContentStatePanel
-            title="Loading participant summaries"
-            message="Restoring character, EX, and passive labels from the content catalog."
-          />
-        {:else if referenceErrorMessage}
-          <ContentStatePanel
-            title="Participant labels are partially restored"
-            message={referenceErrorMessage}
-          />
-        {/if}
-
-        {#if participantItems.length > 0}
+        {#if screen.participantCards.length > 0}
           <div class="gm-lobby-page__slots">
-            {#each participantItems as participant}
+            {#each screen.participantCards as participant}
               <article class={`gm-lobby-page__participant-card gm-lobby-page__participant-card--${participant.readyTone}`}>
                 <div class="gm-lobby-page__participant-head">
                   <div class="gm-lobby-page__participant-copy">
@@ -916,7 +551,7 @@
 
       <SectionFrame
         title="GM control panel"
-        description="Kick and reset are connected here with minimal controls that fit the current lobby shell."
+        description="Kick and reset use the server-declared action contract with only minimal local form state."
       >
         <div class="gm-lobby-page__guide">
           <p>Current participant count: {participantCount}</p>
@@ -924,17 +559,25 @@
           <p>Use kick for a single participant, or reset the current session state with the options below.</p>
         </div>
 
+        {#if kickAction && !kickAction.enabled}
+          <ContentStatePanel
+            title="Kick unavailable"
+            message={kickAction.disabledReason?.userMessage ?? 'Kick is currently unavailable.'}
+            tone="error"
+          />
+        {/if}
+
         <div class="gm-lobby-page__control-group">
           <label class="gm-lobby-page__field">
             <span>Player to remove</span>
             <select
               bind:value={selectedKickPlayerId}
-              disabled={loading || actionPending !== null || participantCount === 0}
+              disabled={loading || pendingActionId !== null || !kickAction?.enabled || participantCount === 0}
             >
               <option value="">Select player</option>
-              {#each Object.values(session.players) as player}
-                <option value={player.playerId}>
-                  {player.playerId}
+              {#each screen.participantCards as participant}
+                <option value={participant.name}>
+                  {participant.slot} | {participant.name}
                 </option>
               {/each}
             </select>
@@ -946,27 +589,35 @@
               bind:value={kickReason}
               type="text"
               placeholder="Optional reason"
-              disabled={loading || actionPending !== null}
+              disabled={loading || pendingActionId !== null || !kickAction?.enabled}
             />
           </label>
 
           <div class="gm-lobby-page__controls">
             <button
               type="button"
-              disabled={loading || actionPending !== null || !selectedKickPlayerId}
-              onclick={() => void handleKickPlayer()}
+              disabled={loading || pendingActionId !== null || !kickAction?.enabled || !selectedKickPlayerId}
+              onclick={() => void runKick()}
             >
-              {kickActionLabel}
+              {pendingActionId === 'gmLobby.kick' ? getPendingActionLabel('gmLobby.kick') : kickAction?.label ?? 'Kick player'}
             </button>
           </div>
         </div>
+
+        {#if resetAction && !resetAction.enabled}
+          <ContentStatePanel
+            title="Reset unavailable"
+            message={resetAction.disabledReason?.userMessage ?? 'Reset is currently unavailable.'}
+            tone="error"
+          />
+        {/if}
 
         <div class="gm-lobby-page__control-group gm-lobby-page__control-group--bordered">
           <label class="gm-lobby-page__toggle">
             <input
               bind:checked={resetKeepPlayers}
               type="checkbox"
-              disabled={loading || actionPending !== null}
+              disabled={loading || pendingActionId !== null || !resetAction?.enabled}
             />
             <span>Keep current players</span>
           </label>
@@ -975,7 +626,7 @@
             <input
               bind:checked={resetKeepLoadouts}
               type="checkbox"
-              disabled={loading || actionPending !== null}
+              disabled={loading || pendingActionId !== null || !resetAction?.enabled}
             />
             <span>Keep current loadouts</span>
           </label>
@@ -986,17 +637,17 @@
               bind:value={resetSeedInput}
               type="text"
               placeholder="Optional integer seed"
-              disabled={loading || actionPending !== null}
+              disabled={loading || pendingActionId !== null || !resetAction?.enabled}
             />
           </label>
 
           <div class="gm-lobby-page__controls">
             <button
               type="button"
-              disabled={loading || actionPending !== null}
-              onclick={() => void handleResetSession()}
+              disabled={loading || pendingActionId !== null || !resetAction?.enabled}
+              onclick={() => void runReset()}
             >
-              {resetActionLabel}
+              {pendingActionId === 'gmLobby.reset' ? getPendingActionLabel('gmLobby.reset') : resetAction?.label ?? 'Reset session'}
             </button>
           </div>
         </div>
@@ -1005,32 +656,46 @@
 
     <SectionFrame
       title="Action zone"
-      description="Bottom action strip keeps navigation and live combat start in the GM lobby without changing the surrounding route structure."
+      description="Combat start now follows the server-declared screen action instead of a frontend retry script."
     >
       <div class="gm-lobby-page__action-stack">
         <label class="gm-lobby-page__field">
           <span>Start as player</span>
           <select
             bind:value={selectedStartPlayerId}
-            disabled={loading || actionPending !== null || participantCount === 0}
+            disabled={loading || pendingActionId !== null || !startCombatAction?.enabled || !screen.startCombat.selectableStartPlayers.length}
           >
-            <option value="">Select player</option>
-            {#each getSortedPlayers(session) as player}
+            <option value="">Use recommended player</option>
+            {#each screen.startCombat.selectableStartPlayers as player}
               <option value={player.playerId}>
-                {player.playerId}{player.ready ? ' | ready' : ' | not ready'}
+                {player.label}
               </option>
             {/each}
           </select>
         </label>
 
         <p class="gm-lobby-page__action-note">
-          START_COMBAT sends `expectedVersion` {session.version} with playerId `{selectedStartPlayerId || 'unselected'}`.
+          START_COMBAT uses screen version {screen.version} with player `{selectedStartPlayerId || screen.startCombat.recommendedStartPlayerId || 'unselected'}`.
         </p>
+
+        {#if selectedStartPlayerLabel}
+          <p class="gm-lobby-page__action-note">
+            Selected start player: {selectedStartPlayerLabel}
+          </p>
+        {/if}
 
         {#if startBlockedMessage}
           <p class="gm-lobby-page__action-note gm-lobby-page__action-note--warning">
             {startBlockedMessage}
           </p>
+        {/if}
+
+        {#if startCombatAction && !startCombatAction.enabled}
+          <ContentStatePanel
+            title="Combat start unavailable"
+            message={startCombatAction.disabledReason?.userMessage ?? 'Combat start is currently unavailable.'}
+            tone="error"
+          />
         {/if}
       </div>
 
@@ -1042,15 +707,17 @@
         >
           Back to session entry
         </a>
-        <a class="gm-lobby-page__link-action" data-nav href={pathBuilders.combat(session.sessionCode)}>
+        <a class="gm-lobby-page__link-action" data-nav href={pathBuilders.combat(screen.sessionCode)}>
           Open combat command
         </a>
         <button
           type="button"
-          disabled={loading || actionPending !== null || !!startBlockedMessage}
-          onclick={() => void handleStartCombat()}
+          disabled={loading || pendingActionId !== null || !startCombatAction?.enabled}
+          onclick={() => void runStartCombat()}
         >
-          {startActionLabel}
+          {pendingActionId === 'gmLobby.startCombat'
+            ? getPendingActionLabel('gmLobby.startCombat')
+            : startCombatAction?.label ?? 'Start combat'}
         </button>
       </div>
     </SectionFrame>
@@ -1082,8 +749,8 @@
 
   .gm-lobby-page__summary-copy p,
   .gm-lobby-page__summary-copy h3,
-  .gm-lobby-page__summary-meta,
-  .gm-lobby-page__guide p {
+  .gm-lobby-page__guide p,
+  .gm-lobby-page__summary-meta {
     margin: 0;
   }
 
@@ -1100,7 +767,9 @@
     line-height: 1.1;
   }
 
-  .gm-lobby-page__summary-meta {
+  .gm-lobby-page__summary-meta,
+  .gm-lobby-page__guide p,
+  .gm-lobby-page__action-note {
     color: var(--color-text-soft);
     line-height: 1.6;
   }
@@ -1163,7 +832,8 @@
   }
 
   .gm-lobby-page__participant-copy p,
-  .gm-lobby-page__participant-details dt {
+  .gm-lobby-page__participant-details dt,
+  .gm-lobby-page__field span {
     color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -1189,15 +859,8 @@
     line-height: 1.55;
   }
 
-  .gm-lobby-page__guide p {
-    color: var(--color-text-soft);
-    line-height: 1.65;
-  }
-
   .gm-lobby-page__action-note {
     margin: 0;
-    color: var(--color-text-soft);
-    line-height: 1.6;
   }
 
   .gm-lobby-page__action-note--warning {
@@ -1212,13 +875,6 @@
   .gm-lobby-page__field {
     display: grid;
     gap: 0.5rem;
-  }
-
-  .gm-lobby-page__field span {
-    color: var(--color-text-muted);
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
   }
 
   .gm-lobby-page__field input,

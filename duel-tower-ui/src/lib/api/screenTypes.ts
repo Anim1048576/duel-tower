@@ -80,6 +80,27 @@ export type PlayerLobbyActionPayload =
   | PlayerLobbySaveLoadoutPayload
   | PlayerLobbyApplyPresetPayload
 
+export type GmLobbyKickPayload = {
+  playerId?: string | null
+  reason?: string | null
+}
+
+export type GmLobbyResetPayload = {
+  keepPlayers?: boolean | null
+  keepLoadouts?: boolean | null
+  newSeed?: number | null
+}
+
+export type GmLobbyStartCombatPayload = {
+  expectedVersion?: number | null
+  playerId?: string | null
+}
+
+export type GmLobbyActionPayload =
+  | GmLobbyKickPayload
+  | GmLobbyResetPayload
+  | GmLobbyStartCombatPayload
+
 export type DeckEditorActionId =
   | 'deckEditor.validate'
   | 'deckEditor.save'
@@ -97,6 +118,11 @@ export type PlayerLobbyActionId =
   | 'playerLobby.leave'
   | 'playerLobby.saveLoadout'
   | 'playerLobby.applyPreset'
+
+export type GmLobbyActionId =
+  | 'gmLobby.kick'
+  | 'gmLobby.reset'
+  | 'gmLobby.startCombat'
 
 export type DeckEditorDraftCardDto = {
   key: string
@@ -236,6 +262,36 @@ export type PlayerLobbyPreviewItemDto = {
   label: string
   subtitle: string
   tags: PlayerLobbyTagDto[]
+}
+
+export type GmLobbyTagDto = {
+  label: string
+  tone: 'accent' | 'muted' | 'success' | 'warning'
+}
+
+export type GmLobbyParticipantCardDto = {
+  slot: string
+  name: string
+  readyLabel: string
+  readyTone: 'accent' | 'muted' | 'success' | 'warning'
+  characterSummary: string
+  exSummary: string
+  passiveSummary: string
+  deckSummary: string
+  detailTags: GmLobbyTagDto[]
+}
+
+export type GmLobbySelectableStartPlayerDto = {
+  playerId: string
+  slot: string
+  label: string
+  ready: boolean
+}
+
+export type GmLobbyStartCombatDto = {
+  recommendedStartPlayerId: string | null
+  blockedReason: DisabledReasonDto | null
+  selectableStartPlayers: GmLobbySelectableStartPlayerDto[]
 }
 
 export type PlayerLobbyPresetPreviewDto = {
@@ -470,6 +526,10 @@ export type PlayerLobbyScreenAction = ScreenActionDto<PlayerLobbyActionPayload> 
   id: PlayerLobbyActionId
 }
 
+export type GmLobbyScreenAction = ScreenActionDto<GmLobbyActionPayload> & {
+  id: GmLobbyActionId
+}
+
 export type ScreenResponseBase<TAction extends ScreenActionDto = ScreenActionDto> = {
   screenKey: string
   generatedAt: string
@@ -522,6 +582,16 @@ export type PlayerLobbyScreenResponse = ScreenResponseBase<PlayerLobbyScreenActi
   presets: PlayerLobbyServerPresets
 }
 
+export type GmLobbyScreenResponse = ScreenResponseBase<GmLobbyScreenAction> & {
+  sessionCode: string
+  version: number
+  routeTemplate: string
+  policyGroup: string
+  auth: string
+  participantCards: GmLobbyParticipantCardDto[]
+  startCombat: GmLobbyStartCombatDto
+}
+
 export type DeckEditorActionResponseById = {
   'deckEditor.validate': DeckValidationResponseLike
   'deckEditor.save': DeckResponse
@@ -541,6 +611,25 @@ export type PlayerLobbyActionResponseById = {
   'playerLobby.leave': SessionStateDto
   'playerLobby.saveLoadout': SessionStateDto
   'playerLobby.applyPreset': SessionStateDto
+}
+
+export type GmLobbyStartCombatActionResponse = {
+  success: boolean
+  outcome: string
+  message: string | null
+  disabledReason: DisabledReasonDto | null
+  nextRoute: string | null
+  combatEntryHint: string | null
+  gmAccessRestored: boolean
+  restoredGmToken: string | null
+  retryUsed: boolean
+  latestScreen: GmLobbyScreenResponse | null
+}
+
+export type GmLobbyActionResponseById = {
+  'gmLobby.kick': SessionStateDto
+  'gmLobby.reset': SessionStateDto
+  'gmLobby.startCombat': GmLobbyStartCombatActionResponse
 }
 
 type DeckValidationResponseLike = {
@@ -602,6 +691,13 @@ export function findPresetEditorAction(
 export function findPlayerLobbyAction(
   screen: Pick<PlayerLobbyScreenResponse, 'possibleActions'>,
   actionId: PlayerLobbyActionId,
+) {
+  return screen.possibleActions.find((action) => action.id === actionId) ?? null
+}
+
+export function findGmLobbyAction(
+  screen: Pick<GmLobbyScreenResponse, 'possibleActions'>,
+  actionId: GmLobbyActionId,
 ) {
   return screen.possibleActions.find((action) => action.id === actionId) ?? null
 }
