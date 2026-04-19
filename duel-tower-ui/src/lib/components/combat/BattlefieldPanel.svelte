@@ -28,6 +28,9 @@
     onToggleTargetPlayer: (playerId: string) => void
     onToggleTargetEnemy: (enemyId: string) => void
     onToggleTargetSummon: (owner: string, summonId: string) => void
+    canToggleTargetPlayer: (playerId: string) => boolean
+    canToggleTargetEnemy: (enemyId: string) => boolean
+    canToggleTargetSummon: (owner: string, summonId: string) => boolean
     onHoverEntity: (entity: CombatInspectorEntityReference | null) => void
     onPinEntity: (entity: CombatInspectorEntityReference | null) => void
     resolveInspectState: (entity: CombatInspectorEntityReference) => 'idle' | 'hovered' | 'pinned'
@@ -46,6 +49,9 @@
     onToggleTargetPlayer,
     onToggleTargetEnemy,
     onToggleTargetSummon,
+    canToggleTargetPlayer,
+    canToggleTargetEnemy,
+    canToggleTargetSummon,
     onHoverEntity,
     onPinEntity,
     resolveInspectState,
@@ -125,6 +131,9 @@
                       ? 'Targeted'
                       : 'Target',
                     selected: selectedTargets.some((target) => target.playerId === player.playerId),
+                    disabled:
+                      !selectedTargets.some((target) => target.playerId === player.playerId) &&
+                      !canToggleTargetPlayer(player.playerId),
                     onClick: () => onToggleTargetPlayer(player.playerId),
                   },
                 ]}
@@ -174,6 +183,9 @@
                       ? 'Targeted'
                       : 'Target',
                     selected: selectedTargets.some((target) => target.enemyId === enemy.enemyId),
+                    disabled:
+                      !selectedTargets.some((target) => target.enemyId === enemy.enemyId) &&
+                      !canToggleTargetEnemy(enemy.enemyId),
                     onClick: () => onToggleTargetEnemy(enemy.enemyId),
                   },
                 ]}
@@ -219,6 +231,12 @@
                         target.summonOwnerPlayerId === summon.owner &&
                         target.summonInstanceId === summon.summonId,
                     ),
+                    disabled:
+                      !selectedTargets.some(
+                        (target) =>
+                          target.summonOwnerPlayerId === summon.owner &&
+                          target.summonInstanceId === summon.summonId,
+                      ) && !canToggleTargetSummon(summon.owner, summon.summonId),
                     onClick: () => onToggleTargetSummon(summon.owner, summon.summonId),
                   },
                 ]}

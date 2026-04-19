@@ -7,9 +7,10 @@
     sourceLabel: string | null
     detailLoading: boolean
     detailError: string | null
-    selectedTargetLabels: readonly string[]
+    selectedBoardObjectLabels: readonly string[]
     selectedDiscardIds: readonly string[]
     selectedFieldIds: readonly string[]
+    selectedCount: number | null
     onClearTargets: () => void
     onClearSelectionInputs: () => void
   }
@@ -19,9 +20,10 @@
     sourceLabel,
     detailLoading,
     detailError,
-    selectedTargetLabels,
+    selectedBoardObjectLabels,
     selectedDiscardIds,
     selectedFieldIds,
+    selectedCount,
     onClearTargets,
     onClearSelectionInputs,
   }: Props = $props()
@@ -31,9 +33,27 @@
   <strong>Selected command input</strong>
   <p>Command source: {requirementView?.sourceLabel ?? sourceLabel ?? 'Select a card or EX first'}</p>
   <p>Target rule: {requirementView?.targetSummary ?? 'No command-specific target rule loaded yet.'}</p>
+  <p>Board-object rule: {requirementView?.boardObjectSummary ?? 'No board-object selection requirement loaded yet.'}</p>
   <p>Discard rule: {requirementView?.discardSummary ?? 'No extra hand discard required'}</p>
   <p>Field selection rule: {requirementView?.fieldSelectionSummary ?? 'No extra field selection required'}</p>
   <p>Choice rule: {requirementView?.choiceSummary ?? 'No explicit choice requirement'}</p>
+
+  {#if requirementView?.boardCountChoiceOptions.length}
+    <p>
+      Count choice:
+      {#if requirementView.boardCountChoiceRequired}
+        choose one of {requirementView.boardCountChoiceOptions.join(', ')}
+      {:else}
+        auto-resolved from server hint
+      {/if}
+      {#if selectedCount != null}
+        | current {selectedCount}
+      {/if}
+      {#if requirementView.boardCandidateCount != null}
+        | candidates {requirementView.boardCandidateCount}
+      {/if}
+    </p>
+  {/if}
 
   {#if detailLoading}
     <p>Loading card detail for the selected command source.</p>
@@ -42,12 +62,12 @@
   {/if}
 
   <div class="target-selection-panel__tag-row">
-    {#if selectedTargetLabels.length > 0}
-      {#each selectedTargetLabels as label}
+    {#if selectedBoardObjectLabels.length > 0}
+      {#each selectedBoardObjectLabels as label}
         <TagChip label={label} tone="warning" />
       {/each}
     {:else}
-      <TagChip label="No manual target" tone="muted" />
+      <TagChip label="No board-object selection" tone="muted" />
     {/if}
   </div>
 

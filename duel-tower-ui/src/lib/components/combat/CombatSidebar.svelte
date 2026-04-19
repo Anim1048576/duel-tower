@@ -31,7 +31,7 @@
     sourceLabel: string | null
     detailLoading: boolean
     detailError: string | null
-    selectedTargetLabels: readonly string[]
+    selectedBoardObjectLabels: readonly string[]
     selectedDiscardIds: readonly string[]
     selectedFieldIds: readonly string[]
     pendingDecision: PendingDecisionDto | null
@@ -41,6 +41,8 @@
     canResolvePendingCommand: boolean
     selectedCount: number | null
     selectedReason: string
+    boardCountChoiceOptions: readonly number[]
+    boardCountChoiceRequired: boolean
     visiblePlayerView: CombatPlayerViewModel | null
     eventEntries: readonly CombatFeedEntry[]
     eventsLoading: boolean
@@ -62,6 +64,7 @@
     onToggleOrderedActorKey: (actorKey: string) => void
     onResolvePendingDecision: () => void
     onToggleSelectedId: (instanceId: string) => void
+    canToggleSelectedId: (instanceId: string) => boolean
     onRetryEvents: () => void
     onRetryLogs: () => void
     onRetryResults: () => void
@@ -81,7 +84,7 @@
     sourceLabel,
     detailLoading,
     detailError,
-    selectedTargetLabels,
+    selectedBoardObjectLabels,
     selectedDiscardIds,
     selectedFieldIds,
     pendingDecision,
@@ -91,6 +94,8 @@
     canResolvePendingCommand,
     selectedCount,
     selectedReason,
+    boardCountChoiceOptions,
+    boardCountChoiceRequired,
     visiblePlayerView,
     eventEntries,
     eventsLoading,
@@ -112,6 +117,7 @@
     onToggleOrderedActorKey,
     onResolvePendingDecision,
     onToggleSelectedId,
+    canToggleSelectedId,
     onRetryEvents,
     onRetryLogs,
     onRetryResults,
@@ -161,7 +167,7 @@
             sourceLabel={sourceLabel}
             detailLoading={detailLoading}
             detailError={detailError}
-            selectedTargetLabels={selectedTargetLabels}
+            selectedBoardObjectLabels={selectedBoardObjectLabels}
             selectedDiscardIds={selectedDiscardIds}
             selectedFieldIds={selectedFieldIds}
             pendingDecision={pendingDecision}
@@ -171,6 +177,8 @@
             canResolvePendingCommand={canResolvePendingCommand}
             {selectedCount}
             {selectedReason}
+            {boardCountChoiceOptions}
+            {boardCountChoiceRequired}
             onCommandButtonClick={onCommandButtonClick}
             onClearTargets={onClearTargets}
             onClearSelectionInputs={onClearSelectionInputs}
@@ -185,6 +193,7 @@
             {visiblePlayerView}
             selectedFieldIds={selectedFieldIds}
             onToggleSelectedId={onToggleSelectedId}
+            {canToggleSelectedId}
           />
         </div>
       {:else if activeTab === 'log'}

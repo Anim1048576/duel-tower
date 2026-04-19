@@ -20,7 +20,7 @@
     sourceLabel: string | null
     detailLoading: boolean
     detailError: string | null
-    selectedTargetLabels: readonly string[]
+    selectedBoardObjectLabels: readonly string[]
     selectedDiscardIds: readonly string[]
     selectedFieldIds: readonly string[]
     pendingDecision: PendingDecisionDto | null
@@ -30,6 +30,8 @@
     canResolvePendingCommand: boolean
     selectedCount: number | null
     selectedReason: string
+    boardCountChoiceOptions: readonly number[]
+    boardCountChoiceRequired: boolean
     onCommandButtonClick: (commandType: string) => void
     onClearTargets: () => void
     onClearSelectionInputs: () => void
@@ -53,7 +55,7 @@
     sourceLabel,
     detailLoading,
     detailError,
-    selectedTargetLabels,
+    selectedBoardObjectLabels,
     selectedDiscardIds,
     selectedFieldIds,
     pendingDecision,
@@ -63,6 +65,8 @@
     canResolvePendingCommand,
     selectedCount,
     selectedReason,
+    boardCountChoiceOptions,
+    boardCountChoiceRequired,
     onCommandButtonClick,
     onClearTargets,
     onClearSelectionInputs,
@@ -124,9 +128,10 @@
       sourceLabel={sourceLabel}
       detailLoading={detailLoading}
       detailError={detailError}
-      selectedTargetLabels={selectedTargetLabels}
+      selectedBoardObjectLabels={selectedBoardObjectLabels}
       selectedDiscardIds={selectedDiscardIds}
       selectedFieldIds={selectedFieldIds}
+      {selectedCount}
       onClearTargets={onClearTargets}
       onClearSelectionInputs={onClearSelectionInputs}
     />
@@ -134,6 +139,24 @@
 
   <div class="command-action-panel__zone-panel">
     <strong>Command helper inputs</strong>
+    {#if boardCountChoiceOptions.length > 0}
+      <label class="command-action-panel__field-control">
+        <span>{boardCountChoiceRequired ? 'Choose board-object count first' : 'Board-object count'}</span>
+        <div class="command-action-panel__tag-row">
+          {#each boardCountChoiceOptions as option}
+            <button
+              type="button"
+              class="command-action-panel__inline-button"
+              class:selected={selectedCount === option}
+              onclick={() => onSelectedCountChange(String(option))}
+            >
+              {option}
+            </button>
+          {/each}
+        </div>
+      </label>
+    {/if}
+
     <label class="command-action-panel__field-control">
       <span>Selected count</span>
       <input type="number" min="1" value={selectedCount ?? 1} oninput={handleCountInput} />

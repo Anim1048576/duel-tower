@@ -7,9 +7,10 @@
     visiblePlayerView: CombatPlayerViewModel | null
     selectedFieldIds: readonly string[]
     onToggleSelectedId: (instanceId: string) => void
+    canToggleSelectedId: (instanceId: string) => boolean
   }
 
-  let { visiblePlayerView, selectedFieldIds, onToggleSelectedId }: Props = $props()
+  let { visiblePlayerView, selectedFieldIds, onToggleSelectedId, canToggleSelectedId }: Props = $props()
 
   function archiveTone(card: ResolvedCombatCardViewModel) {
     return card.unresolved ? 'warning' : 'muted'
@@ -35,7 +36,12 @@
               </div>
               <div class="combat-zone-summary__tag-row">
                 <TagChip label={card.unresolved ? 'Unresolved' : 'Field'} tone={card.unresolved ? 'warning' : 'success'} />
-                <button type="button" class="combat-zone-summary__inline-button" onclick={() => onToggleSelectedId(card.instanceId)}>
+                <button
+                  type="button"
+                  class="combat-zone-summary__inline-button"
+                  disabled={!selectedFieldIds.includes(card.instanceId) && !canToggleSelectedId(card.instanceId)}
+                  onclick={() => onToggleSelectedId(card.instanceId)}
+                >
                   {selectedFieldIds.includes(card.instanceId) ? 'Unmark field id' : 'Select field id'}
                 </button>
               </div>

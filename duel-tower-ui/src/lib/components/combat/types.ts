@@ -137,6 +137,10 @@ export type CombatCommandRequirementViewModel = {
   discardSummary: string
   fieldSelectionSummary: string
   choiceSummary: string
+  boardObjectSummary: string
+  boardCountChoiceOptions: number[]
+  boardCountChoiceRequired: boolean
+  boardCandidateCount: number | null
 }
 
 export type CombatPlayerViewModel = {

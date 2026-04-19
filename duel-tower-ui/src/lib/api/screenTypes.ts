@@ -591,6 +591,25 @@ export type CombatSelectedIdsRequirementDto = {
   excludeSourceCard: boolean
 }
 
+export type CombatBoardObjectKind = 'CHARACTER' | 'SUMMON' | 'FIELD_CARD'
+
+export type CombatBoardObjectRelation = 'ALLY' | 'HOSTILE' | 'ANY'
+
+export type CombatBoardObjectRequirementDto = {
+  minSelections: number
+  maxSelections: number
+  kinds: CombatBoardObjectKind[]
+  relation: CombatBoardObjectRelation
+  filter: string
+  excludeSourceCard: boolean
+}
+
+export type CombatBoardObjectSelectionHintsDto = {
+  candidateCount: number
+  allowedCounts: number[]
+  skipCountChoice: boolean
+}
+
 export type CombatChoiceOptionDto = {
   id: string
   label: string
@@ -611,9 +630,12 @@ export type CombatRequirementViewDto = {
   discardSummary: string
   selectedIdsSummary: string
   choiceSummary: string
+  boardObjectSummary: string
   targetRule: CombatRequirementTargetRuleDto | null
   discardRequirement: CombatDiscardRequirementDto | null
   selectedIdsRequirement: CombatSelectedIdsRequirementDto | null
+  boardObjectRequirement: CombatBoardObjectRequirementDto | null
+  boardObjectSelectionHints: CombatBoardObjectSelectionHintsDto | null
   pendingChoiceSchema: CombatPendingChoiceSchemaDto | null
   unsupportedReason: string | null
 }

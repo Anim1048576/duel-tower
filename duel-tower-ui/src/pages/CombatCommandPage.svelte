@@ -5,6 +5,8 @@
     buildScreenActionPayload,
     findCombatAction,
     type CombatActionId,
+    type CombatBoardObjectKind,
+    type CombatBoardObjectRelation,
     type CombatCardDto,
     type CombatPendingActionMetadataDto,
     type CombatRequirementViewDto,
@@ -97,6 +99,13 @@
   let requestSequence = 0
   let pollingHandle: TimedPollingHandle | null = null
   type CombatLocalSelectionState = ReturnType<typeof readLocalSelectionState>
+  type BoardObjectSelectionKind = 'player' | 'enemy' | 'summon' | 'field'
+  type BoardObjectSelectionDescriptor = {
+    key: string
+    kind: BoardObjectSelectionKind
+    boardKind: CombatBoardObjectKind
+    relation: CombatBoardObjectRelation
+  }
 
   const combatPresentationState = $derived<CombatPresentationState>({
     activeSidebarTab,
@@ -377,12 +386,19 @@
       return null
     }
 
+    const boardCountChoiceOptions = requirement.boardObjectSelectionHints?.allowedCounts ?? []
     return {
       sourceLabel: requirement.sourceLabel,
       targetSummary: requirement.targetSummary,
       discardSummary: requirement.discardSummary,
       fieldSelectionSummary: requirement.selectedIdsSummary,
       choiceSummary: requirement.choiceSummary,
+      boardObjectSummary: requirement.boardObjectSummary,
+      boardCountChoiceOptions,
+      boardCountChoiceRequired:
+        boardCountChoiceOptions.length > 1 &&
+        !(requirement.boardObjectSelectionHints?.skipCountChoice ?? false),
+      boardCandidateCount: requirement.boardObjectSelectionHints?.candidateCount ?? null,
     }
   }
 
@@ -428,6 +444,225 @@
         return null
       })
       .filter(Boolean) as TargetRefDto[]
+  }
+
+  function fieldSelectionKey(instanceId: string) {
+    return `field:${instanceId}`
+  }
+
+  function isFieldSelectionKey(key: string) {
+    return key.startsWith('field:')
+  }
+
+  function fieldIdFromSelectionKey(key: string) {
+    return key.startsWith('field:') ? key.slice('field:'.length) : null
+  }
+
+  function uniqueIdentifiers(values: readonly string[]) {
+    return [...new Set(values)]
+  }
+
+  function buildSelectedBoardObjectKeys(
+    targetKeys: readonly string[],
+    fieldIds: readonly string[],
+  ) {
+    return uniqueIdentifiers([...targetKeys, ...fieldIds.map((instanceId) => fieldSelectionKey(instanceId))])
+  }
+
+  function writeBoardObjectKeys(nextKeys: readonly string[]) {
+    const uniqueKeys = uniqueIdentifiers(nextKeys)
+    selectedTargetKeys = uniqueKeys.filter((key) => !isFieldSelectionKey(key))
+    selectedFieldIds = uniqueKeys
+      .map((key) => fieldIdFromSelectionKey(key))
+      .filter((value): value is string => Boolean(value))
+  }
+
+  function describeBoardSelectionKey(
+    key: string,
+    allyPlayerId: string | null,
+  ): BoardObjectSelectionDescriptor | null {
+    if (key.startsWith('player:')) {
+      return { key, kind: 'player', boardKind: 'CHARACTER', relation: 'ALLY' }
+    }
+
+    if (key.startsWith('enemy:')) {
+      return { key, kind: 'enemy', boardKind: 'CHARACTER', relation: 'HOSTILE' }
+    }
+
+    if (key.startsWith('summon:')) {
+      const [, owner] = key.split(':')
+      return {
+        key,
+        kind: 'summon',
+        boardKind: 'SUMMON',
+        relation: owner && allyPlayerId && owner === allyPlayerId ? 'ALLY' : 'HOSTILE',
+      }
+    }
+
+    if (isFieldSelectionKey(key)) {
+      return { key, kind: 'field', boardKind: 'FIELD_CARD', relation: 'ALLY' }
+    }
+
+    return null
+  }
+
+  function getSelectedActionRequirementView(action: CombatScreenAction | null) {
+    if (!action?.metadata) {
+      return null
+    }
+
+    if (action.metadata.kind === 'playCard') {
+      if (!selectedCardId) {
+        return null
+      }
+
+      const selectedSource = action.metadata.sourceOptions.find((option) => option.instanceId === selectedCardId)
+      return selectedSource?.requirementView ?? null
+    }
+
+    if (action.metadata.kind === 'useEx') {
+      return action.metadata.requirementView ?? null
+    }
+
+    return null
+  }
+
+  function getBoardCountChoiceOptions(requirement: CombatRequirementViewDto | null | undefined) {
+    return uniqueIdentifiers((requirement?.boardObjectSelectionHints?.allowedCounts ?? []).map(String)).map(Number)
+  }
+
+  function requiresBoardCountChoice(requirement: CombatRequirementViewDto | null | undefined) {
+    const countOptions = getBoardCountChoiceOptions(requirement)
+    return countOptions.length > 1 && !(requirement?.boardObjectSelectionHints?.skipCountChoice ?? false)
+  }
+
+  function resolveBoardSelectionLimit(requirement: CombatRequirementViewDto | null | undefined) {
+    const boardRequirement = requirement?.boardObjectRequirement
+    if (!boardRequirement) {
+      return null
+    }
+
+    const countOptions = getBoardCountChoiceOptions(requirement)
+    if (countOptions.length === 0) {
+      return boardRequirement.maxSelections
+    }
+
+    if (requirement?.boardObjectSelectionHints?.skipCountChoice) {
+      return countOptions[0] ?? boardRequirement.maxSelections
+    }
+
+    return selectedCount != null && countOptions.includes(selectedCount) ? selectedCount : null
+  }
+
+  function acceptsBoardSelectionKey(
+    requirement: CombatRequirementViewDto | null | undefined,
+    key: string,
+    allyPlayerId: string | null,
+  ) {
+    const boardRequirement = requirement?.boardObjectRequirement
+    if (!boardRequirement) {
+      return true
+    }
+
+    const descriptor = describeBoardSelectionKey(key, allyPlayerId)
+    if (!descriptor) {
+      return false
+    }
+
+    if (!boardRequirement.kinds.includes(descriptor.boardKind)) {
+      return false
+    }
+
+    return boardRequirement.relation === 'ANY' || boardRequirement.relation === descriptor.relation
+  }
+
+  function filterBoardSelectionKeysForRequirement(
+    keys: readonly string[],
+    requirement: CombatRequirementViewDto | null | undefined,
+    allyPlayerId: string | null,
+  ) {
+    return keys.filter((key) => acceptsBoardSelectionKey(requirement, key, allyPlayerId))
+  }
+
+  function prepareBoardSelectionState(
+    requirement: CombatRequirementViewDto | null | undefined,
+    options: { resetCountChoice?: boolean } = {},
+  ) {
+    const allyPlayerId = visiblePlayerView?.playerId ?? screen?.zones.visiblePlayerId ?? null
+    const compatibleKeys = filterBoardSelectionKeysForRequirement(
+      buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds),
+      requirement,
+      allyPlayerId,
+    )
+    const resolvedLimit = resolveBoardSelectionLimit(requirement)
+    const trimmedKeys =
+      resolvedLimit == null ? compatibleKeys : compatibleKeys.slice(0, Math.max(0, resolvedLimit))
+    writeBoardObjectKeys(trimmedKeys)
+
+    const countOptions = getBoardCountChoiceOptions(requirement)
+    if (requiresBoardCountChoice(requirement)) {
+      if (options.resetCountChoice || (selectedCount != null && !countOptions.includes(selectedCount))) {
+        selectedCount = null
+      }
+      return
+    }
+
+    if (countOptions.length === 1 && (selectedCount == null || !countOptions.includes(selectedCount))) {
+      selectedCount = countOptions[0]
+    }
+  }
+
+  function buildBoardSelectionPayload(requirement: CombatRequirementViewDto | null | undefined) {
+    const allyPlayerId = visiblePlayerView?.playerId ?? screen?.zones.visiblePlayerId ?? null
+    const boardSelectionKeys = filterBoardSelectionKeysForRequirement(
+      buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds),
+      requirement,
+      allyPlayerId,
+    )
+    return {
+      targets: buildTargetRefs(boardSelectionKeys.filter((key) => !isFieldSelectionKey(key))),
+      selectedIds: boardSelectionKeys
+        .map((key) => fieldIdFromSelectionKey(key))
+        .filter((value): value is string => Boolean(value)),
+    }
+  }
+
+  function canToggleBoardSelectionKey(key: string) {
+    const requirement = getSelectedActionRequirementView(selectedAction)
+    const allyPlayerId = visiblePlayerView?.playerId ?? screen?.zones.visiblePlayerId ?? null
+    if (!acceptsBoardSelectionKey(requirement, key, allyPlayerId)) {
+      return false
+    }
+
+    const selectedBoardKeys = filterBoardSelectionKeysForRequirement(
+      buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds),
+      requirement,
+      allyPlayerId,
+    )
+    if (selectedBoardKeys.includes(key)) {
+      return true
+    }
+
+    const resolvedLimit = resolveBoardSelectionLimit(requirement)
+    if (resolvedLimit == null) {
+      return requirement?.boardObjectRequirement == null
+    }
+
+    return selectedBoardKeys.length < resolvedLimit
+  }
+
+  function toggleBoardSelectionKey(key: string) {
+    const selectedKeys = buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds)
+    if (selectedKeys.includes(key)) {
+      writeBoardObjectKeys(selectedKeys.filter((entry) => entry !== key))
+      return
+    }
+
+    if (!canToggleBoardSelectionKey(key)) {
+      return
+    }
+
+    writeBoardObjectKeys([...selectedKeys, key])
   }
 
   function toggleIdentifier(values: readonly string[], value: string) {
@@ -658,6 +893,33 @@
       return requirement.unsupportedReason
     }
 
+    if (requirement.boardObjectRequirement) {
+      const allyPlayerId = visiblePlayerView?.playerId ?? screen?.zones.visiblePlayerId ?? null
+      const selectedBoardKeys = filterBoardSelectionKeysForRequirement(
+        buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds),
+        requirement,
+        allyPlayerId,
+      )
+      if (selectedBoardKeys.length !== uniqueIdentifiers(selectedBoardKeys).length) {
+        return 'Select distinct board objects only.'
+      }
+
+      if (requiresBoardCountChoice(requirement) && resolveBoardSelectionLimit(requirement) == null) {
+        const options = getBoardCountChoiceOptions(requirement)
+        return `Choose how many board objects to select first (${options.join(' or ')}).`
+      }
+
+      const resolvedLimit = resolveBoardSelectionLimit(requirement)
+      const minSelections = resolvedLimit ?? requirement.boardObjectRequirement.minSelections
+      const maxSelections = resolvedLimit ?? requirement.boardObjectRequirement.maxSelections
+      if (selectedBoardKeys.length < minSelections) {
+        return requirement.boardObjectSummary
+      }
+      if (selectedBoardKeys.length > maxSelections) {
+        return `Select at most ${maxSelections} board object${maxSelections === 1 ? '' : 's'}.`
+      }
+    }
+
     if (requirement.targetRule?.requiredSelection && selectedTargetKeys.length === 0) {
       return requirement.targetSummary
     }
@@ -815,20 +1077,30 @@
       }
       case 'combat.playCard': {
         const basePayload = buildScreenActionPayload(action, {})
+        const requirement = getSelectedActionRequirementView(action)
+        const boardSelectionPayload = buildBoardSelectionPayload(requirement)
         return {
           ...basePayload,
           cardId: selectedCardId ?? '',
           discardIds: selectedDiscardIds,
-          selectedIds: selectedFieldIds,
-          targets: buildTargetRefs(selectedTargetKeys),
+          selectedIds: requirement?.boardObjectRequirement
+            ? boardSelectionPayload.selectedIds
+            : selectedFieldIds,
+          targets: requirement?.boardObjectRequirement
+            ? boardSelectionPayload.targets
+            : buildTargetRefs(selectedTargetKeys),
           reason: normalizeOptionalText(selectedReason),
         }
       }
       case 'combat.useEx': {
         const basePayload = buildScreenActionPayload(action, {})
+        const requirement = getSelectedActionRequirementView(action)
+        const boardSelectionPayload = buildBoardSelectionPayload(requirement)
         return {
           ...basePayload,
-          targets: buildTargetRefs(selectedTargetKeys),
+          targets: requirement?.boardObjectRequirement
+            ? boardSelectionPayload.targets
+            : buildTargetRefs(selectedTargetKeys),
           reason: normalizeOptionalText(selectedReason),
         }
       }
@@ -903,6 +1175,9 @@
 
     const normalizedActionId = actionId as CombatActionId
     selectedActionId = normalizedActionId
+    prepareBoardSelectionState(getSelectedActionRequirementView(findCombatAction(screen, normalizedActionId)), {
+      resetCountChoice: normalizedActionId === 'combat.useEx',
+    })
 
     if (
       normalizedActionId === 'combat.draw' ||
@@ -923,20 +1198,25 @@
   }
 
   function handleToggleTargetPlayer(playerId: string) {
-    selectedTargetKeys = toggleIdentifier(selectedTargetKeys, targetKeyForPlayer(playerId))
+    toggleBoardSelectionKey(targetKeyForPlayer(playerId))
   }
 
   function handleToggleTargetEnemy(enemyId: string) {
-    selectedTargetKeys = toggleIdentifier(selectedTargetKeys, targetKeyForEnemy(enemyId))
+    toggleBoardSelectionKey(targetKeyForEnemy(enemyId))
   }
 
   function handleToggleTargetSummon(owner: string, summonId: string) {
-    selectedTargetKeys = toggleIdentifier(selectedTargetKeys, targetKeyForSummon(owner, summonId))
+    toggleBoardSelectionKey(targetKeyForSummon(owner, summonId))
   }
 
   function handleSelectHandCard(instanceId: string) {
-    selectedCardId = selectedCardId === instanceId ? null : instanceId
+    const nextSelectedCardId = selectedCardId === instanceId ? null : instanceId
+    selectedCardId = nextSelectedCardId
     selectedActionId = 'combat.playCard'
+    const nextAction = screen ? findCombatAction(screen, 'combat.playCard') : null
+    prepareBoardSelectionState(getSelectedActionRequirementView(nextAction), {
+      resetCountChoice: nextSelectedCardId !== null,
+    })
   }
 
   function handleToggleDiscard(instanceId: string) {
@@ -944,7 +1224,7 @@
   }
 
   function handleToggleFieldId(instanceId: string) {
-    selectedFieldIds = toggleIdentifier(selectedFieldIds, instanceId)
+    toggleBoardSelectionKey(fieldSelectionKey(instanceId))
   }
 
   function handleTogglePendingSelectedId(value: string) {
@@ -961,7 +1241,13 @@
   }
 
   function handleSelectedCountChange(value: string) {
-    selectedCount = normalizePositiveInteger(value) ?? 1
+    if (!value.trim()) {
+      selectedCount = null
+      return
+    }
+
+    selectedCount = normalizePositiveInteger(value)
+    prepareBoardSelectionState(getSelectedActionRequirementView(selectedAction))
   }
 
   function handleSelectedReasonChange(value: string) {
@@ -1025,6 +1311,7 @@
   const selectedAction = $derived.by(() =>
     screen && selectedActionId ? findCombatAction(screen, selectedActionId) : null,
   )
+  const selectedActionRequirement = $derived.by(() => getSelectedActionRequirementView(selectedAction))
   const selectedActionLocalBlock = $derived.by(() => getActionPresentationBlock(selectedAction))
   const selectedRequirementView = $derived.by(() => {
     if (!selectedAction?.metadata) {
@@ -1094,13 +1381,13 @@
     return enemyViews.find((enemy) => enemy.enemyId === enemyId) ?? null
   })
   const selectedTargets = $derived.by(() => buildTargetRefs(selectedTargetKeys))
-  const selectedTargetLabels = $derived.by(() => {
+  const selectedBoardObjectLabels = $derived.by(() => {
     if (!screen) {
       return []
     }
 
     const labels: string[] = []
-    for (const key of selectedTargetKeys) {
+    for (const key of buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds)) {
       if (key.startsWith('player:')) {
         const playerId = key.slice('player:'.length)
         const player = screen.actors.players.find((entry) => entry.playerId === playerId)
@@ -1118,11 +1405,22 @@
       if (key.startsWith('summon:')) {
         const [, owner, summonId] = key.split(':')
         labels.push(owner && summonId ? `Summon ${summonId} (${owner})` : key)
+        continue
+      }
+
+      const fieldId = fieldIdFromSelectionKey(key)
+      if (fieldId) {
+        const card = visiblePlayerView?.fieldCards.find((entry) => entry.instanceId === fieldId)
+        labels.push(card ? `Field ${card.title}` : `Field ${fieldId}`)
       }
     }
 
     return labels
   })
+  const boardCountChoiceOptions = $derived.by(
+    () => selectedActionRequirement?.boardObjectSelectionHints?.allowedCounts ?? [],
+  )
+  const boardCountChoiceRequired = $derived.by(() => requiresBoardCountChoice(selectedActionRequirement))
   const resolveEntityInspectState = (entity: CombatInspectorEntityReference) =>
     isSameEntityReference(pinnedEntity, entity) ? 'pinned' : isSameEntityReference(hoveredEntity, entity) ? 'hovered' : 'idle'
   const resolveHandCardInspectState = (instanceId: string) =>
@@ -1300,6 +1598,10 @@
           onToggleTargetPlayer={handleToggleTargetPlayer}
           onToggleTargetEnemy={handleToggleTargetEnemy}
           onToggleTargetSummon={handleToggleTargetSummon}
+          canToggleTargetPlayer={(playerId) => canToggleBoardSelectionKey(targetKeyForPlayer(playerId))}
+          canToggleTargetEnemy={(enemyId) => canToggleBoardSelectionKey(targetKeyForEnemy(enemyId))}
+          canToggleTargetSummon={(owner, summonId) =>
+            canToggleBoardSelectionKey(targetKeyForSummon(owner, summonId))}
           onHoverEntity={setHoveredEntity}
           onPinEntity={setPinnedEntity}
           resolveInspectState={resolveEntityInspectState}
@@ -1321,7 +1623,7 @@
           sourceLabel={selectedSourceLabel}
           detailLoading={false}
           detailError={null}
-          {selectedTargetLabels}
+          {selectedBoardObjectLabels}
           {selectedDiscardIds}
           {selectedFieldIds}
           {pendingDecision}
@@ -1331,6 +1633,8 @@
           {canResolvePendingCommand}
           {selectedCount}
           {selectedReason}
+          {boardCountChoiceOptions}
+          {boardCountChoiceRequired}
           {visiblePlayerView}
           eventEntries={eventFeedEntries}
           eventsLoading={false}
@@ -1352,6 +1656,7 @@
           onToggleOrderedActorKey={handleToggleOrderedActorKey}
           onResolvePendingDecision={handleResolvePendingDecision}
           onToggleSelectedId={handleToggleFieldId}
+          canToggleSelectedId={(instanceId) => canToggleBoardSelectionKey(fieldSelectionKey(instanceId))}
           onRetryEvents={() => void refreshCombatScreen('action-failure')}
           onRetryLogs={() => void refreshCombatScreen('action-failure')}
           onRetryResults={() => void refreshCombatScreen('action-failure')}
