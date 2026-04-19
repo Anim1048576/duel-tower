@@ -79,9 +79,10 @@ class CardPlaySpecExposureTest {
 
     @Test
     void tigDiscardCardsShouldExposeDiscardRequirementInPlaySpec() {
-        assertDiscardOneFromHand("Tig004_Card", true, Target.ENEMY_ONE);
+        assertHostileSingleTarget("Tig003_Card");
+        assertDiscardOneFromHand("Tig004_Card", true, Target.ENEMY_ONE, true);
         assertDiscardOneFromHand("Tig005_Card", false, Target.NONE);
-        assertDiscardOneFromHand("Tig008_Card", true, Target.ENEMY_ONE);
+        assertDiscardOneFromHand("Tig008_Card", true, Target.ENEMY_ONE, true);
     }
 
     @Test
@@ -140,9 +141,9 @@ class CardPlaySpecExposureTest {
 
         assertThat(detail.playSpec()).isNotNull();
         assertThat(detail.playSpec().target().target()).isEqualTo(Target.ENEMY_ONE);
-        assertThat(detail.playSpec().extraRequirements())
-                .singleElement()
-                .isInstanceOf(DiscardFromHandRequirement.class);
+        assertThat(detail.playSpec().extraRequirements()).hasSize(2);
+        assertHostileBoardObjectSelection(detail.playSpec());
+        assertThat(detail.playSpec().extraRequirements().get(1)).isInstanceOf(DiscardFromHandRequirement.class);
     }
 
     @Test
@@ -164,20 +165,80 @@ class CardPlaySpecExposureTest {
         assertThat(detail.playSpec()).isNotNull();
         assertThat(detail.playSpec().target().target()).isEqualTo(Target.ENEMY_ONE);
         assertThat(detail.playSpec().target().requiredSelection()).isTrue();
-        assertThat(detail.playSpec().extraRequirements()).isEmpty();
+        assertHostileBoardObjectSelection(detail.playSpec());
+    }
+
+    @Test
+    void basicRecoveryAndExWrapShouldExposeAllyBoardObjectSelectionRequirement() {
+        assertAllySingleTarget("C002", Target.ALLY_ONE);
+        assertAllySingleTarget("EX901", Target.ALLY_ONE);
+    }
+
+    @Test
+    void basicCurseAndTigHostileCardsShouldExposeHostileBoardObjectSelectionRequirement() {
+        assertHostileSingleTarget("C004");
+        assertHostileSingleTarget("Tig004_Card");
+        assertHostileSingleTarget("Tig008_Card");
     }
 
     private void assertDiscardOneFromHand(String cardId, boolean targetRequired, Target expectedTarget) {
+        assertDiscardOneFromHand(cardId, targetRequired, expectedTarget, false);
+    }
+
+    private void assertDiscardOneFromHand(String cardId,
+                                          boolean targetRequired,
+                                          Target expectedTarget,
+                                          boolean expectHostileBoardRequirement) {
         CardDetailResponse detail = cardService.get(cardId);
         CardPlaySpec playSpec = detail.playSpec();
 
         assertThat(playSpec.target().requiredSelection()).isEqualTo(targetRequired);
         assertThat(playSpec.target().target()).isEqualTo(expectedTarget);
-        assertThat(playSpec.extraRequirements())
-                .singleElement()
+        int discardIndex = expectHostileBoardRequirement ? 1 : 0;
+        if (expectHostileBoardRequirement) {
+            assertHostileBoardObjectSelection(playSpec);
+        }
+        assertThat(playSpec.extraRequirements().get(discardIndex))
                 .isInstanceOfSatisfying(DiscardFromHandRequirement.class, discard -> {
                     assertThat(discard.count()).isEqualTo(1);
                     assertThat(discard.excludeSourceCard()).isTrue();
+                });
+    }
+
+    private void assertHostileSingleTarget(String cardId) {
+        CardDetailResponse detail = cardService.get(cardId);
+        CardPlaySpec playSpec = detail.playSpec();
+
+        assertThat(playSpec.target().requiredSelection()).isTrue();
+        assertThat(playSpec.target().target()).isEqualTo(Target.ENEMY_ONE);
+        assertHostileBoardObjectSelection(playSpec);
+    }
+
+    private void assertAllySingleTarget(String cardId, Target expectedTarget) {
+        CardDetailResponse detail = cardService.get(cardId);
+        CardPlaySpec playSpec = detail.playSpec();
+
+        assertThat(playSpec.target().requiredSelection()).isTrue();
+        assertThat(playSpec.target().target()).isEqualTo(expectedTarget);
+        assertThat(playSpec.extraRequirements())
+                .singleElement()
+                .isInstanceOfSatisfying(SelectBoardObjectsRequirement.class, req -> {
+                    assertThat(req.minSelections()).isEqualTo(1);
+                    assertThat(req.maxSelections()).isEqualTo(1);
+                    assertThat(req.kinds()).containsExactly(BoardObjectKind.CHARACTER, BoardObjectKind.SUMMON);
+                    assertThat(req.relation()).isEqualTo(BoardObjectRelation.ALLY);
+                    assertThat(req.excludeSourceCard()).isFalse();
+                });
+    }
+
+    private void assertHostileBoardObjectSelection(CardPlaySpec playSpec) {
+        assertThat(playSpec.extraRequirements().get(0))
+                .isInstanceOfSatisfying(SelectBoardObjectsRequirement.class, req -> {
+                    assertThat(req.minSelections()).isEqualTo(1);
+                    assertThat(req.maxSelections()).isEqualTo(1);
+                    assertThat(req.kinds()).containsExactly(BoardObjectKind.CHARACTER, BoardObjectKind.SUMMON);
+                    assertThat(req.relation()).isEqualTo(BoardObjectRelation.HOSTILE);
+                    assertThat(req.excludeSourceCard()).isFalse();
                 });
     }
 }

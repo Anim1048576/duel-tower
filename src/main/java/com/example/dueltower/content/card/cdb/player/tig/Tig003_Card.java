@@ -1,9 +1,12 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.BoardObjectKind;
+import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.DiscardFilter;
 import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
+import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.content.status.sdb.S106_Vulnerable;
 import com.example.dueltower.engine.core.ZoneOps;
@@ -40,7 +43,17 @@ public class Tig003_Card implements CardBlueprint {
     public CardPlaySpec playSpec() {
         return new CardPlaySpec(
                 TargetSpec.required(Target.ENEMY_ONE),
-                List.of(new DiscardFromHandRequirement(1, true, DiscardFilter.ANY))
+                List.of(
+                        new SelectBoardObjectsRequirement(
+                                1,
+                                1,
+                                List.of(BoardObjectKind.CHARACTER, BoardObjectKind.SUMMON),
+                                BoardObjectRelation.HOSTILE,
+                                null,
+                                false
+                        ),
+                        new DiscardFromHandRequirement(1, true, DiscardFilter.ANY)
+                )
         );
     }
 

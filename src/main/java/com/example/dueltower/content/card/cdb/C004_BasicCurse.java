@@ -1,7 +1,10 @@
 package com.example.dueltower.content.card.cdb;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.BoardObjectKind;
+import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.content.status.sdb.S101_Pain;
 import com.example.dueltower.engine.core.effect.EffectContext;
@@ -44,7 +47,14 @@ public class C004_BasicCurse implements CardBlueprint {
     public CardPlaySpec playSpec() {
         return new CardPlaySpec(
                 TargetSpec.required(Target.ENEMY_ONE),
-                List.of()
+                List.of(new SelectBoardObjectsRequirement(
+                        1,
+                        1,
+                        List.of(BoardObjectKind.CHARACTER, BoardObjectKind.SUMMON),
+                        BoardObjectRelation.HOSTILE,
+                        null,
+                        false
+                ))
         );
     }
 

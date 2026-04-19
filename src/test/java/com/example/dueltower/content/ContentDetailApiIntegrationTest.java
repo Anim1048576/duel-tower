@@ -92,11 +92,23 @@ class ContentDetailApiIntegrationTest {
     @Test
     @DisplayName("카드 상세는 TIG discard 카드의 play spec 메타데이터를 노출한다")
     void cardDetailShouldExposePlaySpecMetadataForTigDiscardCards() throws Exception {
+        mockMvc.perform(get("/api/content/cards/{id}", "Tig003_Card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(2))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("HOSTILE"))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[1].type").value("discard_from_hand"));
+
         mockMvc.perform(get("/api/content/cards/{id}", "Tig004_Card"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
                 .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
-                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1));
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(2))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("HOSTILE"))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[1].type").value("discard_from_hand"));
 
         mockMvc.perform(get("/api/content/cards/{id}", "Tig005_Card"))
                 .andExpect(status().isOk())
@@ -114,7 +126,10 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
                 .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
-                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1));
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(2))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("HOSTILE"))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[1].type").value("discard_from_hand"));
     }
 
     @Test
@@ -207,7 +222,41 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
                 .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
-                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(0));
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("HOSTILE"));
+    }
+
+    @Test
+    @DisplayName("移대뱶 ?곸꽭??湲곕낯 ally target 移대뱶??board-object selection play spec???몄텧?쒕떎")
+    void cardDetailShouldExposeAllyBoardObjectSelectionPlaySpecForBasicSupportCards() throws Exception {
+        mockMvc.perform(get("/api/content/cards/{id}", "C002"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playSpec.target.target").value("ALLY_ONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("ALLY"));
+
+        mockMvc.perform(get("/api/content/cards/{id}", "EX901"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playSpec.target.target").value("ALLY_ONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("ALLY"));
+    }
+
+    @Test
+    @DisplayName("移대뱶 ?곸꽭??湲곕낯 hostile target 移대뱶??board-object selection play spec???몄텧?쒕떎")
+    void cardDetailShouldExposeHostileBoardObjectSelectionPlaySpecForBasicHostileCards() throws Exception {
+        mockMvc.perform(get("/api/content/cards/{id}", "C004"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("HOSTILE"));
     }
 
     @Test
