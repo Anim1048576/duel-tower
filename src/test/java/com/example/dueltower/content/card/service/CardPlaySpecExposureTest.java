@@ -64,8 +64,8 @@ class CardPlaySpecExposureTest {
         CardDetailResponse detail = cardService.get("Tig002_Card");
         CardPlaySpec playSpec = detail.playSpec();
 
-        assertThat(playSpec.target().requiredSelection()).isTrue();
-        assertThat(playSpec.target().target()).isEqualTo(Target.ALLY_ONE);
+        assertThat(playSpec.target().requiredSelection()).isFalse();
+        assertThat(playSpec.target().target()).isEqualTo(Target.NONE);
         assertThat(playSpec.extraRequirements())
                 .singleElement()
                 .isInstanceOfSatisfying(SelectBoardObjectsRequirement.class, req -> {
@@ -80,9 +80,9 @@ class CardPlaySpecExposureTest {
     @Test
     void tigDiscardCardsShouldExposeDiscardRequirementInPlaySpec() {
         assertHostileSingleTarget("Tig003_Card");
-        assertDiscardOneFromHand("Tig004_Card", true, Target.ENEMY_ONE, true);
+        assertDiscardOneFromHand("Tig004_Card", false, Target.NONE, true);
         assertDiscardOneFromHand("Tig005_Card", false, Target.NONE);
-        assertDiscardOneFromHand("Tig008_Card", true, Target.ENEMY_ONE, true);
+        assertDiscardOneFromHand("Tig008_Card", false, Target.NONE, true);
     }
 
     @Test
@@ -140,7 +140,7 @@ class CardPlaySpecExposureTest {
         CardDetailResponse detail = cardService.get("Tig004_Card");
 
         assertThat(detail.playSpec()).isNotNull();
-        assertThat(detail.playSpec().target().target()).isEqualTo(Target.ENEMY_ONE);
+        assertThat(detail.playSpec().target().target()).isEqualTo(Target.NONE);
         assertThat(detail.playSpec().extraRequirements()).hasSize(2);
         assertHostileBoardObjectSelection(detail.playSpec());
         assertThat(detail.playSpec().extraRequirements().get(1)).isInstanceOf(DiscardFromHandRequirement.class);
@@ -163,15 +163,15 @@ class CardPlaySpecExposureTest {
         CardDetailResponse detail = cardService.get("C001");
 
         assertThat(detail.playSpec()).isNotNull();
-        assertThat(detail.playSpec().target().target()).isEqualTo(Target.ENEMY_ONE);
-        assertThat(detail.playSpec().target().requiredSelection()).isTrue();
+        assertThat(detail.playSpec().target().target()).isEqualTo(Target.NONE);
+        assertThat(detail.playSpec().target().requiredSelection()).isFalse();
         assertHostileBoardObjectSelection(detail.playSpec());
     }
 
     @Test
     void basicRecoveryAndExWrapShouldExposeAllyBoardObjectSelectionRequirement() {
-        assertAllySingleTarget("C002", Target.ALLY_ONE);
-        assertAllySingleTarget("EX901", Target.ALLY_ONE);
+        assertAllySingleTarget("C002");
+        assertAllySingleTarget("EX901");
     }
 
     @Test
@@ -209,17 +209,17 @@ class CardPlaySpecExposureTest {
         CardDetailResponse detail = cardService.get(cardId);
         CardPlaySpec playSpec = detail.playSpec();
 
-        assertThat(playSpec.target().requiredSelection()).isTrue();
-        assertThat(playSpec.target().target()).isEqualTo(Target.ENEMY_ONE);
+        assertThat(playSpec.target().requiredSelection()).isFalse();
+        assertThat(playSpec.target().target()).isEqualTo(Target.NONE);
         assertHostileBoardObjectSelection(playSpec);
     }
 
-    private void assertAllySingleTarget(String cardId, Target expectedTarget) {
+    private void assertAllySingleTarget(String cardId) {
         CardDetailResponse detail = cardService.get(cardId);
         CardPlaySpec playSpec = detail.playSpec();
 
-        assertThat(playSpec.target().requiredSelection()).isTrue();
-        assertThat(playSpec.target().target()).isEqualTo(expectedTarget);
+        assertThat(playSpec.target().requiredSelection()).isFalse();
+        assertThat(playSpec.target().target()).isEqualTo(Target.NONE);
         assertThat(playSpec.extraRequirements())
                 .singleElement()
                 .isInstanceOfSatisfying(SelectBoardObjectsRequirement.class, req -> {

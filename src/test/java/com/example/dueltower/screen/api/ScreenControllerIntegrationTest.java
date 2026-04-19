@@ -728,8 +728,19 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertActionContract(useExAction);
         assertThat(playCardAction.path("metadata").path("kind").asText()).isEqualTo("playCard");
         assertThat(playCardAction.path("metadata").path("sourceOptions")).isNotEmpty();
-        assertThat(playCardAction.path("metadata").path("sourceOptions").get(0).path("requirementView").path("targetSummary").asText()).isNotBlank();
-        assertThat(playCardAction.path("metadata").path("sourceOptions").get(0).path("requirementView").has("discardRequirement")).isTrue();
+        JsonNode hostileSourceOption = StreamSupport.stream(
+                        playCardAction.path("metadata").path("sourceOptions").spliterator(),
+                        false
+                )
+                .filter(option -> "HOSTILE".equals(option.path("requirementView").path("boardObjectRequirement").path("relation").asText(null)))
+                .findFirst()
+                .orElse(playCardAction.path("metadata").path("sourceOptions").get(0));
+        assertThat(hostileSourceOption.path("requirementView").path("targetSummary").asText()).isNotBlank();
+        assertThat(hostileSourceOption.path("requirementView").path("boardObjectRequirement").path("relation").asText())
+                .isEqualTo("HOSTILE");
+        assertThat(hostileSourceOption.path("requirementView").path("targetRule").path("requiredSelection").asBoolean())
+                .isFalse();
+        assertThat(hostileSourceOption.path("requirementView").has("discardRequirement")).isTrue();
         assertThat(useExAction.path("metadata").path("kind").asText()).isEqualTo("useEx");
         assertThat(useExAction.path("metadata").path("requirementView").path("targetSummary").asText()).isNotBlank();
     }

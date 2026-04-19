@@ -212,15 +212,26 @@ class ScreenResponseSerializationContractTest extends ScreenApiContractTestSuppo
                               "discardSummary": "No extra hand discard required",
                               "selectedIdsSummary": "No extra field selection required",
                               "choiceSummary": "No explicit choice requirement",
-                              "boardObjectSummary": "No board-object selection requirement",
+                              "boardObjectSummary": "Select exactly one hostile character or hostile summon",
                               "targetRule": {
-                                "target": "ENEMY_ONE",
-                                "requiredSelection": true
+                                "target": "NONE",
+                                "requiredSelection": false
                               },
                               "discardRequirement": null,
                               "selectedIdsRequirement": null,
-                              "boardObjectRequirement": null,
-                              "boardObjectSelectionHints": null,
+                              "boardObjectRequirement": {
+                                "minSelections": 1,
+                                "maxSelections": 1,
+                                "kinds": ["CHARACTER", "SUMMON"],
+                                "relation": "HOSTILE",
+                                "filter": "ANY",
+                                "excludeSourceCard": false
+                              },
+                              "boardObjectSelectionHints": {
+                                "candidateCount": 1,
+                                "allowedCounts": [1],
+                                "skipCountChoice": true
+                              },
                               "pendingChoiceSchema": null,
                               "unsupportedReason": null
                             },
@@ -240,7 +251,8 @@ class ScreenResponseSerializationContractTest extends ScreenApiContractTestSuppo
         assertActionContract(action);
         assertThat(action.path("metadata").path("kind").asText()).isEqualTo("playCard");
         assertThat(action.path("metadata").path("sourceOptions").isArray()).isTrue();
-        assertThat(action.path("metadata").path("sourceOptions").get(0).path("requirementView").path("targetRule").path("requiredSelection").asBoolean()).isTrue();
+        assertThat(action.path("metadata").path("sourceOptions").get(0).path("requirementView").path("targetRule").path("requiredSelection").asBoolean()).isFalse();
+        assertThat(action.path("metadata").path("sourceOptions").get(0).path("requirementView").path("boardObjectRequirement").path("relation").asText()).isEqualTo("HOSTILE");
         assertThat(action.path("metadata").path("sourceOptions").get(0).path("supported").asBoolean()).isTrue();
     }
 

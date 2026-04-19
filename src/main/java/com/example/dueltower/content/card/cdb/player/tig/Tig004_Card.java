@@ -45,7 +45,7 @@ public class Tig004_Card implements CardBlueprint {
     @Override
     public CardPlaySpec playSpec() {
         return new CardPlaySpec(
-                TargetSpec.required(Target.ENEMY_ONE),
+                TargetSpec.none(),
                 List.of(
                         new SelectBoardObjectsRequirement(
                                 1,

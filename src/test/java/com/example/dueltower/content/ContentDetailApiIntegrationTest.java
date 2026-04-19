@@ -94,8 +94,8 @@ class ContentDetailApiIntegrationTest {
     void cardDetailShouldExposePlaySpecMetadataForTigDiscardCards() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "Tig003_Card"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
-                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
                 .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(2))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("HOSTILE"))
@@ -103,8 +103,8 @@ class ContentDetailApiIntegrationTest {
 
         mockMvc.perform(get("/api/content/cards/{id}", "Tig004_Card"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
-                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
                 .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(2))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("HOSTILE"))
@@ -124,8 +124,8 @@ class ContentDetailApiIntegrationTest {
 
         mockMvc.perform(get("/api/content/cards/{id}", "Tig008_Card"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
-                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
                 .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(2))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("HOSTILE"))
@@ -160,8 +160,8 @@ class ContentDetailApiIntegrationTest {
     void cardDetailShouldExposeBoardObjectSelectionPlaySpecForTig002() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "Tig002_Card"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.playSpec.target.target").value("ALLY_ONE"))
-                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
                 .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].minSelections").value(1))
@@ -220,8 +220,8 @@ class ContentDetailApiIntegrationTest {
     void cardDetailShouldExposeEnemyTargetPlaySpecForBasicAttackCard() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "C001"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
-                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
                 .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("HOSTILE"));
@@ -232,16 +232,16 @@ class ContentDetailApiIntegrationTest {
     void cardDetailShouldExposeAllyBoardObjectSelectionPlaySpecForBasicSupportCards() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "C002"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.playSpec.target.target").value("ALLY_ONE"))
-                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
                 .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("ALLY"));
 
         mockMvc.perform(get("/api/content/cards/{id}", "EX901"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.playSpec.target.target").value("ALLY_ONE"))
-                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
                 .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("ALLY"));
@@ -252,8 +252,8 @@ class ContentDetailApiIntegrationTest {
     void cardDetailShouldExposeHostileBoardObjectSelectionPlaySpecForBasicHostileCards() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "C004"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
-                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
+                .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
+                .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
                 .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("HOSTILE"));

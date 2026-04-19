@@ -46,7 +46,7 @@ public class C004_BasicCurse implements CardBlueprint {
     @Override
     public CardPlaySpec playSpec() {
         return new CardPlaySpec(
-                TargetSpec.required(Target.ENEMY_ONE),
+                TargetSpec.none(),
                 List.of(new SelectBoardObjectsRequirement(
                         1,
                         1,
