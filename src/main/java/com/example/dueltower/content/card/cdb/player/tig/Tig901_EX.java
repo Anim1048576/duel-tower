@@ -1,6 +1,11 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.BoardObjectKind;
+import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
+import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.EffectOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
@@ -31,6 +36,21 @@ public class Tig901_EX implements CardBlueprint {
                         또는, 적 하나에게 {공격력}+[극복] 피해를 2번 입히고 1장 드로우한다.
                         [극복]이 3이상인 경우, 공격 횟수를 1 증가시킨다.
                         """
+                );
+    }
+
+    @Override
+    public CardPlaySpec playSpec() {
+        return new CardPlaySpec(
+                TargetSpec.none(),
+                List.of(new SelectBoardObjectsRequirement(
+                        1,
+                        2,
+                        List.of(BoardObjectKind.CHARACTER, BoardObjectKind.SUMMON),
+                        BoardObjectRelation.HOSTILE,
+                        null,
+                        false
+                ))
         );
     }
 

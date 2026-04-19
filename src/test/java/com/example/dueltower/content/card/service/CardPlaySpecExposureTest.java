@@ -2,8 +2,11 @@ package com.example.dueltower.content.card.service;
 
 import com.example.dueltower.content.card.dto.CardDetailResponse;
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.BoardObjectKind;
+import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
+import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
 import com.example.dueltower.content.card.model.playspec.SelectFieldCardsRequirement;
 import com.example.dueltower.engine.model.Target;
 import org.junit.jupiter.api.Test;
@@ -78,6 +81,24 @@ class CardPlaySpecExposureTest {
     }
 
     @Test
+    void tig901ShouldExposeHostileBoardObjectSelectionRequirement() {
+        CardDetailResponse detail = cardService.get("Tig901_EX");
+        CardPlaySpec playSpec = detail.playSpec();
+
+        assertThat(playSpec.target().requiredSelection()).isFalse();
+        assertThat(playSpec.target().target()).isEqualTo(Target.NONE);
+        assertThat(playSpec.extraRequirements())
+                .singleElement()
+                .isInstanceOfSatisfying(SelectBoardObjectsRequirement.class, req -> {
+                    assertThat(req.minSelections()).isEqualTo(1);
+                    assertThat(req.maxSelections()).isEqualTo(2);
+                    assertThat(req.kinds()).containsExactly(BoardObjectKind.CHARACTER, BoardObjectKind.SUMMON);
+                    assertThat(req.relation()).isEqualTo(BoardObjectRelation.HOSTILE);
+                    assertThat(req.excludeSourceCard()).isFalse();
+                });
+    }
+
+    @Test
     void cardDetailShouldExposePlaySpec() {
         CardDetailResponse detail = cardService.get("Tig004_Card");
 
@@ -101,12 +122,12 @@ class CardPlaySpecExposureTest {
     }
 
     @Test
-    void defaultCardDetailShouldExposeNonePlaySpec() {
+    void basicAttackCardDetailShouldExposeEnemyTargetPlaySpec() {
         CardDetailResponse detail = cardService.get("C001");
 
         assertThat(detail.playSpec()).isNotNull();
-        assertThat(detail.playSpec().target().target()).isEqualTo(Target.NONE);
-        assertThat(detail.playSpec().target().requiredSelection()).isFalse();
+        assertThat(detail.playSpec().target().target()).isEqualTo(Target.ENEMY_ONE);
+        assertThat(detail.playSpec().target().requiredSelection()).isTrue();
         assertThat(detail.playSpec().extraRequirements()).isEmpty();
     }
 

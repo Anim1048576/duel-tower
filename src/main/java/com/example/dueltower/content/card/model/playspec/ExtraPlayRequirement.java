@@ -7,7 +7,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 @JsonSubTypes({
         @JsonSubTypes.Type(value = DiscardFromHandRequirement.class, name = "discard_from_hand"),
         @JsonSubTypes.Type(value = ChoiceRequirement.class, name = "choice"),
-        @JsonSubTypes.Type(value = SelectFieldCardsRequirement.class, name = "select_field_cards")
+        @JsonSubTypes.Type(value = SelectFieldCardsRequirement.class, name = "select_field_cards"),
+        @JsonSubTypes.Type(value = SelectBoardObjectsRequirement.class, name = "select_board_objects")
 })
-public sealed interface ExtraPlayRequirement permits DiscardFromHandRequirement, ChoiceRequirement, SelectFieldCardsRequirement {
+public sealed interface ExtraPlayRequirement permits DiscardFromHandRequirement, ChoiceRequirement, SelectFieldCardsRequirement, SelectBoardObjectsRequirement {
 }

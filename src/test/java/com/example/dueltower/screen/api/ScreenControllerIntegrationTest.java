@@ -1139,6 +1139,31 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(deleteAction.path("payloadTemplate").isNull()).isTrue();
     }
 
+    @Test
+    void combatScreenExposesBoardObjectRequirementMetadataForTig901Ex() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-tig901", "gm-tig901@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-tig901");
+        MockHttpSession playerSession = signUpAndLogin("player-tig901", "player-tig901@example.com", "password123");
+        long characterId = createCharacter("Tig901_EX");
+        String playerToken = joinAsPlayer(playerSession, session.code(), "player-tig901", characterId);
+
+        markPlayerReady(session.code(), "player-tig901", playerToken);
+        startCombat(session.code(), session.gmToken(), "player-tig901");
+
+        JsonNode body = getCombatScreen(session.code(), playerToken);
+        JsonNode useExAction = findAction(body, "combat.useEx");
+        JsonNode requirementView = useExAction.path("metadata").path("requirementView");
+
+        assertThat(requirementView.path("boardObjectSummary").asText()).contains("hostile");
+        assertThat(requirementView.path("boardObjectRequirement").path("minSelections").asInt()).isEqualTo(1);
+        assertThat(requirementView.path("boardObjectRequirement").path("maxSelections").asInt()).isEqualTo(2);
+        assertThat(requirementView.path("boardObjectRequirement").path("relation").asText()).isEqualTo("HOSTILE");
+        assertThat(requirementView.path("boardObjectRequirement").path("kinds")).hasSize(2);
+        assertThat(requirementView.path("boardObjectSelectionHints").path("candidateCount").asInt()).isGreaterThanOrEqualTo(1);
+        assertThat(requirementView.path("boardObjectSelectionHints").path("allowedCounts").get(0).asInt()).isEqualTo(1);
+        assertThat(requirementView.path("targetRule").path("requiredSelection").asBoolean()).isFalse();
+    }
+
     private SessionInfo createSession(MockHttpSession session, String gmId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/sessions")
                         .session(session)
@@ -1234,6 +1259,10 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     private long createCharacter() {
+        return createCharacter("EX901");
+    }
+
+    private long createCharacter(String exCardId) {
         CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
                 .name("Screen Test Character")
                 .gender(CharacterGender.OTHER)
@@ -1250,7 +1279,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .trait2(null)
                 .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
                 .currentSkillDeck(List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"))
-                .exCard("{\"id\":\"EX901\"}")
+                .exCard("{\"id\":\"" + exCardId + "\"}")
                 .build());
         return profile.getId();
     }

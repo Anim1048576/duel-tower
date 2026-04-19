@@ -212,12 +212,15 @@ class ScreenResponseSerializationContractTest extends ScreenApiContractTestSuppo
                               "discardSummary": "No extra hand discard required",
                               "selectedIdsSummary": "No extra field selection required",
                               "choiceSummary": "No explicit choice requirement",
+                              "boardObjectSummary": "No board-object selection requirement",
                               "targetRule": {
                                 "target": "ENEMY_ONE",
                                 "requiredSelection": true
                               },
                               "discardRequirement": null,
                               "selectedIdsRequirement": null,
+                              "boardObjectRequirement": null,
+                              "boardObjectSelectionHints": null,
                               "pendingChoiceSchema": null,
                               "unsupportedReason": null
                             },

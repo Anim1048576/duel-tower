@@ -5,6 +5,10 @@ import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.ChoiceRequirement;
 import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
 import com.example.dueltower.content.card.model.playspec.ExtraPlayRequirement;
+import com.example.dueltower.content.card.model.playspec.BoardObjectFilter;
+import com.example.dueltower.content.card.model.playspec.BoardObjectKind;
+import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
+import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
 import com.example.dueltower.content.card.model.playspec.SelectFieldCardsRequirement;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.engine.model.CardDefinition;
@@ -35,6 +39,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.IntStream;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
@@ -592,12 +597,15 @@ public class CombatScreenService {
         CardPlaySpec playSpec = cardService.playSpec(new CardDefId(instance.defId()));
         CombatScreenResponse.CardView sourceCard = cardView(instanceId, state, cardService.asMap());
         String sourceLabel = sourceCard == null ? instanceId : sourceCard.title();
-        return requirementMetadata(playSpec, sourceLabel);
+        return requirementMetadata(playSpec, sourceLabel, state, instanceId, ownerPlayerIdForSource(instanceId, state));
     }
 
     private RequirementMetadata requirementMetadata(CardPlaySpec playSpec,
-                                                    String sourceLabel) {
-        Map<String, Object> view = requirementView(playSpec, sourceLabel);
+                                                    String sourceLabel,
+                                                    SessionStateDto state,
+                                                    String sourceInstanceId,
+                                                    String sourceOwnerPlayerId) {
+        Map<String, Object> view = requirementView(playSpec, sourceLabel, state, sourceInstanceId, sourceOwnerPlayerId);
         ChoiceRequirement choiceRequirement = firstRequirement(playSpec, ChoiceRequirement.class);
         String unsupportedReason = choiceRequirement == null
                 ? null
@@ -606,23 +614,40 @@ public class CombatScreenService {
     }
 
     private Map<String, Object> requirementView(CardPlaySpec playSpec,
-                                                String sourceLabel) {
+                                                String sourceLabel,
+                                                SessionStateDto state,
+                                                String sourceInstanceId,
+                                                String sourceOwnerPlayerId) {
         DiscardFromHandRequirement discardRequirement = firstRequirement(playSpec, DiscardFromHandRequirement.class);
+        SelectBoardObjectsRequirement boardObjectRequirement = firstRequirement(playSpec, SelectBoardObjectsRequirement.class);
         SelectFieldCardsRequirement selectedIdsRequirement = firstRequirement(playSpec, SelectFieldCardsRequirement.class);
         ChoiceRequirement choiceRequirement = firstRequirement(playSpec, ChoiceRequirement.class);
+        String boardObjectSummary = describeBoardObjectRequirement(boardObjectRequirement);
+        Map<String, Object> boardObjectRequirementView = boardObjectRequirementView(boardObjectRequirement);
+        Map<String, Object> boardObjectSelectionHints = boardObjectSelectionHints(
+                boardObjectRequirement,
+                state,
+                sourceInstanceId,
+                sourceOwnerPlayerId
+        );
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("sourceLabel", sourceLabel);
-        view.put("targetSummary", describeTargetRequirement(playSpec));
+        view.put("targetSummary", boardObjectRequirement != null && !isFieldCardOnly(boardObjectRequirement)
+                ? boardObjectSummary
+                : describeTargetRequirement(playSpec));
         view.put("discardSummary", discardRequirement == null
                 ? "No extra hand discard required"
                 : "Select " + discardRequirement.count() + " hand discard" + (discardRequirement.count() > 1 ? "s" : "")
                 + (discardRequirement.excludeSourceCard() ? " excluding the source card" : ""));
-        view.put("selectedIdsSummary", selectedIdsRequirement == null
+        view.put("selectedIdsSummary", boardObjectRequirement != null && isFieldCardOnly(boardObjectRequirement)
+                ? boardObjectSummary
+                : selectedIdsRequirement == null
                 ? "No extra field selection required"
                 : "Select " + selectedIdsRequirement.minSelections() + "-" + selectedIdsRequirement.maxSelections() + " field card ids");
         view.put("choiceSummary", choiceRequirement == null
                 ? "No explicit choice requirement"
                 : choiceRequirement.label() + " (" + choiceRequirement.options().stream().map(option -> option.label()).toList() + ")");
+        view.put("boardObjectSummary", boardObjectRequirement == null ? "No board-object selection requirement" : boardObjectSummary);
         view.put("targetRule", Map.of(
                 "target", playSpec.target().target().name(),
                 "requiredSelection", playSpec.target().requiredSelection()
@@ -639,6 +664,8 @@ public class CombatScreenService {
                 "filter", selectedIdsRequirement.filter().name(),
                 "excludeSourceCard", selectedIdsRequirement.excludeSourceCard()
         ));
+        view.put("boardObjectRequirement", boardObjectRequirementView);
+        view.put("boardObjectSelectionHints", boardObjectSelectionHints);
         view.put("pendingChoiceSchema", choiceRequirement == null ? null : Map.of(
                 "id", choiceRequirement.id(),
                 "label", choiceRequirement.label(),
@@ -658,6 +685,18 @@ public class CombatScreenService {
         return view;
     }
 
+    private String describeBoardObjectRequirement(SelectBoardObjectsRequirement requirement) {
+        if (requirement == null) {
+            return "No board-object selection requirement";
+        }
+
+        String countSummary = describeSelectionRange(requirement.minSelections(), requirement.maxSelections());
+        String filterPrefix = requirement.filter() == BoardObjectFilter.INSTALLED_ONLY ? "installed " : "";
+        String objectLabel = describeBoardObjectKinds(requirement.kinds(), requirement.relation());
+        String excludeSource = requirement.excludeSourceCard() ? " excluding the source card" : "";
+        return countSummary + " " + filterPrefix + objectLabel + excludeSource;
+    }
+
     private String describeTargetRequirement(CardPlaySpec playSpec) {
         if (playSpec == null || !playSpec.target().requiredSelection() || playSpec.target().target() == com.example.dueltower.engine.model.Target.NONE) {
             return "No manual target required";
@@ -671,6 +710,181 @@ public class CombatScreenService {
             case ENEMY_ALL, ENEMY_SIDE -> "Enemy-side target is resolved automatically";
             case ALLY_ALL, ALLY_SIDE -> "Ally-side target is resolved automatically";
             default -> "Target rule: " + playSpec.target().target().name();
+        };
+    }
+
+    private Map<String, Object> boardObjectRequirementView(SelectBoardObjectsRequirement requirement) {
+        if (requirement == null) {
+            return null;
+        }
+        return Map.of(
+                "minSelections", requirement.minSelections(),
+                "maxSelections", requirement.maxSelections(),
+                "kinds", requirement.kinds().stream().map(BoardObjectKind::name).toList(),
+                "relation", requirement.relation().name(),
+                "filter", requirement.filter().name(),
+                "excludeSourceCard", requirement.excludeSourceCard()
+        );
+    }
+
+    private Map<String, Object> boardObjectSelectionHints(SelectBoardObjectsRequirement requirement,
+                                                          SessionStateDto state,
+                                                          String sourceInstanceId,
+                                                          String sourceOwnerPlayerId) {
+        if (requirement == null || state == null) {
+            return null;
+        }
+
+        int candidateCount = countBoardObjectCandidates(requirement, state, sourceInstanceId, sourceOwnerPlayerId);
+        int maxAllowed = Math.min(requirement.maxSelections(), candidateCount);
+        List<Integer> allowedCounts = maxAllowed < requirement.minSelections()
+                ? List.of()
+                : IntStream.rangeClosed(requirement.minSelections(), maxAllowed).boxed().toList();
+
+        Map<String, Object> hints = new LinkedHashMap<>();
+        hints.put("candidateCount", candidateCount);
+        hints.put("allowedCounts", allowedCounts);
+        hints.put("skipCountChoice", allowedCounts.size() <= 1);
+        return hints;
+    }
+
+    private int countBoardObjectCandidates(SelectBoardObjectsRequirement requirement,
+                                           SessionStateDto state,
+                                           String sourceInstanceId,
+                                           String sourceOwnerPlayerId) {
+        int total = 0;
+        if (requirement.kinds().contains(BoardObjectKind.CHARACTER)) {
+            total += countCharacterCandidates(requirement.relation(), state, sourceOwnerPlayerId);
+        }
+        if (requirement.kinds().contains(BoardObjectKind.SUMMON)) {
+            total += countSummonCandidates(requirement.relation(), state, sourceOwnerPlayerId);
+        }
+        if (requirement.kinds().contains(BoardObjectKind.FIELD_CARD)) {
+            total += countFieldCardCandidates(requirement.relation(), state, sourceOwnerPlayerId);
+        }
+        if (requirement.excludeSourceCard() && sourceInstanceId != null && requirement.kinds().contains(BoardObjectKind.FIELD_CARD)) {
+            boolean sourceOnField = state.players().values().stream().anyMatch(player -> player.field().contains(sourceInstanceId));
+            if (sourceOnField) {
+                total = Math.max(0, total - 1);
+            }
+        }
+        return total;
+    }
+
+    private int countCharacterCandidates(BoardObjectRelation relation,
+                                         SessionStateDto state,
+                                         String sourceOwnerPlayerId) {
+        int playerCount = state.players() == null ? 0 : state.players().size();
+        int enemyCount = state.combat() == null || state.combat().enemies() == null ? 0 : state.combat().enemies().size();
+        return switch (relation) {
+            case ALLY -> sourceOwnerPlayerId == null || !state.players().containsKey(sourceOwnerPlayerId) ? 0 : 1;
+            case HOSTILE -> enemyCount;
+            case ANY -> playerCount + enemyCount;
+        };
+    }
+
+    private int countSummonCandidates(BoardObjectRelation relation,
+                                      SessionStateDto state,
+                                      String sourceOwnerPlayerId) {
+        if (state.combat() == null || state.combat().summons() == null) {
+            return 0;
+        }
+        return switch (relation) {
+            case ALLY -> (int) state.combat().summons().stream()
+                    .filter(summon -> Objects.equals(summon.owner(), sourceOwnerPlayerId))
+                    .count();
+            case HOSTILE -> (int) state.combat().summons().stream()
+                    .filter(summon -> !Objects.equals(summon.owner(), sourceOwnerPlayerId))
+                    .count();
+            case ANY -> state.combat().summons().size();
+        };
+    }
+
+    private int countFieldCardCandidates(BoardObjectRelation relation,
+                                         SessionStateDto state,
+                                         String sourceOwnerPlayerId) {
+        if (state.players() == null) {
+            return 0;
+        }
+        return switch (relation) {
+            case ALLY -> sourceOwnerPlayerId == null || !state.players().containsKey(sourceOwnerPlayerId)
+                    ? 0
+                    : state.players().get(sourceOwnerPlayerId).field().size();
+            case HOSTILE -> state.players().values().stream()
+                    .filter(player -> !Objects.equals(player.playerId(), sourceOwnerPlayerId))
+                    .mapToInt(player -> player.field().size())
+                    .sum();
+            case ANY -> state.players().values().stream().mapToInt(player -> player.field().size()).sum();
+        };
+    }
+
+    private String ownerPlayerIdForSource(String sourceInstanceId,
+                                          SessionStateDto state) {
+        if (sourceInstanceId == null || sourceInstanceId.isBlank() || state.players() == null) {
+            return null;
+        }
+        return state.players().values().stream()
+                .filter(player -> player.hand().contains(sourceInstanceId)
+                        || player.field().contains(sourceInstanceId)
+                        || player.grave().contains(sourceInstanceId)
+                        || player.excluded().contains(sourceInstanceId)
+                        || Objects.equals(player.exCard(), sourceInstanceId))
+                .map(PlayerStateDto::playerId)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean isFieldCardOnly(SelectBoardObjectsRequirement requirement) {
+        return requirement != null
+                && requirement.kinds().size() == 1
+                && requirement.kinds().contains(BoardObjectKind.FIELD_CARD);
+    }
+
+    private String describeSelectionRange(int minSelections,
+                                          int maxSelections) {
+        if (minSelections == maxSelections) {
+            return minSelections == 1
+                    ? "Select exactly one"
+                    : "Select exactly " + minSelections;
+        }
+        if (minSelections == 0) {
+            return "Select up to " + maxSelections;
+        }
+        return "Select " + minSelections + "-" + maxSelections;
+    }
+
+    private String describeBoardObjectKinds(List<BoardObjectKind> kinds,
+                                            BoardObjectRelation relation) {
+        List<String> labels = kinds.stream()
+                .map(kind -> describeBoardObjectKind(kind, relation))
+                .toList();
+        if (labels.size() == 1) {
+            return labels.get(0);
+        }
+        if (labels.size() == 2) {
+            return labels.get(0) + " or " + labels.get(1);
+        }
+        return String.join(", ", labels.subList(0, labels.size() - 1)) + ", or " + labels.get(labels.size() - 1);
+    }
+
+    private String describeBoardObjectKind(BoardObjectKind kind,
+                                           BoardObjectRelation relation) {
+        return switch (kind) {
+            case CHARACTER -> switch (relation) {
+                case ALLY -> "ally character";
+                case HOSTILE -> "hostile character";
+                case ANY -> "character";
+            };
+            case SUMMON -> switch (relation) {
+                case ALLY -> "ally summon";
+                case HOSTILE -> "hostile summon";
+                case ANY -> "summon";
+            };
+            case FIELD_CARD -> switch (relation) {
+                case ALLY -> "ally field card";
+                case HOSTILE -> "hostile field card";
+                case ANY -> "field card";
+            };
         };
     }
 
