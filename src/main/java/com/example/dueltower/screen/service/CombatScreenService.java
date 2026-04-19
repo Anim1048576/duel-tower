@@ -777,7 +777,7 @@ public class CombatScreenService {
         int playerCount = state.players() == null ? 0 : state.players().size();
         int enemyCount = state.combat() == null || state.combat().enemies() == null ? 0 : state.combat().enemies().size();
         return switch (relation) {
-            case ALLY -> sourceOwnerPlayerId == null || !state.players().containsKey(sourceOwnerPlayerId) ? 0 : 1;
+            case ALLY -> sourceOwnerPlayerId == null || !state.players().containsKey(sourceOwnerPlayerId) ? 0 : playerCount;
             case HOSTILE -> enemyCount;
             case ANY -> playerCount + enemyCount;
         };

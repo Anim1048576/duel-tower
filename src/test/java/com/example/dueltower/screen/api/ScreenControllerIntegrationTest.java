@@ -1153,14 +1153,31 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         JsonNode body = getCombatScreen(session.code(), playerToken);
         JsonNode useExAction = findAction(body, "combat.useEx");
         JsonNode requirementView = useExAction.path("metadata").path("requirementView");
+        int hostileSummonCount = 0;
+        for (JsonNode summon : body.path("actors").path("summons")) {
+            if (!"player-tig901".equals(summon.path("owner").asText())) {
+                hostileSummonCount++;
+            }
+        }
+        int expectedCandidateCount = body.path("actors").path("enemies").size() + hostileSummonCount;
+        List<Integer> expectedAllowedCounts = expectedCandidateCount <= 0
+                ? List.of()
+                : expectedCandidateCount == 1
+                ? List.of(1)
+                : List.of(1, 2);
 
         assertThat(requirementView.path("boardObjectSummary").asText()).contains("hostile");
         assertThat(requirementView.path("boardObjectRequirement").path("minSelections").asInt()).isEqualTo(1);
         assertThat(requirementView.path("boardObjectRequirement").path("maxSelections").asInt()).isEqualTo(2);
         assertThat(requirementView.path("boardObjectRequirement").path("relation").asText()).isEqualTo("HOSTILE");
         assertThat(requirementView.path("boardObjectRequirement").path("kinds")).hasSize(2);
-        assertThat(requirementView.path("boardObjectSelectionHints").path("candidateCount").asInt()).isGreaterThanOrEqualTo(1);
-        assertThat(requirementView.path("boardObjectSelectionHints").path("allowedCounts").get(0).asInt()).isEqualTo(1);
+        assertThat(requirementView.path("boardObjectSelectionHints").path("candidateCount").asInt()).isEqualTo(expectedCandidateCount);
+        assertThat(StreamSupport.stream(
+                requirementView.path("boardObjectSelectionHints").path("allowedCounts").spliterator(),
+                false
+        ).map(JsonNode::asInt).toList()).isEqualTo(expectedAllowedCounts);
+        assertThat(requirementView.path("boardObjectSelectionHints").path("skipCountChoice").asBoolean())
+                .isEqualTo(expectedAllowedCounts.size() <= 1);
         assertThat(requirementView.path("targetRule").path("requiredSelection").asBoolean()).isFalse();
     }
 

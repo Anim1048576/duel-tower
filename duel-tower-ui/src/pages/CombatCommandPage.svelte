@@ -5,8 +5,6 @@
     buildScreenActionPayload,
     findCombatAction,
     type CombatActionId,
-    type CombatBoardObjectKind,
-    type CombatBoardObjectRelation,
     type CombatCardDto,
     type CombatPendingActionMetadataDto,
     type CombatRequirementViewDto,
@@ -43,6 +41,24 @@
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import { pathBuilders } from '../lib/navigation'
+  import {
+    acceptsBoardSelectionKey,
+    buildBoardSelectionPayload as buildBoardSelectionPayloadForRequirement,
+    buildSelectedBoardObjectKeys,
+    buildTargetRefs,
+    createBoardSelectionContext,
+    fieldIdFromSelectionKey,
+    fieldSelectionKey,
+    filterBoardSelectionKeysForRequirement as filterBoardSelectionKeysByRequirement,
+    getBoardCountChoiceOptions,
+    isFieldSelectionKey,
+    requiresBoardCountChoice,
+    resolveBoardSelectionLimit,
+    targetKeyForEnemy,
+    targetKeyForPlayer,
+    targetKeyForSummon,
+    uniqueIdentifiers,
+  } from '../lib/session/combatBoardSelection.js'
   import { readStoredSessionAccess, type StoredSessionAccess } from '../lib/session/access'
   import {
     reconcileCombatLocalSelectionState,
@@ -99,14 +115,6 @@
   let requestSequence = 0
   let pollingHandle: TimedPollingHandle | null = null
   type CombatLocalSelectionState = ReturnType<typeof readLocalSelectionState>
-  type BoardObjectSelectionKind = 'player' | 'enemy' | 'summon' | 'field'
-  type BoardObjectSelectionDescriptor = {
-    key: string
-    kind: BoardObjectSelectionKind
-    boardKind: CombatBoardObjectKind
-    relation: CombatBoardObjectRelation
-  }
-
   const combatPresentationState = $derived<CombatPresentationState>({
     activeSidebarTab,
     headerExpanded,
@@ -402,108 +410,12 @@
     }
   }
 
-  function targetKeyForPlayer(playerId: string) {
-    return `player:${playerId}`
-  }
-
-  function targetKeyForEnemy(enemyId: string) {
-    return `enemy:${enemyId}`
-  }
-
-  function targetKeyForSummon(owner: string, summonId: string) {
-    return `summon:${owner}:${summonId}`
-  }
-
-  function buildTargetRefs(targetKeys: readonly string[]): TargetRefDto[] {
-    return targetKeys
-      .map((key) => {
-        if (key.startsWith('player:')) {
-          return {
-            playerId: key.slice('player:'.length),
-          }
-        }
-
-        if (key.startsWith('enemy:')) {
-          return {
-            enemyId: key.slice('enemy:'.length),
-          }
-        }
-
-        if (key.startsWith('summon:')) {
-          const [, owner, summonId] = key.split(':')
-          if (!owner || !summonId) {
-            return null
-          }
-
-          return {
-            summonOwnerPlayerId: owner,
-            summonInstanceId: summonId,
-          }
-        }
-
-        return null
-      })
-      .filter(Boolean) as TargetRefDto[]
-  }
-
-  function fieldSelectionKey(instanceId: string) {
-    return `field:${instanceId}`
-  }
-
-  function isFieldSelectionKey(key: string) {
-    return key.startsWith('field:')
-  }
-
-  function fieldIdFromSelectionKey(key: string) {
-    return key.startsWith('field:') ? key.slice('field:'.length) : null
-  }
-
-  function uniqueIdentifiers(values: readonly string[]) {
-    return [...new Set(values)]
-  }
-
-  function buildSelectedBoardObjectKeys(
-    targetKeys: readonly string[],
-    fieldIds: readonly string[],
-  ) {
-    return uniqueIdentifiers([...targetKeys, ...fieldIds.map((instanceId) => fieldSelectionKey(instanceId))])
-  }
-
   function writeBoardObjectKeys(nextKeys: readonly string[]) {
     const uniqueKeys = uniqueIdentifiers(nextKeys)
     selectedTargetKeys = uniqueKeys.filter((key) => !isFieldSelectionKey(key))
     selectedFieldIds = uniqueKeys
       .map((key) => fieldIdFromSelectionKey(key))
       .filter((value): value is string => Boolean(value))
-  }
-
-  function describeBoardSelectionKey(
-    key: string,
-    allyPlayerId: string | null,
-  ): BoardObjectSelectionDescriptor | null {
-    if (key.startsWith('player:')) {
-      return { key, kind: 'player', boardKind: 'CHARACTER', relation: 'ALLY' }
-    }
-
-    if (key.startsWith('enemy:')) {
-      return { key, kind: 'enemy', boardKind: 'CHARACTER', relation: 'HOSTILE' }
-    }
-
-    if (key.startsWith('summon:')) {
-      const [, owner] = key.split(':')
-      return {
-        key,
-        kind: 'summon',
-        boardKind: 'SUMMON',
-        relation: owner && allyPlayerId && owner === allyPlayerId ? 'ALLY' : 'HOSTILE',
-      }
-    }
-
-    if (isFieldSelectionKey(key)) {
-      return { key, kind: 'field', boardKind: 'FIELD_CARD', relation: 'ALLY' }
-    }
-
-    return null
   }
 
   function getSelectedActionRequirementView(action: CombatScreenAction | null) {
@@ -527,74 +439,26 @@
     return null
   }
 
-  function getBoardCountChoiceOptions(requirement: CombatRequirementViewDto | null | undefined) {
-    return uniqueIdentifiers((requirement?.boardObjectSelectionHints?.allowedCounts ?? []).map(String)).map(Number)
-  }
-
-  function requiresBoardCountChoice(requirement: CombatRequirementViewDto | null | undefined) {
-    const countOptions = getBoardCountChoiceOptions(requirement)
-    return countOptions.length > 1 && !(requirement?.boardObjectSelectionHints?.skipCountChoice ?? false)
-  }
-
-  function resolveBoardSelectionLimit(requirement: CombatRequirementViewDto | null | undefined) {
-    const boardRequirement = requirement?.boardObjectRequirement
-    if (!boardRequirement) {
-      return null
-    }
-
-    const countOptions = getBoardCountChoiceOptions(requirement)
-    if (countOptions.length === 0) {
-      return boardRequirement.maxSelections
-    }
-
-    if (requirement?.boardObjectSelectionHints?.skipCountChoice) {
-      return countOptions[0] ?? boardRequirement.maxSelections
-    }
-
-    return selectedCount != null && countOptions.includes(selectedCount) ? selectedCount : null
-  }
-
-  function acceptsBoardSelectionKey(
-    requirement: CombatRequirementViewDto | null | undefined,
-    key: string,
-    allyPlayerId: string | null,
-  ) {
-    const boardRequirement = requirement?.boardObjectRequirement
-    if (!boardRequirement) {
-      return true
-    }
-
-    const descriptor = describeBoardSelectionKey(key, allyPlayerId)
-    if (!descriptor) {
-      return false
-    }
-
-    if (!boardRequirement.kinds.includes(descriptor.boardKind)) {
-      return false
-    }
-
-    return boardRequirement.relation === 'ANY' || boardRequirement.relation === descriptor.relation
+  function getBoardSelectionContext() {
+    return createBoardSelectionContext(screen, visiblePlayerView?.playerId ?? screen?.zones.visiblePlayerId ?? null)
   }
 
   function filterBoardSelectionKeysForRequirement(
     keys: readonly string[],
     requirement: CombatRequirementViewDto | null | undefined,
-    allyPlayerId: string | null,
   ) {
-    return keys.filter((key) => acceptsBoardSelectionKey(requirement, key, allyPlayerId))
+    return filterBoardSelectionKeysByRequirement(keys, requirement, getBoardSelectionContext())
   }
 
   function prepareBoardSelectionState(
     requirement: CombatRequirementViewDto | null | undefined,
     options: { resetCountChoice?: boolean } = {},
   ) {
-    const allyPlayerId = visiblePlayerView?.playerId ?? screen?.zones.visiblePlayerId ?? null
     const compatibleKeys = filterBoardSelectionKeysForRequirement(
       buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds),
       requirement,
-      allyPlayerId,
     )
-    const resolvedLimit = resolveBoardSelectionLimit(requirement)
+    const resolvedLimit = resolveBoardSelectionLimit(requirement, selectedCount)
     const trimmedKeys =
       resolvedLimit == null ? compatibleKeys : compatibleKeys.slice(0, Math.max(0, resolvedLimit))
     writeBoardObjectKeys(trimmedKeys)
@@ -613,37 +477,30 @@
   }
 
   function buildBoardSelectionPayload(requirement: CombatRequirementViewDto | null | undefined) {
-    const allyPlayerId = visiblePlayerView?.playerId ?? screen?.zones.visiblePlayerId ?? null
-    const boardSelectionKeys = filterBoardSelectionKeysForRequirement(
-      buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds),
+    return buildBoardSelectionPayloadForRequirement({
       requirement,
-      allyPlayerId,
-    )
-    return {
-      targets: buildTargetRefs(boardSelectionKeys.filter((key) => !isFieldSelectionKey(key))),
-      selectedIds: boardSelectionKeys
-        .map((key) => fieldIdFromSelectionKey(key))
-        .filter((value): value is string => Boolean(value)),
-    }
+      selectedTargetKeys,
+      selectedFieldIds,
+      context: getBoardSelectionContext(),
+    })
   }
 
   function canToggleBoardSelectionKey(key: string) {
     const requirement = getSelectedActionRequirementView(selectedAction)
-    const allyPlayerId = visiblePlayerView?.playerId ?? screen?.zones.visiblePlayerId ?? null
-    if (!acceptsBoardSelectionKey(requirement, key, allyPlayerId)) {
+    const context = getBoardSelectionContext()
+    if (!acceptsBoardSelectionKey(requirement, key, context)) {
       return false
     }
 
     const selectedBoardKeys = filterBoardSelectionKeysForRequirement(
       buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds),
       requirement,
-      allyPlayerId,
     )
     if (selectedBoardKeys.includes(key)) {
       return true
     }
 
-    const resolvedLimit = resolveBoardSelectionLimit(requirement)
+    const resolvedLimit = resolveBoardSelectionLimit(requirement, selectedCount)
     if (resolvedLimit == null) {
       return requirement?.boardObjectRequirement == null
     }
@@ -894,22 +751,20 @@
     }
 
     if (requirement.boardObjectRequirement) {
-      const allyPlayerId = visiblePlayerView?.playerId ?? screen?.zones.visiblePlayerId ?? null
       const selectedBoardKeys = filterBoardSelectionKeysForRequirement(
         buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds),
         requirement,
-        allyPlayerId,
       )
       if (selectedBoardKeys.length !== uniqueIdentifiers(selectedBoardKeys).length) {
         return 'Select distinct board objects only.'
       }
 
-      if (requiresBoardCountChoice(requirement) && resolveBoardSelectionLimit(requirement) == null) {
+      if (requiresBoardCountChoice(requirement) && resolveBoardSelectionLimit(requirement, selectedCount) == null) {
         const options = getBoardCountChoiceOptions(requirement)
         return `Choose how many board objects to select first (${options.join(' or ')}).`
       }
 
-      const resolvedLimit = resolveBoardSelectionLimit(requirement)
+      const resolvedLimit = resolveBoardSelectionLimit(requirement, selectedCount)
       const minSelections = resolvedLimit ?? requirement.boardObjectRequirement.minSelections
       const maxSelections = resolvedLimit ?? requirement.boardObjectRequirement.maxSelections
       if (selectedBoardKeys.length < minSelections) {
@@ -1380,7 +1235,7 @@
     const enemyId = selectedEnemyKey.slice('enemy:'.length)
     return enemyViews.find((enemy) => enemy.enemyId === enemyId) ?? null
   })
-  const selectedTargets = $derived.by(() => buildTargetRefs(selectedTargetKeys))
+  const selectedTargets = $derived.by(() => buildTargetRefs(selectedTargetKeys) as TargetRefDto[])
   const selectedBoardObjectLabels = $derived.by(() => {
     if (!screen) {
       return []
@@ -1410,8 +1265,10 @@
 
       const fieldId = fieldIdFromSelectionKey(key)
       if (fieldId) {
-        const card = visiblePlayerView?.fieldCards.find((entry) => entry.instanceId === fieldId)
-        labels.push(card ? `Field ${card.title}` : `Field ${fieldId}`)
+        const owner = screen.actors.players.find((player) =>
+          player.fieldCards.some((entry) => entry.instanceId === fieldId))
+        const card = owner?.fieldCards.find((entry) => entry.instanceId === fieldId) ?? null
+        labels.push(card ? `Field ${card.title}${owner ? ` (${owner.playerId})` : ''}` : `Field ${fieldId}`)
       }
     }
 
