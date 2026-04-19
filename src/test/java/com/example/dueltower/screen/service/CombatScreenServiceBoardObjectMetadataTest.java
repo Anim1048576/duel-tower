@@ -3,11 +3,14 @@ package com.example.dueltower.screen.service;
 import com.example.dueltower.content.card.model.playspec.BoardObjectFilter;
 import com.example.dueltower.content.card.model.playspec.BoardObjectKind;
 import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
+import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
+import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.session.dto.CardInstanceDto;
 import com.example.dueltower.session.dto.CombatStateDto;
 import com.example.dueltower.session.dto.PlayerStateDto;
 import com.example.dueltower.session.dto.SessionStateDto;
+import com.example.dueltower.engine.model.Target;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -99,6 +102,35 @@ class CombatScreenServiceBoardObjectMetadataTest {
         assertThat(hints).containsEntry("skipCountChoice", false);
     }
 
+    @Test
+    void fieldCardBoardObjectRequirementOwnsMetadataWhenLegacySelectedIdsRequirementIsAbsent() {
+        SelectBoardObjectsRequirement requirement = new SelectBoardObjectsRequirement(
+                0,
+                3,
+                List.of(BoardObjectKind.FIELD_CARD),
+                BoardObjectRelation.ANY,
+                BoardObjectFilter.INSTALLED_ONLY,
+                true
+        );
+        CardPlaySpec playSpec = new CardPlaySpec(
+                TargetSpec.none(),
+                List.of(requirement)
+        );
+        SessionStateDto state = sessionState(
+                players(
+                        player("p1", List.of("field-1"), List.of("hand-source")),
+                        player("p2", List.of("field-2"), List.of())
+                ),
+                combatState(List.of(), List.of())
+        );
+
+        Map<String, Object> view = invokeRequirementView(playSpec, "Tig006_Card", state, "hand-source", "p1");
+
+        assertThat(view).containsEntry("selectedIdsSummary", "Select up to 3 installed field card excluding the source card");
+        assertThat(view).containsEntry("selectedIdsRequirement", null);
+        assertThat(((Map<?, ?>) view.get("boardObjectRequirement")).get("filter")).isEqualTo("INSTALLED_ONLY");
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> invokeBoardObjectSelectionHints(SelectBoardObjectsRequirement requirement,
                                                                 SessionStateDto state,
@@ -108,6 +140,23 @@ class CombatScreenServiceBoardObjectMetadataTest {
                 service,
                 "boardObjectSelectionHints",
                 requirement,
+                state,
+                sourceInstanceId,
+                sourceOwnerPlayerId
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> invokeRequirementView(CardPlaySpec playSpec,
+                                                      String sourceLabel,
+                                                      SessionStateDto state,
+                                                      String sourceInstanceId,
+                                                      String sourceOwnerPlayerId) {
+        return (Map<String, Object>) ReflectionTestUtils.invokeMethod(
+                service,
+                "requirementView",
+                playSpec,
+                sourceLabel,
                 state,
                 sourceInstanceId,
                 sourceOwnerPlayerId

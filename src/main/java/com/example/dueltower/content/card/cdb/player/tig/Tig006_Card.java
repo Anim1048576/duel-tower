@@ -7,10 +7,7 @@ import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.DiscardFilter;
 import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
-import com.example.dueltower.content.card.model.playspec.FieldCardFilter;
-import com.example.dueltower.content.card.model.playspec.FieldCardSelectionScope;
 import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
-import com.example.dueltower.content.card.model.playspec.SelectFieldCardsRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.model.CardDefinition;
@@ -55,13 +52,6 @@ public class Tig006_Card implements CardBlueprint {
                                 List.of(BoardObjectKind.FIELD_CARD),
                                 BoardObjectRelation.ANY,
                                 BoardObjectFilter.INSTALLED_ONLY,
-                                true
-                        ),
-                        new SelectFieldCardsRequirement(
-                                0,
-                                3,
-                                FieldCardSelectionScope.ALL_PLAYER_FIELDS,
-                                FieldCardFilter.INSTALLED_ONLY,
                                 true
                         )
                 )

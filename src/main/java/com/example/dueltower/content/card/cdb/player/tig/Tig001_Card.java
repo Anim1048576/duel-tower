@@ -5,10 +5,7 @@ import com.example.dueltower.content.card.model.playspec.BoardObjectFilter;
 import com.example.dueltower.content.card.model.playspec.BoardObjectKind;
 import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
-import com.example.dueltower.content.card.model.playspec.FieldCardFilter;
-import com.example.dueltower.content.card.model.playspec.FieldCardSelectionScope;
 import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
-import com.example.dueltower.content.card.model.playspec.SelectFieldCardsRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.effect.EffectOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
@@ -56,13 +53,6 @@ public class Tig001_Card implements CardBlueprint {
                                 List.of(BoardObjectKind.FIELD_CARD),
                                 BoardObjectRelation.ANY,
                                 BoardObjectFilter.INSTALLED_ONLY,
-                                true
-                        ),
-                        new SelectFieldCardsRequirement(
-                                0,
-                                1,
-                                FieldCardSelectionScope.ALL_PLAYER_FIELDS,
-                                FieldCardFilter.INSTALLED_ONLY,
                                 true
                         )
                 )

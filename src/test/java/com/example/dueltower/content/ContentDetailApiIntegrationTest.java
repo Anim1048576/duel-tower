@@ -120,7 +120,7 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
                 .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
-                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(3));
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(2));
 
         mockMvc.perform(get("/api/content/cards/{id}", "Tig008_Card"))
                 .andExpect(status().isOk())
@@ -139,20 +139,14 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.playSpec.target.target").value("ENEMY_ONE"))
                 .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(true))
-                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(2))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("select_board_objects"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].minSelections").value(0))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].maxSelections").value(1))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].kinds[0]").value("FIELD_CARD"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].relation").value("ANY"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].filter").value("INSTALLED_ONLY"))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[0].excludeSourceCard").value(true))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[1].type").value("select_field_cards"))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[1].minSelections").value(0))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[1].maxSelections").value(1))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[1].scope").value("ALL_PLAYER_FIELDS"))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[1].filter").value("INSTALLED_ONLY"))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[1].excludeSourceCard").value(true));
+                .andExpect(jsonPath("$.playSpec.extraRequirements[0].excludeSourceCard").value(true));
     }
 
     @Test
@@ -180,7 +174,7 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
                 .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
-                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(3))
+                .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(2))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[0].type").value("discard_from_hand"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[1].type").value("select_board_objects"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[1].minSelections").value(0))
@@ -188,13 +182,7 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(jsonPath("$.playSpec.extraRequirements[1].kinds[0]").value("FIELD_CARD"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[1].relation").value("ANY"))
                 .andExpect(jsonPath("$.playSpec.extraRequirements[1].filter").value("INSTALLED_ONLY"))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[1].excludeSourceCard").value(true))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[2].type").value("select_field_cards"))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[2].minSelections").value(0))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[2].maxSelections").value(3))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[2].scope").value("ALL_PLAYER_FIELDS"))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[2].filter").value("INSTALLED_ONLY"))
-                .andExpect(jsonPath("$.playSpec.extraRequirements[2].excludeSourceCard").value(true));
+                .andExpect(jsonPath("$.playSpec.extraRequirements[1].excludeSourceCard").value(true));
     }
 
     @Test

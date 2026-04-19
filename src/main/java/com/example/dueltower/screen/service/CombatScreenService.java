@@ -630,16 +630,17 @@ public class CombatScreenService {
                 sourceInstanceId,
                 sourceOwnerPlayerId
         );
+        boolean fieldSelectionHandledByBoardObjects = boardObjectRequirement != null && isFieldCardOnly(boardObjectRequirement);
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("sourceLabel", sourceLabel);
-        view.put("targetSummary", boardObjectRequirement != null && !isFieldCardOnly(boardObjectRequirement)
+        view.put("targetSummary", boardObjectRequirement != null && !fieldSelectionHandledByBoardObjects
                 ? boardObjectSummary
                 : describeTargetRequirement(playSpec));
         view.put("discardSummary", discardRequirement == null
                 ? "No extra hand discard required"
                 : "Select " + discardRequirement.count() + " hand discard" + (discardRequirement.count() > 1 ? "s" : "")
                 + (discardRequirement.excludeSourceCard() ? " excluding the source card" : ""));
-        view.put("selectedIdsSummary", boardObjectRequirement != null && isFieldCardOnly(boardObjectRequirement)
+        view.put("selectedIdsSummary", fieldSelectionHandledByBoardObjects
                 ? boardObjectSummary
                 : selectedIdsRequirement == null
                 ? "No extra field selection required"
@@ -657,7 +658,7 @@ public class CombatScreenService {
                 "excludeSourceCard", discardRequirement.excludeSourceCard(),
                 "filter", discardRequirement.filter().name()
         ));
-        view.put("selectedIdsRequirement", selectedIdsRequirement == null ? null : Map.of(
+        view.put("selectedIdsRequirement", selectedIdsRequirement == null || fieldSelectionHandledByBoardObjects ? null : Map.of(
                 "minSelections", selectedIdsRequirement.minSelections(),
                 "maxSelections", selectedIdsRequirement.maxSelections(),
                 "scope", selectedIdsRequirement.scope().name(),

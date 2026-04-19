@@ -1,5 +1,10 @@
 package com.example.dueltower.content.card.model.playspec;
 
+/**
+ * Legacy declaration for selectedIds-based field-card selection metadata.
+ * New card specs should prefer SelectBoardObjectsRequirement(FIELD_CARD).
+ */
+@Deprecated(forRemoval = false)
 public record SelectFieldCardsRequirement(
         int minSelections,
         int maxSelections,
