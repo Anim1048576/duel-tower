@@ -1,11 +1,15 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.BoardObjectFilter;
+import com.example.dueltower.content.card.model.playspec.BoardObjectKind;
+import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.DiscardFilter;
 import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
 import com.example.dueltower.content.card.model.playspec.FieldCardFilter;
 import com.example.dueltower.content.card.model.playspec.FieldCardSelectionScope;
+import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
 import com.example.dueltower.content.card.model.playspec.SelectFieldCardsRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.effect.EffectContext;
@@ -45,6 +49,14 @@ public class Tig006_Card implements CardBlueprint {
                 TargetSpec.none(),
                 List.of(
                         new DiscardFromHandRequirement(1, true, DiscardFilter.ANY),
+                        new SelectBoardObjectsRequirement(
+                                0,
+                                3,
+                                List.of(BoardObjectKind.FIELD_CARD),
+                                BoardObjectRelation.ANY,
+                                BoardObjectFilter.INSTALLED_ONLY,
+                                true
+                        ),
                         new SelectFieldCardsRequirement(
                                 0,
                                 3,

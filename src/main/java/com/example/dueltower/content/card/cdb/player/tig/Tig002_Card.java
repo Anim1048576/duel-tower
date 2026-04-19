@@ -1,7 +1,10 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.BoardObjectKind;
+import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
+import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
@@ -37,7 +40,14 @@ public class Tig002_Card implements CardBlueprint {
     public CardPlaySpec playSpec() {
         return new CardPlaySpec(
                 TargetSpec.required(Target.ALLY_ONE),
-                List.of()
+                List.of(new SelectBoardObjectsRequirement(
+                        1,
+                        1,
+                        List.of(BoardObjectKind.CHARACTER, BoardObjectKind.SUMMON),
+                        BoardObjectRelation.ALLY,
+                        null,
+                        false
+                ))
         );
     }
 

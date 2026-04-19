@@ -39,14 +39,41 @@ class CardPlaySpecExposureTest {
 
         assertThat(playSpec.target().target()).isEqualTo(Target.ENEMY_ONE);
         assertThat(playSpec.target().requiredSelection()).isTrue();
-        assertThat(playSpec.extraRequirements())
-                .singleElement()
+        assertThat(playSpec.extraRequirements()).hasSize(2);
+        assertThat(playSpec.extraRequirements().get(0))
+                .isInstanceOfSatisfying(SelectBoardObjectsRequirement.class, req -> {
+                    assertThat(req.minSelections()).isEqualTo(0);
+                    assertThat(req.maxSelections()).isEqualTo(1);
+                    assertThat(req.kinds()).containsExactly(BoardObjectKind.FIELD_CARD);
+                    assertThat(req.relation()).isEqualTo(BoardObjectRelation.ANY);
+                    assertThat(req.filter().name()).isEqualTo("INSTALLED_ONLY");
+                    assertThat(req.excludeSourceCard()).isTrue();
+                });
+        assertThat(playSpec.extraRequirements().get(1))
                 .isInstanceOfSatisfying(SelectFieldCardsRequirement.class, req -> {
                     assertThat(req.minSelections()).isEqualTo(0);
                     assertThat(req.maxSelections()).isEqualTo(1);
                     assertThat(req.scope().name()).isEqualTo("ALL_PLAYER_FIELDS");
                     assertThat(req.filter().name()).isEqualTo("INSTALLED_ONLY");
                     assertThat(req.excludeSourceCard()).isTrue();
+                });
+    }
+
+    @Test
+    void tig002ShouldExposeAllyBoardObjectSelectionRequirement() {
+        CardDetailResponse detail = cardService.get("Tig002_Card");
+        CardPlaySpec playSpec = detail.playSpec();
+
+        assertThat(playSpec.target().requiredSelection()).isTrue();
+        assertThat(playSpec.target().target()).isEqualTo(Target.ALLY_ONE);
+        assertThat(playSpec.extraRequirements())
+                .singleElement()
+                .isInstanceOfSatisfying(SelectBoardObjectsRequirement.class, req -> {
+                    assertThat(req.minSelections()).isEqualTo(1);
+                    assertThat(req.maxSelections()).isEqualTo(1);
+                    assertThat(req.kinds()).containsExactly(BoardObjectKind.CHARACTER, BoardObjectKind.SUMMON);
+                    assertThat(req.relation()).isEqualTo(BoardObjectRelation.ALLY);
+                    assertThat(req.excludeSourceCard()).isFalse();
                 });
     }
 
@@ -64,13 +91,22 @@ class CardPlaySpecExposureTest {
 
         assertThat(playSpec.target().requiredSelection()).isFalse();
         assertThat(playSpec.target().target()).isEqualTo(Target.NONE);
-        assertThat(playSpec.extraRequirements()).hasSize(2);
+        assertThat(playSpec.extraRequirements()).hasSize(3);
         assertThat(playSpec.extraRequirements().get(0))
                 .isInstanceOfSatisfying(DiscardFromHandRequirement.class, discard -> {
                     assertThat(discard.count()).isEqualTo(1);
                     assertThat(discard.excludeSourceCard()).isTrue();
                 });
         assertThat(playSpec.extraRequirements().get(1))
+                .isInstanceOfSatisfying(SelectBoardObjectsRequirement.class, req -> {
+                    assertThat(req.minSelections()).isEqualTo(0);
+                    assertThat(req.maxSelections()).isEqualTo(3);
+                    assertThat(req.kinds()).containsExactly(BoardObjectKind.FIELD_CARD);
+                    assertThat(req.relation()).isEqualTo(BoardObjectRelation.ANY);
+                    assertThat(req.filter().name()).isEqualTo("INSTALLED_ONLY");
+                    assertThat(req.excludeSourceCard()).isTrue();
+                });
+        assertThat(playSpec.extraRequirements().get(2))
                 .isInstanceOfSatisfying(SelectFieldCardsRequirement.class, req -> {
                     assertThat(req.minSelections()).isEqualTo(0);
                     assertThat(req.maxSelections()).isEqualTo(3);
@@ -116,9 +152,9 @@ class CardPlaySpecExposureTest {
         assertThat(detail.playSpec()).isNotNull();
         assertThat(detail.playSpec().target().target()).isEqualTo(Target.ENEMY_ONE);
         assertThat(detail.playSpec().target().requiredSelection()).isTrue();
-        assertThat(detail.playSpec().extraRequirements())
-                .singleElement()
-                .isInstanceOf(SelectFieldCardsRequirement.class);
+        assertThat(detail.playSpec().extraRequirements()).hasSize(2);
+        assertThat(detail.playSpec().extraRequirements().get(0)).isInstanceOf(SelectBoardObjectsRequirement.class);
+        assertThat(detail.playSpec().extraRequirements().get(1)).isInstanceOf(SelectFieldCardsRequirement.class);
     }
 
     @Test

@@ -1,9 +1,13 @@
 package com.example.dueltower.content.card.cdb.player.tig;
 
 import com.example.dueltower.content.card.model.CardBlueprint;
+import com.example.dueltower.content.card.model.playspec.BoardObjectFilter;
+import com.example.dueltower.content.card.model.playspec.BoardObjectKind;
+import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.FieldCardFilter;
 import com.example.dueltower.content.card.model.playspec.FieldCardSelectionScope;
+import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
 import com.example.dueltower.content.card.model.playspec.SelectFieldCardsRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.engine.core.effect.EffectOps;
@@ -45,13 +49,23 @@ public class Tig001_Card implements CardBlueprint {
     public CardPlaySpec playSpec() {
         return new CardPlaySpec(
                 TargetSpec.required(Target.ENEMY_ONE),
-                List.of(new SelectFieldCardsRequirement(
-                        0,
-                        1,
-                        FieldCardSelectionScope.ALL_PLAYER_FIELDS,
-                        FieldCardFilter.INSTALLED_ONLY,
-                        true
-                ))
+                List.of(
+                        new SelectBoardObjectsRequirement(
+                                0,
+                                1,
+                                List.of(BoardObjectKind.FIELD_CARD),
+                                BoardObjectRelation.ANY,
+                                BoardObjectFilter.INSTALLED_ONLY,
+                                true
+                        ),
+                        new SelectFieldCardsRequirement(
+                                0,
+                                1,
+                                FieldCardSelectionScope.ALL_PLAYER_FIELDS,
+                                FieldCardFilter.INSTALLED_ONLY,
+                                true
+                        )
+                )
         );
     }
 
