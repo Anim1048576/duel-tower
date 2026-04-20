@@ -2,6 +2,7 @@ package com.example.dueltower.screen.service;
 
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.dto.DeckValidationResponse;
 import com.example.dueltower.content.deck.dto.DeckResponse;
@@ -305,6 +306,17 @@ public class ScreenResponseFactory {
                 validatedSignature,
                 OffsetDateTime.now()
         );
+    }
+
+    public PlayerLobbyDeckEditorStateDto playerLobbyDeckEditorFromOwnedCards(List<OwnedCard> ownedCards,
+                                                                             List<String> draftDeckOwnedCardIds,
+                                                                             PlayerLobbyDeckEditAnalysis analysis) {
+        List<OwnedCardRef> ownedCardRefs = ownedCards == null
+                ? List.of()
+                : ownedCards.stream()
+                .map(ownedCard -> new OwnedCardRef(ownedCard.ownedCardId(), ownedCard.cardId()))
+                .toList();
+        return buildPlayerLobbyDeckEditor(ownedCardRefs, draftDeckOwnedCardIds, analysis);
     }
 
     private List<ScreenActionDto> playerLobbyActions(String sessionCode,
@@ -723,11 +735,23 @@ public class ScreenResponseFactory {
 
     private PlayerLobbyDeckEditorStateDto playerLobbyDeckEditor(PlayerStateDto me,
                                                                 PlayerLobbyDeckEditAnalysis analysis) {
+        List<OwnedCardRef> ownedCardRefs = me == null || me.ownedCards() == null
+                ? List.of()
+                : me.ownedCards().stream()
+                .map(ownedCard -> new OwnedCardRef(ownedCard.ownedCardId(), ownedCard.cardId()))
+                .toList();
+        List<String> draftDeckOwnedCardIds = me == null ? List.of() : me.deckOwnedCardIds();
+        return buildPlayerLobbyDeckEditor(ownedCardRefs, draftDeckOwnedCardIds, analysis);
+    }
+
+    private PlayerLobbyDeckEditorStateDto buildPlayerLobbyDeckEditor(List<OwnedCardRef> ownedCards,
+                                                                     List<String> draftDeckOwnedCardIds,
+                                                                     PlayerLobbyDeckEditAnalysis analysis) {
         if (analysis == null) {
             return new PlayerLobbyDeckEditorStateDto(null, List.of(), List.of(), List.of(), List.of());
         }
 
-        Set<String> draftOwnedCardIds = new LinkedHashSet<>(me.deckOwnedCardIds());
+        Set<String> draftOwnedCardIds = new LinkedHashSet<>(draftDeckOwnedCardIds == null ? List.of() : draftDeckOwnedCardIds);
         return new PlayerLobbyDeckEditorStateDto(
                 new PlayerLobbyDeckEditorStateDto.DeckState(
                         analysis.deck().requiredDeckSize(),
@@ -764,7 +788,7 @@ public class ScreenResponseFactory {
                                 group.addable(),
                                 group.nextOwnedCardId(),
                                 issueCodes(group.blockedReasons()),
-                                me.ownedCards().stream()
+                                ownedCards.stream()
                                         .filter(ownedCard -> safeTrim(ownedCard.cardId()).equals(group.cardId()))
                                         .map(ownedCard -> playerLobbyDeckEditorOwnedCardState(ownedCard, group, draftOwnedCardIds))
                                         .toList()
@@ -774,7 +798,7 @@ public class ScreenResponseFactory {
     }
 
     private PlayerLobbyDeckEditorStateDto.OwnedCardState playerLobbyDeckEditorOwnedCardState(
-            OwnedCardDto ownedCard,
+            OwnedCardRef ownedCard,
             PlayerLobbyDeckEditAnalysis.CardPoolGroupAnalysis group,
             Set<String> draftOwnedCardIds
     ) {
@@ -790,6 +814,11 @@ public class ScreenResponseFactory {
                 reasonCodes
         );
     }
+
+    private record OwnedCardRef(
+            String ownedCardId,
+            String cardId
+    ) {}
 
     private List<String> issueCodes(List<PlayerLobbyDeckEditAnalysis.IssueCode> codes) {
         return codes.stream()

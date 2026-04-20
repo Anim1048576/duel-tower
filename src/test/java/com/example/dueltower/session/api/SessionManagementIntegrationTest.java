@@ -23,6 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -307,6 +308,185 @@ class SessionManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("loadout preview는 본인만 가능하며 응답 echo/signature를 포함하고 세션 상태를 바꾸지 않는다")
+    void previewLoadoutAllowsSelfOnlyAndDoesNotMutateState() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
+        String playerToken = joinAsPlayerWithOwnedCards(
+                playerSession,
+                info.code(),
+                "player1",
+                """
+                        [
+                          {"ownedCardId":"oc-01","cardId":"C001"},
+                          {"ownedCardId":"oc-02","cardId":"C001"},
+                          {"ownedCardId":"oc-03","cardId":"C001"},
+                          {"ownedCardId":"oc-04","cardId":"C002"},
+                          {"ownedCardId":"oc-05","cardId":"C002"},
+                          {"ownedCardId":"oc-06","cardId":"C002"},
+                          {"ownedCardId":"oc-07","cardId":"C003"},
+                          {"ownedCardId":"oc-08","cardId":"C003"},
+                          {"ownedCardId":"oc-09","cardId":"C003"},
+                          {"ownedCardId":"oc-10","cardId":"C004"},
+                          {"ownedCardId":"oc-11","cardId":"C004"},
+                          {"ownedCardId":"oc-12","cardId":"C004"},
+                          {"ownedCardId":"oc-13","cardId":"C005"}
+                        ]
+                        """,
+                """
+                        [
+                          "oc-01","oc-02","oc-03",
+                          "oc-04","oc-05","oc-06",
+                          "oc-07","oc-08","oc-09",
+                          "oc-10","oc-11","oc-12"
+                        ]
+                        """
+        );
+
+        MvcResult previewResult = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/preview", info.code(), "player1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "deckOwnedCardIds": [
+                                    "oc-01","oc-02","oc-03",
+                                    "oc-04","oc-05","oc-06",
+                                    "oc-07","oc-08","oc-09",
+                                    "oc-10","oc-11","oc-13"
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draft.deckOwnedCardIds[11]").value("oc-13"))
+                .andExpect(jsonPath("$.draftSignature").isNotEmpty())
+                .andExpect(jsonPath("$.deckEditor.deck.changedCardCount").value(1))
+                .andReturn();
+
+        JsonNode previewBody = JSON.readTree(previewResult.getResponse().getContentAsString());
+        assertThat(previewBody.path("deckEditor").path("deck").path("saveAllowed").asBoolean()).isTrue();
+
+        MvcResult stateResult = mockMvc.perform(get("/api/sessions/{code}", info.code()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode stateBody = JSON.readTree(stateResult.getResponse().getContentAsString());
+        assertThat(stateBody.path("players").path("player1").path("deckOwnedCardIds").get(11).asText()).isEqualTo("oc-12");
+    }
+
+    @Test
+    @DisplayName("loadout preview는 다른 playerId 경로에 대해 거부된다")
+    void previewLoadoutRejectsDifferentPathPlayerId() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "gm");
+        MockHttpSession player1Session = signUpAndLogin("player1", "player1@example.com", "password123");
+        MockHttpSession player2Session = signUpAndLogin("player2", "player2@example.com", "password123");
+        String player1Token = joinAsPlayer(player1Session, info.code(), "player1");
+        joinAsPlayer(player2Session, info.code(), "player2");
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/preview", info.code(), "player2")
+                        .header("X-Player-Token", player1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "deckOwnedCardIds": []
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("loadout preview 응답은 locked 카드, 장수 제한, 교체 제한, 동일 카드 제한을 드러낸다")
+    void previewLoadoutReflectsDeckEditorViolations() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
+        String playerToken = joinAsPlayerWithOwnedCards(
+                playerSession,
+                info.code(),
+                "player1",
+                """
+                        [
+                          {"ownedCardId":"oc-01","cardId":"C001","lockedInDeck":true},
+                          {"ownedCardId":"oc-02","cardId":"C001"},
+                          {"ownedCardId":"oc-03","cardId":"C001"},
+                          {"ownedCardId":"oc-04","cardId":"C001"},
+                          {"ownedCardId":"oc-05","cardId":"C002"},
+                          {"ownedCardId":"oc-06","cardId":"C002"},
+                          {"ownedCardId":"oc-07","cardId":"C002"},
+                          {"ownedCardId":"oc-08","cardId":"C003"},
+                          {"ownedCardId":"oc-09","cardId":"C003"},
+                          {"ownedCardId":"oc-10","cardId":"C003"},
+                          {"ownedCardId":"oc-11","cardId":"C004"},
+                          {"ownedCardId":"oc-12","cardId":"C004"},
+                          {"ownedCardId":"oc-13","cardId":"C004"},
+                          {"ownedCardId":"oc-14","cardId":"C005"},
+                          {"ownedCardId":"oc-15","cardId":"C005"},
+                          {"ownedCardId":"oc-16","cardId":"C005"},
+                          {"ownedCardId":"oc-17","cardId":"C005"}
+                        ]
+                        """,
+                """
+                        [
+                          "oc-01","oc-02","oc-03",
+                          "oc-05","oc-06","oc-07",
+                          "oc-08","oc-09","oc-10",
+                          "oc-11","oc-12","oc-13"
+                        ]
+                        """
+        );
+
+        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/preview", info.code(), "player1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "deckOwnedCardIds": [
+                                    "oc-01","oc-02","oc-03",
+                                    "oc-05","oc-06","oc-07",
+                                    "oc-08","oc-09","oc-10",
+                                    "oc-11","oc-12","oc-13"
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deckEditor.draftEntries[0].ownedCardId").value("oc-01"))
+                .andExpect(jsonPath("$.deckEditor.draftEntries[0].canRemove").value(false))
+                .andExpect(jsonPath("$.deckEditor.draftEntries[0].reasonCodes[0]").value("LOCKED_CARD"));
+
+        MvcResult previewResult = mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/preview", info.code(), "player1")
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "deckOwnedCardIds": [
+                                    "oc-02","oc-03","oc-04",
+                                    "oc-05","oc-06","oc-07",
+                                    "oc-08","oc-09","oc-10",
+                                    "oc-14","oc-15","oc-16","oc-17"
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deckEditor.deck.draftDeckSize").value(13))
+                .andExpect(jsonPath("$.deckEditor.deck.saveAllowed").value(false))
+                .andReturn();
+
+        JsonNode body = JSON.readTree(previewResult.getResponse().getContentAsString());
+        List<String> globalReasonCodes = jsonTextValues(body.path("deckEditor").path("globalReasonCodes"));
+        assertThat(globalReasonCodes).contains(
+                "INVALID_DECK_SIZE",
+                "LOCKED_CARD",
+                "REPLACEMENT_LIMIT_REACHED",
+                "CARD_LIMIT_REACHED"
+        );
+        JsonNode c005Group = findCardPoolGroup(body.path("deckEditor").path("cardPoolGroups"), "C005");
+        assertThat(c005Group).isNotNull();
+        assertThat(c005Group.path("canAdd").asBoolean()).isFalse();
+        assertThat(jsonTextValues(c005Group.path("reasonCodes"))).contains("DECK_FULL", "CARD_LIMIT_REACHED");
+    }
+
+    @Test
     @DisplayName("로드아웃 수정은 character ID, passive, deck을 검증한다")
     void updateLoadoutValidatesCharacterIdPassiveAndDeck() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
@@ -555,6 +735,48 @@ class SessionManagementIntegrationTest {
 
         JsonNode node = JSON.readTree(result.getResponse().getContentAsString());
         return node.path("playerToken").asText();
+    }
+
+    private String joinAsPlayerWithOwnedCards(MockHttpSession session,
+                                              String code,
+                                              String playerId,
+                                              String ownedCardsJson,
+                                              String presetDeckOwnedCardIdsJson) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "%s",
+                                  "ownedCards": %s,
+                                  "presetDeckOwnedCardIds": %s
+                                }
+                                """.formatted(playerId, ownedCardsJson, presetDeckOwnedCardIdsJson)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode node = JSON.readTree(result.getResponse().getContentAsString());
+        return node.path("playerToken").asText();
+    }
+
+    private JsonNode findCardPoolGroup(JsonNode groups, String cardId) {
+        for (JsonNode group : groups) {
+            if (cardId.equals(group.path("cardId").asText())) {
+                return group;
+            }
+        }
+        return null;
+    }
+
+    private List<String> jsonTextValues(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return List.of();
+        }
+        List<String> values = new java.util.ArrayList<>();
+        for (JsonNode item : node) {
+            values.add(item.asText());
+        }
+        return List.copyOf(values);
     }
 
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {

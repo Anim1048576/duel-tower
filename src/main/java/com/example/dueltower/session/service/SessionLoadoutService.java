@@ -92,6 +92,74 @@ public class SessionLoadoutService {
         );
     }
 
+    public LoadoutPreview previewLoadout(String code,
+                                         String actorPlayerIdRaw,
+                                         String targetPlayerIdRaw,
+                                         Long characterIdRaw,
+                                         List<String> passiveIdsRaw,
+                                         List<String> deckOwnedCardIdsRaw,
+                                         String exCardIdRaw) {
+        String actorPlayerId = requirePlayerText(actorPlayerIdRaw, "actorPlayerId is required");
+        String targetPlayerId = requirePlayerText(targetPlayerIdRaw, "playerId is required");
+
+        PlayerId actor = new PlayerId(actorPlayerId);
+        PlayerId target = new PlayerId(targetPlayerId);
+        return sessionLifecycleService.withLockedSession(code, rt -> {
+            GameState state = rt.state();
+            if (!actor.equals(target)) {
+                throw new ResponseStatusException(FORBIDDEN, "players may only edit their own loadout");
+            }
+
+            PlayerState ps = state.player(target);
+            if (ps == null) {
+                throw new ResponseStatusException(NOT_FOUND, "player not found");
+            }
+
+            sessionLoadoutSupport.validateDeckEditableState(state.nodeState(), ps);
+
+            SessionLoadoutSupport.CharacterJoinTemplate characterTemplate = (characterIdRaw == null)
+                    ? null
+                    : sessionLoadoutSupport.loadCharacterJoinTemplate(characterIdRaw);
+            List<OwnedCard> effectiveOwnedCards = sessionLoadoutSupport.resolveLoadoutOwnedCards(ps, characterTemplate);
+            List<String> effectivePassiveIds = sessionLoadoutSupport.resolveLoadoutPassiveIds(ps, characterTemplate, passiveIdsRaw);
+            List<String> effectiveDeckOwnedCardIds = sessionLoadoutSupport.resolveLoadoutDeckOwnedCardIds(
+                    ps,
+                    effectiveOwnedCards,
+                    characterTemplate,
+                    deckOwnedCardIdsRaw
+            );
+            String effectiveExCardId = sessionLoadoutSupport.resolveLoadoutExCardId(state, ps, characterTemplate, exCardIdRaw);
+            sessionLoadoutSupport.validateExCardId(effectiveExCardId);
+
+            Long effectiveCharacterId = characterIdRaw != null
+                    ? characterIdRaw
+                    : rt.findCharacterIdByPlayerId(target.value());
+            List<String> savedDeckOwnedCardIds = (characterTemplate == null)
+                    ? sessionLoadoutSupport.currentDeckOwnedCardIds(ps)
+                    : List.of();
+            PlayerLobbyDeckEditAnalysis deckEditAnalysis = sessionLoadoutSupport.analyzePlayerLobbyDeckEdit(
+                    effectiveOwnedCards,
+                    savedDeckOwnedCardIds,
+                    effectiveDeckOwnedCardIds
+            );
+
+            return new LoadoutPreview(
+                    effectiveCharacterId,
+                    effectivePassiveIds,
+                    effectiveDeckOwnedCardIds,
+                    effectiveExCardId,
+                    sessionLoadoutSupport.buildLoadoutDraftSignature(
+                            effectiveCharacterId,
+                            effectivePassiveIds,
+                            effectiveDeckOwnedCardIds,
+                            effectiveExCardId
+                    ),
+                    effectiveOwnedCards,
+                    deckEditAnalysis
+            );
+        });
+    }
+
     public GameState applyPresetToLoadout(String code,
                                           String actorPlayerIdRaw,
                                           String targetPlayerIdRaw,
@@ -244,10 +312,10 @@ public class SessionLoadoutService {
                               List<String> deckOwnedCardIdsRaw,
                               String exCardIdRaw) {
         List<String> previousDeckOwnedCardIds = sessionLoadoutSupport.currentDeckOwnedCardIds(ps);
-        List<OwnedCard> effectiveOwnedCards = resolveLoadoutOwnedCards(ps, characterTemplate);
-        List<String> effectivePassiveIds = resolveLoadoutPassiveIds(ps, characterTemplate, passiveIdsRaw);
-        List<String> effectiveDeckOwnedCardIds = resolveLoadoutDeckOwnedCardIds(ps, effectiveOwnedCards, characterTemplate, deckOwnedCardIdsRaw);
-        String effectiveExCardId = resolveLoadoutExCardId(state, ps, characterTemplate, exCardIdRaw);
+        List<OwnedCard> effectiveOwnedCards = sessionLoadoutSupport.resolveLoadoutOwnedCards(ps, characterTemplate);
+        List<String> effectivePassiveIds = sessionLoadoutSupport.resolveLoadoutPassiveIds(ps, characterTemplate, passiveIdsRaw);
+        List<String> effectiveDeckOwnedCardIds = sessionLoadoutSupport.resolveLoadoutDeckOwnedCardIds(ps, effectiveOwnedCards, characterTemplate, deckOwnedCardIdsRaw);
+        String effectiveExCardId = sessionLoadoutSupport.resolveLoadoutExCardId(state, ps, characterTemplate, exCardIdRaw);
 
         List<String> currentDeckForValidation = (characterTemplate == null) ? previousDeckOwnedCardIds : null;
         boolean allowEmptyCharacterDeck = characterTemplate != null && effectiveDeckOwnedCardIds.isEmpty();
@@ -275,55 +343,6 @@ public class SessionLoadoutService {
         return raw.trim();
     }
 
-    private List<OwnedCard> resolveLoadoutOwnedCards(PlayerState ps, SessionLoadoutSupport.CharacterJoinTemplate characterTemplate) {
-        if (characterTemplate == null) {
-            return List.copyOf(ps.ownedCards());
-        }
-        return sessionLoadoutSupport.parseOwnedCards(characterTemplate.ownedCards());
-    }
-
-    private List<String> resolveLoadoutPassiveIds(PlayerState ps,
-                                                  SessionLoadoutSupport.CharacterJoinTemplate characterTemplate,
-                                                  List<String> passiveIdsRaw) {
-        if (passiveIdsRaw != null) {
-            return sessionLoadoutSupport.parsePassiveIds(passiveIdsRaw);
-        }
-        if (characterTemplate != null) {
-            return sessionLoadoutSupport.parsePassiveIds(characterTemplate.passiveIds());
-        }
-        return List.copyOf(ps.passiveIds());
-    }
-
-    private List<String> resolveLoadoutDeckOwnedCardIds(PlayerState ps,
-                                                        List<OwnedCard> effectiveOwnedCards,
-                                                        SessionLoadoutSupport.CharacterJoinTemplate characterTemplate,
-                                                        List<String> deckOwnedCardIdsRaw) {
-        if (deckOwnedCardIdsRaw != null) {
-            return sessionLoadoutSupport.resolveRequestedDeckOwnedCardIds(deckOwnedCardIdsRaw, effectiveOwnedCards);
-        }
-        if (characterTemplate != null) {
-            List<String> currentSkillDeck = characterTemplate.currentSkillDeck();
-            if (currentSkillDeck == null || currentSkillDeck.isEmpty()) {
-                return List.of();
-            }
-            return sessionLoadoutSupport.resolveStoredDeckToOwnedCardIds(currentSkillDeck, effectiveOwnedCards);
-        }
-        return List.copyOf(ps.deckOwnedCardIds());
-    }
-
-    private String resolveLoadoutExCardId(GameState state,
-                                          PlayerState ps,
-                                          SessionLoadoutSupport.CharacterJoinTemplate characterTemplate,
-                                          String exCardIdRaw) {
-        if (exCardIdRaw != null) {
-            return sessionLoadoutSupport.normalizeExCardId(exCardIdRaw);
-        }
-        if (characterTemplate != null) {
-            return sessionLoadoutSupport.normalizeExCardId(characterTemplate.exCardId());
-        }
-        return sessionLoadoutSupport.normalizeExCardId(sessionLoadoutSupport.resolveCurrentExCardId(state, ps));
-    }
-
     private record LoadoutApplySpec(
             Long characterId,
             List<String> passiveIds,
@@ -342,8 +361,18 @@ public class SessionLoadoutService {
                     presetLoadout.characterId(),
                     presetLoadout.passiveIds(),
                     presetLoadout.deckCardIds(),
-                    presetLoadout.exCardId()
+                presetLoadout.exCardId()
             );
         }
     }
+
+    public record LoadoutPreview(
+            Long characterId,
+            List<String> passiveIds,
+            List<String> deckOwnedCardIds,
+            String exCardId,
+            String draftSignature,
+            List<OwnedCard> ownedCards,
+            PlayerLobbyDeckEditAnalysis deckEditAnalysis
+    ) {}
 }

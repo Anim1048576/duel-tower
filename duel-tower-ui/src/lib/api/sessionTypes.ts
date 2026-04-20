@@ -1,3 +1,5 @@
+import type { PlayerLobbyDeckEditorStateDto } from './screenTypes'
+
 export type SessionCode = string
 
 export type SessionIdentifier = SessionCode
@@ -242,6 +244,26 @@ export type UpdateSessionLoadoutRequest = {
   passiveIds?: readonly string[] | null
   deckOwnedCardIds?: readonly string[] | null
   exCardId?: string | null
+}
+
+export type PreviewSessionLoadoutRequest = {
+  characterId?: number | null
+  passiveIds?: readonly string[] | null
+  deckOwnedCardIds?: readonly string[] | null
+  exCardId?: string | null
+}
+
+export type PreviewSessionLoadoutDraftDto = {
+  characterId: number | null
+  passiveIds: string[]
+  deckOwnedCardIds: string[]
+  exCardId: string
+}
+
+export type PreviewSessionLoadoutResponse = {
+  draft: PreviewSessionLoadoutDraftDto
+  draftSignature: string
+  deckEditor: PlayerLobbyDeckEditorStateDto
 }
 
 export type ApplyPresetToSessionRequest = {

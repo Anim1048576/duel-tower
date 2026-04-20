@@ -8,6 +8,8 @@ import type {
   JoinSessionRequest,
   JoinSessionResponse,
   KickPlayerRequest,
+  PreviewSessionLoadoutRequest,
+  PreviewSessionLoadoutResponse,
   RecentResultsResponse,
   ResetSessionRequest,
   RestoreGmAccessResponse,
@@ -135,6 +137,19 @@ export function updateSessionLoadout(
 ) {
   return apiPost<SessionStateDto, UpdateSessionLoadoutRequest>(
     `${getSessionPlayerResourcePath(code, playerId)}/loadout`,
+    payload,
+    withPlayerToken(playerToken),
+  )
+}
+
+export function previewSessionLoadout(
+  code: SessionCode,
+  playerId: SessionPlayerId,
+  payload: PreviewSessionLoadoutRequest,
+  playerToken: SessionToken,
+) {
+  return apiPost<PreviewSessionLoadoutResponse, PreviewSessionLoadoutRequest>(
+    `${getSessionPlayerResourcePath(code, playerId)}/loadout/preview`,
     payload,
     withPlayerToken(playerToken),
   )

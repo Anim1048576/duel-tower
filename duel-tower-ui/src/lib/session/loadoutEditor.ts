@@ -1,4 +1,8 @@
-import type { PlayerStateDto, SessionStateDto } from '../api/sessionTypes'
+import type {
+  PlayerStateDto,
+  PreviewSessionLoadoutRequest,
+  SessionStateDto,
+} from '../api/sessionTypes'
 import type { PlayerLobbyLoadoutDto, PlayerLobbySaveLoadoutPayload } from '../api/screenTypes'
 import {
   normalizePresetIdentifier,
@@ -127,6 +131,19 @@ export function buildSessionLoadoutActionPatch(
     ...(!characterChanged || editFlags.exCardEdited
       ? { exCardId: normalizedDraft.exCardId }
       : {}),
+  }
+}
+
+export function buildSessionLoadoutPreviewRequest(
+  draft: SessionLoadoutDraft,
+): PreviewSessionLoadoutRequest {
+  const normalizedDraft = normalizeSessionLoadoutDraft(draft)
+
+  return {
+    characterId: normalizedDraft.characterId,
+    passiveIds: normalizedDraft.passiveIds,
+    deckOwnedCardIds: normalizedDraft.deckOwnedCardIds,
+    exCardId: normalizedDraft.exCardId,
   }
 }
 

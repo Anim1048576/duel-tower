@@ -93,6 +93,7 @@ public final class SecurityPaths {
             "/api/sessions/*/players/*/forget",
             "/api/sessions/*/players/*/deck",
             "/api/sessions/*/players/*/loadout",
+            "/api/sessions/*/players/*/loadout/preview",
             "/api/sessions/*/players/*/loadout/from-preset"
     };
 

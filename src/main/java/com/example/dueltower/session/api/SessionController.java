@@ -11,6 +11,9 @@ import com.example.dueltower.session.dto.ForgetOwnedCardRequest;
 import com.example.dueltower.session.dto.JoinSessionRequest;
 import com.example.dueltower.session.dto.JoinSessionResponse;
 import com.example.dueltower.session.dto.KickPlayerRequest;
+import com.example.dueltower.session.dto.PreviewSessionLoadoutDraftDto;
+import com.example.dueltower.session.dto.PreviewSessionLoadoutRequest;
+import com.example.dueltower.session.dto.PreviewSessionLoadoutResponse;
 import com.example.dueltower.session.dto.RecentResultsResponse;
 import com.example.dueltower.session.dto.ResetSessionRequest;
 import com.example.dueltower.session.dto.RestoreGmAccessResponse;
@@ -29,7 +32,7 @@ import com.example.dueltower.session.service.SessionLifecycleService;
 import com.example.dueltower.session.service.SessionLoadoutService;
 import com.example.dueltower.session.service.SessionLobbyService;
 import com.example.dueltower.session.service.SessionQueryService;
-import lombok.extern.slf4j.Slf4j;
+import com.example.dueltower.screen.service.ScreenResponseFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -52,8 +55,9 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @RestController
 @RequestMapping("/api/sessions")
-@Slf4j
 public class SessionController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SessionController.class);
 
     private final SessionLifecycleService sessionLifecycleService;
     private final SessionLoadoutService sessionLoadoutService;
@@ -61,6 +65,7 @@ public class SessionController {
     private final SessionQueryService sessionQueryService;
     private final SessionCommandService sessionCommandService;
     private final SessionAccessResolver sessionAccessResolver;
+    private final ScreenResponseFactory screenResponseFactory;
 
     public SessionController(SessionLifecycleService sessionLifecycleService,
                              SessionLoadoutService sessionLoadoutService,
@@ -68,6 +73,7 @@ public class SessionController {
                              SessionQueryService sessionQueryService,
                              SessionCommandService sessionCommandService,
                              SessionAccessResolver sessionAccessResolver,
+                             ScreenResponseFactory screenResponseFactory,
                              ItemService itemService,
                              EquipService equipService) {
         this.sessionLifecycleService = sessionLifecycleService;
@@ -76,6 +82,7 @@ public class SessionController {
         this.sessionQueryService = sessionQueryService;
         this.sessionCommandService = sessionCommandService;
         this.sessionAccessResolver = sessionAccessResolver;
+        this.screenResponseFactory = screenResponseFactory;
         StateMapper.configureContentServices(itemService, equipService);
     }
 
@@ -256,6 +263,46 @@ public class SessionController {
                 req.exCardId()
         );
         return sessionLifecycleService.withLockedSession(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
+    }
+
+    @PostMapping("/{code}/players/{playerId}/loadout/preview")
+    public PreviewSessionLoadoutResponse previewLoadout(@PathVariable String code,
+                                                        @PathVariable String playerId,
+                                                        @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                                        @RequestBody(required = false) PreviewSessionLoadoutRequest req) {
+        if (req == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "request body is required");
+        }
+        SessionRuntime runtime = sessionLifecycleService.get(code);
+        String actorPlayerId = sessionAccessResolver.requirePlayerSelf(
+                runtime,
+                playerTokenHeader,
+                playerId,
+                "players may only edit their own loadout"
+        );
+        SessionLoadoutService.LoadoutPreview preview = sessionLoadoutService.previewLoadout(
+                code,
+                actorPlayerId,
+                playerId,
+                req.characterId(),
+                req.passiveIds(),
+                req.deckOwnedCardIds(),
+                req.exCardId()
+        );
+        return new PreviewSessionLoadoutResponse(
+                new PreviewSessionLoadoutDraftDto(
+                        preview.characterId(),
+                        preview.passiveIds(),
+                        preview.deckOwnedCardIds(),
+                        preview.exCardId()
+                ),
+                preview.draftSignature(),
+                screenResponseFactory.playerLobbyDeckEditorFromOwnedCards(
+                        preview.ownedCards(),
+                        preview.deckOwnedCardIds(),
+                        preview.deckEditAnalysis()
+                )
+        );
     }
 
     @PostMapping("/{code}/players/{playerId}/loadout/from-preset")

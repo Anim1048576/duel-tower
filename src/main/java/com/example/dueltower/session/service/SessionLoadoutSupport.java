@@ -287,6 +287,70 @@ public class SessionLoadoutSupport {
         ));
     }
 
+    public List<OwnedCard> resolveLoadoutOwnedCards(PlayerState ps,
+                                                    CharacterJoinTemplate characterTemplate) {
+        if (characterTemplate == null) {
+            return List.copyOf(ps.ownedCards());
+        }
+        return parseOwnedCards(characterTemplate.ownedCards());
+    }
+
+    public List<String> resolveLoadoutPassiveIds(PlayerState ps,
+                                                 CharacterJoinTemplate characterTemplate,
+                                                 List<String> passiveIdsRaw) {
+        if (passiveIdsRaw != null) {
+            return parsePassiveIds(passiveIdsRaw);
+        }
+        if (characterTemplate != null) {
+            return parsePassiveIds(characterTemplate.passiveIds());
+        }
+        return List.copyOf(ps.passiveIds());
+    }
+
+    public List<String> resolveLoadoutDeckOwnedCardIds(PlayerState ps,
+                                                       List<OwnedCard> effectiveOwnedCards,
+                                                       CharacterJoinTemplate characterTemplate,
+                                                       List<String> deckOwnedCardIdsRaw) {
+        if (deckOwnedCardIdsRaw != null) {
+            return resolveRequestedDeckOwnedCardIds(deckOwnedCardIdsRaw, effectiveOwnedCards);
+        }
+        if (characterTemplate != null) {
+            List<String> currentSkillDeck = characterTemplate.currentSkillDeck();
+            if (currentSkillDeck == null || currentSkillDeck.isEmpty()) {
+                return List.of();
+            }
+            return resolveStoredDeckToOwnedCardIds(currentSkillDeck, effectiveOwnedCards);
+        }
+        return List.copyOf(ps.deckOwnedCardIds());
+    }
+
+    public String resolveLoadoutExCardId(GameState state,
+                                         PlayerState ps,
+                                         CharacterJoinTemplate characterTemplate,
+                                         String exCardIdRaw) {
+        if (exCardIdRaw != null) {
+            return normalizeExCardId(exCardIdRaw);
+        }
+        if (characterTemplate != null) {
+            return normalizeExCardId(characterTemplate.exCardId());
+        }
+        return normalizeExCardId(resolveCurrentExCardId(state, ps));
+    }
+
+    public String buildLoadoutDraftSignature(Long characterId,
+                                             List<String> passiveIds,
+                                             List<String> deckOwnedCardIds,
+                                             String exCardId) {
+        String characterToken = characterId == null ? "" : characterId.toString();
+        String passiveToken = String.join("|", passiveIds == null ? List.of() : passiveIds);
+        String deckToken = String.join("|", deckOwnedCardIds == null ? List.of() : deckOwnedCardIds);
+        String exToken = normalizeExCardId(exCardId);
+        return "characterId=" + characterToken
+                + ";passiveIds=" + passiveToken
+                + ";deckOwnedCardIds=" + deckToken
+                + ";exCardId=" + exToken;
+    }
+
     public Map<String, Integer> cardCountsFromOwned(List<OwnedCard> ownedCards) {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (OwnedCard ownedCard : ownedCards) {
