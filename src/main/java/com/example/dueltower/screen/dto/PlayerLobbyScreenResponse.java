@@ -16,6 +16,7 @@ public class PlayerLobbyScreenResponse extends ScreenResponseBase {
     private final String auth;
     private final List<PlayerLobbyParticipantSlotDto> participantSlots;
     private final PlayerLobbyMeDto me;
+    private final PlayerLobbyDeckEditorStateDto deckEditor;
     private final PlayerLobbyReferencesDto references;
     private final PlayerLobbyPresetsDto presets;
 
@@ -30,6 +31,7 @@ public class PlayerLobbyScreenResponse extends ScreenResponseBase {
                                      String auth,
                                      List<PlayerLobbyParticipantSlotDto> participantSlots,
                                      PlayerLobbyMeDto me,
+                                     PlayerLobbyDeckEditorStateDto deckEditor,
                                      PlayerLobbyReferencesDto references,
                                      PlayerLobbyPresetsDto presets) {
         super(screenKey, generatedAt, uiNotices, possibleActions);
@@ -40,6 +42,7 @@ public class PlayerLobbyScreenResponse extends ScreenResponseBase {
         this.auth = auth;
         this.participantSlots = participantSlots == null ? List.of() : List.copyOf(participantSlots);
         this.me = me;
+        this.deckEditor = deckEditor;
         this.references = references;
         this.presets = presets;
     }
@@ -70,6 +73,10 @@ public class PlayerLobbyScreenResponse extends ScreenResponseBase {
 
     public PlayerLobbyMeDto getMe() {
         return me;
+    }
+
+    public PlayerLobbyDeckEditorStateDto getDeckEditor() {
+        return deckEditor;
     }
 
     public PlayerLobbyReferencesDto getReferences() {

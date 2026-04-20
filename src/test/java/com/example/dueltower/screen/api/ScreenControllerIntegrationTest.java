@@ -120,6 +120,12 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("me").path("draftFlags").path("dirty").asBoolean()).isFalse();
         assertThat(body.path("me").path("draftFlags").path("deckEditingLocked").asBoolean()).isFalse();
         assertThat(body.path("me").path("draftFlags").path("requiredFieldsMissing").asBoolean()).isFalse();
+        assertThat(body.path("deckEditor").path("deck").path("requiredDeckSize").asInt()).isEqualTo(12);
+        assertThat(body.path("deckEditor").path("deck").path("draftDeckSize").asInt()).isEqualTo(body.path("me").path("loadout").path("deckCount").asInt());
+        assertThat(body.path("deckEditor").path("deck").path("saveAllowed").asBoolean()).isTrue();
+        assertThat(body.path("deckEditor").path("draftEntries")).isNotEmpty();
+        assertThat(body.path("deckEditor").path("cardPoolGroups")).isNotEmpty();
+        assertThat(body.path("deckEditor").path("issues").isArray()).isTrue();
         assertThat(body.path("references").path("characterOptions")).isNotEmpty();
         assertThat(body.path("references").path("exCardOptions")).isNotEmpty();
         assertThat(body.path("references").path("passiveOptions")).isNotEmpty();
@@ -252,6 +258,47 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(afterReadyBody.path("participantSlots").get(0).path("state").asText()).isEqualTo("You / Ready");
         assertThat(findAction(afterReadyBody, "playerLobby.toggleReady").path("label").asText()).isEqualTo("Mark not ready");
         assertThat(findAction(afterReadyBody, "playerLobby.toggleReady").path("payloadTemplate").path("ready").asBoolean()).isFalse();
+    }
+
+    @Test
+    void playerLobbyScreenIncludesDeckEditorReasonsForLockedAndInvalidDeckState() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-deck-editor", "gm-deck-editor@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-deck-editor");
+        MockHttpSession playerSession = signUpAndLogin("player-deck-editor", "player-deck-editor@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "player-deck-editor", characterId);
+
+        sessionLifecycleService.withLockedSession(session.code(), rt -> {
+            var player = rt.state().player(new Ids.PlayerId("player-deck-editor"));
+            List<com.example.dueltower.content.card.model.OwnedCard> ownedCards = new java.util.ArrayList<>(player.ownedCards());
+            ownedCards.set(0, ownedCards.get(0).withLockInDeck(true));
+            player.ownedCards(ownedCards);
+            player.deckOwnedCardIds(List.copyOf(player.deckOwnedCardIds().subList(0, player.deckOwnedCardIds().size() - 1)));
+            return null;
+        });
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/player-lobby", session.code())
+                        .header("X-Player-Token", playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "PlayerLobby");
+        assertThat(body.path("deckEditor").path("deck").path("draftDeckSize").asInt()).isEqualTo(11);
+        assertThat(body.path("deckEditor").path("deck").path("saveAllowed").asBoolean()).isFalse();
+        assertThat(StreamSupport.stream(body.path("deckEditor").path("globalReasonCodes").spliterator(), false)
+                .map(JsonNode::asText))
+                .contains("INVALID_DECK_SIZE");
+        assertThat(StreamSupport.stream(body.path("deckEditor").path("issues").spliterator(), false)
+                .map(issue -> issue.path("code").asText()))
+                .contains("INVALID_DECK_SIZE");
+        JsonNode lockedEntry = StreamSupport.stream(body.path("deckEditor").path("draftEntries").spliterator(), false)
+                .filter(entry -> entry.path("lockedInDeck").asBoolean())
+                .findFirst()
+                .orElseThrow();
+        assertThat(lockedEntry.path("canRemove").asBoolean()).isFalse();
+        assertThat(StreamSupport.stream(lockedEntry.path("reasonCodes").spliterator(), false)
+                .map(JsonNode::asText))
+                .contains("LOCKED_CARD");
     }
 
     @Test

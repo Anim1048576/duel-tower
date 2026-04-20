@@ -10,6 +10,7 @@ import com.example.dueltower.engine.model.PassiveDefinition;
 import com.example.dueltower.preset.dto.PresetResponse;
 import com.example.dueltower.preset.service.PresetService;
 import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
+import com.example.dueltower.session.service.SessionLoadoutSupport;
 import com.example.dueltower.session.dto.PlayerStateDto;
 import com.example.dueltower.session.dto.SessionStateDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
@@ -40,6 +41,7 @@ public class PlayerLobbyScreenService {
     private final SessionLifecycleService sessionLifecycleService;
     private final SessionAccessResolver sessionAccessResolver;
     private final ScreenResponseFactory screenResponseFactory;
+    private final SessionLoadoutSupport sessionLoadoutSupport;
     private final CharacterProfileService characterProfileService;
     private final CardService cardService;
     private final PassiveService passiveService;
@@ -48,6 +50,7 @@ public class PlayerLobbyScreenService {
     public PlayerLobbyScreenService(SessionLifecycleService sessionLifecycleService,
                                     SessionAccessResolver sessionAccessResolver,
                                     ScreenResponseFactory screenResponseFactory,
+                                    SessionLoadoutSupport sessionLoadoutSupport,
                                     CharacterProfileService characterProfileService,
                                     CardService cardService,
                                     PassiveService passiveService,
@@ -55,6 +58,7 @@ public class PlayerLobbyScreenService {
         this.sessionLifecycleService = sessionLifecycleService;
         this.sessionAccessResolver = sessionAccessResolver;
         this.screenResponseFactory = screenResponseFactory;
+        this.sessionLoadoutSupport = sessionLoadoutSupport;
         this.characterProfileService = characterProfileService;
         this.cardService = cardService;
         this.passiveService = passiveService;
@@ -83,6 +87,12 @@ public class PlayerLobbyScreenService {
         if (me == null) {
             throw new ResponseStatusException(FORBIDDEN, "player lobby access requires a joined player");
         }
+        var runtimePlayer = rt.state().player(new com.example.dueltower.engine.model.Ids.PlayerId(playerId));
+        var deckEditAnalysis = sessionLoadoutSupport.analyzePlayerLobbyDeckEdit(
+                runtimePlayer.ownedCards(),
+                runtimePlayer.deckOwnedCardIds(),
+                runtimePlayer.deckOwnedCardIds()
+        );
 
         List<CharacterProfileResponse> characters = characterProfileService.list();
         List<CardDefinition> exCards = cardService.list(CardType.EX);
@@ -95,6 +105,7 @@ public class PlayerLobbyScreenService {
                 rt,
                 playerId,
                 me,
+                deckEditAnalysis,
                 characters,
                 exCards,
                 passives,

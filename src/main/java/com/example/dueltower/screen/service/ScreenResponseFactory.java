@@ -19,6 +19,7 @@ import com.example.dueltower.screen.dto.GmLobbySelectableStartPlayerDto;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatDto;
 import com.example.dueltower.screen.dto.GmLobbyTagDto;
 import com.example.dueltower.screen.dto.PlayerLobbyDraftFlagsDto;
+import com.example.dueltower.screen.dto.PlayerLobbyDeckEditorStateDto;
 import com.example.dueltower.screen.dto.PlayerLobbyLoadoutDto;
 import com.example.dueltower.screen.dto.PlayerLobbyMeDto;
 import com.example.dueltower.screen.dto.PlayerLobbyMeSummaryDto;
@@ -51,6 +52,7 @@ import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.dto.PlayerStateDto;
 import com.example.dueltower.session.dto.SessionStateDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
+import com.example.dueltower.session.service.PlayerLobbyDeckEditAnalysis;
 import com.example.dueltower.session.service.SessionAccessDecision;
 import org.springframework.stereotype.Component;
 
@@ -59,6 +61,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -152,6 +155,7 @@ public class ScreenResponseFactory {
                                                  SessionRuntime runtime,
                                                  String currentPlayerId,
                                                  PlayerStateDto me,
+                                                 PlayerLobbyDeckEditAnalysis deckEditAnalysis,
                                                  List<com.example.dueltower.character.dto.CharacterProfileResponse> characters,
                                                  List<CardDefinition> exCards,
                                                  List<PassiveDefinition> passives,
@@ -178,6 +182,7 @@ public class ScreenResponseFactory {
                         loadout,
                         playerLobbyDraftFlags(loadout)
                 ),
+                playerLobbyDeckEditor(me, deckEditAnalysis),
                 playerLobbyReferences(characters, exCards, passives, me),
                 presetSection
         );
@@ -714,6 +719,82 @@ public class ScreenResponseFactory {
                 player.deckOwnedCardIds().size(),
                 player.passiveIds().size()
         );
+    }
+
+    private PlayerLobbyDeckEditorStateDto playerLobbyDeckEditor(PlayerStateDto me,
+                                                                PlayerLobbyDeckEditAnalysis analysis) {
+        if (analysis == null) {
+            return new PlayerLobbyDeckEditorStateDto(null, List.of(), List.of(), List.of(), List.of());
+        }
+
+        Set<String> draftOwnedCardIds = new LinkedHashSet<>(me.deckOwnedCardIds());
+        return new PlayerLobbyDeckEditorStateDto(
+                new PlayerLobbyDeckEditorStateDto.DeckState(
+                        analysis.deck().requiredDeckSize(),
+                        analysis.deck().draftDeckSize(),
+                        analysis.deck().changedCardCount(),
+                        analysis.deck().saveAllowed()
+                ),
+                analysis.globalIssues().stream()
+                        .map(issue -> issue.code().name())
+                        .toList(),
+                analysis.globalIssues().stream()
+                        .map(issue -> new PlayerLobbyDeckEditorStateDto.Issue(
+                                issue.level().name(),
+                                issue.code().name(),
+                                issue.details()
+                        ))
+                        .toList(),
+                analysis.deckEntries().stream()
+                        .map(entry -> new PlayerLobbyDeckEditorStateDto.DraftEntry(
+                                entry.ownedCardId(),
+                                entry.cardId(),
+                                entry.inSavedDeck(),
+                                entry.lockedInDeck(),
+                                entry.removable(),
+                                issueCodes(entry.blockedReasons())
+                        ))
+                        .toList(),
+                analysis.cardPoolGroups().stream()
+                        .map(group -> new PlayerLobbyDeckEditorStateDto.CardPoolGroup(
+                                group.cardId(),
+                                group.currentDeckCount(),
+                                group.totalOwnedCount(),
+                                group.availableOwnedCount(),
+                                group.addable(),
+                                group.nextOwnedCardId(),
+                                issueCodes(group.blockedReasons()),
+                                me.ownedCards().stream()
+                                        .filter(ownedCard -> safeTrim(ownedCard.cardId()).equals(group.cardId()))
+                                        .map(ownedCard -> playerLobbyDeckEditorOwnedCardState(ownedCard, group, draftOwnedCardIds))
+                                        .toList()
+                        ))
+                        .toList()
+        );
+    }
+
+    private PlayerLobbyDeckEditorStateDto.OwnedCardState playerLobbyDeckEditorOwnedCardState(
+            OwnedCardDto ownedCard,
+            PlayerLobbyDeckEditAnalysis.CardPoolGroupAnalysis group,
+            Set<String> draftOwnedCardIds
+    ) {
+        boolean inDraftDeck = draftOwnedCardIds.contains(safeTrim(ownedCard.ownedCardId()));
+        List<String> reasonCodes = inDraftDeck
+                ? List.of(PlayerLobbyDeckEditAnalysis.IssueCode.ALREADY_IN_DECK.name())
+                : issueCodes(group.blockedReasons());
+        return new PlayerLobbyDeckEditorStateDto.OwnedCardState(
+                ownedCard.ownedCardId(),
+                ownedCard.cardId(),
+                inDraftDeck,
+                !inDraftDeck && group.addable(),
+                reasonCodes
+        );
+    }
+
+    private List<String> issueCodes(List<PlayerLobbyDeckEditAnalysis.IssueCode> codes) {
+        return codes.stream()
+                .map(Enum::name)
+                .toList();
     }
 
     private PlayerLobbyReferencesDto playerLobbyReferences(List<com.example.dueltower.character.dto.CharacterProfileResponse> characters,

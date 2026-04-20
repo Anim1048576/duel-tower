@@ -246,6 +246,67 @@ export type PlayerLobbyMeDto = {
   draftFlags: PlayerLobbyDraftFlagsDto
 }
 
+export type PlayerLobbyDeckEditorIssueLevel = 'WARNING' | 'ERROR' | string
+
+export type PlayerLobbyDeckEditorReasonCode =
+  | 'DECK_FULL'
+  | 'INVALID_DECK_SIZE'
+  | 'CARD_LIMIT_REACHED'
+  | 'REPLACEMENT_LIMIT_REACHED'
+  | 'LOCKED_CARD'
+  | 'NOT_OWNED'
+  | 'ALREADY_IN_DECK'
+  | string
+
+export type PlayerLobbyDeckEditorDeckStateDto = {
+  requiredDeckSize: number
+  draftDeckSize: number
+  changedCardCount: number
+  saveAllowed: boolean
+}
+
+export type PlayerLobbyDeckEditorIssueDto = {
+  level: PlayerLobbyDeckEditorIssueLevel
+  code: PlayerLobbyDeckEditorReasonCode
+  details: Record<string, unknown>
+}
+
+export type PlayerLobbyDeckEditorDraftEntryDto = {
+  ownedCardId: string
+  cardId: string
+  inSavedDeck: boolean
+  lockedInDeck: boolean
+  canRemove: boolean
+  reasonCodes: PlayerLobbyDeckEditorReasonCode[]
+}
+
+export type PlayerLobbyDeckEditorOwnedCardStateDto = {
+  ownedCardId: string
+  cardId: string
+  inDraftDeck: boolean
+  canAdd: boolean
+  reasonCodes: PlayerLobbyDeckEditorReasonCode[]
+}
+
+export type PlayerLobbyDeckEditorCardPoolGroupDto = {
+  cardId: string
+  currentDeckCount: number
+  totalOwnedCount: number
+  availableOwnedCount: number
+  canAdd: boolean
+  nextOwnedCardId: string
+  reasonCodes: PlayerLobbyDeckEditorReasonCode[]
+  ownedCards: PlayerLobbyDeckEditorOwnedCardStateDto[]
+}
+
+export type PlayerLobbyDeckEditorStateDto = {
+  deck: PlayerLobbyDeckEditorDeckStateDto
+  globalReasonCodes: PlayerLobbyDeckEditorReasonCode[]
+  issues: PlayerLobbyDeckEditorIssueDto[]
+  draftEntries: PlayerLobbyDeckEditorDraftEntryDto[]
+  cardPoolGroups: PlayerLobbyDeckEditorCardPoolGroupDto[]
+}
+
 export type PlayerLobbyOptionDto = {
   id: string
   label: string
@@ -994,6 +1055,7 @@ export type PlayerLobbyScreenResponse = ScreenResponseBase<PlayerLobbyScreenActi
   auth: string
   participantSlots: PlayerLobbyParticipantSlotDto[]
   me: PlayerLobbyServerMe
+  deckEditor: PlayerLobbyDeckEditorStateDto
   references: PlayerLobbyServerReferences
   presets: PlayerLobbyServerPresets
 }
