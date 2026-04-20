@@ -2,6 +2,8 @@
 /** @typedef {import('../api/screenTypes').PlayerLobbyDeckEditorStateDto} PlayerLobbyDeckEditorStateDto */
 /** @typedef {import('../api/screenTypes').PlayerLobbyOwnedCardOptionDto} PlayerLobbyOwnedCardOptionDto */
 /** @typedef {import('../api/sessionTypes').PreviewSessionLoadoutResponse} PreviewSessionLoadoutResponse */
+/** @typedef {import('../api/sessionTypes').PreviewSessionLoadoutDraftDto} PreviewSessionLoadoutDraftDto */
+/** @typedef {import('./loadoutEditor').areSessionLoadoutDraftsEqual} AreSessionLoadoutDraftsEqualFn */
 
 /** @param {string | null | undefined} value */
 function normalizeText(value) {
@@ -11,21 +13,6 @@ function normalizeText(value) {
 /** @param {readonly string[] | null | undefined} values */
 function normalizeIdentifierList(values) {
   return (values ?? []).map((value) => normalizeText(value)).filter(Boolean)
-}
-
-/**
- * @param {SessionLoadoutDraft} draft
- */
-export function buildPlayerLobbyPreviewDraftSignature(draft) {
-  const characterToken =
-    typeof draft?.characterId === 'number' && Number.isFinite(draft.characterId) && draft.characterId > 0
-      ? String(draft.characterId)
-      : ''
-  const passiveToken = normalizeIdentifierList(draft?.passiveIds).join('|')
-  const deckToken = normalizeIdentifierList(draft?.deckOwnedCardIds).join('|')
-  const exToken = normalizeText(draft?.exCardId)
-
-  return `characterId=${characterToken};passiveIds=${passiveToken};deckOwnedCardIds=${deckToken};exCardId=${exToken}`
 }
 
 /**
@@ -65,24 +52,59 @@ export function removeOwnedCardIdFromLoadoutDraft(draft, ownedCardId) {
 
 /**
  * @param {PreviewSessionLoadoutResponse | null | undefined} previewResponse
- * @param {string} draftSignature
+ * @param {string | null | undefined} clientRequestId
+ * @param {(source: PreviewSessionLoadoutDraftDto | null | undefined, draft: SessionLoadoutDraft) => boolean} isPreviewDraftCurrent
+ * @param {SessionLoadoutDraft} draft
  */
-export function isPlayerLobbyPreviewResponseCurrent(previewResponse, draftSignature) {
-  return normalizeText(previewResponse?.draftSignature) !== '' &&
-    normalizeText(previewResponse?.draftSignature) === normalizeText(draftSignature)
+export function isPlayerLobbyPreviewResponseCurrent(
+  previewResponse,
+  clientRequestId,
+  isPreviewDraftCurrent,
+  draft,
+) {
+  const normalizedClientRequestId = normalizeText(clientRequestId)
+  if (
+    normalizedClientRequestId &&
+    normalizeText(previewResponse?.clientRequestId) === normalizedClientRequestId
+  ) {
+    return true
+  }
+  return isPreviewDraftCurrent(previewResponse?.draft, draft)
+}
+
+/**
+ * @param {PreviewSessionLoadoutResponse | null | undefined} previewResponse
+ * @param {(source: PreviewSessionLoadoutDraftDto | null | undefined, draft: SessionLoadoutDraft) => boolean} isPreviewDraftCurrent
+ * @param {SessionLoadoutDraft} draft
+ */
+export function isPlayerLobbyPreviewResponseForDraft(
+  previewResponse,
+  isPreviewDraftCurrent,
+  draft,
+) {
+  return isPreviewDraftCurrent(previewResponse?.draft, draft)
 }
 
 /**
  * @param {{
  *   requestId: number
  *   latestRequestId: number
- *   draftSignature: string
+ *   clientRequestId: string | null | undefined
  *   response: PreviewSessionLoadoutResponse | null | undefined
+ *   isPreviewDraftCurrent: (source: PreviewSessionLoadoutDraftDto | null | undefined, draft: SessionLoadoutDraft) => boolean
+ *   draft: SessionLoadoutDraft
  * }} params
  */
 export function shouldAcceptPlayerLobbyPreviewResponse(params) {
-  return params.requestId === params.latestRequestId &&
-    isPlayerLobbyPreviewResponseCurrent(params.response, params.draftSignature)
+  if (params.requestId !== params.latestRequestId) {
+    return false
+  }
+  return isPlayerLobbyPreviewResponseCurrent(
+    params.response,
+    params.clientRequestId,
+    params.isPreviewDraftCurrent,
+    params.draft,
+  )
 }
 
 /**
@@ -110,30 +132,50 @@ function findOwnedCardOptionByCardId(options, cardId) {
 }
 
 /**
+ * @param {PreviewSessionLoadoutResponse | null | undefined} previewResponse
+ * @param {(source: PreviewSessionLoadoutDraftDto | null | undefined, draft: SessionLoadoutDraft) => boolean} isPreviewDraftCurrent
+ * @param {SessionLoadoutDraft} draft
+ */
+function resolveMatchingPreviewResponse(previewResponse, isPreviewDraftCurrent, draft) {
+  return isPlayerLobbyPreviewResponseForDraft(previewResponse, isPreviewDraftCurrent, draft)
+    ? previewResponse ?? null
+    : null
+}
+
+/**
+ * @param {PlayerLobbyDeckEditorStateDto | null | undefined} previewResponse
+ * @returns {PlayerLobbyDeckEditorStateDto | null}
+ */
+function normalizeDeckEditor(previewResponse) {
+  return previewResponse ?? null
+}
+
+/**
  * @param {{
  *   screenDeckEditor: PlayerLobbyDeckEditorStateDto | null | undefined
- *   previewResponse: PreviewSessionLoadoutResponse | null | undefined
- *   draftSignature: string
+ *   matchingPreviewResponse: PreviewSessionLoadoutResponse | null | undefined
+ *   fallbackPreviewResponse: PreviewSessionLoadoutResponse | null | undefined
  *   draftDirty: boolean
  * }} params
  * @returns {PlayerLobbyDeckEditorStateDto | null}
  */
 export function resolvePlayerLobbyActiveDeckEditor(params) {
   if (!params.draftDirty) {
-    return params.screenDeckEditor ?? null
+    return normalizeDeckEditor(params.screenDeckEditor)
   }
-  if (isPlayerLobbyPreviewResponseCurrent(params.previewResponse, params.draftSignature)) {
-    return params.previewResponse?.deckEditor ?? null
-  }
-  return null
+  return normalizeDeckEditor(
+    params.matchingPreviewResponse?.deckEditor ??
+      params.fallbackPreviewResponse?.deckEditor ??
+      null,
+  )
 }
 
 /**
  * @param {{
  *   draftDeckOwnedCardIds: readonly string[]
  *   screenDeckEditor: PlayerLobbyDeckEditorStateDto | null | undefined
- *   previewResponse: PreviewSessionLoadoutResponse | null | undefined
- *   draftSignature: string
+ *   matchingPreviewResponse: PreviewSessionLoadoutResponse | null | undefined
+ *   fallbackPreviewResponse: PreviewSessionLoadoutResponse | null | undefined
  *   draftDirty: boolean
  *   ownedCardOptions: readonly PlayerLobbyOwnedCardOptionDto[] | null | undefined
  * }} params
@@ -182,8 +224,8 @@ export function buildPlayerLobbyCurrentDeckEntries(params) {
 /**
  * @param {{
  *   screenDeckEditor: PlayerLobbyDeckEditorStateDto | null | undefined
- *   previewResponse: PreviewSessionLoadoutResponse | null | undefined
- *   draftSignature: string
+ *   matchingPreviewResponse: PreviewSessionLoadoutResponse | null | undefined
+ *   fallbackPreviewResponse: PreviewSessionLoadoutResponse | null | undefined
  *   draftDirty: boolean
  *   ownedCardOptions: readonly PlayerLobbyOwnedCardOptionDto[] | null | undefined
  * }} params
@@ -207,7 +249,6 @@ export function buildPlayerLobbyDeckPoolGroups(params) {
       totalOwnedCount: group.totalOwnedCount,
       availableOwnedCount: group.availableOwnedCount,
       canAdd: Boolean(group.canAdd),
-      nextOwnedCardId: group.nextOwnedCardId,
       reasonCodes: group.reasonCodes ?? [],
       ownedCards: (group.ownedCards ?? []).map((ownedCard, ownedIndex) => {
         const ownedOption = findOwnedCardOption(params.ownedCardOptions, ownedCard.ownedCardId)
@@ -230,3 +271,28 @@ export function buildPlayerLobbyDeckPoolGroups(params) {
   })
 }
 
+/**
+ * @param {{
+ *   previewResponse: PreviewSessionLoadoutResponse | null | undefined
+ *   fallbackPreviewResponse: PreviewSessionLoadoutResponse | null | undefined
+ *   isPreviewDraftCurrent: (source: PreviewSessionLoadoutDraftDto | null | undefined, draft: SessionLoadoutDraft) => boolean
+ *   draft: SessionLoadoutDraft
+ * }} params
+ */
+export function resolvePlayerLobbyPreviewState(params) {
+  const matchingPreviewResponse = resolveMatchingPreviewResponse(
+    params.previewResponse,
+    params.isPreviewDraftCurrent,
+    params.draft,
+  )
+  const fallbackPreviewResponse =
+    params.fallbackPreviewResponse && params.fallbackPreviewResponse !== matchingPreviewResponse
+      ? params.fallbackPreviewResponse
+      : null
+
+  return {
+    matchingPreviewResponse,
+    fallbackPreviewResponse,
+    hasStaleFallback: fallbackPreviewResponse !== null,
+  }
+}

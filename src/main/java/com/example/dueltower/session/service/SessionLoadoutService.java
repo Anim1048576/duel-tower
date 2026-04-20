@@ -148,12 +148,6 @@ public class SessionLoadoutService {
                     effectivePassiveIds,
                     effectiveDeckOwnedCardIds,
                     effectiveExCardId,
-                    sessionLoadoutSupport.buildLoadoutDraftSignature(
-                            effectiveCharacterId,
-                            effectivePassiveIds,
-                            effectiveDeckOwnedCardIds,
-                            effectiveExCardId
-                    ),
                     effectiveOwnedCards,
                     deckEditAnalysis
             );
@@ -371,7 +365,6 @@ public class SessionLoadoutService {
             List<String> passiveIds,
             List<String> deckOwnedCardIds,
             String exCardId,
-            String draftSignature,
             List<OwnedCard> ownedCards,
             PlayerLobbyDeckEditAnalysis deckEditAnalysis
     ) {}

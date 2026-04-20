@@ -349,6 +349,7 @@ class SessionManagementIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "clientRequestId": "preview-req-1",
                                   "deckOwnedCardIds": [
                                     "oc-01","oc-02","oc-03",
                                     "oc-04","oc-05","oc-06",
@@ -358,8 +359,8 @@ class SessionManagementIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientRequestId").value("preview-req-1"))
                 .andExpect(jsonPath("$.draft.deckOwnedCardIds[11]").value("oc-13"))
-                .andExpect(jsonPath("$.draftSignature").isNotEmpty())
                 .andExpect(jsonPath("$.deckEditor.deck.changedCardCount").value(1))
                 .andReturn();
 

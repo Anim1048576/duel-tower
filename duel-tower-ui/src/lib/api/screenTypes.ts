@@ -294,7 +294,6 @@ export type PlayerLobbyDeckEditorCardPoolGroupDto = {
   totalOwnedCount: number
   availableOwnedCount: number
   canAdd: boolean
-  nextOwnedCardId: string
   reasonCodes: PlayerLobbyDeckEditorReasonCode[]
   ownedCards: PlayerLobbyDeckEditorOwnedCardStateDto[]
 }

@@ -33,7 +33,6 @@
     totalOwnedCount: number
     availableOwnedCount: number
     canAdd: boolean
-    nextOwnedCardId: string
     reasonCodes: string[]
     ownedCards: {
       key: string
@@ -56,6 +55,8 @@
     controlsDisabled,
     previewPending,
     previewErrorMessage,
+    previewStale,
+    onRetryPreview,
     onAddOwnedCard,
     onRemoveOwnedCard,
   }: {
@@ -65,6 +66,8 @@
     controlsDisabled: boolean
     previewPending: boolean
     previewErrorMessage: string | null
+    previewStale: boolean
+    onRetryPreview: (() => void) | null
     onAddOwnedCard: (ownedCardId: string) => void
     onRemoveOwnedCard: (ownedCardId: string) => void
   } = $props()
@@ -128,16 +131,22 @@
 
   {#if previewErrorMessage}
     <ContentStatePanel
-      title="Preview refresh failed"
-      message={previewErrorMessage}
+      title={previewStale ? 'Preview refresh failed, showing last server result' : 'Preview refresh failed'}
+      message={previewStale
+        ? `${previewErrorMessage} The last successful server preview is still shown below and may be outdated.`
+        : previewErrorMessage}
       tone="error"
+      actionLabel={onRetryPreview ? 'Retry preview' : undefined}
+      onAction={onRetryPreview ?? undefined}
     />
   {/if}
 
   {#if previewPending}
     <ContentStatePanel
       title="Preview refreshing"
-      message="The latest canAdd, canRemove, reason codes, and deck counters are being resolved by the server."
+      message={previewStale
+        ? 'Refreshing the latest server preview while keeping the previous resolved add/remove state visible.'
+        : 'The latest canAdd, canRemove, reason codes, and deck counters are being resolved by the server.'}
     />
   {/if}
 

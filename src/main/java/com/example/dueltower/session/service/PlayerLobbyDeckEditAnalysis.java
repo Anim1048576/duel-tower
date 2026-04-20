@@ -59,12 +59,10 @@ public record PlayerLobbyDeckEditAnalysis(
             int totalOwnedCount,
             int availableOwnedCount,
             boolean addable,
-            String nextOwnedCardId,
             List<IssueCode> blockedReasons
     ) {
         public CardPoolGroupAnalysis {
             cardId = normalize(cardId);
-            nextOwnedCardId = normalize(nextOwnedCardId);
             blockedReasons = blockedReasons == null ? List.of() : List.copyOf(blockedReasons);
         }
     }

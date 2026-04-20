@@ -127,15 +127,11 @@ public class PlayerLobbyDeckEditAnalyzer {
             int totalOwnedCount = ownedGroup.size();
             int currentDeckCount = draftCardCounts.getOrDefault(cardId, 0);
             int availableOwnedCount = 0;
-            String nextOwnedCardId = "";
             for (OwnedCard ownedCard : ownedGroup) {
                 if (draftDeckOwnedCardIds.contains(ownedCard.ownedCardId())) {
                     continue;
                 }
                 availableOwnedCount++;
-                if (nextOwnedCardId.isBlank()) {
-                    nextOwnedCardId = ownedCard.ownedCardId();
-                }
             }
 
             List<PlayerLobbyDeckEditAnalysis.IssueCode> blockedReasons = new ArrayList<>();
@@ -155,7 +151,6 @@ public class PlayerLobbyDeckEditAnalyzer {
                     totalOwnedCount,
                     availableOwnedCount,
                     blockedReasons.isEmpty(),
-                    nextOwnedCardId,
                     distinct(blockedReasons)
             ));
         }

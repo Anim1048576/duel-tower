@@ -34,7 +34,6 @@
     totalOwnedCount: number
     availableOwnedCount: number
     canAdd: boolean
-    nextOwnedCardId: string
     reasonCodes: string[]
     ownedCards: DeckPoolOwnedCardItem[]
   }

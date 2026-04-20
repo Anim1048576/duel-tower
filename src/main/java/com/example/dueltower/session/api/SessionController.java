@@ -296,7 +296,7 @@ public class SessionController {
                         preview.deckOwnedCardIds(),
                         preview.exCardId()
                 ),
-                preview.draftSignature(),
+                req.clientRequestId(),
                 screenResponseFactory.playerLobbyDeckEditorFromOwnedCards(
                         preview.ownedCards(),
                         preview.deckOwnedCardIds(),

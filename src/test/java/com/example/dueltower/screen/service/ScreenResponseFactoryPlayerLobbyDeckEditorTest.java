@@ -94,7 +94,6 @@ class ScreenResponseFactoryPlayerLobbyDeckEditorTest {
                                 2,
                                 1,
                                 false,
-                                "oc-2",
                                 List.of(PlayerLobbyDeckEditAnalysis.IssueCode.REPLACEMENT_LIMIT_REACHED)
                         ),
                         new PlayerLobbyDeckEditAnalysis.CardPoolGroupAnalysis(
@@ -103,7 +102,6 @@ class ScreenResponseFactoryPlayerLobbyDeckEditorTest {
                                 1,
                                 0,
                                 false,
-                                "",
                                 List.of(PlayerLobbyDeckEditAnalysis.IssueCode.ALREADY_IN_DECK)
                         )
                 )

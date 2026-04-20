@@ -1,5 +1,6 @@
 import type {
   PlayerStateDto,
+  PreviewSessionLoadoutDraftDto,
   PreviewSessionLoadoutRequest,
   SessionStateDto,
 } from '../api/sessionTypes'
@@ -14,6 +15,13 @@ export type SessionLoadoutDraft = {
   deckOwnedCardIds: string[]
   exCardId: string
   passiveIds: string[]
+}
+
+type SessionLoadoutDraftLike = {
+  characterId: number | null | undefined
+  deckOwnedCardIds: readonly string[] | null | undefined
+  exCardId: string | null | undefined
+  passiveIds: readonly string[] | null | undefined
 }
 
 export type SessionLoadoutDraftEditFlags = {
@@ -136,6 +144,7 @@ export function buildSessionLoadoutActionPatch(
 
 export function buildSessionLoadoutPreviewRequest(
   draft: SessionLoadoutDraft,
+  clientRequestId: string | null = null,
 ): PreviewSessionLoadoutRequest {
   const normalizedDraft = normalizeSessionLoadoutDraft(draft)
 
@@ -144,7 +153,20 @@ export function buildSessionLoadoutPreviewRequest(
     passiveIds: normalizedDraft.passiveIds,
     deckOwnedCardIds: normalizedDraft.deckOwnedCardIds,
     exCardId: normalizedDraft.exCardId,
+    clientRequestId,
   }
+}
+
+function normalizeSessionLoadoutDraftLike(draft: SessionLoadoutDraftLike): SessionLoadoutDraft {
+  return normalizeSessionLoadoutDraft({
+    characterId:
+      typeof draft.characterId === 'number' && Number.isFinite(draft.characterId) && draft.characterId > 0
+        ? draft.characterId
+        : null,
+    deckOwnedCardIds: normalizePresetIdentifierList(draft.deckOwnedCardIds ?? []),
+    exCardId: normalizePresetIdentifier(draft.exCardId),
+    passiveIds: normalizePresetIdentifierList(draft.passiveIds ?? []),
+  })
 }
 
 function areStringListsEqual(source: readonly string[], draft: readonly string[]) {
@@ -179,4 +201,23 @@ export function isSessionLoadoutDraftDirty(source: SessionLoadoutDraft, draft: S
   }
 
   return false
+}
+
+export function areSessionLoadoutDraftsEqual(
+  source: SessionLoadoutDraftLike,
+  draft: SessionLoadoutDraftLike,
+) {
+  const normalizedSource = normalizeSessionLoadoutDraftLike(source)
+  const normalizedDraft = normalizeSessionLoadoutDraftLike(draft)
+  return !isSessionLoadoutDraftDirty(normalizedSource, normalizedDraft)
+}
+
+export function isPreviewSessionLoadoutDraftCurrent(
+  source: PreviewSessionLoadoutDraftDto | null | undefined,
+  draft: SessionLoadoutDraftLike,
+) {
+  if (!source) {
+    return false
+  }
+  return areSessionLoadoutDraftsEqual(source, draft)
 }

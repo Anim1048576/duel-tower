@@ -28,12 +28,14 @@
     type StoredSessionAccess,
   } from '../lib/session/access'
   import {
+    areSessionLoadoutDraftsEqual,
     buildSessionLoadoutActionPatch,
     buildSessionLoadoutPreviewRequest,
     cloneSessionLoadoutDraft,
     createEmptySessionLoadoutDraft,
     createEmptySessionLoadoutDraftEditFlags,
     createSessionLoadoutDraftFromScreen,
+    isPreviewSessionLoadoutDraftCurrent,
     isSessionLoadoutDraftDirty,
     normalizeSessionLoadoutDraft,
     type SessionLoadoutDraft,
@@ -52,9 +54,9 @@
     addOwnedCardIdToLoadoutDraft,
     buildPlayerLobbyCurrentDeckEntries,
     buildPlayerLobbyDeckPoolGroups,
-    buildPlayerLobbyPreviewDraftSignature,
-    isPlayerLobbyPreviewResponseCurrent,
     removeOwnedCardIdFromLoadoutDraft,
+    resolvePlayerLobbyActiveDeckEditor,
+    resolvePlayerLobbyPreviewState,
     shouldAcceptPlayerLobbyPreviewResponse,
   } from '../lib/session/playerLobbyDeckEditor.js'
   import { createPlayerLobbyLocalPresentation } from '../lib/session/playerLobbyPresentation.js'
@@ -87,11 +89,12 @@
   let requestedSessionCode = $state<string | null>(null)
   let requestSequence = 0
   let deckPreviewResponse = $state<Awaited<ReturnType<typeof previewSessionLoadout>> | null>(null)
+  let lastSuccessfulDeckPreviewResponse = $state<Awaited<ReturnType<typeof previewSessionLoadout>> | null>(null)
   let deckPreviewPending = $state(false)
   let deckPreviewErrorMessage = $state<string | null>(null)
   let deckPreviewRequestSequence = 0
   let latestDeckPreviewRequestId = 0
-  let pendingDeckPreviewSignature = $state('')
+  let pendingDeckPreviewDraft = $state<SessionLoadoutDraft | null>(null)
   let pollingHandle: TimedPollingHandle | null = null
 
   function getRouteSessionCode() {
@@ -194,9 +197,10 @@
     selectedPresetId = ''
     lastAppliedPresetLabel = null
     deckPreviewResponse = null
+    lastSuccessfulDeckPreviewResponse = null
     deckPreviewPending = false
     deckPreviewErrorMessage = null
-    pendingDeckPreviewSignature = ''
+    pendingDeckPreviewDraft = null
     resetEditState()
   }
 
@@ -472,12 +476,12 @@
   async function refreshDeckPreview(
     nextScreen: PlayerLobbyScreenResponse,
     nextDraft: SessionLoadoutDraft,
-    draftSignature: string,
     playerToken: string,
   ) {
     const requestId = ++deckPreviewRequestSequence
+    const clientRequestId = `player-lobby-preview-${requestId}`
     latestDeckPreviewRequestId = requestId
-    pendingDeckPreviewSignature = draftSignature
+    pendingDeckPreviewDraft = cloneSessionLoadoutDraft(nextDraft)
     deckPreviewPending = true
     deckPreviewErrorMessage = null
 
@@ -485,30 +489,48 @@
       const response = await previewSessionLoadout(
         nextScreen.sessionCode,
         nextScreen.me.playerId,
-        buildSessionLoadoutPreviewRequest(nextDraft),
+        buildSessionLoadoutPreviewRequest(nextDraft, clientRequestId),
         playerToken,
       )
       if (!shouldAcceptPlayerLobbyPreviewResponse({
         requestId,
         latestRequestId: latestDeckPreviewRequestId,
-        draftSignature,
+        clientRequestId,
         response,
+        isPreviewDraftCurrent: isPreviewSessionLoadoutDraftCurrent,
+        draft: nextDraft,
       })) {
         return
       }
       deckPreviewResponse = response
+      lastSuccessfulDeckPreviewResponse = response
       deckPreviewErrorMessage = null
     } catch (error) {
-      if (requestId !== latestDeckPreviewRequestId || draftSignature !== loadoutDraftSignature) {
+      if (
+        requestId !== latestDeckPreviewRequestId ||
+        !areSessionLoadoutDraftsEqual(normalizeSessionLoadoutDraft(loadoutDraft), nextDraft)
+      ) {
         return
       }
       deckPreviewErrorMessage = getApiErrorMessage(error, 'Unable to refresh the current deck preview.')
     } finally {
-      if (requestId === latestDeckPreviewRequestId && draftSignature === loadoutDraftSignature) {
+      if (
+        requestId === latestDeckPreviewRequestId &&
+        areSessionLoadoutDraftsEqual(normalizeSessionLoadoutDraft(loadoutDraft), nextDraft)
+      ) {
         deckPreviewPending = false
-        pendingDeckPreviewSignature = ''
+        pendingDeckPreviewDraft = null
       }
     }
+  }
+
+  function retryDeckPreview() {
+    if (!screen || !isStoredPlayerSessionAccess(runtimeAccess)) return
+    void refreshDeckPreview(
+      screen,
+      normalizedLoadoutDraft,
+      runtimeAccess.playerToken,
+    )
   }
 
   onMount(() => {
@@ -533,9 +555,10 @@
       : null,
   )
   const normalizedLoadoutDraft = $derived.by(() => normalizeSessionLoadoutDraft(loadoutDraft))
-  const loadoutDraftSignature = $derived.by(() => buildPlayerLobbyPreviewDraftSignature(normalizedLoadoutDraft))
-  const screenDraftSignature = $derived.by(() =>
-    screen ? buildPlayerLobbyPreviewDraftSignature(createSessionLoadoutDraftFromScreen(screen.me.draft)) : '',
+  const screenDraftMatchesLoadoutDraft = $derived.by(() =>
+    screen
+      ? areSessionLoadoutDraftsEqual(createSessionLoadoutDraftFromScreen(screen.me.draft), normalizedLoadoutDraft)
+      : false,
   )
   const currentPlayerId = $derived.by(() => screen?.me.playerId ?? runtimeAccess?.playerId ?? null)
   const participantCount = $derived.by(() => screen?.participantSlots.length ?? 0)
@@ -546,25 +569,31 @@
   const applyPresetAction = $derived.by(() => (screen ? findPlayerLobbyAction(screen, 'playerLobby.applyPreset') : null))
   const loadoutEditGuardMessage = $derived.by(() => !saveLoadoutAction?.enabled ? saveLoadoutAction?.disabledReason?.userMessage ?? 'Current loadout editing is unavailable.' : null)
   const presetApplyGuardMessage = $derived.by(() => !applyPresetAction?.enabled ? applyPresetAction?.disabledReason?.userMessage ?? 'Preset apply is unavailable.' : null)
-  const currentDeckPreviewMatchesDraft = $derived.by(() =>
-    isPlayerLobbyPreviewResponseCurrent(deckPreviewResponse, loadoutDraftSignature),
+  const deckPreviewState = $derived.by(() =>
+    resolvePlayerLobbyPreviewState({
+      previewResponse: deckPreviewResponse,
+      fallbackPreviewResponse: lastSuccessfulDeckPreviewResponse,
+      isPreviewDraftCurrent: isPreviewSessionLoadoutDraftCurrent,
+      draft: normalizedLoadoutDraft,
+    }),
   )
-  const effectiveDeckEditor = $derived.by(() => {
-    if (!screen) {
-      return null
-    }
-    if (!localPresentation?.dirty) {
-      return screen.deckEditor
-    }
-    return currentDeckPreviewMatchesDraft ? deckPreviewResponse?.deckEditor ?? null : null
-  })
+  const currentDeckPreviewMatchesDraft = $derived.by(() => deckPreviewState.matchingPreviewResponse !== null)
+  const staleDeckPreviewVisible = $derived.by(() => deckPreviewState.hasStaleFallback)
+  const effectiveDeckEditor = $derived.by(() =>
+    resolvePlayerLobbyActiveDeckEditor({
+      screenDeckEditor: screen?.deckEditor ?? null,
+      matchingPreviewResponse: deckPreviewState.matchingPreviewResponse,
+      fallbackPreviewResponse: deckPreviewState.fallbackPreviewResponse,
+      draftDirty: localPresentation?.dirty ?? false,
+    }),
+  )
   const currentDeckEntries = $derived.by(() =>
     screen
       ? buildPlayerLobbyCurrentDeckEntries({
           draftDeckOwnedCardIds: normalizedLoadoutDraft.deckOwnedCardIds,
           screenDeckEditor: screen.deckEditor,
-          previewResponse: deckPreviewResponse,
-          draftSignature: loadoutDraftSignature,
+          matchingPreviewResponse: deckPreviewState.matchingPreviewResponse,
+          fallbackPreviewResponse: deckPreviewState.fallbackPreviewResponse,
           draftDirty: localPresentation?.dirty ?? false,
           ownedCardOptions: screen.references.ownedCardOptions,
         })
@@ -574,8 +603,8 @@
     screen
       ? buildPlayerLobbyDeckPoolGroups({
           screenDeckEditor: screen.deckEditor,
-          previewResponse: deckPreviewResponse,
-          draftSignature: loadoutDraftSignature,
+          matchingPreviewResponse: deckPreviewState.matchingPreviewResponse,
+          fallbackPreviewResponse: deckPreviewState.fallbackPreviewResponse,
           draftDirty: localPresentation?.dirty ?? false,
           ownedCardOptions: screen.references.ownedCardOptions,
         })
@@ -586,34 +615,38 @@
     pendingActionId !== null ||
     Boolean(loadoutEditGuardMessage) ||
     Boolean(localPresentation?.deckEditingLocked) ||
-    (Boolean(localPresentation?.dirty) && deckPreviewPending),
+    (Boolean(localPresentation?.dirty) && deckPreviewPending && !staleDeckPreviewVisible),
   )
 
   $effect(() => {
     if (!screen || !localPresentation || !isStoredPlayerSessionAccess(runtimeAccess)) {
       deckPreviewResponse = null
+      lastSuccessfulDeckPreviewResponse = null
       deckPreviewPending = false
       deckPreviewErrorMessage = null
-      pendingDeckPreviewSignature = ''
+      pendingDeckPreviewDraft = null
       return
     }
 
-    if (!localPresentation.dirty || loadoutDraftSignature === screenDraftSignature) {
+    if (!localPresentation.dirty || screenDraftMatchesLoadoutDraft) {
       deckPreviewResponse = null
+      lastSuccessfulDeckPreviewResponse = null
       deckPreviewPending = false
       deckPreviewErrorMessage = null
-      pendingDeckPreviewSignature = ''
+      pendingDeckPreviewDraft = null
       return
     }
 
-    if (currentDeckPreviewMatchesDraft || pendingDeckPreviewSignature === loadoutDraftSignature) {
+    if (
+      currentDeckPreviewMatchesDraft ||
+      (pendingDeckPreviewDraft && areSessionLoadoutDraftsEqual(pendingDeckPreviewDraft, normalizedLoadoutDraft))
+    ) {
       return
     }
 
     void refreshDeckPreview(
       screen,
       normalizedLoadoutDraft,
-      loadoutDraftSignature,
       runtimeAccess.playerToken,
     )
   })
@@ -722,6 +755,8 @@
           <p>
             {#if localPresentation.characterChangePending}
               Save the new character first to refresh server-owned cards and character defaults before editing the deck again.
+            {:else if deckPreviewErrorMessage && staleDeckPreviewVisible}
+              The latest preview refresh failed, so the last successful server deck state is still shown below until retry succeeds.
             {:else if localPresentation.dirty && !currentDeckPreviewMatchesDraft}
               Waiting for the latest server preview before updating add/remove controls and deck status badges.
             {:else}
@@ -798,6 +833,8 @@
           controlsDisabled={deckPreviewInteractionLocked}
           previewPending={Boolean(localPresentation.dirty) && deckPreviewPending}
           previewErrorMessage={deckPreviewErrorMessage}
+          previewStale={staleDeckPreviewVisible}
+          onRetryPreview={screen && isStoredPlayerSessionAccess(runtimeAccess) ? retryDeckPreview : null}
           onAddOwnedCard={addOwnedCardToDeck}
           onRemoveOwnedCard={removeOwnedCardFromDeck}
         />
@@ -822,7 +859,9 @@
           <ContentStatePanel
             title="Deck preview source"
             message={localPresentation.dirty
-              ? currentDeckPreviewMatchesDraft
+              ? deckPreviewErrorMessage && staleDeckPreviewVisible
+                ? 'The latest preview refresh failed, so the deck editor is still showing the last successful server preview for an older local draft.'
+                : currentDeckPreviewMatchesDraft
                 ? 'The current deck editor state comes from the latest preview response for this local draft.'
                 : 'Waiting for the latest preview response before updating canAdd and canRemove state.'
               : 'The current deck editor state comes from the synced player lobby screen response.'}

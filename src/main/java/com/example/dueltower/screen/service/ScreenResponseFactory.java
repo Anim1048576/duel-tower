@@ -786,7 +786,6 @@ public class ScreenResponseFactory {
                                 group.totalOwnedCount(),
                                 group.availableOwnedCount(),
                                 group.addable(),
-                                group.nextOwnedCardId(),
                                 issueCodes(group.blockedReasons()),
                                 ownedCards.stream()
                                         .filter(ownedCard -> safeTrim(ownedCard.cardId()).equals(group.cardId()))

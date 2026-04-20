@@ -58,13 +58,11 @@ public record PlayerLobbyDeckEditorStateDto(
             int totalOwnedCount,
             int availableOwnedCount,
             boolean canAdd,
-            String nextOwnedCardId,
             List<String> reasonCodes,
             List<OwnedCardState> ownedCards
     ) {
         public CardPoolGroup {
             cardId = normalize(cardId);
-            nextOwnedCardId = normalize(nextOwnedCardId);
             reasonCodes = reasonCodes == null ? List.of() : List.copyOf(reasonCodes);
             ownedCards = ownedCards == null ? List.of() : List.copyOf(ownedCards);
         }

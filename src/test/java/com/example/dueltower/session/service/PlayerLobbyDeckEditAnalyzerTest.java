@@ -172,7 +172,6 @@ class PlayerLobbyDeckEditAnalyzerTest {
         assertThat(entry(analysis, "oc-01").removable()).isTrue();
         assertThat(group(analysis, "C005").addable()).isTrue();
         assertThat(group(analysis, "C005").availableOwnedCount()).isEqualTo(2);
-        assertThat(group(analysis, "C005").nextOwnedCardId()).isEqualTo("oc-13");
     }
 
     private PlayerLobbyDeckEditAnalysis analyze(List<OwnedCard> ownedCards, List<String> savedDeckOwnedCardIds, List<String> draftDeckOwnedCardIds) {

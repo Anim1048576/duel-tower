@@ -251,6 +251,7 @@ export type PreviewSessionLoadoutRequest = {
   passiveIds?: readonly string[] | null
   deckOwnedCardIds?: readonly string[] | null
   exCardId?: string | null
+  clientRequestId?: string | null
 }
 
 export type PreviewSessionLoadoutDraftDto = {
@@ -262,7 +263,7 @@ export type PreviewSessionLoadoutDraftDto = {
 
 export type PreviewSessionLoadoutResponse = {
   draft: PreviewSessionLoadoutDraftDto
-  draftSignature: string
+  clientRequestId: string | null
   deckEditor: PlayerLobbyDeckEditorStateDto
 }
 

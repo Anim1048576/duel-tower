@@ -6,5 +6,6 @@ public record PreviewSessionLoadoutRequest(
         Long characterId,
         List<String> passiveIds,
         List<String> deckOwnedCardIds,
-        String exCardId
+        String exCardId,
+        String clientRequestId
 ) {}

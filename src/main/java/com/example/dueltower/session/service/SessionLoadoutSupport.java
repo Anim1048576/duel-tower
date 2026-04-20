@@ -337,20 +337,6 @@ public class SessionLoadoutSupport {
         return normalizeExCardId(resolveCurrentExCardId(state, ps));
     }
 
-    public String buildLoadoutDraftSignature(Long characterId,
-                                             List<String> passiveIds,
-                                             List<String> deckOwnedCardIds,
-                                             String exCardId) {
-        String characterToken = characterId == null ? "" : characterId.toString();
-        String passiveToken = String.join("|", passiveIds == null ? List.of() : passiveIds);
-        String deckToken = String.join("|", deckOwnedCardIds == null ? List.of() : deckOwnedCardIds);
-        String exToken = normalizeExCardId(exCardId);
-        return "characterId=" + characterToken
-                + ";passiveIds=" + passiveToken
-                + ";deckOwnedCardIds=" + deckToken
-                + ";exCardId=" + exToken;
-    }
-
     public Map<String, Integer> cardCountsFromOwned(List<OwnedCard> ownedCards) {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (OwnedCard ownedCard : ownedCards) {

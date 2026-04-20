@@ -3,9 +3,10 @@ import {
   addOwnedCardIdToLoadoutDraft,
   buildPlayerLobbyCurrentDeckEntries,
   buildPlayerLobbyDeckPoolGroups,
-  buildPlayerLobbyPreviewDraftSignature,
   isPlayerLobbyPreviewResponseCurrent,
   removeOwnedCardIdFromLoadoutDraft,
+  resolvePlayerLobbyActiveDeckEditor,
+  resolvePlayerLobbyPreviewState,
   shouldAcceptPlayerLobbyPreviewResponse,
 } from '../src/lib/session/playerLobbyDeckEditor.js'
 
@@ -51,15 +52,30 @@ const ownedCardOptions = [
 ]
 
 const previewDraft = addOwnedCardIdToLoadoutDraft(baseDraft, 'oc-3')
-const previewDraftSignature = buildPlayerLobbyPreviewDraftSignature(previewDraft)
+const currentDraft = {
+  characterId: 101,
+  deckOwnedCardIds: ['oc-1', 'oc-2', 'oc-3'],
+  exCardId: 'EX901',
+  passiveIds: ['P001'],
+}
+
+function isPreviewDraftCurrent(previewDraft, draft) {
+  return JSON.stringify(previewDraft) === JSON.stringify({
+    characterId: draft.characterId,
+    deckOwnedCardIds: draft.deckOwnedCardIds,
+    exCardId: draft.exCardId,
+    passiveIds: draft.passiveIds,
+  })
+}
+
 const previewResponse = {
+  clientRequestId: 'preview-request-2',
   draft: {
     characterId: 101,
     deckOwnedCardIds: ['oc-1', 'oc-2', 'oc-3'],
     exCardId: 'EX901',
     passiveIds: ['P001'],
   },
-  draftSignature: previewDraftSignature,
   deckEditor: {
     deck: {
       requiredDeckSize: 12,
@@ -102,7 +118,6 @@ const previewResponse = {
         totalOwnedCount: 1,
         availableOwnedCount: 0,
         canAdd: false,
-        nextOwnedCardId: '',
         reasonCodes: ['ALREADY_IN_DECK'],
         ownedCards: [
           {
@@ -126,18 +141,35 @@ runTest('click-style add and remove update local draft ids', () => {
   assert.deepEqual(removedDraft.deckOwnedCardIds, ['oc-1', 'oc-3'])
 })
 
-runTest('preview response becomes current only when draft signature matches', () => {
-  assert.equal(isPlayerLobbyPreviewResponseCurrent(previewResponse, previewDraftSignature), true)
-  assert.equal(isPlayerLobbyPreviewResponseCurrent(previewResponse, 'characterId=101;passiveIds=P001;deckOwnedCardIds=oc-1;exCardId=EX901'), false)
+runTest('preview response becomes current when echoed client request id or normalized draft matches', () => {
+  assert.equal(
+    isPlayerLobbyPreviewResponseCurrent(previewResponse, 'preview-request-2', isPreviewDraftCurrent, currentDraft),
+    true,
+  )
+  assert.equal(
+    isPlayerLobbyPreviewResponseCurrent(previewResponse, 'preview-request-9', isPreviewDraftCurrent, currentDraft),
+    true,
+  )
+  assert.equal(
+    isPlayerLobbyPreviewResponseCurrent(
+      { ...previewResponse, draft: { ...previewResponse.draft, deckOwnedCardIds: ['oc-1'] } },
+      'preview-request-9',
+      isPreviewDraftCurrent,
+      currentDraft,
+    ),
+    false,
+  )
 })
 
-runTest('stale preview responses are ignored by request id and signature', () => {
+runTest('stale preview responses are ignored by request id and client request echo', () => {
   assert.equal(
     shouldAcceptPlayerLobbyPreviewResponse({
       requestId: 2,
       latestRequestId: 2,
-      draftSignature: previewDraftSignature,
+      clientRequestId: 'preview-request-2',
       response: previewResponse,
+      isPreviewDraftCurrent,
+      draft: currentDraft,
     }),
     true,
   )
@@ -145,8 +177,10 @@ runTest('stale preview responses are ignored by request id and signature', () =>
     shouldAcceptPlayerLobbyPreviewResponse({
       requestId: 1,
       latestRequestId: 2,
-      draftSignature: previewDraftSignature,
+      clientRequestId: 'preview-request-2',
       response: previewResponse,
+      isPreviewDraftCurrent,
+      draft: currentDraft,
     }),
     false,
   )
@@ -154,8 +188,10 @@ runTest('stale preview responses are ignored by request id and signature', () =>
     shouldAcceptPlayerLobbyPreviewResponse({
       requestId: 2,
       latestRequestId: 2,
-      draftSignature: 'characterId=999',
+      clientRequestId: 'preview-request-999',
       response: previewResponse,
+      isPreviewDraftCurrent,
+      draft: { ...currentDraft, deckOwnedCardIds: ['oc-1'] },
     }),
     false,
   )
@@ -165,11 +201,8 @@ runTest('unresolved ownedCardId still produces stable current deck entries', () 
   const entries = buildPlayerLobbyCurrentDeckEntries({
     draftDeckOwnedCardIds: ['oc-1', 'missing-owned-card'],
     screenDeckEditor: null,
-    previewResponse: null,
-    draftSignature: buildPlayerLobbyPreviewDraftSignature({
-      ...baseDraft,
-      deckOwnedCardIds: ['oc-1', 'missing-owned-card'],
-    }),
+    matchingPreviewResponse: null,
+    fallbackPreviewResponse: null,
     draftDirty: true,
     ownedCardOptions,
   })
@@ -184,15 +217,15 @@ runTest('locked cards stay remove-blocked and card pool reflects server preview 
   const entries = buildPlayerLobbyCurrentDeckEntries({
     draftDeckOwnedCardIds: previewDraft.deckOwnedCardIds,
     screenDeckEditor: null,
-    previewResponse,
-    draftSignature: previewDraftSignature,
+    matchingPreviewResponse: previewResponse,
+    fallbackPreviewResponse: null,
     draftDirty: true,
     ownedCardOptions,
   })
   const poolGroups = buildPlayerLobbyDeckPoolGroups({
     screenDeckEditor: null,
-    previewResponse,
-    draftSignature: previewDraftSignature,
+    matchingPreviewResponse: previewResponse,
+    fallbackPreviewResponse: null,
     draftDirty: true,
     ownedCardOptions,
   })
@@ -203,4 +236,30 @@ runTest('locked cards stay remove-blocked and card pool reflects server preview 
   assert.equal(poolGroups.length, 1)
   assert.equal(poolGroups[0].ownedCards[0].canAdd, false)
   assert.deepEqual(poolGroups[0].ownedCards[0].reasonCodes, ['ALREADY_IN_DECK'])
+})
+
+runTest('last successful preview stays visible as stale fallback after a newer preview mismatch', () => {
+  const staleState = resolvePlayerLobbyPreviewState({
+    previewResponse: {
+      ...previewResponse,
+      clientRequestId: 'preview-request-3',
+      draft: { ...previewResponse.draft, deckOwnedCardIds: ['oc-1'] },
+    },
+    fallbackPreviewResponse: previewResponse,
+    isPreviewDraftCurrent,
+    draft: currentDraft,
+  })
+
+  assert.equal(staleState.matchingPreviewResponse, null)
+  assert.equal(staleState.hasStaleFallback, true)
+  assert.equal(staleState.fallbackPreviewResponse?.clientRequestId, 'preview-request-2')
+  assert.equal(
+    resolvePlayerLobbyActiveDeckEditor({
+      screenDeckEditor: null,
+      matchingPreviewResponse: staleState.matchingPreviewResponse,
+      fallbackPreviewResponse: staleState.fallbackPreviewResponse,
+      draftDirty: true,
+    })?.deck.changedCardCount,
+    1,
+  )
 })
