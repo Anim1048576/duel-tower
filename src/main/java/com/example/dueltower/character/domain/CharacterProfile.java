@@ -65,6 +65,11 @@ public class CharacterProfile {
     @Column(length = 100)
     private String trait2;
 
+    /** 전체 비공개 히든 특성 태그 */
+    @Convert(converter = ListStringJsonConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private List<String> hiddenTraitIds;
+
     /** 보유 카드 현황(JSON 문자열) */
     @Lob
     @Column(nullable = false, columnDefinition = "TEXT")

@@ -2,6 +2,7 @@ package com.example.dueltower.character.service;
 
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.domain.CharacterDisposition;
+import com.example.dueltower.character.domain.HiddenTraitIds;
 import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.dto.CombatStatsDto;
@@ -58,6 +59,7 @@ public class CharacterProfileService {
                 .willpower(req.willpower())
                 .trait1(normalizeOptionalText(req.trait1()))
                 .trait2(normalizeOptionalText(req.trait2()))
+                .hiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()))
                 .ownedCards(req.ownedCards().trim())
                 .currentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()))
                 .exCard(req.exCard().trim())
@@ -84,6 +86,7 @@ public class CharacterProfileService {
         profile.setWillpower(req.willpower());
         profile.setTrait1(normalizeOptionalText(req.trait1()));
         profile.setTrait2(normalizeOptionalText(req.trait2()));
+        profile.setHiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()));
         profile.setOwnedCards(req.ownedCards().trim());
         if (req.currentSkillDeck() != null) {
             profile.setCurrentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()));
@@ -153,6 +156,7 @@ public class CharacterProfileService {
         requireNumber(req.sense(), "sense is required");
         requireNumber(req.willpower(), "willpower is required");
         validateTraits(req.trait1(), req.trait2());
+        validateHiddenTraits(req.hiddenTraitIds());
         requireText(req.ownedCards(), "ownedCards is required");
         requireText(req.exCard(), "exCard is required");
     }
@@ -177,6 +181,38 @@ public class CharacterProfileService {
         }
     }
 
+
+    private static void validateHiddenTraits(List<String> hiddenTraitIds) {
+        List<String> normalizedIds = normalizeHiddenTraitIds(hiddenTraitIds);
+
+        for (String id : normalizedIds) {
+            if (!HiddenTraitIds.isSupported(id)) {
+                throw new ResponseStatusException(BAD_REQUEST, "unknown hiddenTraitId: " + id);
+            }
+        }
+
+        if (normalizedIds.contains(HiddenTraitIds.SIN) && !normalizedIds.contains(HiddenTraitIds.DEMON)) {
+            throw new ResponseStatusException(BAD_REQUEST, "죄악은 악마 없이 단독으로 설정할 수 없습니다");
+        }
+
+        if (normalizedIds.contains(HiddenTraitIds.HUMAN)
+                && normalizedIds.contains(HiddenTraitIds.NON_HUMAN)
+                && !normalizedIds.contains(HiddenTraitIds.HYBRID)) {
+            throw new ResponseStatusException(BAD_REQUEST, "인간과 비인간을 동시에 가지려면 혼혈이 필요합니다");
+        }
+    }
+
+    private static List<String> normalizeHiddenTraitIds(List<String> hiddenTraitIds) {
+        if (hiddenTraitIds == null) {
+            return List.of();
+        }
+        return hiddenTraitIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .distinct()
+                .toList();
+    }
 
     private static List<String> normalizeCurrentSkillDeck(List<String> deckPresetIds) {
         return SessionNormalizationSupport.normalizeStoredCurrentSkillDeck(deckPresetIds);

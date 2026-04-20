@@ -2,11 +2,13 @@ package com.example.dueltower.character.service;
 
 import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
+import com.example.dueltower.character.domain.HiddenTraitIds;
 import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -16,17 +18,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertIterableEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import org.mockito.ArgumentCaptor;
-
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
@@ -99,6 +93,63 @@ class CharacterProfileServiceTest {
     }
 
     @Test
+    @DisplayName("create: hiddenTraitIds 공백/null/중복은 정규화한다")
+    void hiddenTraitIdsAreNormalized() {
+        when(repository.save(any(CharacterProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
+                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+
+        CharacterProfileRequest req = validRequestWithHiddenTraits(Arrays.asList(
+                "  " + HiddenTraitIds.HUMAN + "  ",
+                null,
+                " ",
+                HiddenTraitIds.HUMAN,
+                HiddenTraitIds.HYBRID
+        ));
+
+        service.create(req);
+
+        ArgumentCaptor<CharacterProfile> captor = ArgumentCaptor.forClass(CharacterProfile.class);
+        verify(repository).save(captor.capture());
+
+        CharacterProfile saved = captor.getValue();
+        assertIterableEquals(List.of(HiddenTraitIds.HUMAN, HiddenTraitIds.HYBRID), saved.getHiddenTraitIds());
+    }
+
+    @Test
+    @DisplayName("create: 미등록 hiddenTraitId가 오면 BAD_REQUEST를 던진다")
+    void rejectUnknownHiddenTraitId() {
+        CharacterProfileRequest req = validRequestWithHiddenTraits(List.of("UNKNOWN"));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.create(req));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: 죄악은 악마 없이 단독으로 설정할 수 없다")
+    void sinRequiresDemon() {
+        CharacterProfileRequest req = validRequestWithHiddenTraits(List.of(HiddenTraitIds.SIN));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.create(req));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: 인간과 비인간을 동시에 가지려면 혼혈이 필요하다")
+    void humanAndNonHumanRequireHybrid() {
+        CharacterProfileRequest req = validRequestWithHiddenTraits(List.of(HiddenTraitIds.HUMAN, HiddenTraitIds.NON_HUMAN));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.create(req));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("create: trait1/trait2 공백 문자열은 null로 정규화한다")
     void optionalTextNormalizationBlankTraitsBecomeNull() {
         when(repository.save(any(CharacterProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -128,6 +179,7 @@ class CharacterProfileServiceTest {
                 "  한줄소개  ",
                 "  이야기  ",
                 "  질서/선  ",
+                List.of(),
                 "  [\"card-1\"]  ",
                 "  {\"id\":\"ex-1\"}  ",
                 List.of("  deck-1  ")
@@ -203,6 +255,7 @@ class CharacterProfileServiceTest {
                 "oneLiner",
                 "story",
                 disposition,
+                List.of(),
                 "[]",
                 "{}",
                 List.of("deck-1")
@@ -224,6 +277,7 @@ class CharacterProfileServiceTest {
                 5,
                 trait1,
                 trait2,
+                List.of(),
                 "[]",
                 List.of("deck-1"),
                 "{}"
@@ -237,9 +291,24 @@ class CharacterProfileServiceTest {
                 "oneLiner",
                 "story",
                 "질서/선",
+                List.of(),
                 "[]",
                 "{}",
                 currentSkillDeck
+        );
+    }
+
+    private static CharacterProfileRequest validRequestWithHiddenTraits(List<String> hiddenTraitIds) {
+        return validRequest(
+                "name",
+                "wish",
+                "oneLiner",
+                "story",
+                "질서/선",
+                hiddenTraitIds,
+                "[]",
+                "{}",
+                List.of("deck-1")
         );
     }
 
@@ -249,6 +318,7 @@ class CharacterProfileServiceTest {
             String oneLiner,
             String story,
             String disposition,
+            List<String> hiddenTraitIds,
             String ownedCards,
             String exCard,
             List<String> currentSkillDeck
@@ -267,6 +337,7 @@ class CharacterProfileServiceTest {
                 5,
                 "trait1",
                 "trait2",
+                hiddenTraitIds,
                 ownedCards,
                 currentSkillDeck,
                 exCard
@@ -289,6 +360,7 @@ class CharacterProfileServiceTest {
                 .willpower(5)
                 .trait1("trait1")
                 .trait2("trait2")
+                .hiddenTraitIds(List.of())
                 .ownedCards("[]")
                 .currentSkillDeck(List.of("deck-1"))
                 .exCard("{}")

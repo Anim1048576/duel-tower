@@ -18,6 +18,7 @@ public record CharacterProfileRequest(
         Integer willpower,
         String trait1,
         String trait2,
+        List<String> hiddenTraitIds,
         String ownedCards,
         List<String> currentSkillDeck,
         String exCard
