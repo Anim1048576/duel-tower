@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte'
+  import { previewSessionLoadout } from '../lib/api/sessions'
   import { getScreen, invokeScreenAction } from '../lib/api/screens'
   import {
     buildScreenActionPayload,
@@ -28,6 +29,7 @@
   } from '../lib/session/access'
   import {
     buildSessionLoadoutActionPatch,
+    buildSessionLoadoutPreviewRequest,
     cloneSessionLoadoutDraft,
     createEmptySessionLoadoutDraft,
     createEmptySessionLoadoutDraftEditFlags,
@@ -45,6 +47,16 @@
     setSessionPageFeedback,
     type SessionPageFeedback,
   } from '../lib/session/pageState'
+  import PlayerLobbyDeckEditorPanel from '../lib/session/components/PlayerLobbyDeckEditorPanel.svelte'
+  import {
+    addOwnedCardIdToLoadoutDraft,
+    buildPlayerLobbyCurrentDeckEntries,
+    buildPlayerLobbyDeckPoolGroups,
+    buildPlayerLobbyPreviewDraftSignature,
+    isPlayerLobbyPreviewResponseCurrent,
+    removeOwnedCardIdFromLoadoutDraft,
+    shouldAcceptPlayerLobbyPreviewResponse,
+  } from '../lib/session/playerLobbyDeckEditor.js'
   import { createPlayerLobbyLocalPresentation } from '../lib/session/playerLobbyPresentation.js'
   import { resolvePlayerLobbyScreenRefreshPlan } from '../lib/session/playerLobbyScreenRefresh.js'
   import { readSessionCodeFromRoute } from '../lib/session/sessionRoute'
@@ -71,10 +83,15 @@
   let loadoutDraft = $state<SessionLoadoutDraft>(createEmptySessionLoadoutDraft())
   let savedLoadoutDraft = $state<SessionLoadoutDraft>(createEmptySessionLoadoutDraft())
   let editFlags = $state<SessionLoadoutDraftEditFlags>(createEmptySessionLoadoutDraftEditFlags())
-  let ownedCardCandidate = $state('')
   let passiveCandidate = $state('')
   let requestedSessionCode = $state<string | null>(null)
   let requestSequence = 0
+  let deckPreviewResponse = $state<Awaited<ReturnType<typeof previewSessionLoadout>> | null>(null)
+  let deckPreviewPending = $state(false)
+  let deckPreviewErrorMessage = $state<string | null>(null)
+  let deckPreviewRequestSequence = 0
+  let latestDeckPreviewRequestId = 0
+  let pendingDeckPreviewSignature = $state('')
   let pollingHandle: TimedPollingHandle | null = null
 
   function getRouteSessionCode() {
@@ -119,7 +136,6 @@
 
   function resetEditState() {
     editFlags = createEmptySessionLoadoutDraftEditFlags()
-    ownedCardCandidate = ''
     passiveCandidate = ''
   }
 
@@ -168,6 +184,8 @@
   function clearPlayerLobbyRuntimeState() {
     stopPolling()
     requestSequence += 1
+    deckPreviewRequestSequence += 1
+    latestDeckPreviewRequestId = 0
     screen = null
     runtimeAccess = null
     invalidAccessMessage = null
@@ -175,6 +193,10 @@
     savedLoadoutDraft = createEmptySessionLoadoutDraft()
     selectedPresetId = ''
     lastAppliedPresetLabel = null
+    deckPreviewResponse = null
+    deckPreviewPending = false
+    deckPreviewErrorMessage = null
+    pendingDeckPreviewSignature = ''
     resetEditState()
   }
 
@@ -283,16 +305,18 @@
     editFlags = { ...editFlags, passiveIdsEdited: true }
   }
 
-  function addOwnedCardCandidate() {
-    const nextIdentifier = normalizePresetIdentifier(ownedCardCandidate)
-    if (!nextIdentifier || localPresentation?.deckEditingLocked) return
+  function addOwnedCardToDeck(ownedCardId: string) {
+    if (!ownedCardId || localPresentation?.deckEditingLocked) return
 
-    loadoutDraft = {
-      ...loadoutDraft,
-      deckOwnedCardIds: addPresetIdentifier(loadoutDraft.deckOwnedCardIds, nextIdentifier),
-    }
+    loadoutDraft = addOwnedCardIdToLoadoutDraft(loadoutDraft, ownedCardId)
     editFlags = { ...editFlags, deckOwnedCardIdsEdited: true }
-    ownedCardCandidate = ''
+  }
+
+  function removeOwnedCardFromDeck(ownedCardId: string) {
+    if (!ownedCardId || localPresentation?.deckEditingLocked) return
+
+    loadoutDraft = removeOwnedCardIdFromLoadoutDraft(loadoutDraft, ownedCardId)
+    editFlags = { ...editFlags, deckOwnedCardIdsEdited: true }
   }
 
   function addPassiveCandidate() {
@@ -450,6 +474,48 @@
     void refreshPlayerLobbyScreen('route-change')
   }
 
+  async function refreshDeckPreview(
+    nextScreen: PlayerLobbyScreenResponse,
+    nextDraft: SessionLoadoutDraft,
+    draftSignature: string,
+    playerToken: string,
+  ) {
+    const requestId = ++deckPreviewRequestSequence
+    latestDeckPreviewRequestId = requestId
+    pendingDeckPreviewSignature = draftSignature
+    deckPreviewPending = true
+    deckPreviewErrorMessage = null
+
+    try {
+      const response = await previewSessionLoadout(
+        nextScreen.sessionCode,
+        nextScreen.me.playerId,
+        buildSessionLoadoutPreviewRequest(nextDraft),
+        playerToken,
+      )
+      if (!shouldAcceptPlayerLobbyPreviewResponse({
+        requestId,
+        latestRequestId: latestDeckPreviewRequestId,
+        draftSignature,
+        response,
+      })) {
+        return
+      }
+      deckPreviewResponse = response
+      deckPreviewErrorMessage = null
+    } catch (error) {
+      if (requestId !== latestDeckPreviewRequestId || draftSignature !== loadoutDraftSignature) {
+        return
+      }
+      deckPreviewErrorMessage = getApiErrorMessage(error, 'Unable to refresh the current deck preview.')
+    } finally {
+      if (requestId === latestDeckPreviewRequestId && draftSignature === loadoutDraftSignature) {
+        deckPreviewPending = false
+        pendingDeckPreviewSignature = ''
+      }
+    }
+  }
+
   onMount(() => {
     feedback = readSessionPageFeedback()
     void refreshPlayerLobbyScreen('initial-load')
@@ -471,6 +537,11 @@
         ) as PlayerLobbyLocalPresentationState)
       : null,
   )
+  const normalizedLoadoutDraft = $derived.by(() => normalizeSessionLoadoutDraft(loadoutDraft))
+  const loadoutDraftSignature = $derived.by(() => buildPlayerLobbyPreviewDraftSignature(normalizedLoadoutDraft))
+  const screenDraftSignature = $derived.by(() =>
+    screen ? buildPlayerLobbyPreviewDraftSignature(createSessionLoadoutDraftFromScreen(screen.me.draft)) : '',
+  )
   const currentPlayerId = $derived.by(() => screen?.me.playerId ?? runtimeAccess?.playerId ?? null)
   const participantCount = $derived.by(() => screen?.participantSlots.length ?? 0)
   const readyCount = $derived.by(() => screen?.participantSlots.filter((slot) => slot.state.includes('Ready')).length ?? 0)
@@ -480,6 +551,77 @@
   const applyPresetAction = $derived.by(() => (screen ? findPlayerLobbyAction(screen, 'playerLobby.applyPreset') : null))
   const loadoutEditGuardMessage = $derived.by(() => !saveLoadoutAction?.enabled ? saveLoadoutAction?.disabledReason?.userMessage ?? 'Current loadout editing is unavailable.' : null)
   const presetApplyGuardMessage = $derived.by(() => !applyPresetAction?.enabled ? applyPresetAction?.disabledReason?.userMessage ?? 'Preset apply is unavailable.' : null)
+  const currentDeckPreviewMatchesDraft = $derived.by(() =>
+    isPlayerLobbyPreviewResponseCurrent(deckPreviewResponse, loadoutDraftSignature),
+  )
+  const effectiveDeckEditor = $derived.by(() => {
+    if (!screen) {
+      return null
+    }
+    if (!localPresentation?.dirty) {
+      return screen.deckEditor
+    }
+    return currentDeckPreviewMatchesDraft ? deckPreviewResponse?.deckEditor ?? null : null
+  })
+  const currentDeckEntries = $derived.by(() =>
+    screen
+      ? buildPlayerLobbyCurrentDeckEntries({
+          draftDeckOwnedCardIds: normalizedLoadoutDraft.deckOwnedCardIds,
+          screenDeckEditor: screen.deckEditor,
+          previewResponse: deckPreviewResponse,
+          draftSignature: loadoutDraftSignature,
+          draftDirty: localPresentation?.dirty ?? false,
+          ownedCardOptions: screen.references.ownedCardOptions,
+        })
+      : [],
+  )
+  const deckPoolGroups = $derived.by(() =>
+    screen
+      ? buildPlayerLobbyDeckPoolGroups({
+          screenDeckEditor: screen.deckEditor,
+          previewResponse: deckPreviewResponse,
+          draftSignature: loadoutDraftSignature,
+          draftDirty: localPresentation?.dirty ?? false,
+          ownedCardOptions: screen.references.ownedCardOptions,
+        })
+      : [],
+  )
+  const deckPreviewInteractionLocked = $derived.by(() =>
+    loading ||
+    pendingActionId !== null ||
+    Boolean(loadoutEditGuardMessage) ||
+    Boolean(localPresentation?.deckEditingLocked) ||
+    (Boolean(localPresentation?.dirty) && deckPreviewPending),
+  )
+
+  $effect(() => {
+    if (!screen || !localPresentation || !isStoredPlayerSessionAccess(runtimeAccess)) {
+      deckPreviewResponse = null
+      deckPreviewPending = false
+      deckPreviewErrorMessage = null
+      pendingDeckPreviewSignature = ''
+      return
+    }
+
+    if (!localPresentation.dirty || loadoutDraftSignature === screenDraftSignature) {
+      deckPreviewResponse = null
+      deckPreviewPending = false
+      deckPreviewErrorMessage = null
+      pendingDeckPreviewSignature = ''
+      return
+    }
+
+    if (currentDeckPreviewMatchesDraft || pendingDeckPreviewSignature === loadoutDraftSignature) {
+      return
+    }
+
+    void refreshDeckPreview(
+      screen,
+      normalizedLoadoutDraft,
+      loadoutDraftSignature,
+      runtimeAccess.playerToken,
+    )
+  })
 </script>
 
 <div class="player-lobby-page">
@@ -640,20 +782,6 @@
           </label>
 
           <label class="player-lobby-page__field player-lobby-page__field--span-2">
-            <span>Deck owned card ids</span>
-            <div class="player-lobby-page__picker-row">
-              <select bind:value={ownedCardCandidate} disabled={loading || pendingActionId !== null || Boolean(loadoutEditGuardMessage) || localPresentation.deckEditingLocked}>
-                <option value="">Quick add owned card</option>
-                {#each screen.references.ownedCardOptions as option}
-                  <option value={option.ownedCardId}>{option.label}</option>
-                {/each}
-              </select>
-              <button type="button" disabled={loading || pendingActionId !== null || Boolean(loadoutEditGuardMessage) || localPresentation.deckEditingLocked || !ownedCardCandidate} onclick={addOwnedCardCandidate}>Add card</button>
-            </div>
-            <textarea rows="6" value={formatIdentifierText(loadoutDraft.deckOwnedCardIds)} placeholder={localPresentation.deckEditingLocked ? 'Save the selected character first to refresh owned card ids.' : 'One owned card id per line'} disabled={loading || pendingActionId !== null || Boolean(loadoutEditGuardMessage) || localPresentation.deckEditingLocked} oninput={(event) => updateDeckOwnedCardIds((event.currentTarget as HTMLTextAreaElement).value)}></textarea>
-          </label>
-
-          <label class="player-lobby-page__field player-lobby-page__field--span-2">
             <span>Passive ids</span>
             <div class="player-lobby-page__picker-row">
               <select bind:value={passiveCandidate} disabled={loading || pendingActionId !== null || Boolean(loadoutEditGuardMessage)}>
@@ -668,6 +796,20 @@
           </label>
         </div>
 
+        <PlayerLobbyDeckEditorPanel
+          deckEditor={effectiveDeckEditor}
+          currentDeckEntries={currentDeckEntries}
+          cardPoolGroups={deckPoolGroups}
+          controlsDisabled={deckPreviewInteractionLocked}
+          previewPending={Boolean(localPresentation.dirty) && deckPreviewPending}
+          previewErrorMessage={deckPreviewErrorMessage}
+          fallbackDeckText={formatIdentifierText(loadoutDraft.deckOwnedCardIds)}
+          fallbackDeckEditingLocked={Boolean(localPresentation.deckEditingLocked)}
+          onAddOwnedCard={addOwnedCardToDeck}
+          onRemoveOwnedCard={removeOwnedCardFromDeck}
+          onFallbackDeckInput={updateDeckOwnedCardIds}
+        />
+
         <div class="player-lobby-page__actions">
           <button type="button" onclick={() => void runSaveLoadout()} disabled={loading || pendingActionId !== null || Boolean(loadoutEditGuardMessage) || !localPresentation.dirty || !saveLoadoutAction?.enabled}>
             {pendingActionId === 'playerLobby.saveLoadout' ? getPendingActionLabel('playerLobby.saveLoadout') : saveLoadoutAction?.label ?? 'Save loadout'}
@@ -675,8 +817,24 @@
         </div>
 
         <div class="player-lobby-page__grid">
-          <EntityListPane items={localPresentation.deckItems} emptyMessage="No deck owned card ids are currently assigned to the local draft." />
-          <EntityListPane items={localPresentation.passiveItems} emptyMessage="No passive ids are currently assigned to the local draft." />
+          <ContentStatePanel
+            title="Draft passive summary"
+            message={localPresentation.passiveItems.length
+              ? `${localPresentation.passiveItems.length} passive ids are currently assigned to the local draft.`
+              : 'No passive ids are currently assigned to the local draft.'}
+          >
+            {#each localPresentation.passiveItems as passiveItem}
+              <p>{passiveItem.title}{passiveItem.subtitle ? ` · ${passiveItem.subtitle}` : ''}</p>
+            {/each}
+          </ContentStatePanel>
+          <ContentStatePanel
+            title="Deck preview source"
+            message={localPresentation.dirty
+              ? currentDeckPreviewMatchesDraft
+                ? 'The current deck editor state comes from the latest preview response for this local draft.'
+                : 'Waiting for the latest preview response before updating canAdd and canRemove state.'
+              : 'The current deck editor state comes from the synced player lobby screen response.'}
+          />
         </div>
       </SectionFrame>
 
