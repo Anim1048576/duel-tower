@@ -108,11 +108,11 @@ runTest('local dirty reacts immediately to loadout draft changes', () => {
 
   assert.equal(presentation.dirty, true)
   assert.equal(presentation.summary, 'Deck 2 cards | 1 passives | EX ex-1')
-  assert.equal(presentation.deckItems[1].title, 'Burst')
-  assert.equal(presentation.previewNeedsResolveRefresh, true)
+  assert.equal(presentation.deckCount, 2)
+  assert.equal(presentation.passiveItems[0].title, 'Quick Step')
 })
 
-runTest('local preview falls back cleanly for unresolved ids', () => {
+runTest('character change keeps deck editing locked until the next server sync', () => {
   const presentation = createPlayerLobbyLocalPresentation(
     baseScreen,
     {
@@ -126,12 +126,34 @@ runTest('local preview falls back cleanly for unresolved ids', () => {
 
   assert.equal(presentation.character.label, 'Basil #202')
   assert.equal(presentation.ex.label, 'EX card (unresolved)')
+  assert.equal(presentation.characterChangePending, true)
+  assert.equal(presentation.deckEditingLocked, true)
   assert.equal(
     presentation.deckEditingLockReason,
     'Save the new character first to refresh owned card options and unlock deck editing.',
   )
-  assert.equal(presentation.deckItems[0].title, 'oc-9')
-  assert.equal(presentation.deckItems[0].note, 'This owned card id is not available in the latest server reference options.')
+  assert.equal(presentation.passiveItems[0].title, 'Heavy Step')
+})
+
+runTest('server deck lock is exposed even without a local character change', () => {
+  const presentation = createPlayerLobbyLocalPresentation(
+    {
+      ...baseScreen,
+      me: {
+        ...baseScreen.me,
+        draftFlags: {
+          ...baseScreen.me.draftFlags,
+          deckEditingLocked: true,
+        },
+      },
+    },
+    baseScreen.me.draft,
+    '11',
+  )
+
+  assert.equal(presentation.characterChangePending, false)
+  assert.equal(presentation.deckEditingLocked, true)
+  assert.equal(presentation.deckEditingLockReason, 'Deck editing is locked in the latest server snapshot.')
 })
 
 runTest('preset preview only uses the latest server-selected preset snapshot', () => {

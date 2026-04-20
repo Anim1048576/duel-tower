@@ -424,8 +424,8 @@ export type PlayerLobbyServerPresets = PlayerLobbyPresetsDto
 
 /**
  * Frontend-only PlayerLobby presentation state.
- * This keeps dirty/summary/preview-freshness aligned with the current local draft
- * without reintroducing reference resolution or action-enable rules on the client.
+ * This keeps dirty/summary and non-deck reference labels aligned with the current
+ * local draft without reintroducing deck-rule calculation or action-enable rules on the client.
  */
 export type PlayerLobbyLocalPresentationState = {
   dirty: boolean
@@ -437,7 +437,6 @@ export type PlayerLobbyLocalPresentationState = {
   syncedSummary: string
   deckCount: number
   passiveCount: number
-  previewNeedsResolveRefresh: boolean
   character: {
     label: string
     subtitle: string
@@ -454,17 +453,6 @@ export type PlayerLobbyLocalPresentationState = {
       tone?: 'accent' | 'muted' | 'success' | 'warning'
     }[]
   }
-  deckItems: {
-    id: string
-    title: string
-    subtitle?: string
-    meta?: string
-    note?: string
-    tags?: {
-      label: string
-      tone?: 'accent' | 'muted' | 'success' | 'warning'
-    }[]
-  }[]
   passiveItems: {
     id: string
     title: string

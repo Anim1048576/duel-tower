@@ -56,11 +56,8 @@
     controlsDisabled,
     previewPending,
     previewErrorMessage,
-    fallbackDeckText,
-    fallbackDeckEditingLocked,
     onAddOwnedCard,
     onRemoveOwnedCard,
-    onFallbackDeckInput,
   }: {
     deckEditor: PlayerLobbyDeckEditorStateDto | null
     currentDeckEntries: DeckEntryItem[]
@@ -68,11 +65,8 @@
     controlsDisabled: boolean
     previewPending: boolean
     previewErrorMessage: string | null
-    fallbackDeckText: string
-    fallbackDeckEditingLocked: boolean
     onAddOwnedCard: (ownedCardId: string) => void
     onRemoveOwnedCard: (ownedCardId: string) => void
-    onFallbackDeckInput: (value: string) => void
   } = $props()
 
   let searchQuery = $state('')
@@ -172,24 +166,10 @@
       onAdd={onAddOwnedCard}
     />
   </div>
-
-  <details class="player-lobby-deck-editor-panel__fallback">
-    <summary>Manual deck id fallback</summary>
-    <p>
-      Textarea editing remains available as a temporary fallback. The rendered canAdd/canRemove state above still comes from the server preview.
-    </p>
-    <textarea
-      rows="6"
-      value={fallbackDeckText}
-      disabled={controlsDisabled || fallbackDeckEditingLocked}
-      oninput={(event) => onFallbackDeckInput((event.currentTarget as HTMLTextAreaElement).value)}
-    ></textarea>
-  </details>
 </div>
 
 <style>
-  .player-lobby-deck-editor-panel,
-  .player-lobby-deck-editor-panel__fallback {
+  .player-lobby-deck-editor-panel {
     display: grid;
     gap: 1rem;
   }
@@ -205,33 +185,6 @@
     grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
     gap: 1rem;
     align-items: start;
-  }
-
-  .player-lobby-deck-editor-panel__fallback summary,
-  .player-lobby-deck-editor-panel__fallback p {
-    margin: 0;
-  }
-
-  .player-lobby-deck-editor-panel__fallback summary {
-    cursor: pointer;
-    color: var(--color-text);
-    font-weight: 600;
-  }
-
-  .player-lobby-deck-editor-panel__fallback p {
-    color: var(--color-text-muted);
-    line-height: 1.6;
-  }
-
-  .player-lobby-deck-editor-panel__fallback textarea {
-    min-height: 7rem;
-    width: 100%;
-    border: 1px solid var(--color-border);
-    background: rgba(12, 11, 10, 0.3);
-    color: var(--color-text);
-    padding: 0.75rem 0.9rem;
-    font: inherit;
-    resize: vertical;
   }
 
   @media (max-width: 980px) {

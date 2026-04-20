@@ -1,6 +1,5 @@
 /** @typedef {import('../api/screenTypes').PlayerLobbyScreenResponse} PlayerLobbyScreenResponse */
 /** @typedef {import('../api/screenTypes').PlayerLobbyOptionDto} PlayerLobbyOptionDto */
-/** @typedef {import('../api/screenTypes').PlayerLobbyOwnedCardOptionDto} PlayerLobbyOwnedCardOptionDto */
 /** @typedef {import('../api/screenTypes').PlayerLobbyPreviewItemDto} PlayerLobbyPreviewItemDto */
 /** @typedef {import('../api/screenTypes').PlayerLobbyTagDto} PlayerLobbyTagDto */
 /** @typedef {import('./loadoutEditor').SessionLoadoutDraft} SessionLoadoutDraft */
@@ -125,19 +124,6 @@ function findOption(options, value) {
 }
 
 /**
- * @param {readonly PlayerLobbyOwnedCardOptionDto[]} options
- * @param {string} ownedCardId
- */
-function findOwnedCardOption(options, ownedCardId) {
-  const normalized = normalizeText(ownedCardId)
-  if (!normalized) {
-    return null
-  }
-
-  return options.find((option) => normalizeText(option.ownedCardId) === normalized) ?? null
-}
-
-/**
  * @param {PlayerLobbyOptionDto | null} option
  * @param {string} emptyLabel
  * @param {string} missingKind
@@ -164,36 +150,6 @@ function buildReferencePreview(option, emptyLabel, missingKind) {
     subtitle: 'The current local draft refers to a value that is not available in the latest server references.',
     tags: /** @type {EntityListTag[]} */ ([{ label: 'Unresolved', tone: 'warning' }]),
   }
-}
-
-/**
- * @param {readonly string[]} identifiers
- * @param {readonly PlayerLobbyOwnedCardOptionDto[]} options
- * @returns {EntityListItem[]}
- */
-function buildDeckItems(identifiers, options) {
-  return identifiers.map((ownedCardId, index) => {
-    const option = findOwnedCardOption(options, ownedCardId)
-
-    if (!option) {
-      return {
-        id: `deck:${ownedCardId}:${index}`,
-        title: ownedCardId,
-        subtitle: 'Owned card id in the current local draft',
-        meta: `Entry ${index + 1}`,
-        note: 'This owned card id is not available in the latest server reference options.',
-        tags: /** @type {EntityListTag[]} */ ([{ label: 'Unresolved', tone: 'warning' }]),
-      }
-    }
-
-    return {
-      id: `deck:${option.ownedCardId}:${index}`,
-      title: option.label,
-      subtitle: option.subtitle,
-      meta: `Entry ${index + 1}`,
-      tags: mapTags(option.tags),
-    }
-  })
 }
 
 /**
@@ -289,12 +245,6 @@ export function createPlayerLobbyLocalPresentation(screen, loadoutDraft, selecte
     syncedSummary,
     deckCount: deckOwnedCardIds.length,
     passiveCount: passiveIds.length,
-    previewNeedsResolveRefresh:
-      localDirty ||
-      !characterOption && characterId !== null ||
-      !exCardOption && exCardId !== '' ||
-      deckOwnedCardIds.some((ownedCardId) => !findOwnedCardOption(screen.references.ownedCardOptions, ownedCardId)) ||
-      passiveIds.some((passiveId) => !findOption(screen.references.passiveOptions, passiveId)),
     character: buildReferencePreview(
       characterOption,
       characterId === null ? 'No character selected' : '',
@@ -305,7 +255,6 @@ export function createPlayerLobbyLocalPresentation(screen, loadoutDraft, selecte
       exCardId === '' ? 'No EX card selected' : '',
       'EX card',
     ),
-    deckItems: buildDeckItems(deckOwnedCardIds, screen.references.ownedCardOptions),
     passiveItems: buildPassiveItems(passiveIds, screen.references.passiveOptions),
     preset: {
       selectedId: normalizeText(selectedPresetId),

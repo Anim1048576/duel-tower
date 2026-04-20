@@ -295,11 +295,6 @@
     editFlags = { ...editFlags, exCardEdited: true }
   }
 
-  function updateDeckOwnedCardIds(value: string) {
-    loadoutDraft = { ...loadoutDraft, deckOwnedCardIds: parseIdentifierText(value) }
-    editFlags = { ...editFlags, deckOwnedCardIdsEdited: true }
-  }
-
   function updatePassiveIds(value: string) {
     loadoutDraft = { ...loadoutDraft, passiveIds: parseIdentifierText(value) }
     editFlags = { ...editFlags, passiveIdsEdited: true }
@@ -727,10 +722,10 @@
           <p>
             {#if localPresentation.characterChangePending}
               Save the new character first to refresh server-owned cards and character defaults before editing the deck again.
-            {:else if localPresentation.previewNeedsResolveRefresh}
-              Local preview uses the latest server reference options, and unresolved ids will refresh after the next successful save.
+            {:else if localPresentation.dirty && !currentDeckPreviewMatchesDraft}
+              Waiting for the latest server preview before updating add/remove controls and deck status badges.
             {:else}
-              Current draft preview is aligned with the latest server reference options.
+              Current deck editor state is coming from the latest server-owned lobby snapshot or preview response.
             {/if}
           </p>
           {#if localPresentation.deckEditingLocked}
@@ -803,11 +798,8 @@
           controlsDisabled={deckPreviewInteractionLocked}
           previewPending={Boolean(localPresentation.dirty) && deckPreviewPending}
           previewErrorMessage={deckPreviewErrorMessage}
-          fallbackDeckText={formatIdentifierText(loadoutDraft.deckOwnedCardIds)}
-          fallbackDeckEditingLocked={Boolean(localPresentation.deckEditingLocked)}
           onAddOwnedCard={addOwnedCardToDeck}
           onRemoveOwnedCard={removeOwnedCardFromDeck}
-          onFallbackDeckInput={updateDeckOwnedCardIds}
         />
 
         <div class="player-lobby-page__actions">
