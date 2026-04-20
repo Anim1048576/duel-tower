@@ -12,6 +12,7 @@ import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.model.CardInstance;
+import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -58,6 +59,7 @@ public class SessionLoadoutSupport {
 
     private static final Pattern PASSIVE_ID_FORMAT = Pattern.compile("^P\\d{3}$");
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final PlayerLobbyDeckEditAnalyzer PLAYER_LOBBY_DECK_EDIT_ANALYZER = new PlayerLobbyDeckEditAnalyzer();
 
     private final CharacterProfileRepository characterProfileRepository;
     private final CardService cardService;
@@ -158,14 +160,15 @@ public class SessionLoadoutSupport {
     }
 
     public void validateDeckBuild(List<String> deckOwnedCardIds, List<OwnedCard> ownedCards, List<String> currentDeckOwnedCardIds) {
-        if (deckOwnedCardIds.size() != gameRules.deckSize()) {
+        PlayerLobbyDeckEditAnalysis analysis = analyzePlayerLobbyDeckEdit(ownedCards, currentDeckOwnedCardIds, deckOwnedCardIds);
+        if (analysis.deck().draftDeckSize() != gameRules.deckSize()) {
             throw new ApiErrorException(
                     BAD_REQUEST,
                     "DECK_EDIT_INVALID",
                     "VALIDATION",
                     "?깆? ?뺥솗??" + gameRules.deckSize() + "?μ쑝濡?留욎떠???⑸땲??",
                     "deck must contain exactly " + gameRules.deckSize() + " cards",
-                    ApiErrorResolver.details("requiredDeckSize", gameRules.deckSize(), "actualDeckSize", deckOwnedCardIds.size())
+                    ApiErrorResolver.details("requiredDeckSize", gameRules.deckSize(), "actualDeckSize", analysis.deck().draftDeckSize())
             );
         }
 
@@ -203,14 +206,15 @@ public class SessionLoadoutSupport {
 
         Map<String, Integer> deckCounts = cardCounts(deckCardIds);
         for (var e : deckCounts.entrySet()) {
-            if (e.getValue() > gameRules.maxDeckCopies()) {
+            int maxCopies = maxDeckCopiesForCard(e.getKey());
+            if (e.getValue() > maxCopies) {
                 throw new ApiErrorException(
                         BAD_REQUEST,
                         "DECK_EDIT_INVALID",
                         "VALIDATION",
                         "媛숈? 移대뱶???깆뿉 理쒕? " + gameRules.maxDeckCopies() + "?κ퉴吏 ?ｌ쓣 ???덉뒿?덈떎.",
-                        "card copy limit exceeded: " + e.getKey() + " (max " + gameRules.maxDeckCopies() + ")",
-                        ApiErrorResolver.details("cardId", e.getKey(), "maxCopies", gameRules.maxDeckCopies(), "actualCopies", e.getValue())
+                        "card copy limit exceeded: " + e.getKey() + " (max " + maxCopies + ")",
+                        ApiErrorResolver.details("cardId", e.getKey(), "maxCopies", maxCopies, "actualCopies", e.getValue())
                 );
             }
         }
@@ -268,6 +272,19 @@ public class SessionLoadoutSupport {
 
     public List<String> currentDeckOwnedCardIds(PlayerState ps) {
         return ps.deckOwnedCardIds();
+    }
+
+    public PlayerLobbyDeckEditAnalysis analyzePlayerLobbyDeckEdit(List<OwnedCard> ownedCards,
+                                                                  List<String> currentDeckOwnedCardIds,
+                                                                  List<String> draftDeckOwnedCardIds) {
+        return PLAYER_LOBBY_DECK_EDIT_ANALYZER.analyze(new PlayerLobbyDeckEditAnalyzer.Request(
+                ownedCards,
+                currentDeckOwnedCardIds,
+                draftDeckOwnedCardIds,
+                gameRules,
+                relevantCardDefinitions(ownedCards),
+                maxDeckCopiesByCardId(ownedCards)
+        ));
     }
 
     public Map<String, Integer> cardCountsFromOwned(List<OwnedCard> ownedCards) {
@@ -412,6 +429,31 @@ public class SessionLoadoutSupport {
             }
         }
         return out;
+    }
+
+    private Map<String, CardDefinition> relevantCardDefinitions(List<OwnedCard> ownedCards) {
+        Map<CardDefId, CardDefinition> cardDefinitions = cardService.asMap();
+        Map<String, CardDefinition> out = new LinkedHashMap<>();
+        for (OwnedCard ownedCard : ownedCards) {
+            CardDefinition definition = cardDefinitions.get(new CardDefId(ownedCard.cardId()));
+            if (definition != null) {
+                out.putIfAbsent(ownedCard.cardId(), definition);
+            }
+        }
+        return Map.copyOf(out);
+    }
+
+    private Map<String, Integer> maxDeckCopiesByCardId(List<OwnedCard> ownedCards) {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        for (OwnedCard ownedCard : ownedCards) {
+            out.putIfAbsent(ownedCard.cardId(), maxDeckCopiesForCard(ownedCard.cardId()));
+        }
+        return Map.copyOf(out);
+    }
+
+    private int maxDeckCopiesForCard(String cardId) {
+        Integer override = cardService.maxDeckCopies(new CardDefId(cardId));
+        return override == null ? gameRules.maxDeckCopies() : override;
     }
 
     private CharacterProfile loadCharacterProfile(Long characterIdRaw) {
