@@ -7,6 +7,7 @@ import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.dto.CombatStatsDto;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.session.service.SessionNormalizationSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,13 +23,16 @@ public class CharacterProfileService {
 
     private final CharacterProfileRepository repository;
     private final CharacterCombatStatCalculator combatStatCalculator;
+    private final DeckService deckService;
 
     public CharacterProfileService(
             CharacterProfileRepository repository,
-            CharacterCombatStatCalculator combatStatCalculator
+            CharacterCombatStatCalculator combatStatCalculator,
+            DeckService deckService
     ) {
         this.repository = repository;
         this.combatStatCalculator = combatStatCalculator;
+        this.deckService = deckService;
     }
 
     @Transactional(readOnly = true)
@@ -92,6 +96,14 @@ public class CharacterProfileService {
             profile.setCurrentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()));
         }
         profile.setExCard(req.exCard().trim());
+        return toResponse(profile);
+    }
+
+    @Transactional
+    public CharacterProfileResponse applyDeckToCurrentSkillDeck(long characterId, long deckId) {
+        CharacterProfile profile = getByIdOrThrow(characterId);
+        List<String> currentSkillDeck = deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(deckId);
+        profile.setCurrentSkillDeck(normalizeCurrentSkillDeck(currentSkillDeck));
         return toResponse(profile);
     }
 

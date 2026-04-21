@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -267,6 +268,54 @@ class DeckServiceTest {
 
         assertFalse(response.valid());
         assertTrue(response.issues().stream().anyMatch(it -> it.message().contains("EX card is not allowed")));
+    }
+
+    @Test
+    @DisplayName("expandPlayerDeckCardIdsForCurrentSkillDeck: PLAYER 덱 cardId/count를 순서대로 펼친다")
+    void expandPlayerDeckCardIdsForCurrentSkillDeckExpandsCountsInDeckOrder() {
+        when(cardService.asMap()).thenReturn(cardMap("C001", "C002", "C003", "C004"));
+        Deck deck = Deck.create("player", DeckType.PLAYER);
+        Map<String, Integer> cards = new LinkedHashMap<>();
+        cards.put("C001", 2);
+        cards.put("C002", 1);
+        cards.put("C003", 3);
+        cards.put("C004", 6);
+        deck.syncCards(cards);
+        when(deckRepository.findWithCardsById(1L)).thenReturn(Optional.of(deck));
+
+        List<String> expanded = service.expandPlayerDeckCardIdsForCurrentSkillDeck(1L);
+
+        assertEquals(12, expanded.size());
+        assertEquals(List.of(
+                "C001", "C001",
+                "C002",
+                "C003", "C003", "C003",
+                "C004", "C004", "C004", "C004", "C004", "C004"
+        ), expanded);
+    }
+
+    @Test
+    @DisplayName("expandPlayerDeckCardIdsForCurrentSkillDeck: PLAYER 덱이 아니면 적용을 거부한다")
+    void expandPlayerDeckCardIdsForCurrentSkillDeckRejectsNonPlayerDeck() {
+        Deck deck = Deck.create("enemy", DeckType.ENEMY);
+        deck.syncCards(Map.of("C001", 1));
+        when(deckRepository.findWithCardsById(1L)).thenReturn(Optional.of(deck));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.expandPlayerDeckCardIdsForCurrentSkillDeck(1L));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("expandPlayerDeckCardIdsForCurrentSkillDeck: 덱이 없으면 NOT_FOUND를 던진다")
+    void expandPlayerDeckCardIdsForCurrentSkillDeckMissingDeckReturnsNotFound() {
+        when(deckRepository.findWithCardsById(99L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.expandPlayerDeckCardIdsForCurrentSkillDeck(99L));
+
+        assertEquals(NOT_FOUND, ex.getStatusCode());
     }
 
     private static List<DeckCardSpec> cards12() {

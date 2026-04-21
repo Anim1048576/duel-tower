@@ -158,6 +158,25 @@ public class DeckService {
         return new DeckValidationResponse(issues.isEmpty(), List.copyOf(issues), totalCards);
     }
 
+    @Transactional(readOnly = true)
+    public List<String> expandPlayerDeckCardIdsForCurrentSkillDeck(long deckId) {
+        Deck deck = getDeckOrThrow(deckId);
+        if (deck.getType() != DeckType.PLAYER) {
+            throw badRequest("only PLAYER deck can be applied to currentSkillDeck");
+        }
+
+        Map<String, Integer> cards = toCountMap(deck);
+        applyPlayerDeckRulesOrThrow(DeckType.PLAYER, cards, true);
+
+        List<String> expanded = new ArrayList<>();
+        for (DeckCard card : deck.getCards()) {
+            for (int i = 0; i < card.getCount(); i++) {
+                expanded.add(card.getCardId());
+            }
+        }
+        return List.copyOf(expanded);
+    }
+
     @Transactional
     public void upsertCharacterCurrentSkillDeck(long characterId, List<String> deckCardIds) {
         if (characterId <= 0) {

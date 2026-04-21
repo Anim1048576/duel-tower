@@ -5,6 +5,7 @@ import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.domain.HiddenTraitIds;
 import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.content.deck.service.DeckService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +33,9 @@ class CharacterProfileServiceTest {
 
     @Mock
     private CharacterCombatStatCalculator combatStatCalculator;
+
+    @Mock
+    private DeckService deckService;
 
     @InjectMocks
     private CharacterProfileService service;
@@ -226,6 +230,52 @@ class CharacterProfileServiceTest {
         service.update(1L, validRequestWithCurrentSkillDeck(Arrays.asList("  new-1  ", " ", null, "new-2")));
 
         assertIterableEquals(List.of("new-1", "new-2"), existing.getCurrentSkillDeck());
+    }
+
+    @Test
+    @DisplayName("applyDeckToCurrentSkillDeck: PLAYER 덱 count를 펼쳐 currentSkillDeck에 적용하고 detail 응답을 반환한다")
+    void applyDeckToCurrentSkillDeckExpandsCountsAndReturnsCharacterDetail() {
+        CharacterProfile existing = existingProfile();
+        existing.setCurrentSkillDeck(List.of("old"));
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        when(deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(10L))
+                .thenReturn(List.of("C001", "C001", "C002", "C003"));
+        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
+                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+
+        var response = service.applyDeckToCurrentSkillDeck(1L, 10L);
+
+        assertIterableEquals(List.of("C001", "C001", "C002", "C003"), existing.getCurrentSkillDeck());
+        assertIterableEquals(List.of("C001", "C001", "C002", "C003"), response.currentSkillDeck());
+        assertEquals(existing.getOwnedCards(), response.ownedCards());
+        assertEquals(existing.getExCard(), response.exCard());
+        assertEquals(20, response.combatStats().maxHp());
+    }
+
+    @Test
+    @DisplayName("applyDeckToCurrentSkillDeck: 캐릭터가 없으면 NOT_FOUND를 반환하고 덱을 조회하지 않는다")
+    void applyDeckToCurrentSkillDeckMissingCharacterReturnsNotFound() {
+        when(repository.findById(999L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.applyDeckToCurrentSkillDeck(999L, 10L));
+
+        assertEquals(NOT_FOUND, ex.getStatusCode());
+        verify(deckService, never()).expandPlayerDeckCardIdsForCurrentSkillDeck(anyLong());
+    }
+
+    @Test
+    @DisplayName("applyDeckToCurrentSkillDeck: 덱 조회/검증 실패를 그대로 전달한다")
+    void applyDeckToCurrentSkillDeckPropagatesDeckFailure() {
+        CharacterProfile existing = existingProfile();
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        when(deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(404L))
+                .thenThrow(new ResponseStatusException(NOT_FOUND, "deck not found: 404"));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.applyDeckToCurrentSkillDeck(1L, 404L));
+
+        assertEquals(NOT_FOUND, ex.getStatusCode());
     }
 
     @Test

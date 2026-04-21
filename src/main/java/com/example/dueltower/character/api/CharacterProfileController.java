@@ -37,6 +37,14 @@ public class CharacterProfileController {
         return characterProfileService.update(id, req);
     }
 
+    @PostMapping("/{characterId}/current-skill-deck/from-deck/{deckId}")
+    public CharacterProfileResponse applyDeckToCurrentSkillDeck(
+            @PathVariable long characterId,
+            @PathVariable long deckId
+    ) {
+        return characterProfileService.applyDeckToCurrentSkillDeck(characterId, deckId);
+    }
+
     @DeleteMapping("/{id}")
     public void delete(@PathVariable long id) {
         characterProfileService.delete(id);
