@@ -22,7 +22,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -85,6 +88,24 @@ class CharacterDeckApplyIntegrationTest {
                 "C003", "C003", "C003",
                 "C004", "C004", "C004"
         ), reloaded.getCurrentSkillDeck());
+
+        Deck syncedDeck = deckRepository.findFirstByTypeAndName(
+                DeckType.PLAYER,
+                "character:" + character.getId() + ":currentSkillDeck"
+        ).orElseThrow();
+        assertEquals(4, syncedDeck.getCards().size());
+        assertTrue(syncedDeck.getCards().stream()
+                .anyMatch(card -> card.hasCardId("C001") && card.getCount() == 3));
+        assertTrue(syncedDeck.getCards().stream()
+                .anyMatch(card -> card.hasCardId("C004") && card.getCount() == 3));
+
+        mockMvc.perform(get("/api/content/characters/{id}", character.getId())
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(character.getId()))
+                .andExpect(jsonPath("$.currentSkillDeck.length()").value(12))
+                .andExpect(jsonPath("$.currentSkillDeck[0]").value("C001"))
+                .andExpect(jsonPath("$.currentSkillDeck[11]").value("C004"));
     }
 
     @Test

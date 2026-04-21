@@ -102,8 +102,11 @@ public class CharacterProfileService {
     @Transactional
     public CharacterProfileResponse applyDeckToCurrentSkillDeck(long characterId, long deckId) {
         CharacterProfile profile = getByIdOrThrow(characterId);
-        List<String> currentSkillDeck = deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(deckId);
-        profile.setCurrentSkillDeck(normalizeCurrentSkillDeck(currentSkillDeck));
+        List<String> currentSkillDeck = normalizeCurrentSkillDeck(
+                deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(deckId)
+        );
+        profile.setCurrentSkillDeck(currentSkillDeck);
+        deckService.upsertCharacterCurrentSkillDeck(characterId, currentSkillDeck);
         return toResponse(profile);
     }
 

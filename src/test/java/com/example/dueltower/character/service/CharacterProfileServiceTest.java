@@ -250,6 +250,7 @@ class CharacterProfileServiceTest {
         assertEquals(existing.getOwnedCards(), response.ownedCards());
         assertEquals(existing.getExCard(), response.exCard());
         assertEquals(20, response.combatStats().maxHp());
+        verify(deckService).upsertCharacterCurrentSkillDeck(1L, List.of("C001", "C001", "C002", "C003"));
     }
 
     @Test
@@ -262,6 +263,7 @@ class CharacterProfileServiceTest {
 
         assertEquals(NOT_FOUND, ex.getStatusCode());
         verify(deckService, never()).expandPlayerDeckCardIdsForCurrentSkillDeck(anyLong());
+        verify(deckService, never()).upsertCharacterCurrentSkillDeck(anyLong(), any());
     }
 
     @Test
@@ -276,6 +278,7 @@ class CharacterProfileServiceTest {
                 () -> service.applyDeckToCurrentSkillDeck(1L, 404L));
 
         assertEquals(NOT_FOUND, ex.getStatusCode());
+        verify(deckService, never()).upsertCharacterCurrentSkillDeck(anyLong(), any());
     }
 
     @Test
