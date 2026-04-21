@@ -33,6 +33,22 @@ export function updateCharacter(id: CharacterProfileIdentifier, payload: Charact
   return apiPut<CharacterProfileResponse, CharacterProfileRequest>(getCharacterResourcePath(id), payload)
 }
 
+export function applySavedDeckToCharacter(
+  characterId: CharacterProfileIdentifier,
+  deckId: string | number,
+) {
+  const normalizedDeckId = String(deckId).trim()
+
+  if (!normalizedDeckId) {
+    throw new Error('deck id is required')
+  }
+
+  return apiPost<CharacterProfileResponse, null>(
+    `${getCharacterResourcePath(characterId)}/current-skill-deck/from-deck/${encodeURIComponent(normalizedDeckId)}`,
+    null,
+  )
+}
+
 export function deleteCharacter(id: CharacterProfileIdentifier) {
   return apiDeleteVoid(getCharacterResourcePath(id))
 }

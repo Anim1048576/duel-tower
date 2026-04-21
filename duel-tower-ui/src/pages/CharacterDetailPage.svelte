@@ -205,11 +205,27 @@
     }
   }
 
+  function getNavigationFeedback() {
+    if (typeof window === 'undefined') return null
+    const state = history.state as CharacterNavigationState | null
+    return state?.characterFeedback ?? null
+  }
+
   function navigateTo(path: string, mode: 'push' | 'replace' = 'push', state: CharacterNavigationState = {}) {
     if (typeof window === 'undefined') return
 
     history[mode === 'replace' ? 'replaceState' : 'pushState'](state, '', path)
     window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
+  function handleApplySavedDeck() {
+    if (isCreateMode || !requestedCharacterId || saving || deleting || loading) {
+      return
+    }
+
+    setSelectionHandoff(selectionHandoffKeys.deckApplyCharacterId, requestedCharacterId)
+    setSelectionHandoff(selectionHandoffKeys.characterId, requestedCharacterId)
+    navigateTo(pathBuilders.deckList())
   }
 
   const routeState = getCharacterRouteState()
@@ -366,6 +382,8 @@
   }
 
   onMount(() => {
+    saveMessage = getNavigationFeedback()
+
     if (isCreateMode) {
       loading = false
       return
@@ -585,7 +603,7 @@
 
     <SectionFrame
       title={isCreateMode ? 'Create queue' : 'Edit queue'}
-      description="The action strip now saves through the API while leaving deck assignment for a later batch."
+      description="Save profile fields here, or send this saved character to the deck archive to apply a server-validated saved deck."
     >
       <div class="detail-page__actions">
         <a class="detail-page__link-action" data-nav href={pathBuilders.characterList()}>
@@ -604,7 +622,13 @@
             {deleting ? 'Deleting...' : 'Delete record'}
           </button>
         {/if}
-        <button type="button" disabled>Assign to deck (TODO)</button>
+        <button
+          type="button"
+          disabled={isCreateMode || saving || deleting || loading || !requestedCharacterId}
+          onclick={handleApplySavedDeck}
+        >
+          Apply saved deck
+        </button>
       </div>
 
       {#if saveMessage || saveErrorMessage || deleteErrorMessage}
@@ -625,7 +649,11 @@
       {/if}
 
       <div class="detail-page__todo">
-        <p>TODO: Connect deck assignment after the character save flow is finalized.</p>
+        {#if isCreateMode}
+          <p>Save this character before applying a saved deck.</p>
+        {:else}
+          <p>Saved deck application is handled by the server and returns the canonical character detail state.</p>
+        {/if}
         <p>TODO: Replace free-form card payload textareas with structured card editors when that contract is ready.</p>
       </div>
     </SectionFrame>

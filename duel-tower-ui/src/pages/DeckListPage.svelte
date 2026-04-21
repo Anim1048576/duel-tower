@@ -1,5 +1,6 @@
 ﻿<script lang="ts">
   import { onMount } from 'svelte'
+  import { applySavedDeckToCharacter } from '../lib/api/characters'
   import { listDecks } from '../lib/api/decks'
   import type { DeckResponse, DeckType } from '../lib/api/deckTypes'
   import { getApiErrorMessage } from '../lib/api/types'
@@ -17,6 +18,7 @@
   import { pathBuilders } from '../lib/navigation'
   import {
     readSelectionHandoff,
+    removeSelectionHandoff,
     selectionHandoffKeys,
     setSelectionHandoff,
   } from '../lib/selectionHandoff'
@@ -33,9 +35,12 @@
   let selectedId = $state('')
   let loading = $state(true)
   let errorMessage = $state<string | null>(null)
+  let applyErrorMessage = $state<string | null>(null)
+  let applying = $state(false)
   let feedback = $state<DeckPageFeedback | null>(null)
   let decks = $state<DeckResponse[]>([])
   let requestSequence = 0
+  let deckApplyCharacterId = $state<string | null>(null)
 
   function getDeckId(deck: Pick<DeckResponse, 'id'>) {
     return String(deck.id)
@@ -146,10 +151,10 @@
     setSelectionHandoff(selectionHandoffKeys.deckId, id)
   }
 
-  function navigateTo(path: string) {
+  function navigateTo(path: string, state: Record<string, unknown> = {}) {
     if (typeof window === 'undefined') return
 
-    window.history.pushState({}, '', path)
+    window.history.pushState(state, '', path)
     window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
@@ -161,8 +166,38 @@
     navigateTo(pathBuilders.deckEditor(id))
   }
 
+  function selectDeck(id: string) {
+    if (!id) return
+    selectedId = id
+    persistSelectedDeck(id)
+    applyErrorMessage = null
+  }
+
+  async function applySelectedDeckToCharacter() {
+    if (!deckApplyCharacterId || !selectedDeck || applying) {
+      return
+    }
+
+    applying = true
+    applyErrorMessage = null
+
+    try {
+      const response = await applySavedDeckToCharacter(deckApplyCharacterId, getDeckId(selectedDeck))
+      setSelectionHandoff(selectionHandoffKeys.characterId, String(response.id))
+      removeSelectionHandoff(selectionHandoffKeys.deckApplyCharacterId)
+      navigateTo(pathBuilders.characterDetail(String(response.id)), {
+        characterFeedback: 'Saved deck applied to this character.',
+      })
+    } catch (error) {
+      applyErrorMessage = getApiErrorMessage(error, 'Unable to apply the selected deck to this character.')
+    } finally {
+      applying = false
+    }
+  }
+
   onMount(() => {
     feedback = readDeckPageFeedback()
+    deckApplyCharacterId = readSelectionHandoff(selectionHandoffKeys.deckApplyCharacterId)
     void loadDeckArchive()
   })
 
@@ -179,6 +214,7 @@
   const selectedDeckEditorPath = $derived.by(() =>
     selectedDeck ? pathBuilders.deckEditor(getDeckId(selectedDeck)) : pathBuilders.deckEditor(),
   )
+  const inCharacterApplyFlow = $derived.by(() => Boolean(deckApplyCharacterId))
 </script>
 
 <div class="list-page">
@@ -222,7 +258,9 @@
   <div class="list-page__content">
     <SectionFrame
       title="덱 목록"
-      description="Each row comes from GET /api/content/decks and keeps the existing open-editor flow on click."
+      description={inCharacterApplyFlow
+        ? 'Select a saved deck, then apply it through the character deck API.'
+        : 'Each row comes from GET /api/content/decks and keeps the existing open-editor flow on click.'}
     >
       <p class="list-page__summary">{listSummary}</p>
 
@@ -243,7 +281,7 @@
         <EntityListPane
           items={deckItems}
           selectedId={selectedId}
-          onSelect={openDeckEditor}
+          onSelect={inCharacterApplyFlow ? selectDeck : openDeckEditor}
           emptyMessage={emptyListMessage}
         />
       {/if}
@@ -278,6 +316,25 @@
           </div>
 
           <p>{buildDeckNote(selectedDeck)}</p>
+
+          {#if inCharacterApplyFlow}
+            <button
+              type="button"
+              class="list-page__link-action"
+              disabled={applying}
+              onclick={() => void applySelectedDeckToCharacter()}
+            >
+              {applying ? 'Applying deck...' : 'Apply to character'}
+            </button>
+          {/if}
+
+          {#if applyErrorMessage}
+            <ContentStatePanel
+              title="Unable to apply deck"
+              message={applyErrorMessage}
+              tone="error"
+            />
+          {/if}
 
           <a
             class="list-page__link-action"
