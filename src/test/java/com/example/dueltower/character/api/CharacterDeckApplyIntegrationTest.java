@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -76,6 +77,14 @@ class CharacterDeckApplyIntegrationTest {
                 .andExpect(jsonPath("$.ownedCards").value("[]"))
                 .andExpect(jsonPath("$.exCard").value("{}"))
                 .andExpect(jsonPath("$.combatStats.maxHp").exists());
+
+        CharacterProfile reloaded = characterProfileRepository.findById(character.getId()).orElseThrow();
+        assertIterableEquals(List.of(
+                "C001", "C001", "C001",
+                "C002", "C002", "C002",
+                "C003", "C003", "C003",
+                "C004", "C004", "C004"
+        ), reloaded.getCurrentSkillDeck());
     }
 
     @Test
