@@ -179,7 +179,7 @@
 
     if (characterId) {
       navigateTo(pathBuilders.characterDetail(characterId), {
-        characterFeedback: 'Saved deck application canceled.',
+        characterFeedback: 'Saved deck application was canceled.',
       })
     }
   }
@@ -262,7 +262,7 @@
     <div class="list-page__actions">
       {#if inCharacterApplyFlow}
         <button type="button" class="list-page__link-action" onclick={cancelDeckApply}>
-          Cancel deck apply
+          Cancel deck application
         </button>
       {:else}
         <a class="list-page__link-action" data-nav href={pathBuilders.deckEditor()}>
@@ -355,7 +355,7 @@
               disabled={applying}
               onclick={() => void applySelectedDeckToCharacter()}
             >
-              {applying ? 'Applying deck...' : 'Apply to character'}
+              {applying ? 'Applying deck...' : 'Apply deck to character'}
             </button>
           {/if}
 

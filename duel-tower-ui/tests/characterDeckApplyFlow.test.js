@@ -22,13 +22,24 @@ function runTest(name, fn) {
 
 runTest('Character detail exposes Apply saved deck only for saved character flow', () => {
   assert.match(characterDetailSource, />\s*Apply saved deck\s*</)
-  assert.match(
-    characterDetailSource,
-    /disabled=\{isCreateMode \|\| saving \|\| deleting \|\| loading \|\| !requestedCharacterId\}/,
-  )
+  assert.match(characterDetailSource, /disabled=\{applySavedDeckBlocked\}/)
   assert.match(characterDetailSource, /Save this character before applying a saved deck\./)
   assert.match(characterDetailSource, /setSelectionHandoff\(selectionHandoffKeys\.deckApplyCharacterId, requestedCharacterId\)/)
   assert.match(characterDetailSource, /navigateTo\(pathBuilders\.deckList\(\)\)/)
+})
+
+runTest('Character detail blocks saved deck apply when the loaded profile form is dirty', () => {
+  assert.match(characterDetailSource, /function isSameFormState\(left: CharacterFormState, right: CharacterFormState\)/)
+  assert.match(
+    characterDetailSource,
+    /const formDirty = \$derived\.by\(\(\) =>\s*character === null \? false : !isSameFormState\(form, createFormStateFromResponse\(character\)\),\s*\)/,
+  )
+  assert.match(
+    characterDetailSource,
+    /const applySavedDeckBlocked = \$derived\.by\(\(\) =>\s*isCreateMode \|\| !requestedCharacterId \|\| saving \|\| deleting \|\| loading \|\| formDirty,\s*\)/,
+  )
+  assert.match(characterDetailSource, /if \(formDirty\) \{[\s\S]*Save or discard your profile changes before applying a saved deck\./)
+  assert.match(characterDetailSource, /Save or discard profile changes before applying a saved deck\./)
 })
 
 runTest('Character detail renders applied deck from server-loaded character state', () => {
@@ -39,12 +50,21 @@ runTest('Character detail renders applied deck from server-loaded character stat
   assert.doesNotMatch(characterDetailSource, /\.split\(\s*\/\\r\?\\n/)
 })
 
-runTest('Deck list exposes Apply to character only inside character apply context', () => {
+runTest('Deck list exposes Apply deck to character only inside character apply context', () => {
   assert.match(deckListSource, /deckApplyCharacterId = readSelectionHandoff\(selectionHandoffKeys\.deckApplyCharacterId\)/)
   assert.match(deckListSource, /const inCharacterApplyFlow = \$derived\.by\(\(\) => Boolean\(deckApplyCharacterId\)\)/)
-  assert.match(deckListSource, /\{#if inCharacterApplyFlow\}[\s\S]*Apply to character[\s\S]*\{\/if\}/)
+  assert.match(deckListSource, /\{#if inCharacterApplyFlow\}[\s\S]*Apply deck to character[\s\S]*\{\/if\}/)
   assert.match(deckListSource, /onSelect=\{inCharacterApplyFlow \? selectDeck : openDeckEditor\}/)
-  assert.match(deckListSource, /Cancel deck apply/)
+  assert.match(deckListSource, /Cancel deck application/)
+})
+
+runTest('Saved deck application wording avoids link or assignment language', () => {
+  const combinedFlowSource = [characterDetailSource, deckListSource].join('\n')
+
+  assert.match(characterDetailSource, /Deck Applied/)
+  assert.match(characterDetailSource, /No Applied Deck/)
+  assert.match(characterDetailSource, /No saved deck has been applied yet\./)
+  assert.doesNotMatch(combinedFlowSource, /Deck Linked|No Deck|No linked deck|Assign to deck|deck assignment|No deck has been assigned/i)
 })
 
 runTest('Deck apply success calls API, consumes context, and returns to character detail', () => {

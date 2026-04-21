@@ -162,7 +162,7 @@
     const currentDeckCount = character?.currentSkillDeck?.length ?? 0
 
     tags.push(
-      currentDeckCount ? { label: 'Deck Linked', tone: 'success' } : { label: 'No Deck', tone: 'muted' },
+      currentDeckCount ? { label: 'Deck Applied', tone: 'success' } : { label: 'No Applied Deck', tone: 'muted' },
     )
 
     if (form.trait1.trim() || form.trait2.trim()) {
@@ -193,6 +193,26 @@
     }
   }
 
+  function isSameFormState(left: CharacterFormState, right: CharacterFormState) {
+    return (
+      left.name === right.name &&
+      left.gender === right.gender &&
+      left.age === right.age &&
+      left.wish === right.wish &&
+      left.disposition === right.disposition &&
+      left.oneLiner === right.oneLiner &&
+      left.story === right.story &&
+      left.physical === right.physical &&
+      left.technique === right.technique &&
+      left.sense === right.sense &&
+      left.willpower === right.willpower &&
+      left.trait1 === right.trait1 &&
+      left.trait2 === right.trait2 &&
+      left.ownedCards === right.ownedCards &&
+      left.exCard === right.exCard
+    )
+  }
+
   function getNavigationFeedback() {
     if (typeof window === 'undefined') return null
     const state = history.state as CharacterNavigationState | null
@@ -214,9 +234,19 @@
 
   function handleApplySavedDeck() {
     if (isCreateMode || !requestedCharacterId || saving || deleting || loading) {
+      saveErrorMessage = 'Save this character before applying a saved deck.'
+      saveMessage = null
       return
     }
 
+    if (formDirty) {
+      saveErrorMessage = 'Save or discard your profile changes before applying a saved deck.'
+      saveMessage = null
+      return
+    }
+
+    saveErrorMessage = null
+    saveMessage = null
     setSelectionHandoff(selectionHandoffKeys.deckApplyCharacterId, requestedCharacterId)
     setSelectionHandoff(selectionHandoffKeys.characterId, requestedCharacterId)
     navigateTo(pathBuilders.deckList())
@@ -255,6 +285,12 @@
     [form.trait1.trim(), form.trait2.trim()].filter((trait): trait is string => Boolean(trait)),
   )
   const currentDeck = $derived.by(() => character?.currentSkillDeck ?? [])
+  const formDirty = $derived.by(() =>
+    character === null ? false : !isSameFormState(form, createFormStateFromResponse(character)),
+  )
+  const applySavedDeckBlocked = $derived.by(() =>
+    isCreateMode || !requestedCharacterId || saving || deleting || loading || formDirty,
+  )
   const selectionUnavailable = $derived.by(
     () => !isCreateMode && requestedCharacterId === null && missingCharacterId === null && !loading && !errorMessage,
   )
@@ -591,7 +627,7 @@
                 {/each}
               </ul>
             {:else}
-              <p>No deck has been assigned yet.</p>
+              <p>No saved deck has been applied yet.</p>
             {/if}
           </div>
         </div>
@@ -621,7 +657,7 @@
         {/if}
         <button
           type="button"
-          disabled={isCreateMode || saving || deleting || loading || !requestedCharacterId}
+          disabled={applySavedDeckBlocked}
           onclick={handleApplySavedDeck}
         >
           Apply saved deck
@@ -648,6 +684,8 @@
       <div class="detail-page__todo">
         {#if isCreateMode}
           <p>Save this character before applying a saved deck.</p>
+        {:else if formDirty}
+          <p>Save or discard profile changes before applying a saved deck.</p>
         {:else}
           <p>Saved deck application is persisted by the server. This screen reloads the character detail before showing the result.</p>
         {/if}

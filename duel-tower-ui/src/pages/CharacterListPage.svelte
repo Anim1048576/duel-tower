@@ -83,8 +83,8 @@
 
     tags.push(
       character.currentSkillDeck?.length
-        ? { label: 'Deck Linked', tone: 'success' }
-        : { label: 'No Deck', tone: 'muted' },
+        ? { label: 'Deck Applied', tone: 'success' }
+        : { label: 'No Applied Deck', tone: 'muted' },
     )
 
     if (character.trait1 || character.trait2) {
@@ -165,7 +165,7 @@
     () => filteredCharacters.find((item) => item.id === selectedId) ?? filteredCharacters[0] ?? null,
   )
 
-  const deckLinkedCount = $derived.by(() =>
+  const deckAppliedCount = $derived.by(() =>
     characters.filter((character) => (character.currentSkillDeck?.length ?? 0) > 0).length,
   )
 
@@ -208,7 +208,7 @@
   >
     <div class="list-page__stats">
       <StatBlock value={characters.length} label="Total roster" note="Loaded from the character API" />
-      <StatBlock value={deckLinkedCount} label="Deck linked" note="Characters with a current deck selection" />
+      <StatBlock value={deckAppliedCount} label="Deck applied" note="Characters with an applied current skill deck" />
       <StatBlock value={traitTaggedCount} label="Trait tagged" note="Characters with at least one saved trait" />
     </div>
     <div class="list-page__actions">
@@ -236,7 +236,7 @@
       >
         {#snippet filters()}
           <TagChip label="All" tone="accent" />
-          <TagChip label="Deck Linked" tone="success" />
+          <TagChip label="Deck Applied" tone="success" />
           <TagChip label="Traits" tone="warning" />
         {/snippet}
 
