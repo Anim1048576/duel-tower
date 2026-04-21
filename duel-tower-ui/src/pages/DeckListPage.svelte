@@ -161,9 +161,27 @@
   function openDeckEditor(id: string) {
     if (!id) return
 
+    clearDeckApplyContext()
     selectedId = id
     persistSelectedDeck(id)
     navigateTo(pathBuilders.deckEditor(id))
+  }
+
+  function clearDeckApplyContext() {
+    removeSelectionHandoff(selectionHandoffKeys.deckApplyCharacterId)
+    deckApplyCharacterId = null
+    applyErrorMessage = null
+  }
+
+  function cancelDeckApply() {
+    const characterId = deckApplyCharacterId
+    clearDeckApplyContext()
+
+    if (characterId) {
+      navigateTo(pathBuilders.characterDetail(characterId), {
+        characterFeedback: 'Saved deck application canceled.',
+      })
+    }
   }
 
   function selectDeck(id: string) {
@@ -184,9 +202,9 @@
     try {
       const response = await applySavedDeckToCharacter(deckApplyCharacterId, getDeckId(selectedDeck))
       setSelectionHandoff(selectionHandoffKeys.characterId, String(response.id))
-      removeSelectionHandoff(selectionHandoffKeys.deckApplyCharacterId)
+      clearDeckApplyContext()
       navigateTo(pathBuilders.characterDetail(String(response.id)), {
-        characterFeedback: 'Saved deck applied to this character.',
+        characterFeedback: 'Saved deck applied. Character detail was refreshed from the server.',
       })
     } catch (error) {
       applyErrorMessage = getApiErrorMessage(error, 'Unable to apply the selected deck to this character.')
@@ -242,10 +260,23 @@
     </div>
 
     <div class="list-page__actions">
-      <a class="list-page__link-action" data-nav href={pathBuilders.deckEditor()}>
-        {deckListStateCopy.createActionLabel}
-      </a>
+      {#if inCharacterApplyFlow}
+        <button type="button" class="list-page__link-action" onclick={cancelDeckApply}>
+          Cancel deck apply
+        </button>
+      {:else}
+        <a class="list-page__link-action" data-nav href={pathBuilders.deckEditor()}>
+          {deckListStateCopy.createActionLabel}
+        </a>
+      {/if}
     </div>
+
+    {#if inCharacterApplyFlow}
+      <ContentStatePanel
+        title="Applying a saved deck"
+        message="Choose a deck below. The server will validate and persist the character current skill deck."
+      />
+    {/if}
 
     {#if feedback}
       <ContentStatePanel
@@ -340,7 +371,10 @@
             class="list-page__link-action"
             data-nav
             href={selectedDeckEditorPath}
-            onclick={() => persistSelectedDeck(getDeckId(selectedDeck))}
+            onclick={() => {
+              clearDeckApplyContext()
+              persistSelectedDeck(getDeckId(selectedDeck))
+            }}
           >
             Open editor for {selectedDeck.name}
           </a>

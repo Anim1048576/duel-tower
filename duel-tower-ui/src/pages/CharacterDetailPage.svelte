@@ -41,7 +41,6 @@
     trait1: string
     trait2: string
     ownedCards: string
-    currentSkillDeckText: string
     exCard: string
   }
 
@@ -65,7 +64,6 @@
       trait1: '',
       trait2: '',
       ownedCards: '',
-      currentSkillDeckText: '',
       exCard: '',
     }
   }
@@ -86,7 +84,6 @@
       trait1: character.trait1 ?? '',
       trait2: character.trait2 ?? '',
       ownedCards: character.ownedCards,
-      currentSkillDeckText: (character.currentSkillDeck ?? []).join('\n'),
       exCard: character.exCard,
     }
   }
@@ -160,19 +157,12 @@
     return normalized ? normalized : null
   }
 
-  function parseDeckLines(value: string) {
-    return value
-      .split(/\r?\n|,/)
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-  }
-
   function buildCharacterTags(form: CharacterFormState): DetailTag[] {
     const tags: DetailTag[] = [{ label: getGenderLabel(form.gender), tone: 'muted' }]
-    const currentDeck = parseDeckLines(form.currentSkillDeckText)
+    const currentDeckCount = character?.currentSkillDeck?.length ?? 0
 
     tags.push(
-      currentDeck.length ? { label: 'Deck Linked', tone: 'success' } : { label: 'No Deck', tone: 'muted' },
+      currentDeckCount ? { label: 'Deck Linked', tone: 'success' } : { label: 'No Deck', tone: 'muted' },
     )
 
     if (form.trait1.trim() || form.trait2.trim()) {
@@ -183,8 +173,6 @@
   }
 
   function buildCharacterPayload(form: CharacterFormState): CharacterProfileRequest {
-    const currentSkillDeck = parseDeckLines(form.currentSkillDeckText)
-
     return {
       name: form.name.trim(),
       gender: form.gender || null,
@@ -200,7 +188,7 @@
       trait1: normalizeOptionalText(form.trait1),
       trait2: normalizeOptionalText(form.trait2),
       ownedCards: form.ownedCards.trim(),
-      currentSkillDeck: currentSkillDeck.length ? currentSkillDeck : null,
+      currentSkillDeck: isCreateMode ? null : (character?.currentSkillDeck ?? null),
       exCard: form.exCard.trim(),
     }
   }
@@ -208,7 +196,13 @@
   function getNavigationFeedback() {
     if (typeof window === 'undefined') return null
     const state = history.state as CharacterNavigationState | null
-    return state?.characterFeedback ?? null
+    const feedback = state?.characterFeedback ?? null
+
+    if (feedback) {
+      history.replaceState({}, '', window.location.pathname)
+    }
+
+    return feedback
   }
 
   function navigateTo(path: string, mode: 'push' | 'replace' = 'push', state: CharacterNavigationState = {}) {
@@ -260,7 +254,7 @@
   const characterTraits = $derived.by(() =>
     [form.trait1.trim(), form.trait2.trim()].filter((trait): trait is string => Boolean(trait)),
   )
-  const currentDeck = $derived.by(() => parseDeckLines(form.currentSkillDeckText))
+  const currentDeck = $derived.by(() => character?.currentSkillDeck ?? [])
   const selectionUnavailable = $derived.by(
     () => !isCreateMode && requestedCharacterId === null && missingCharacterId === null && !loading && !errorMessage,
   )
@@ -531,7 +525,7 @@
 
       <SectionFrame
         title="Loadout and notes"
-        description="Supporting notes, traits, and deck fields remain in the existing second panel while now writing into the API payload."
+        description="Profile notes remain editable here. The current skill deck is displayed from the latest character API response."
       >
         <fieldset class="detail-page__fieldset" disabled={saving || deleting}>
           <div class="detail-page__form-grid">
@@ -550,15 +544,18 @@
               <textarea bind:value={form.wish} name="wish" rows="4"></textarea>
             </label>
 
-            <label class="detail-page__field detail-page__field--span-2">
+            <div class="detail-page__field detail-page__field--span-2">
               <span>Current skill deck</span>
-              <textarea
-                bind:value={form.currentSkillDeckText}
-                name="currentSkillDeck"
-                rows="5"
-                placeholder="One deck entry per line"
-              ></textarea>
-            </label>
+              <div class="detail-page__readonly-list" aria-live="polite">
+                {#if currentDeck.length}
+                  {#each currentDeck as card, index}
+                    <span>{index + 1}. {card}</span>
+                  {/each}
+                {:else}
+                  <span>No saved deck has been applied.</span>
+                {/if}
+              </div>
+            </div>
 
             <label class="detail-page__field detail-page__field--span-2">
               <span>Owned cards</span>
@@ -652,9 +649,8 @@
         {#if isCreateMode}
           <p>Save this character before applying a saved deck.</p>
         {:else}
-          <p>Saved deck application is handled by the server and returns the canonical character detail state.</p>
+          <p>Saved deck application is persisted by the server. This screen reloads the character detail before showing the result.</p>
         {/if}
-        <p>TODO: Replace free-form card payload textareas with structured card editors when that contract is ready.</p>
       </div>
     </SectionFrame>
   </form>
@@ -828,6 +824,26 @@
   .detail-page__field textarea {
     min-height: 7rem;
     resize: vertical;
+  }
+
+  .detail-page__readonly-list {
+    min-height: 7rem;
+    width: 100%;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--color-border);
+    background: rgba(12, 11, 10, 0.16);
+    color: var(--color-text-soft);
+    display: grid;
+    align-content: start;
+    gap: 0.35rem;
+    line-height: 1.5;
+  }
+
+  .detail-page__readonly-list span {
+    color: inherit;
+    font-size: 0.92rem;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
   .detail-page__list-block > div {
