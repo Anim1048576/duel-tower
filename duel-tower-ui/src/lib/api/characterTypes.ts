@@ -47,7 +47,6 @@ export type CharacterProfileResponse = {
   trait1: string | null
   trait2: string | null
   ownedCards: string
-  currentSkillDeck: string[] | null
   currentSkillDeckPreviewCardIds: string[]
   exCard: string
   combatStats: CharacterCombatStats

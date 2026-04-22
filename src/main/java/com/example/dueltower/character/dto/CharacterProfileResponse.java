@@ -6,6 +6,13 @@ import java.util.List;
 
 import java.sql.Timestamp;
 
+/**
+ * Public character read model.
+ *
+ * <p>Raw CharacterProfile.currentSkillDeck is intentionally not exposed because it can contain either
+ * cardId or ownedCardId values depending on the internal write path. UI/API clients should render
+ * currentSkillDeckPreviewCardIds, which is resolved on the server as cardId-based preview data.</p>
+ */
 public record CharacterProfileResponse(
         Long id,
         String name,
@@ -22,7 +29,6 @@ public record CharacterProfileResponse(
         String trait1,
         String trait2,
         String ownedCards,
-        List<String> currentSkillDeck,
         List<String> currentSkillDeckPreviewCardIds,
         String exCard,
         CombatStatsDto combatStats,

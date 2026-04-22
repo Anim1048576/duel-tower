@@ -71,17 +71,15 @@ class CharacterDeckApplyIntegrationTest {
 
         mockMvc.perform(post("/api/content/characters/{characterId}/current-skill-deck/from-deck/{deckId}",
                         character.getId(), deck.getId())
-                        .session(session))
+                .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(character.getId()))
-                .andExpect(jsonPath("$.currentSkillDeck.length()").value(12))
-                .andExpect(jsonPath("$.currentSkillDeck[0]").value("C001"))
-                .andExpect(jsonPath("$.currentSkillDeck[1]").value("C001"))
-                .andExpect(jsonPath("$.currentSkillDeck[2]").value("C001"))
-                .andExpect(jsonPath("$.currentSkillDeck[3]").value("C002"))
-                .andExpect(jsonPath("$.currentSkillDeck[11]").value("C004"))
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds.length()").value(12))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[0]").value("C001"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[1]").value("C001"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[2]").value("C001"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[3]").value("C002"))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[11]").value("C004"))
                 .andExpect(jsonPath("$.ownedCards").value("[]"))
                 .andExpect(jsonPath("$.exCard").value("{}"))
@@ -106,12 +104,11 @@ class CharacterDeckApplyIntegrationTest {
                 .anyMatch(card -> card.hasCardId("C004") && card.getCount() == 3));
 
         mockMvc.perform(get("/api/content/characters/{id}", character.getId())
-                        .session(session))
+                .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(character.getId()))
-                .andExpect(jsonPath("$.currentSkillDeck.length()").value(12))
-                .andExpect(jsonPath("$.currentSkillDeck[0]").value("C001"))
-                .andExpect(jsonPath("$.currentSkillDeck[11]").value("C004"))
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds.length()").value(12))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[0]").value("C001"))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[11]").value("C004"));
     }
@@ -142,7 +139,8 @@ class CharacterDeckApplyIntegrationTest {
                         character.getId(), secondDeck.getId())
                         .session(session))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currentSkillDeck[11]").value("C004"));
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[11]").value("C004"));
 
         Deck syncedDeck = deckRepository.findFirstByTypeAndName(
                 DeckType.PLAYER,
@@ -253,9 +251,7 @@ class CharacterDeckApplyIntegrationTest {
         mockMvc.perform(get("/api/content/characters/{id}", character.getId())
                         .session(session))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currentSkillDeck[0]").value("oc-2"))
-                .andExpect(jsonPath("$.currentSkillDeck[1]").value("oc-1"))
-                .andExpect(jsonPath("$.currentSkillDeck[2]").value("oc-3"))
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[0]").value("C001"))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[1]").value("C001"))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[2]").value("C002"));

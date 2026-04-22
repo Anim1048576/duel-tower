@@ -74,7 +74,7 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
     }
 
     @Test
-    void gmLobbyCharacterSummaryScoresCurrentSkillDeckByResolvedCardIdsWhenStoredAsOwnedCardIds() {
+    void gmLobbyCharacterSummaryScoresCurrentSkillDeckByResolvedPreviewWhenStoredAsOwnedCardIds() {
         ScreenResponseFactory factory = factory(mock(CharacterProfileRepository.class));
         PlayerStateDto player = player(
                 "player1",
@@ -101,7 +101,7 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                                   {"ownedCardId":"char-oc-2","cardId":"C002"}
                                 ]
                                 """,
-                        List.of("char-oc-1", "char-oc-2")
+                        List.of("C001", "C002")
                 )),
                 List.of(),
                 List.of(),
@@ -114,7 +114,7 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
     }
 
     @Test
-    void gmLobbyCharacterSummaryDoesNotScoreStaleOwnedCardIdsAsCardIds() {
+    void gmLobbyCharacterSummaryDoesNotScoreUnresolvedEntriesAbsentFromPreview() {
         ScreenResponseFactory factory = factory(mock(CharacterProfileRepository.class));
         PlayerStateDto player = player(
                 "player1",
@@ -140,7 +140,7 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                                   {"ownedCardId":"char-oc-1","cardId":"C001"}
                                 ]
                                 """,
-                        List.of("char-oc-1", "oc-stale")
+                        List.of("C001")
                 )),
                 List.of(),
                 List.of(),
@@ -281,7 +281,6 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                 null,
                 null,
                 ownedCards,
-                currentSkillDeck,
                 currentSkillDeck,
                 "{}",
                 null,

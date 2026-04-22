@@ -1087,10 +1087,10 @@ public class ScreenResponseFactory {
             String characterExCardId = normalizeCharacterExCardId(character.exCard());
             boolean exMatched = !resolvedExCardId.isBlank() && resolvedExCardId.equals(characterExCardId);
             int deckOverlap = 0;
-            for (String cardId : currentSkillDeckReadService.resolveStoredCurrentSkillDeckToCardIds(
-                    character.currentSkillDeck(),
-                    character.ownedCards()
-            )) {
+            List<String> previewCardIds = character.currentSkillDeckPreviewCardIds() == null
+                    ? List.of()
+                    : character.currentSkillDeckPreviewCardIds();
+            for (String cardId : previewCardIds) {
                 if (deckCardIds.contains(safeTrim(cardId))) {
                     deckOverlap++;
                 }
