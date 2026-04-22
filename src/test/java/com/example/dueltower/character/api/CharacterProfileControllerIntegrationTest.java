@@ -64,7 +64,7 @@ class CharacterProfileControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("character create without currentSkillDeck stores normal fields and returns null currentSkillDeck")
+    @DisplayName("character create without currentSkillDeck stores normal fields and does not expose raw currentSkillDeck")
     void createWithoutCurrentSkillDeckStoresOtherFields() throws Exception {
         MockHttpSession session = signUpAndLogin("characterCreateAllowed");
 

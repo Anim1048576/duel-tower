@@ -185,6 +185,36 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                 .doesNotContain("3 linked cards");
     }
 
+    @Test
+    void presetEditorResolvedDropsStaleOwnedCardIdsFromAppliedCardsTag() {
+        CharacterProfileRepository repository = mock(CharacterProfileRepository.class);
+        when(repository.findById(7L)).thenReturn(Optional.of(characterProfile(
+                7L,
+                "Partially Stale Character",
+                """
+                        [
+                          {"ownedCardId":"char-oc-1","cardId":"C001"}
+                        ]
+                        """,
+                List.of("char-oc-1", "oc-stale")
+        )));
+        ScreenResponseFactory factory = factory(repository);
+
+        PresetEditorResolvedDto resolved = factory.presetEditorResolved(new PresetEditorDraftDto(
+                "preset",
+                7L,
+                List.of(),
+                null,
+                List.of()
+        ));
+
+        assertThat(resolved.characterTags())
+                .extracting(tag -> tag.label())
+                .contains("1 applied cards")
+                .doesNotContain("2 applied cards")
+                .doesNotContain("2 linked cards");
+    }
+
     private static ScreenResponseFactory factory(CharacterProfileRepository repository) {
         CardService cardService = mock(CardService.class);
         PassiveService passiveService = mock(PassiveService.class);

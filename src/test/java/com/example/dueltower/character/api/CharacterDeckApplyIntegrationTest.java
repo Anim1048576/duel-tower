@@ -258,6 +258,41 @@ class CharacterDeckApplyIntegrationTest {
     }
 
     @Test
+    @DisplayName("detail/list 응답은 stale ownedCardId를 preview에서 제외하고 raw currentSkillDeck을 노출하지 않는다")
+    void characterReadResponsesDropStaleOwnedCardIdsAndDoNotExposeRawCurrentSkillDeck() throws Exception {
+        MockHttpSession session = signUpAndLogin("detailPreviewStaleOwnedIds");
+        CharacterProfile character = createCharacter(
+                """
+                        [
+                          {"ownedCardId":"oc-1","cardId":"C001"},
+                          {"ownedCardId":"oc-2","cardId":"C002"}
+                        ]
+                        """,
+                List.of("oc-1", "oc-stale", "oc-2")
+        );
+
+        mockMvc.perform(get("/api/content/characters/{id}", character.getId())
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds.length()").value(2))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[0]").value("C001"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[1]").value("C002"));
+
+        String listJson = mockMvc.perform(get("/api/content/characters")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].currentSkillDeck").doesNotExist())
+                .andExpect(jsonPath("$[0].currentSkillDeckPreviewCardIds.length()").value(2))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertFalse(listJson.contains("\"currentSkillDeck\":"));
+        assertFalse(listJson.contains("oc-stale"));
+    }
+
+    @Test
     @DisplayName("덱 적용 API는 없는 캐릭터에 NOT_FOUND를 반환한다")
     void applyDeckMissingCharacterReturnsNotFound() throws Exception {
         MockHttpSession session = signUpAndLogin("applyDeckMissingCharacter");

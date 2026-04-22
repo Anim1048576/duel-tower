@@ -51,6 +51,39 @@ class CharacterCurrentSkillDeckReadServiceTest {
     }
 
     @Test
+    @DisplayName("resolve to cardIds returns empty when every stored ownedCardId-looking entry is stale")
+    void resolveToCardIdsDropsEveryStaleOwnedCardIdLookingEntry() {
+        List<String> resolved = service.resolveStoredCurrentSkillDeckToCardIds(
+                List.of("oc-stale-1", "oc-stale-2"),
+                ownedCards()
+        );
+
+        assertTrue(resolved.isEmpty());
+    }
+
+    @Test
+    @DisplayName("resolve to cardIds drops stale uuid ownedCardId-looking entries")
+    void resolveToCardIdsDropsStaleUuidOwnedCardIdLookingEntries() {
+        List<String> resolved = service.resolveStoredCurrentSkillDeckToCardIds(
+                List.of("oc-2", "123e4567-e89b-12d3-a456-426614174000", "oc-3"),
+                ownedCards()
+        );
+
+        assertIterableEquals(List.of("C001", "C002"), resolved);
+    }
+
+    @Test
+    @DisplayName("resolve to cardIds does not expose ownedCardId-looking raw entries when ownedCards are missing")
+    void resolveToCardIdsDropsOwnedCardIdLookingEntriesWhenOwnedCardsAreMissing() {
+        List<String> resolved = service.resolveStoredCurrentSkillDeckToCardIds(
+                List.of("oc-stale-1", "oc-stale-2"),
+                List.of()
+        );
+
+        assertTrue(resolved.isEmpty());
+    }
+
+    @Test
     @DisplayName("resolve to cardIds keeps unresolved non-owned entries as cardId based stored deck")
     void resolveToCardIdsKeepsUnresolvedNonOwnedEntriesAsCardIds() {
         List<String> resolved = service.resolveStoredCurrentSkillDeckToCardIds(
@@ -142,6 +175,22 @@ class CharacterCurrentSkillDeckReadServiceTest {
     }
 
     @Test
+    @DisplayName("preview returns empty stable result for null or empty stored deck")
+    void previewReturnsEmptyStableResultForNullOrEmptyStoredDeck() {
+        var nullPreview = service.previewStoredCurrentSkillDeck(null, "[]");
+        var emptyPreview = service.previewStoredCurrentSkillDeck(List.of(), "[]");
+
+        assertTrue(nullPreview.cardIds().isEmpty());
+        assertEquals(0, nullPreview.totalCards());
+        assertEquals(0, nullPreview.unresolvedEntryCount());
+        assertTrue(!nullPreview.hasUnresolvedEntries());
+        assertTrue(emptyPreview.cardIds().isEmpty());
+        assertEquals(0, emptyPreview.totalCards());
+        assertEquals(0, emptyPreview.unresolvedEntryCount());
+        assertTrue(!emptyPreview.hasUnresolvedEntries());
+    }
+
+    @Test
     @DisplayName("preview drops stale ownedCardId entries and reports unresolved count")
     void previewDropsStaleOwnedCardIdsAndReportsUnresolvedCount() {
         var preview = service.previewStoredCurrentSkillDeck(
@@ -177,6 +226,26 @@ class CharacterCurrentSkillDeckReadServiceTest {
         assertEquals(2, preview.unresolvedEntryCount());
         assertTrue(preview.hasUnresolvedEntries());
         assertTrue(preview.cardIds().isEmpty());
+    }
+
+    @Test
+    @DisplayName("preview does not expose stale uuid ownedCardId-looking entries as cardIds")
+    void previewDropsStaleUuidOwnedCardIdLookingEntries() {
+        var preview = service.previewStoredCurrentSkillDeck(
+                List.of("oc-2", "123e4567-e89b-12d3-a456-426614174000", "oc-3"),
+                """
+                        [
+                          {"ownedCardId":"oc-2","cardId":"C001"},
+                          {"ownedCardId":"oc-3","cardId":"C002"}
+                        ]
+                        """
+        );
+
+        assertEquals(2, preview.totalCards());
+        assertEquals(1, preview.unresolvedEntryCount());
+        assertTrue(preview.hasUnresolvedEntries());
+        assertIterableEquals(List.of("C001", "C002"), preview.cardIds());
+        assertTrue(!preview.cardIds().contains("123e4567-e89b-12d3-a456-426614174000"));
     }
 
     private static List<OwnedCard> ownedCards() {
