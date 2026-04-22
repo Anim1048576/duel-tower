@@ -1,5 +1,6 @@
 package com.example.dueltower.session.api;
 
+import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.engine.model.CardInstance;
 import com.example.dueltower.engine.model.NodeState;
@@ -266,7 +267,6 @@ class SessionDeckRuleIntegrationTest {
                                   "trait1": null,
                                   "trait2": null,
                                   "ownedCards": "[{\\\"cardId\\\":\\\"C001\\\"},{\\\"cardId\\\":\\\"C001\\\"},{\\\"cardId\\\":\\\"C001\\\"},{\\\"cardId\\\":\\\"C002\\\"},{\\\"cardId\\\":\\\"C002\\\"},{\\\"cardId\\\":\\\"C002\\\"},{\\\"cardId\\\":\\\"C003\\\"},{\\\"cardId\\\":\\\"C003\\\"},{\\\"cardId\\\":\\\"C003\\\"},{\\\"cardId\\\":\\\"C004\\\"},{\\\"cardId\\\":\\\"C004\\\"},{\\\"cardId\\\":\\\"C004\\\"},{\\\"cardId\\\":\\\"Tig001_Card\\\"},{\\\"cardId\\\":\\\"Tig001_Card\\\"}]",
-                                  "currentSkillDeck": ["C001","C001","C001","C002","C002","C002","C003","C003","C003","C004","C004","Tig001_Card"],
                                   "exCard": "{\\\"id\\\":\\\"EX901\\\"}"
                                 }
                                 """))
@@ -275,6 +275,14 @@ class SessionDeckRuleIntegrationTest {
                 .getResponse()
                 .getContentAsString();
         String characterIdValue = extractJsonStringOrNumberValue(characterId, "id");
+        CharacterProfile profile = characterProfileRepository.findById(Long.parseLong(characterIdValue)).orElseThrow();
+        profile.setCurrentSkillDeck(List.of(
+                "C001", "C001", "C001",
+                "C002", "C002", "C002",
+                "C003", "C003", "C003",
+                "C004", "C004", "Tig001_Card"
+        ));
+        characterProfileRepository.save(profile);
 
         String code = createSession(session);
         MvcResult joinResult = mockMvc.perform(post("/api/sessions/{code}/join", code)

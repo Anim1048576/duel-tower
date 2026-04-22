@@ -28,7 +28,6 @@ export type CharacterProfileRequest = {
   trait1: string | null
   trait2: string | null
   ownedCards: string
-  currentSkillDeck: string[] | null
   exCard: string
 }
 

@@ -65,7 +65,7 @@ public class CharacterProfileService {
                 .trait2(normalizeOptionalText(req.trait2()))
                 .hiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()))
                 .ownedCards(req.ownedCards().trim())
-                .currentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()))
+                .currentSkillDeck(null)
                 .exCard(req.exCard().trim())
                 .build();
 
@@ -92,9 +92,6 @@ public class CharacterProfileService {
         profile.setTrait2(normalizeOptionalText(req.trait2()));
         profile.setHiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()));
         profile.setOwnedCards(req.ownedCards().trim());
-        if (req.currentSkillDeck() != null) {
-            profile.setCurrentSkillDeck(normalizeCurrentSkillDeck(req.currentSkillDeck()));
-        }
         profile.setExCard(req.exCard().trim());
         return toResponse(profile);
     }

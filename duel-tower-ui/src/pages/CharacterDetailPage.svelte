@@ -188,7 +188,6 @@
       trait1: normalizeOptionalText(form.trait1),
       trait2: normalizeOptionalText(form.trait2),
       ownedCards: form.ownedCards.trim(),
-      currentSkillDeck: isCreateMode ? null : (character?.currentSkillDeck ?? null),
       exCard: form.exCard.trim(),
     }
   }

@@ -44,7 +44,7 @@ runTest('Character detail blocks saved deck apply when the loaded profile form i
 
 runTest('Character detail renders applied deck from server-loaded character state', () => {
   assert.match(characterDetailSource, /const currentDeck = \$derived\.by\(\(\) => character\?\.currentSkillDeck \?\? \[\]\)/)
-  assert.match(characterDetailSource, /currentSkillDeck: isCreateMode \? null : \(character\?\.currentSkillDeck \?\? null\)/)
+  assert.doesNotMatch(characterDetailSource, /currentSkillDeck:/)
   assert.doesNotMatch(characterDetailSource, /currentSkillDeckText/)
   assert.doesNotMatch(characterDetailSource, /\.join\(['"`]\\n['"`]\)/)
   assert.doesNotMatch(characterDetailSource, /\.split\(\s*\/\\r\?\\n/)

@@ -185,8 +185,7 @@ class CharacterProfileServiceTest {
                 "  질서/선  ",
                 List.of(),
                 "  [\"card-1\"]  ",
-                "  {\"id\":\"ex-1\"}  ",
-                List.of("  deck-1  ")
+                "  {\"id\":\"ex-1\"}  "
         );
 
         service.create(req);
@@ -202,34 +201,35 @@ class CharacterProfileServiceTest {
         assertEquals("질서/선", saved.getDisposition());
         assertEquals("[\"card-1\"]", saved.getOwnedCards());
         assertEquals("{\"id\":\"ex-1\"}", saved.getExCard());
+        assertNull(saved.getCurrentSkillDeck());
     }
 
     @Test
-    @DisplayName("update: req.currentSkillDeck가 null이면 기존 currentSkillDeck를 유지한다")
-    void updateKeepsExistingCurrentSkillDeckWhenRequestDeckIsNull() {
+    @DisplayName("update: profile 필드 저장 시 기존 currentSkillDeck를 유지한다")
+    void updateKeepsExistingCurrentSkillDeckWhenSavingProfileFields() {
         CharacterProfile existing = existingProfile();
         existing.setCurrentSkillDeck(List.of("old-1", "old-2"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(combatStatCalculator.calculate(any(CharacterProfile.class)))
                 .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
 
-        service.update(1L, validRequestWithCurrentSkillDeck(null));
+        service.update(1L, validRequestWithDisposition(existing.getDisposition()));
 
         assertIterableEquals(List.of("old-1", "old-2"), existing.getCurrentSkillDeck());
     }
 
     @Test
-    @DisplayName("update: 새 currentSkillDeck 제공 시 trim/빈값 제거로 정규화한다")
-    void updateNormalizesCurrentSkillDeckWhenProvided() {
+    @DisplayName("update: public profile 저장 경로는 currentSkillDeck를 변경하지 않는다")
+    void updateDoesNotWriteCurrentSkillDeckThroughProfileSave() {
         CharacterProfile existing = existingProfile();
         existing.setCurrentSkillDeck(List.of("old"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(combatStatCalculator.calculate(any(CharacterProfile.class)))
                 .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
 
-        service.update(1L, validRequestWithCurrentSkillDeck(Arrays.asList("  new-1  ", " ", null, "new-2")));
+        service.update(1L, validRequestWithDisposition(existing.getDisposition()));
 
-        assertIterableEquals(List.of("new-1", "new-2"), existing.getCurrentSkillDeck());
+        assertIterableEquals(List.of("old"), existing.getCurrentSkillDeck());
     }
 
     @Test
@@ -310,8 +310,7 @@ class CharacterProfileServiceTest {
                 disposition,
                 List.of(),
                 "[]",
-                "{}",
-                List.of("deck-1")
+                "{}"
         );
     }
 
@@ -332,22 +331,7 @@ class CharacterProfileServiceTest {
                 trait2,
                 List.of(),
                 "[]",
-                List.of("deck-1"),
                 "{}"
-        );
-    }
-
-    private static CharacterProfileRequest validRequestWithCurrentSkillDeck(List<String> currentSkillDeck) {
-        return validRequest(
-                "name",
-                "wish",
-                "oneLiner",
-                "story",
-                "질서/선",
-                List.of(),
-                "[]",
-                "{}",
-                currentSkillDeck
         );
     }
 
@@ -360,8 +344,7 @@ class CharacterProfileServiceTest {
                 "질서/선",
                 hiddenTraitIds,
                 "[]",
-                "{}",
-                List.of("deck-1")
+                "{}"
         );
     }
 
@@ -373,8 +356,7 @@ class CharacterProfileServiceTest {
             String disposition,
             List<String> hiddenTraitIds,
             String ownedCards,
-            String exCard,
-            List<String> currentSkillDeck
+            String exCard
     ) {
         return new CharacterProfileRequest(
                 name,
@@ -392,7 +374,6 @@ class CharacterProfileServiceTest {
                 "trait2",
                 hiddenTraitIds,
                 ownedCards,
-                currentSkillDeck,
                 exCard
         );
     }

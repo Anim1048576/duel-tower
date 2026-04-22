@@ -20,7 +20,6 @@ public record CharacterProfileRequest(
         String trait2,
         List<String> hiddenTraitIds,
         String ownedCards,
-        List<String> currentSkillDeck,
         String exCard
 ) {
 }
