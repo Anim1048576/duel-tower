@@ -23,6 +23,7 @@ public record CharacterProfileResponse(
         String trait2,
         String ownedCards,
         List<String> currentSkillDeck,
+        List<String> currentSkillDeckPreviewCardIds,
         String exCard,
         CombatStatsDto combatStats,
         Timestamp createDate,

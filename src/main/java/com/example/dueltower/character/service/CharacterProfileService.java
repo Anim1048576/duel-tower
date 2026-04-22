@@ -146,6 +146,7 @@ public class CharacterProfileService {
                 profile.getTrait1(),
                 profile.getTrait2(),
                 profile.getOwnedCards(),
+                profile.getCurrentSkillDeck(),
                 currentSkillDeckReadService.resolveStoredCurrentSkillDeckToCardIds(
                         profile.getCurrentSkillDeck(),
                         profile.getOwnedCards()

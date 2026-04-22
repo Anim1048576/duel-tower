@@ -159,7 +159,7 @@
 
   function buildCharacterTags(form: CharacterFormState): DetailTag[] {
     const tags: DetailTag[] = [{ label: getGenderLabel(form.gender), tone: 'muted' }]
-    const currentDeckCount = character?.currentSkillDeck?.length ?? 0
+    const currentDeckCount = character?.currentSkillDeckPreviewCardIds?.length ?? 0
 
     tags.push(
       currentDeckCount ? { label: 'Deck Applied', tone: 'success' } : { label: 'No Applied Deck', tone: 'muted' },
@@ -283,7 +283,7 @@
   const characterTraits = $derived.by(() =>
     [form.trait1.trim(), form.trait2.trim()].filter((trait): trait is string => Boolean(trait)),
   )
-  const currentDeck = $derived.by(() => character?.currentSkillDeck ?? [])
+  const currentDeckPreviewCardIds = $derived.by(() => character?.currentSkillDeckPreviewCardIds ?? [])
   const formDirty = $derived.by(() =>
     character === null ? false : !isSameFormState(form, createFormStateFromResponse(character)),
   )
@@ -582,8 +582,8 @@
             <div class="detail-page__field detail-page__field--span-2">
               <span>Current skill deck</span>
               <div class="detail-page__readonly-list" aria-live="polite">
-                {#if currentDeck.length}
-                  {#each currentDeck as card, index}
+                {#if currentDeckPreviewCardIds.length}
+                  {#each currentDeckPreviewCardIds as card, index}
                     <span>{index + 1}. {card}</span>
                   {/each}
                 {:else}
@@ -619,9 +619,9 @@
           </div>
           <div>
             <strong>Current skill deck preview</strong>
-            {#if currentDeck.length}
+            {#if currentDeckPreviewCardIds.length}
               <ul>
-                {#each currentDeck as card}
+                {#each currentDeckPreviewCardIds as card}
                   <li>{card}</li>
                 {/each}
               </ul>

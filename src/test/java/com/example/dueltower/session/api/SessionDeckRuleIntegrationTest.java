@@ -354,8 +354,11 @@ class SessionDeckRuleIntegrationTest {
                         .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.currentSkillDeck").isArray())
-                .andExpect(jsonPath("$.currentSkillDeck[0]").value(updatedDeckCardIds.get(0)))
-                .andExpect(jsonPath("$.currentSkillDeck[10]").value(updatedDeckCardIds.get(10)))
+                .andExpect(jsonPath("$.currentSkillDeck[0]").value(updatedDeckOwnedCardIds.get(0)))
+                .andExpect(jsonPath("$.currentSkillDeck[10]").value(updatedDeckOwnedCardIds.get(10)))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isArray())
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[0]").value(updatedDeckCardIds.get(0)))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[10]").value(updatedDeckCardIds.get(10)))
                 .andExpect(jsonPath("$.ownedCards").value(savedProfile.getOwnedCards()));
 
         String rejoinCode = createSession(session);

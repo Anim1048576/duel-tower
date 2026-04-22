@@ -82,7 +82,7 @@
     const tags: NonNullable<CharacterListItem['tags']> = []
 
     tags.push(
-      character.currentSkillDeck?.length
+      character.currentSkillDeckPreviewCardIds?.length
         ? { label: 'Deck Applied', tone: 'success' }
         : { label: 'No Applied Deck', tone: 'muted' },
     )
@@ -166,7 +166,7 @@
   )
 
   const deckAppliedCount = $derived.by(() =>
-    characters.filter((character) => (character.currentSkillDeck?.length ?? 0) > 0).length,
+    characters.filter((character) => (character.currentSkillDeckPreviewCardIds?.length ?? 0) > 0).length,
   )
 
   const traitTaggedCount = $derived.by(() =>

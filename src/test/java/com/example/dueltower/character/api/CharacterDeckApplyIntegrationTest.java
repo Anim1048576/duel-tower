@@ -80,6 +80,9 @@ class CharacterDeckApplyIntegrationTest {
                 .andExpect(jsonPath("$.currentSkillDeck[2]").value("C001"))
                 .andExpect(jsonPath("$.currentSkillDeck[3]").value("C002"))
                 .andExpect(jsonPath("$.currentSkillDeck[11]").value("C004"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds.length()").value(12))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[0]").value("C001"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[11]").value("C004"))
                 .andExpect(jsonPath("$.ownedCards").value("[]"))
                 .andExpect(jsonPath("$.exCard").value("{}"))
                 .andExpect(jsonPath("$.combatStats.maxHp").exists());
@@ -108,7 +111,9 @@ class CharacterDeckApplyIntegrationTest {
                 .andExpect(jsonPath("$.id").value(character.getId()))
                 .andExpect(jsonPath("$.currentSkillDeck.length()").value(12))
                 .andExpect(jsonPath("$.currentSkillDeck[0]").value("C001"))
-                .andExpect(jsonPath("$.currentSkillDeck[11]").value("C004"));
+                .andExpect(jsonPath("$.currentSkillDeck[11]").value("C004"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[0]").value("C001"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[11]").value("C004"));
     }
 
     @Test

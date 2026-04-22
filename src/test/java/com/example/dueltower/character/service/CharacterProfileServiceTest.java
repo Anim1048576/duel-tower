@@ -264,7 +264,8 @@ class CharacterProfileServiceTest {
         ));
 
         assertNull(existing.getCurrentSkillDeck());
-        assertTrue(response.currentSkillDeck().isEmpty());
+        assertNull(response.currentSkillDeck());
+        assertTrue(response.currentSkillDeckPreviewCardIds().isEmpty());
         verify(currentSkillDeckService).clearCurrentSkillDeck(existing);
     }
 
@@ -292,6 +293,7 @@ class CharacterProfileServiceTest {
 
         assertIterableEquals(List.of("C001", "C001", "C002", "C003"), existing.getCurrentSkillDeck());
         assertIterableEquals(List.of("C001", "C001", "C002", "C003"), response.currentSkillDeck());
+        assertIterableEquals(List.of("C001", "C001", "C002", "C003"), response.currentSkillDeckPreviewCardIds());
         assertEquals(existing.getOwnedCards(), response.ownedCards());
         assertEquals(existing.getExCard(), response.exCard());
         assertEquals(20, response.combatStats().maxHp());

@@ -201,6 +201,7 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                 null,
                 ownedCards,
                 currentSkillDeck,
+                currentSkillDeck,
                 "{}",
                 null,
                 null,
