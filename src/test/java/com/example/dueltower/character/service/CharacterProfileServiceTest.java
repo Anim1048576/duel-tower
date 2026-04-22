@@ -37,6 +37,9 @@ class CharacterProfileServiceTest {
     @Mock
     private DeckService deckService;
 
+    @Mock
+    private CharacterCurrentSkillDeckService currentSkillDeckService;
+
     @InjectMocks
     private CharacterProfileService service;
 
@@ -240,6 +243,11 @@ class CharacterProfileServiceTest {
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(10L))
                 .thenReturn(List.of("C001", "C001", "C002", "C003"));
+        when(currentSkillDeckService.replaceCurrentSkillDeckFromCardIds(existing, List.of("C001", "C001", "C002", "C003")))
+                .thenAnswer(invocation -> {
+                    existing.setCurrentSkillDeck(invocation.getArgument(1));
+                    return existing;
+                });
         when(combatStatCalculator.calculate(any(CharacterProfile.class)))
                 .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
 
@@ -250,7 +258,7 @@ class CharacterProfileServiceTest {
         assertEquals(existing.getOwnedCards(), response.ownedCards());
         assertEquals(existing.getExCard(), response.exCard());
         assertEquals(20, response.combatStats().maxHp());
-        verify(deckService).upsertCharacterCurrentSkillDeck(1L, List.of("C001", "C001", "C002", "C003"));
+        verify(currentSkillDeckService).replaceCurrentSkillDeckFromCardIds(existing, List.of("C001", "C001", "C002", "C003"));
     }
 
     @Test
@@ -263,7 +271,7 @@ class CharacterProfileServiceTest {
 
         assertEquals(NOT_FOUND, ex.getStatusCode());
         verify(deckService, never()).expandPlayerDeckCardIdsForCurrentSkillDeck(anyLong());
-        verify(deckService, never()).upsertCharacterCurrentSkillDeck(anyLong(), any());
+        verify(currentSkillDeckService, never()).replaceCurrentSkillDeckFromCardIds(any(), any());
     }
 
     @Test
@@ -278,7 +286,7 @@ class CharacterProfileServiceTest {
                 () -> service.applyDeckToCurrentSkillDeck(1L, 404L));
 
         assertEquals(NOT_FOUND, ex.getStatusCode());
-        verify(deckService, never()).upsertCharacterCurrentSkillDeck(anyLong(), any());
+        verify(currentSkillDeckService, never()).replaceCurrentSkillDeckFromCardIds(any(), any());
     }
 
     @Test

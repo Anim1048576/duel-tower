@@ -8,7 +8,6 @@ import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.dto.CombatStatsDto;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.deck.service.DeckService;
-import com.example.dueltower.session.service.SessionNormalizationSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -24,15 +23,18 @@ public class CharacterProfileService {
     private final CharacterProfileRepository repository;
     private final CharacterCombatStatCalculator combatStatCalculator;
     private final DeckService deckService;
+    private final CharacterCurrentSkillDeckService currentSkillDeckService;
 
     public CharacterProfileService(
             CharacterProfileRepository repository,
             CharacterCombatStatCalculator combatStatCalculator,
-            DeckService deckService
+            DeckService deckService,
+            CharacterCurrentSkillDeckService currentSkillDeckService
     ) {
         this.repository = repository;
         this.combatStatCalculator = combatStatCalculator;
         this.deckService = deckService;
+        this.currentSkillDeckService = currentSkillDeckService;
     }
 
     @Transactional(readOnly = true)
@@ -99,12 +101,9 @@ public class CharacterProfileService {
     @Transactional
     public CharacterProfileResponse applyDeckToCurrentSkillDeck(long characterId, long deckId) {
         CharacterProfile profile = getByIdOrThrow(characterId);
-        List<String> currentSkillDeck = normalizeCurrentSkillDeck(
-                deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(deckId)
-        );
-        profile.setCurrentSkillDeck(currentSkillDeck);
-        deckService.upsertCharacterCurrentSkillDeck(characterId, currentSkillDeck);
-        return toResponse(profile);
+        List<String> currentSkillDeck = deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(deckId);
+        CharacterProfile saved = currentSkillDeckService.replaceCurrentSkillDeckFromCardIds(profile, currentSkillDeck);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -224,10 +223,6 @@ public class CharacterProfileService {
                 .filter(value -> !value.isEmpty())
                 .distinct()
                 .toList();
-    }
-
-    private static List<String> normalizeCurrentSkillDeck(List<String> deckPresetIds) {
-        return SessionNormalizationSupport.normalizeStoredCurrentSkillDeck(deckPresetIds);
     }
 
     private static String normalizeOptionalText(String value) {

@@ -1,6 +1,7 @@
 package com.example.dueltower.session.service;
 
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCurrentSkillDeckService;
 import com.example.dueltower.config.GameRules;
 import com.example.dueltower.config.RewardTableConfig;
 import com.example.dueltower.content.card.model.OwnedCard;
@@ -67,8 +68,8 @@ public class SessionService {
         this(
                 new SessionLoadoutSupport(
                         characterProfileRepository,
+                        new CharacterCurrentSkillDeckService(characterProfileRepository, deckService),
                         cardService,
-                        deckService,
                         passiveService,
                         gameRules,
                         starterLoadoutConfig

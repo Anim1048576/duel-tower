@@ -2,13 +2,13 @@ package com.example.dueltower.session.service;
 
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCurrentSkillDeckService;
 import com.example.dueltower.common.api.ApiErrorException;
 import com.example.dueltower.common.api.ApiErrorResolver;
 import com.example.dueltower.config.GameRules;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.model.OwnedCardModifier;
 import com.example.dueltower.content.card.service.CardService;
-import com.example.dueltower.content.deck.service.DeckService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.model.CardInstance;
@@ -62,21 +62,21 @@ public class SessionLoadoutSupport {
     private static final PlayerLobbyDeckEditAnalyzer PLAYER_LOBBY_DECK_EDIT_ANALYZER = new PlayerLobbyDeckEditAnalyzer();
 
     private final CharacterProfileRepository characterProfileRepository;
+    private final CharacterCurrentSkillDeckService currentSkillDeckService;
     private final CardService cardService;
-    private final DeckService deckService;
     private final PassiveService passiveService;
     private final GameRules gameRules;
     private final StarterLoadoutConfig starterLoadoutConfig;
 
     public SessionLoadoutSupport(CharacterProfileRepository characterProfileRepository,
+                                 CharacterCurrentSkillDeckService currentSkillDeckService,
                                  CardService cardService,
-                                 DeckService deckService,
                                  PassiveService passiveService,
                                  GameRules gameRules,
                                  StarterLoadoutConfig starterLoadoutConfig) {
         this.characterProfileRepository = characterProfileRepository;
+        this.currentSkillDeckService = currentSkillDeckService;
         this.cardService = cardService;
-        this.deckService = deckService;
         this.passiveService = passiveService;
         this.gameRules = gameRules;
         this.starterLoadoutConfig = starterLoadoutConfig;
@@ -374,12 +374,8 @@ public class SessionLoadoutSupport {
         CharacterProfile profile = characterProfileRepository.findById(characterId)
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId));
 
-        List<String> deckCardIds = currentDeckCardIdsFromOwnedCardIds(deckOwnedCardIds, ownedCards);
         profile.setOwnedCards(toCanonicalOwnedCardsJson(ownedCards));
-        profile.setCurrentSkillDeck(List.copyOf(deckOwnedCardIds));
-        characterProfileRepository.save(profile);
-
-        deckService.upsertCharacterCurrentSkillDeck(characterId, deckCardIds);
+        currentSkillDeckService.replaceCurrentSkillDeckFromOwnedCardIds(profile, deckOwnedCardIds, ownedCards);
     }
 
     public void loadDeck(GameState state, PlayerState ps, List<String> deckOwnedCardIds) {
