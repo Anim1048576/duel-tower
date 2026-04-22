@@ -97,6 +97,27 @@ class CharacterCurrentSkillDeckServiceTest {
         assertEquals("currentSkillDeck ownedCardIds must not contain duplicate values: oc-1", ex.getReason());
     }
 
+    @Test
+    @DisplayName("deleteCurrentSkillDeckMirror: character current deck 미러 삭제를 DeckService에 위임한다")
+    void deleteCurrentSkillDeckMirrorDelegatesToDeckService() {
+        service.deleteCurrentSkillDeckMirror(7L);
+
+        verify(deckService).deleteCharacterCurrentSkillDeck(7L);
+    }
+
+    @Test
+    @DisplayName("clearCurrentSkillDeck: profile currentSkillDeck을 비우고 미러 deck을 삭제한다")
+    void clearCurrentSkillDeckClearsProfileAndDeletesMirrorDeck() {
+        CharacterProfile profile = profile();
+        when(repository.save(profile)).thenReturn(profile);
+
+        CharacterProfile saved = service.clearCurrentSkillDeck(profile);
+
+        assertEquals(null, saved.getCurrentSkillDeck());
+        verify(repository).save(profile);
+        verify(deckService).deleteCharacterCurrentSkillDeck(7L);
+    }
+
     private static CharacterProfile profile() {
         return CharacterProfile.builder()
                 .id(7L)

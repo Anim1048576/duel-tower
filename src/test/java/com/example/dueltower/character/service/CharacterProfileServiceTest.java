@@ -236,6 +236,36 @@ class CharacterProfileServiceTest {
     }
 
     @Test
+    @DisplayName("update: ownedCards가 변경되면 stale currentSkillDeck와 미러 덱을 비운다")
+    void updateClearsCurrentSkillDeckWhenOwnedCardsChanges() {
+        CharacterProfile existing = existingProfile();
+        existing.setOwnedCards("[\"old-card\"]");
+        existing.setCurrentSkillDeck(List.of("old"));
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        when(currentSkillDeckService.clearCurrentSkillDeck(existing)).thenAnswer(invocation -> {
+            existing.setCurrentSkillDeck(null);
+            return existing;
+        });
+        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
+                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+
+        var response = service.update(1L, validRequest(
+                "name",
+                "wish",
+                "oneLiner",
+                "story",
+                existing.getDisposition(),
+                List.of(),
+                "[\"new-card\"]",
+                "{}"
+        ));
+
+        assertNull(existing.getCurrentSkillDeck());
+        assertNull(response.currentSkillDeck());
+        verify(currentSkillDeckService).clearCurrentSkillDeck(existing);
+    }
+
+    @Test
     @DisplayName("applyDeckToCurrentSkillDeck: PLAYER 덱 count를 펼쳐 currentSkillDeck에 적용하고 detail 응답을 반환한다")
     void applyDeckToCurrentSkillDeckExpandsCountsAndReturnsCharacterDetail() {
         CharacterProfile existing = existingProfile();
@@ -297,6 +327,17 @@ class CharacterProfileServiceTest {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.delete(999L));
 
         assertEquals(NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("delete: 캐릭터 삭제 시 currentSkillDeck 미러 덱도 삭제한다")
+    void deleteRemovesCurrentSkillDeckMirror() {
+        when(repository.existsById(1L)).thenReturn(true);
+
+        service.delete(1L);
+
+        verify(currentSkillDeckService).deleteCurrentSkillDeckMirror(1L);
+        verify(repository).deleteById(1L);
     }
 
     @Test

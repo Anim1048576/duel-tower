@@ -23,6 +23,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
@@ -145,6 +146,29 @@ class DeckServiceCharacterCurrentDeckTest {
         assertEquals(12, total);
         assertEquals(2, saved.getCards().stream().filter(card -> card.getCardId().equals("a")).findFirst().orElseThrow().getCount());
         assertEquals(2, saved.getCards().stream().filter(card -> card.getCardId().equals("b")).findFirst().orElseThrow().getCount());
+    }
+
+    @Test
+    @DisplayName("deleteCharacterCurrentSkillDeck: 파생 currentSkillDeck 덱이 있으면 삭제한다")
+    void deleteCharacterCurrentSkillDeckDeletesMirrorDeckWhenPresent() {
+        Deck existing = Deck.create("character:4:currentSkillDeck", DeckType.PLAYER);
+        when(deckRepository.findFirstByTypeAndName(DeckType.PLAYER, "character:4:currentSkillDeck"))
+                .thenReturn(Optional.of(existing));
+
+        service.deleteCharacterCurrentSkillDeck(4L);
+
+        verify(deckRepository).delete(existing);
+    }
+
+    @Test
+    @DisplayName("deleteCharacterCurrentSkillDeck: 파생 currentSkillDeck 덱이 없어도 성공한다")
+    void deleteCharacterCurrentSkillDeckIgnoresMissingMirrorDeck() {
+        when(deckRepository.findFirstByTypeAndName(DeckType.PLAYER, "character:4:currentSkillDeck"))
+                .thenReturn(Optional.empty());
+
+        service.deleteCharacterCurrentSkillDeck(4L);
+
+        verify(deckRepository, never()).delete(any());
     }
 
     private static Map<Ids.CardDefId, CardDefinition> cardMap(String... ids) {

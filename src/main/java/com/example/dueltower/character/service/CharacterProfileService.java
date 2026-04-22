@@ -93,8 +93,13 @@ public class CharacterProfileService {
         profile.setTrait1(normalizeOptionalText(req.trait1()));
         profile.setTrait2(normalizeOptionalText(req.trait2()));
         profile.setHiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()));
-        profile.setOwnedCards(req.ownedCards().trim());
+        String ownedCards = req.ownedCards().trim();
+        boolean ownedCardsChanged = !ownedCards.equals(profile.getOwnedCards());
+        profile.setOwnedCards(ownedCards);
         profile.setExCard(req.exCard().trim());
+        if (ownedCardsChanged) {
+            profile = currentSkillDeckService.clearCurrentSkillDeck(profile);
+        }
         return toResponse(profile);
     }
 
@@ -111,6 +116,7 @@ public class CharacterProfileService {
         if (!repository.existsById(id)) {
             throw new ResponseStatusException(NOT_FOUND, "character not found: " + id);
         }
+        currentSkillDeckService.deleteCurrentSkillDeckMirror(id);
         repository.deleteById(id);
     }
 

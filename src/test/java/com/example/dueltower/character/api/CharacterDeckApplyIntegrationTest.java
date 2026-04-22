@@ -23,10 +23,13 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -106,6 +109,125 @@ class CharacterDeckApplyIntegrationTest {
                 .andExpect(jsonPath("$.currentSkillDeck.length()").value(12))
                 .andExpect(jsonPath("$.currentSkillDeck[0]").value("C001"))
                 .andExpect(jsonPath("$.currentSkillDeck[11]").value("C004"));
+    }
+
+    @Test
+    @DisplayName("저장된 PLAYER 덱을 재적용하면 currentSkillDeck 미러 덱에서 이전 카드가 제거된다")
+    void reapplyingPlayerDeckReplacesMirrorDeckWithoutStaleCards() throws Exception {
+        MockHttpSession session = signUpAndLogin("applyDeckReplaceMirror");
+        CharacterProfile character = createCharacter(List.of("OLD_CARD"));
+        Deck firstDeck = createDeck("player-apply-first", DeckType.PLAYER, orderedCards(
+                "C001", 3,
+                "C002", 3,
+                "C003", 3,
+                "Tig001_Card", 3
+        ));
+        Deck secondDeck = createDeck("player-apply-second", DeckType.PLAYER, orderedCards(
+                "C001", 3,
+                "C002", 3,
+                "C003", 3,
+                "C004", 3
+        ));
+
+        mockMvc.perform(post("/api/content/characters/{characterId}/current-skill-deck/from-deck/{deckId}",
+                        character.getId(), firstDeck.getId())
+                        .session(session))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/content/characters/{characterId}/current-skill-deck/from-deck/{deckId}",
+                        character.getId(), secondDeck.getId())
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentSkillDeck[11]").value("C004"));
+
+        Deck syncedDeck = deckRepository.findFirstByTypeAndName(
+                DeckType.PLAYER,
+                "character:" + character.getId() + ":currentSkillDeck"
+        ).orElseThrow();
+        assertFalse(syncedDeck.getCards().stream().anyMatch(card -> card.hasCardId("Tig001_Card")));
+        assertTrue(syncedDeck.getCards().stream().anyMatch(card -> card.hasCardId("C004") && card.getCount() == 3));
+    }
+
+    @Test
+    @DisplayName("캐릭터 삭제 시 currentSkillDeck 미러 덱도 삭제된다")
+    void deletingCharacterRemovesCurrentSkillDeckMirrorDeck() throws Exception {
+        MockHttpSession session = signUpAndLogin("applyDeckDeleteMirror");
+        CharacterProfile character = createCharacter(List.of("OLD_CARD"));
+        Deck deck = createDeck("player-apply-delete", DeckType.PLAYER, orderedCards(
+                "C001", 3,
+                "C002", 3,
+                "C003", 3,
+                "C004", 3
+        ));
+
+        mockMvc.perform(post("/api/content/characters/{characterId}/current-skill-deck/from-deck/{deckId}",
+                        character.getId(), deck.getId())
+                        .session(session))
+                .andExpect(status().isOk());
+
+        assertTrue(deckRepository.findFirstByTypeAndName(
+                DeckType.PLAYER,
+                "character:" + character.getId() + ":currentSkillDeck"
+        ).isPresent());
+
+        mockMvc.perform(delete("/api/content/characters/{id}", character.getId())
+                        .session(session))
+                .andExpect(status().isOk());
+
+        assertTrue(characterProfileRepository.findById(character.getId()).isEmpty());
+        assertTrue(deckRepository.findFirstByTypeAndName(
+                DeckType.PLAYER,
+                "character:" + character.getId() + ":currentSkillDeck"
+        ).isEmpty());
+    }
+
+    @Test
+    @DisplayName("ownedCards 변경 저장 시 stale currentSkillDeck와 미러 덱을 비운다")
+    void updatingOwnedCardsClearsCurrentSkillDeckAndMirrorDeck() throws Exception {
+        MockHttpSession session = signUpAndLogin("applyDeckOwnedCardsChanged");
+        CharacterProfile character = createCharacter(List.of("OLD_CARD"));
+        Deck deck = createDeck("player-apply-owned-cards-change", DeckType.PLAYER, orderedCards(
+                "C001", 3,
+                "C002", 3,
+                "C003", 3,
+                "C004", 3
+        ));
+
+        mockMvc.perform(post("/api/content/characters/{characterId}/current-skill-deck/from-deck/{deckId}",
+                        character.getId(), deck.getId())
+                        .session(session))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/content/characters/{id}", character.getId())
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "test-character",
+                                  "gender": "MALE",
+                                  "age": 20,
+                                  "wish": "wish",
+                                  "disposition": "질서/선",
+                                  "oneLiner": "oneLiner",
+                                  "story": "story",
+                                  "physical": 5,
+                                  "technique": 5,
+                                  "sense": 5,
+                                  "willpower": 5,
+                                  "trait1": "trait1",
+                                  "trait2": "trait2",
+                                  "hiddenTraitIds": [],
+                                  "ownedCards": "[{\\"cardId\\":\\"C001\\"}]",
+                                  "exCard": "{}"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        CharacterProfile reloaded = characterProfileRepository.findById(character.getId()).orElseThrow();
+        assertEquals(null, reloaded.getCurrentSkillDeck());
+        assertTrue(deckRepository.findFirstByTypeAndName(
+                DeckType.PLAYER,
+                "character:" + character.getId() + ":currentSkillDeck"
+        ).isEmpty());
     }
 
     @Test

@@ -197,6 +197,16 @@ public class DeckService {
     }
 
     @Transactional
+    public void deleteCharacterCurrentSkillDeck(long characterId) {
+        if (characterId <= 0) {
+            throw badRequest("characterId must be positive");
+        }
+
+        deckRepository.findFirstByTypeAndName(DeckType.PLAYER, characterCurrentDeckName(characterId))
+                .ifPresent(deckRepository::delete);
+    }
+
+    @Transactional
     public void delete(long id) {
         if (!deckRepository.existsById(id)) {
             throw notFound("deck not found: " + id);

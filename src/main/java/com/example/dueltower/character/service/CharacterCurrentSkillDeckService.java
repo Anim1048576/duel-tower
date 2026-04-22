@@ -63,6 +63,20 @@ public class CharacterCurrentSkillDeckService {
         return saved;
     }
 
+    @Transactional
+    public void deleteCurrentSkillDeckMirror(long characterId) {
+        deckService.deleteCharacterCurrentSkillDeck(characterId);
+    }
+
+    @Transactional
+    public CharacterProfile clearCurrentSkillDeck(CharacterProfile profile) {
+        CharacterProfile target = requirePersistedProfile(profile);
+        target.setCurrentSkillDeck(null);
+        CharacterProfile saved = repository.save(target);
+        deckService.deleteCharacterCurrentSkillDeck(saved.getId());
+        return saved;
+    }
+
     private static CharacterProfile requirePersistedProfile(CharacterProfile profile) {
         if (profile == null || profile.getId() == null || profile.getId() <= 0) {
             throw new ResponseStatusException(BAD_REQUEST, "persisted character profile is required");
