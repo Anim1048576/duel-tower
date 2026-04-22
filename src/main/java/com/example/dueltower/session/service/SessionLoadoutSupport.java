@@ -2,6 +2,7 @@ package com.example.dueltower.session.service;
 
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCurrentSkillDeckReadService;
 import com.example.dueltower.character.service.CharacterCurrentSkillDeckService;
 import com.example.dueltower.common.api.ApiErrorException;
 import com.example.dueltower.common.api.ApiErrorResolver;
@@ -62,6 +63,7 @@ public class SessionLoadoutSupport {
     private static final PlayerLobbyDeckEditAnalyzer PLAYER_LOBBY_DECK_EDIT_ANALYZER = new PlayerLobbyDeckEditAnalyzer();
 
     private final CharacterProfileRepository characterProfileRepository;
+    private final CharacterCurrentSkillDeckReadService currentSkillDeckReadService;
     private final CharacterCurrentSkillDeckService currentSkillDeckService;
     private final CardService cardService;
     private final PassiveService passiveService;
@@ -69,12 +71,14 @@ public class SessionLoadoutSupport {
     private final StarterLoadoutConfig starterLoadoutConfig;
 
     public SessionLoadoutSupport(CharacterProfileRepository characterProfileRepository,
+                                 CharacterCurrentSkillDeckReadService currentSkillDeckReadService,
                                  CharacterCurrentSkillDeckService currentSkillDeckService,
                                  CardService cardService,
                                  PassiveService passiveService,
                                  GameRules gameRules,
                                  StarterLoadoutConfig starterLoadoutConfig) {
         this.characterProfileRepository = characterProfileRepository;
+        this.currentSkillDeckReadService = currentSkillDeckReadService;
         this.currentSkillDeckService = currentSkillDeckService;
         this.cardService = cardService;
         this.passiveService = passiveService;
@@ -131,7 +135,7 @@ public class SessionLoadoutSupport {
             if (currentSkillDeck == null || currentSkillDeck.isEmpty()) {
                 return List.of();
             }
-            return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(currentSkillDeck, ownedCards);
+            return currentSkillDeckReadService.resolveStoredCurrentSkillDeckToOwnedCardIds(currentSkillDeck, ownedCards);
         }
 
         if (requestedPresetDeckOwnedCardIdsRaw != null) {
@@ -156,7 +160,7 @@ public class SessionLoadoutSupport {
     }
 
     public List<String> resolveStoredDeckToOwnedCardIds(List<String> storedDeckEntries, List<OwnedCard> ownedCards) {
-        return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(storedDeckEntries, ownedCards);
+        return currentSkillDeckReadService.resolveStoredCurrentSkillDeckToOwnedCardIds(storedDeckEntries, ownedCards);
     }
 
     public void validateDeckBuild(List<String> deckOwnedCardIds, List<OwnedCard> ownedCards, List<String> currentDeckOwnedCardIds) {
@@ -319,7 +323,7 @@ public class SessionLoadoutSupport {
             if (currentSkillDeck == null || currentSkillDeck.isEmpty()) {
                 return List.of();
             }
-            return resolveStoredDeckToOwnedCardIds(currentSkillDeck, effectiveOwnedCards);
+            return currentSkillDeckReadService.resolveStoredCurrentSkillDeckToOwnedCardIds(currentSkillDeck, effectiveOwnedCards);
         }
         return List.copyOf(ps.deckOwnedCardIds());
     }

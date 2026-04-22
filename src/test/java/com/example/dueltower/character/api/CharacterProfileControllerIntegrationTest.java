@@ -76,7 +76,7 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.name").value("created-name"))
                 .andExpect(jsonPath("$.ownedCards").value("[]"))
                 .andExpect(jsonPath("$.exCard").value("{}"))
-                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist());
+                .andExpect(jsonPath("$.currentSkillDeck").isEmpty());
     }
 
     @Test
@@ -98,14 +98,14 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("after-name"))
                 .andExpect(jsonPath("$.ownedCards").value("[{\"cardId\":\"C001\"}]"))
-                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist());
+                .andExpect(jsonPath("$.currentSkillDeck").isEmpty());
 
         mockMvc.perform(get("/api/content/characters/{id}", characterId)
                         .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("after-name"))
                 .andExpect(jsonPath("$.ownedCards").value("[{\"cardId\":\"C001\"}]"))
-                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist());
+                .andExpect(jsonPath("$.currentSkillDeck").isEmpty());
     }
 
     private String validCharacterBody(String name, String ownedCards) {

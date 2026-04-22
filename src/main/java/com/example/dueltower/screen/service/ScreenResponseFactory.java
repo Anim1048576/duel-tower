@@ -2,6 +2,7 @@ package com.example.dueltower.screen.service;
 
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCurrentSkillDeckReadService;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.dto.DeckValidationResponse;
@@ -55,6 +56,7 @@ import com.example.dueltower.session.dto.SessionStateDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import com.example.dueltower.session.service.PlayerLobbyDeckEditAnalysis;
 import com.example.dueltower.session.service.SessionAccessDecision;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
@@ -77,15 +79,25 @@ public class ScreenResponseFactory {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
 
     private final CharacterProfileRepository characterProfileRepository;
+    private final CharacterCurrentSkillDeckReadService currentSkillDeckReadService;
     private final CardService cardService;
     private final PassiveService passiveService;
+
+    @Autowired
+    public ScreenResponseFactory(CharacterProfileRepository characterProfileRepository,
+                                 CharacterCurrentSkillDeckReadService currentSkillDeckReadService,
+                                 CardService cardService,
+                                 PassiveService passiveService) {
+        this.characterProfileRepository = characterProfileRepository;
+        this.currentSkillDeckReadService = currentSkillDeckReadService;
+        this.cardService = cardService;
+        this.passiveService = passiveService;
+    }
 
     public ScreenResponseFactory(CharacterProfileRepository characterProfileRepository,
                                  CardService cardService,
                                  PassiveService passiveService) {
-        this.characterProfileRepository = characterProfileRepository;
-        this.cardService = cardService;
-        this.passiveService = passiveService;
+        this(characterProfileRepository, new CharacterCurrentSkillDeckReadService(), cardService, passiveService);
     }
 
     public SessionScreenSkeletonResponse sessionSkeleton(ScreenRouteSpec route,
@@ -1075,11 +1087,12 @@ public class ScreenResponseFactory {
             String characterExCardId = normalizeCharacterExCardId(character.exCard());
             boolean exMatched = !resolvedExCardId.isBlank() && resolvedExCardId.equals(characterExCardId);
             int deckOverlap = 0;
-            if (character.currentSkillDeck() != null) {
-                for (String cardId : character.currentSkillDeck()) {
-                    if (deckCardIds.contains(safeTrim(cardId))) {
-                        deckOverlap++;
-                    }
+            for (String cardId : currentSkillDeckReadService.resolveStoredCurrentSkillDeckToCardIds(
+                    character.currentSkillDeck(),
+                    character.ownedCards()
+            )) {
+                if (deckCardIds.contains(safeTrim(cardId))) {
+                    deckOverlap++;
                 }
             }
             int score = (exMatched ? 100 : 0) + deckOverlap;
@@ -1469,8 +1482,12 @@ public class ScreenResponseFactory {
         List<PresetEditorResolvedTagDto> tags = new ArrayList<>();
         tags.add(new PresetEditorResolvedTagDto("Character", "accent"));
         tags.add(new PresetEditorResolvedTagDto("Resolved", "success"));
-        if (profile.getCurrentSkillDeck() != null && !profile.getCurrentSkillDeck().isEmpty()) {
-            tags.add(new PresetEditorResolvedTagDto(profile.getCurrentSkillDeck().size() + " linked cards", "muted"));
+        int totalCards = currentSkillDeckReadService.previewStoredCurrentSkillDeck(
+                profile.getCurrentSkillDeck(),
+                profile.getOwnedCards()
+        ).totalCards();
+        if (totalCards > 0) {
+            tags.add(new PresetEditorResolvedTagDto(totalCards + " applied cards", "muted"));
         }
         return List.copyOf(tags);
     }

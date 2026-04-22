@@ -24,17 +24,20 @@ public class CharacterProfileService {
     private final CharacterCombatStatCalculator combatStatCalculator;
     private final DeckService deckService;
     private final CharacterCurrentSkillDeckService currentSkillDeckService;
+    private final CharacterCurrentSkillDeckReadService currentSkillDeckReadService;
 
     public CharacterProfileService(
             CharacterProfileRepository repository,
             CharacterCombatStatCalculator combatStatCalculator,
             DeckService deckService,
-            CharacterCurrentSkillDeckService currentSkillDeckService
+            CharacterCurrentSkillDeckService currentSkillDeckService,
+            CharacterCurrentSkillDeckReadService currentSkillDeckReadService
     ) {
         this.repository = repository;
         this.combatStatCalculator = combatStatCalculator;
         this.deckService = deckService;
         this.currentSkillDeckService = currentSkillDeckService;
+        this.currentSkillDeckReadService = currentSkillDeckReadService;
     }
 
     @Transactional(readOnly = true)
@@ -143,7 +146,10 @@ public class CharacterProfileService {
                 profile.getTrait1(),
                 profile.getTrait2(),
                 profile.getOwnedCards(),
-                profile.getCurrentSkillDeck(),
+                currentSkillDeckReadService.resolveStoredCurrentSkillDeckToCardIds(
+                        profile.getCurrentSkillDeck(),
+                        profile.getOwnedCards()
+                ),
                 profile.getExCard(),
                 new CombatStatsDto(
                         combatStats.maxHp(),

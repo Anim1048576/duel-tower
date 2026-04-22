@@ -40,6 +40,9 @@ class CharacterProfileServiceTest {
     @Mock
     private CharacterCurrentSkillDeckService currentSkillDeckService;
 
+    @Mock
+    private CharacterCurrentSkillDeckReadService currentSkillDeckReadService;
+
     @InjectMocks
     private CharacterProfileService service;
 
@@ -261,7 +264,7 @@ class CharacterProfileServiceTest {
         ));
 
         assertNull(existing.getCurrentSkillDeck());
-        assertNull(response.currentSkillDeck());
+        assertTrue(response.currentSkillDeck().isEmpty());
         verify(currentSkillDeckService).clearCurrentSkillDeck(existing);
     }
 
@@ -278,6 +281,10 @@ class CharacterProfileServiceTest {
                     existing.setCurrentSkillDeck(invocation.getArgument(1));
                     return existing;
                 });
+        when(currentSkillDeckReadService.resolveStoredCurrentSkillDeckToCardIds(
+                List.of("C001", "C001", "C002", "C003"),
+                existing.getOwnedCards()
+        )).thenReturn(List.of("C001", "C001", "C002", "C003"));
         when(combatStatCalculator.calculate(any(CharacterProfile.class)))
                 .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
 
