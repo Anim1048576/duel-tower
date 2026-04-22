@@ -1189,7 +1189,7 @@ public class ScreenResponseFactory {
                 player.passiveIds().isEmpty() ? "muted" : "success"
         ));
         tags.add(new GmLobbyTagDto(
-                exCardId.isBlank() ? "No EX" : "EX linked",
+                exCardId.isBlank() ? "No EX" : "EX selected",
                 exCardId.isBlank() ? "muted" : "warning"
         ));
         String characterHint = gmLobbyCharacterHint(player, exCardId, characters);
