@@ -9,11 +9,14 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -58,6 +61,82 @@ class CharacterProfileControllerIntegrationTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(containsString("use the dedicated current skill deck API")));
+    }
+
+    @Test
+    @DisplayName("character create without currentSkillDeck stores normal fields and returns null currentSkillDeck")
+    void createWithoutCurrentSkillDeckStoresOtherFields() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterCreateAllowed");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCharacterBody("created-name", "[]")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("created-name"))
+                .andExpect(jsonPath("$.ownedCards").value("[]"))
+                .andExpect(jsonPath("$.exCard").value("{}"))
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("character update without currentSkillDeck stores normal fields")
+    void updateWithoutCurrentSkillDeckStoresOtherFields() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterUpdateAllowed");
+        MvcResult createResult = mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCharacterBody("before-name", "[]")))
+                .andExpect(status().isOk())
+                .andReturn();
+        String characterId = extractJsonNumber(createResult.getResponse().getContentAsString(), "id");
+
+        mockMvc.perform(put("/api/content/characters/{id}", characterId)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCharacterBody("after-name", "[{\\\"cardId\\\":\\\"C001\\\"}]")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("after-name"))
+                .andExpect(jsonPath("$.ownedCards").value("[{\"cardId\":\"C001\"}]"))
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist());
+
+        mockMvc.perform(get("/api/content/characters/{id}", characterId)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("after-name"))
+                .andExpect(jsonPath("$.ownedCards").value("[{\"cardId\":\"C001\"}]"))
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist());
+    }
+
+    private String validCharacterBody(String name, String ownedCards) {
+        return """
+                {
+                  "name": "%s",
+                  "gender": "MALE",
+                  "age": 20,
+                  "wish": "wish",
+                  "disposition": "\\uC911\\uB9BD/\\uC911\\uC6A9",
+                  "oneLiner": "oneLiner",
+                  "story": "story",
+                  "physical": 5,
+                  "technique": 5,
+                  "sense": 5,
+                  "willpower": 5,
+                  "trait1": "trait1",
+                  "trait2": "trait2",
+                  "hiddenTraitIds": [],
+                  "ownedCards": "%s",
+                  "exCard": "{}"
+                }
+                """.formatted(name, ownedCards);
+    }
+
+    private String extractJsonNumber(String json, String key) {
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("\"" + java.util.regex.Pattern.quote(key) + "\"\\s*:\\s*(\\d+)")
+                .matcher(json);
+        org.junit.jupiter.api.Assertions.assertTrue(matcher.find(), "JSON number field not found: " + key);
+        return matcher.group(1);
     }
 
     private MockHttpSession signUpAndLogin(String username) throws Exception {

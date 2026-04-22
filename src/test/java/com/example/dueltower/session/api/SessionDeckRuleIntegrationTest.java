@@ -347,6 +347,14 @@ class SessionDeckRuleIntegrationTest {
             assertTrue(savedOwnedCardIdToCardId.containsKey(deckOwnedCardId));
         }
 
+        mockMvc.perform(get("/api/content/characters/{id}", characterIdValue)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentSkillDeck").isArray())
+                .andExpect(jsonPath("$.currentSkillDeck[0]").value(updatedDeckOwnedCardIds.get(0)))
+                .andExpect(jsonPath("$.currentSkillDeck[10]").value(updatedDeckOwnedCardIds.get(10)))
+                .andExpect(jsonPath("$.ownedCards").value(savedProfile.getOwnedCards()));
+
         String rejoinCode = createSession(session);
         mockMvc.perform(post("/api/sessions/{code}/join", rejoinCode)
                         .session(session)

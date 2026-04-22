@@ -48,6 +48,16 @@ class CharacterCurrentSkillDeckServiceTest {
     }
 
     @Test
+    @DisplayName("cardId based currentSkillDeck write rejects blank cardId input")
+    void replaceCurrentSkillDeckFromCardIdsRejectsBlankCardId() {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.replaceCurrentSkillDeckFromCardIds(profile(), List.of("C001", "   ")));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertEquals("currentSkillDeck cardIds must not contain blank values", ex.getReason());
+    }
+
+    @Test
     @DisplayName("ownedCardId 기반 currentSkillDeck 저장은 ownedCardId를 저장하고 cardId로 미러 deck을 갱신한다")
     void replaceCurrentSkillDeckFromOwnedCardIdsStoresOwnedIdsAndMirrorsCardIds() {
         CharacterProfile profile = profile();
@@ -95,6 +105,20 @@ class CharacterCurrentSkillDeckServiceTest {
 
         assertEquals(BAD_REQUEST, ex.getStatusCode());
         assertEquals("currentSkillDeck ownedCardIds must not contain duplicate values: oc-1", ex.getReason());
+    }
+
+    @Test
+    @DisplayName("ownedCardId based currentSkillDeck write rejects blank ownedCardId input")
+    void replaceCurrentSkillDeckFromOwnedCardIdsRejectsBlankOwnedCardId() {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.replaceCurrentSkillDeckFromOwnedCardIds(
+                        profile(),
+                        List.of("oc-1", "   "),
+                        List.of(new OwnedCard("oc-1", "C001", List.of()))
+                ));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertEquals("currentSkillDeck ownedCardIds must not contain blank values", ex.getReason());
     }
 
     @Test
