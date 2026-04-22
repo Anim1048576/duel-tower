@@ -40,6 +40,28 @@ class CharacterCurrentSkillDeckReadServiceTest {
     }
 
     @Test
+    @DisplayName("resolve to cardIds drops stale ownedCardId-looking entries instead of exposing them as cardIds")
+    void resolveToCardIdsDropsStaleOwnedCardIdLookingEntries() {
+        List<String> resolved = service.resolveStoredCurrentSkillDeckToCardIds(
+                List.of("oc-2", "oc-stale", "oc-3"),
+                ownedCards()
+        );
+
+        assertIterableEquals(List.of("C001", "C002"), resolved);
+    }
+
+    @Test
+    @DisplayName("resolve to cardIds keeps unresolved non-owned entries as cardId based stored deck")
+    void resolveToCardIdsKeepsUnresolvedNonOwnedEntriesAsCardIds() {
+        List<String> resolved = service.resolveStoredCurrentSkillDeckToCardIds(
+                List.of("C001", "UNKNOWN_CARD", "C002"),
+                ownedCards()
+        );
+
+        assertIterableEquals(List.of("C001", "UNKNOWN_CARD", "C002"), resolved);
+    }
+
+    @Test
     @DisplayName("resolve to cardIds returns empty list for null or blank stored deck")
     void resolveToCardIdsReturnsEmptyListForNullOrBlankStoredDeck() {
         assertTrue(service.resolveStoredCurrentSkillDeckToCardIds(null, ownedCards()).isEmpty());
@@ -113,9 +135,48 @@ class CharacterCurrentSkillDeckReadServiceTest {
         );
 
         assertEquals(3, preview.totalCards());
+        assertEquals(0, preview.unresolvedEntryCount());
         assertIterableEquals(List.of("C001", "C001", "C002"), preview.cardIds());
         assertEquals(2, preview.cardCounts().get("C001"));
         assertEquals(1, preview.cardCounts().get("C002"));
+    }
+
+    @Test
+    @DisplayName("preview drops stale ownedCardId entries and reports unresolved count")
+    void previewDropsStaleOwnedCardIdsAndReportsUnresolvedCount() {
+        var preview = service.previewStoredCurrentSkillDeck(
+                List.of("oc-2", "oc-stale", "oc-3"),
+                """
+                        [
+                          {"ownedCardId":"oc-2","cardId":"C001"},
+                          {"ownedCardId":"oc-3","cardId":"C002"}
+                        ]
+                        """
+        );
+
+        assertEquals(2, preview.totalCards());
+        assertEquals(1, preview.unresolvedEntryCount());
+        assertTrue(preview.hasUnresolvedEntries());
+        assertIterableEquals(List.of("C001", "C002"), preview.cardIds());
+        assertTrue(!preview.cardCounts().containsKey("oc-stale"));
+    }
+
+    @Test
+    @DisplayName("preview reports unresolved count even when every stored ownedCardId is stale")
+    void previewReportsUnresolvedCountWhenEveryOwnedCardIdIsStale() {
+        var preview = service.previewStoredCurrentSkillDeck(
+                List.of("oc-stale-1", "oc-stale-2"),
+                """
+                        [
+                          {"ownedCardId":"oc-1","cardId":"C001"}
+                        ]
+                        """
+        );
+
+        assertEquals(0, preview.totalCards());
+        assertEquals(2, preview.unresolvedEntryCount());
+        assertTrue(preview.hasUnresolvedEntries());
+        assertTrue(preview.cardIds().isEmpty());
     }
 
     private static List<OwnedCard> ownedCards() {

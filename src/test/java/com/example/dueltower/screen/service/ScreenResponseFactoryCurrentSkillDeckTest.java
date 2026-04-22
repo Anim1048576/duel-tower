@@ -114,6 +114,47 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
     }
 
     @Test
+    void gmLobbyCharacterSummaryDoesNotScoreStaleOwnedCardIdsAsCardIds() {
+        ScreenResponseFactory factory = factory(mock(CharacterProfileRepository.class));
+        PlayerStateDto player = player(
+                "player1",
+                List.of(
+                        owned("p-oc-1", "C001"),
+                        owned("p-oc-2", "C002")
+                ),
+                List.of("p-oc-1", "p-oc-2")
+        );
+        SessionStateDto state = state(player);
+        SessionRuntime runtime = runtime("player1");
+
+        GmLobbyScreenResponse response = factory.gmLobby(
+                ScreenRouteSpec.GM_LOBBY,
+                state,
+                runtime,
+                new SessionAccessDecision(SessionAccessDecision.SessionAccessSource.GM_TOKEN, "ABCD1234", "gm", null),
+                List.of(characterResponse(
+                        7L,
+                        "Partially Stale",
+                        """
+                                [
+                                  {"ownedCardId":"char-oc-1","cardId":"C001"}
+                                ]
+                                """,
+                        List.of("char-oc-1", "oc-stale")
+                )),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+
+        assertThat(response.getParticipantCards()).hasSize(1);
+        assertThat(response.getParticipantCards().get(0).characterSummary())
+                .isEqualTo("Likely Partially Stale #7");
+        assertThat(response.getParticipantCards().get(0).characterSummary())
+                .doesNotContain("oc-stale");
+    }
+
+    @Test
     void presetEditorResolvedUsesAppliedCardsTagFromResolvedCurrentSkillDeckPreview() {
         CharacterProfileRepository repository = mock(CharacterProfileRepository.class);
         when(repository.findById(7L)).thenReturn(Optional.of(characterProfile(

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
@@ -21,6 +22,8 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 public class CharacterCurrentSkillDeckReadService {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Pattern GENERATED_OWNED_CARD_ID_PATTERN =
+            Pattern.compile("(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
 
     /**
      * 저장된 currentSkillDeck을 cardId 목록으로 해석한다.
@@ -40,16 +43,7 @@ public class CharacterCurrentSkillDeckReadService {
             return List.of();
         }
 
-        Map<String, OwnedCard> ownedById = ownedCardMap(ownedCards);
-        if (!ownedById.isEmpty() && allEntriesAreOwnedCardIds(normalized, ownedById)) {
-            List<String> cardIds = new ArrayList<>(normalized.size());
-            for (String ownedCardId : normalized) {
-                cardIds.add(ownedById.get(ownedCardId).cardId());
-            }
-            return List.copyOf(cardIds);
-        }
-
-        return normalized;
+        return resolveStoredCurrentSkillDeckPreview(normalized, ownedCards).cardIds();
     }
 
     /**
@@ -79,12 +73,56 @@ public class CharacterCurrentSkillDeckReadService {
      * 화면 표시/preview용 currentSkillDeck 정보를 cardId 기준으로 만든다.
      */
     public CurrentSkillDeckPreview previewStoredCurrentSkillDeck(List<String> storedCurrentSkillDeck, String ownedCardsJson) {
-        List<String> cardIds = resolveStoredCurrentSkillDeckToCardIds(storedCurrentSkillDeck, ownedCardsJson);
+        CurrentSkillDeckPreview resolved = resolveStoredCurrentSkillDeckPreview(
+                normalizeStoredEntries(storedCurrentSkillDeck),
+                parseOwnedCardsJson(ownedCardsJson)
+        );
         Map<String, Integer> counts = new LinkedHashMap<>();
-        for (String cardId : cardIds) {
+        for (String cardId : resolved.cardIds()) {
             counts.merge(cardId, 1, Integer::sum);
         }
-        return new CurrentSkillDeckPreview(cardIds, counts, cardIds.size());
+        return new CurrentSkillDeckPreview(
+                resolved.cardIds(),
+                counts,
+                resolved.cardIds().size(),
+                resolved.unresolvedEntryCount(),
+                resolved.unresolvedEntryCount() > 0
+        );
+    }
+
+    private static CurrentSkillDeckPreview resolveStoredCurrentSkillDeckPreview(
+            List<String> normalized,
+            List<OwnedCard> ownedCards
+    ) {
+        if (normalized.isEmpty()) {
+            return CurrentSkillDeckPreview.empty();
+        }
+
+        Map<String, OwnedCard> ownedById = ownedCardMap(ownedCards);
+        List<String> cardIds = new ArrayList<>(normalized.size());
+        int unresolvedEntryCount = 0;
+
+        for (String entry : normalized) {
+            OwnedCard ownedCard = ownedById.get(entry);
+            if (ownedCard != null) {
+                cardIds.add(ownedCard.cardId());
+                continue;
+            }
+
+            if (looksLikeOwnedCardId(entry)) {
+                unresolvedEntryCount++;
+                continue;
+            }
+
+            cardIds.add(entry);
+        }
+
+        /*
+         * Mixed ownedCardId state can happen after ownedCards changes or stale client data.
+         * In that case unresolved ownedCardId-looking values are intentionally dropped instead of being
+         * treated as cardIds, because leaking oc-* / UUID values into preview or scoring corrupts read-side results.
+         */
+        return CurrentSkillDeckPreview.of(cardIds, unresolvedEntryCount);
     }
 
     private List<OwnedCard> parseOwnedCardsJson(String raw) {
@@ -164,13 +202,8 @@ public class CharacterCurrentSkillDeckReadService {
         return List.copyOf(normalized);
     }
 
-    private static boolean allEntriesAreOwnedCardIds(List<String> entries, Map<String, OwnedCard> ownedById) {
-        for (String entry : entries) {
-            if (!ownedById.containsKey(entry)) {
-                return false;
-            }
-        }
-        return true;
+    private static boolean looksLikeOwnedCardId(String value) {
+        return value.startsWith("oc-") || GENERATED_OWNED_CARD_ID_PATTERN.matcher(value).matches();
     }
 
     private static Map<String, OwnedCard> ownedCardMap(List<OwnedCard> ownedCards) {
@@ -193,7 +226,22 @@ public class CharacterCurrentSkillDeckReadService {
     public record CurrentSkillDeckPreview(
             List<String> cardIds,
             Map<String, Integer> cardCounts,
-            int totalCards
+            int totalCards,
+            int unresolvedEntryCount,
+            boolean hasUnresolvedEntries
     ) {
+        private static CurrentSkillDeckPreview empty() {
+            return new CurrentSkillDeckPreview(List.of(), Map.of(), 0, 0, false);
+        }
+
+        private static CurrentSkillDeckPreview of(List<String> cardIds, int unresolvedEntryCount) {
+            return new CurrentSkillDeckPreview(
+                    List.copyOf(cardIds),
+                    Map.of(),
+                    cardIds.size(),
+                    unresolvedEntryCount,
+                    unresolvedEntryCount > 0
+            );
+        }
     }
 }
