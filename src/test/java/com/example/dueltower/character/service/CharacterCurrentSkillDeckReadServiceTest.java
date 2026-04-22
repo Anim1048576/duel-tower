@@ -9,6 +9,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
@@ -36,6 +37,13 @@ class CharacterCurrentSkillDeckReadServiceTest {
         );
 
         assertIterableEquals(List.of("C001", "C001", "C002"), resolved);
+    }
+
+    @Test
+    @DisplayName("resolve to cardIds returns empty list for null or blank stored deck")
+    void resolveToCardIdsReturnsEmptyListForNullOrBlankStoredDeck() {
+        assertTrue(service.resolveStoredCurrentSkillDeckToCardIds(null, ownedCards()).isEmpty());
+        assertTrue(service.resolveStoredCurrentSkillDeckToCardIds(List.of(" ", "\t"), ownedCards()).isEmpty());
     }
 
     @Test
@@ -68,6 +76,26 @@ class CharacterCurrentSkillDeckReadServiceTest {
 
         assertEquals(BAD_REQUEST, ex.getStatusCode());
         assertEquals("ownedCards is required to resolve currentSkillDeck to ownedCardIds", ex.getReason());
+    }
+
+    @Test
+    @DisplayName("resolve to ownedCardIds rejects stale ownedCardId when ownedCards do not contain it")
+    void resolveToOwnedCardIdsRejectsStaleOwnedCardId() {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.resolveStoredCurrentSkillDeckToOwnedCardIds(List.of("stale-owned-card"), ownedCards()));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertEquals("owned card unavailable: stale-owned-card", ex.getReason());
+    }
+
+    @Test
+    @DisplayName("resolve to ownedCardIds rejects cardId stored deck when ownedCards are insufficient")
+    void resolveToOwnedCardIdsRejectsCardIdStoredDeckWhenOwnedCardsAreInsufficient() {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.resolveStoredCurrentSkillDeckToOwnedCardIds(List.of("C001", "C001", "C001"), ownedCards()));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertEquals("owned card unavailable: C001", ex.getReason());
     }
 
     @Test

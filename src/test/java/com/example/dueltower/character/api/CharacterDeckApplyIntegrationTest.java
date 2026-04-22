@@ -236,6 +236,32 @@ class CharacterDeckApplyIntegrationTest {
     }
 
     @Test
+    @DisplayName("detail 조회는 ownedCardId로 저장된 currentSkillDeck의 preview를 cardId로 반환한다")
+    void characterDetailPreviewResolvesOwnedCardIdStoredCurrentSkillDeck() throws Exception {
+        MockHttpSession session = signUpAndLogin("detailPreviewOwnedIds");
+        CharacterProfile character = createCharacter(
+                """
+                        [
+                          {"ownedCardId":"oc-1","cardId":"C001"},
+                          {"ownedCardId":"oc-2","cardId":"C001"},
+                          {"ownedCardId":"oc-3","cardId":"C002"}
+                        ]
+                        """,
+                List.of("oc-2", "oc-1", "oc-3")
+        );
+
+        mockMvc.perform(get("/api/content/characters/{id}", character.getId())
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentSkillDeck[0]").value("oc-2"))
+                .andExpect(jsonPath("$.currentSkillDeck[1]").value("oc-1"))
+                .andExpect(jsonPath("$.currentSkillDeck[2]").value("oc-3"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[0]").value("C001"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[1]").value("C001"))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[2]").value("C002"));
+    }
+
+    @Test
     @DisplayName("덱 적용 API는 없는 캐릭터에 NOT_FOUND를 반환한다")
     void applyDeckMissingCharacterReturnsNotFound() throws Exception {
         MockHttpSession session = signUpAndLogin("applyDeckMissingCharacter");
@@ -278,6 +304,10 @@ class CharacterDeckApplyIntegrationTest {
     }
 
     private CharacterProfile createCharacter(List<String> currentSkillDeck) {
+        return createCharacter("[]", currentSkillDeck);
+    }
+
+    private CharacterProfile createCharacter(String ownedCards, List<String> currentSkillDeck) {
         CharacterProfile profile = CharacterProfile.builder()
                 .name("test-character")
                 .gender(CharacterGender.MALE)
@@ -293,7 +323,7 @@ class CharacterDeckApplyIntegrationTest {
                 .trait1("trait1")
                 .trait2("trait2")
                 .hiddenTraitIds(List.of())
-                .ownedCards("[]")
+                .ownedCards(ownedCards)
                 .currentSkillDeck(currentSkillDeck)
                 .exCard("{}")
                 .build();

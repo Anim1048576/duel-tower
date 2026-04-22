@@ -34,6 +34,46 @@ import static org.mockito.Mockito.when;
 class ScreenResponseFactoryCurrentSkillDeckTest {
 
     @Test
+    void gmLobbyCharacterSummaryScoresCurrentSkillDeckByResolvedCardIdsWhenStoredAsCardIds() {
+        ScreenResponseFactory factory = factory(mock(CharacterProfileRepository.class));
+        PlayerStateDto player = player(
+                "player1",
+                List.of(
+                        owned("p-oc-1", "C001"),
+                        owned("p-oc-2", "C002")
+                ),
+                List.of("p-oc-1", "p-oc-2")
+        );
+        SessionStateDto state = state(player);
+        SessionRuntime runtime = runtime("player1");
+
+        GmLobbyScreenResponse response = factory.gmLobby(
+                ScreenRouteSpec.GM_LOBBY,
+                state,
+                runtime,
+                new SessionAccessDecision(SessionAccessDecision.SessionAccessSource.GM_TOKEN, "ABCD1234", "gm", null),
+                List.of(characterResponse(
+                        7L,
+                        "Card Match",
+                        """
+                                [
+                                  {"ownedCardId":"char-oc-1","cardId":"C001"},
+                                  {"ownedCardId":"char-oc-2","cardId":"C002"}
+                                ]
+                                """,
+                        List.of("C001", "C002")
+                )),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+
+        assertThat(response.getParticipantCards()).hasSize(1);
+        assertThat(response.getParticipantCards().get(0).characterSummary())
+                .isEqualTo("Likely Card Match #7");
+    }
+
+    @Test
     void gmLobbyCharacterSummaryScoresCurrentSkillDeckByResolvedCardIdsWhenStoredAsOwnedCardIds() {
         ScreenResponseFactory factory = factory(mock(CharacterProfileRepository.class));
         PlayerStateDto player = player(
