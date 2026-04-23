@@ -37,6 +37,7 @@ export function getUnsupportedPendingDecisionMessage(pendingDecision: PendingDec
     case 'HAND_SWAP':
     case 'DISCARD_TO_HAND_LIMIT':
     case 'SEARCH_PICK':
+    case 'LAST_WORDS':
     case 'RESOLVE_SEARCH_PICK':
     case 'RESOLVE_INITIATIVE_TIE':
       return null

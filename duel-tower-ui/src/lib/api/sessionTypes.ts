@@ -49,6 +49,7 @@ export type PendingDecisionDto = {
   shuffleAfterPick: boolean | null
   groupIndex: number | null
   actorKeys: string[]
+  canSkip: boolean | null
 }
 
 export type PlayerEquippedItemDto = {

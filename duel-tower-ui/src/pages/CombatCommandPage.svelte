@@ -811,7 +811,7 @@
       return null
     }
 
-    if (metadata.unsupportedReason) {
+    if (metadata.unsupportedReason && metadata.pendingDecisionType !== 'LAST_WORDS') {
       return metadata.unsupportedReason
     }
 
@@ -831,6 +831,17 @@
           return `Select ${schema.pickCount ?? 0} candidate id${schema.pickCount === 1 ? '' : 's'} to resolve the pending decision.`
         }
         return null
+      case 'LAST_WORDS':
+        if (selectedPendingIds.length >= 2) {
+          return 'Select at most 1 candidate id to resolve the pending decision.'
+        }
+        if (schema.canSkip) {
+          return selectedPendingIds.length <= 1 ? null : 'Select at most 1 candidate id to resolve the pending decision.'
+        }
+        if (selectedPendingIds.length !== 1) {
+          return 'Select 1 candidate id to resolve the pending decision.'
+        }
+        return null
       case 'INITIATIVE_TIE_ORDER':
         if ((schema.actorKeys?.length ?? 0) !== orderedActorKeys.length) {
           return '동률 대상 순서를 먼저 정해 주세요.'
@@ -839,6 +850,14 @@
       default:
         return null
     }
+  }
+
+  function getPendingUnsupportedMessage(metadata: CombatPendingActionMetadataDto | null) {
+    if (!metadata?.unsupportedReason) {
+      return null
+    }
+
+    return metadata.pendingDecisionType === 'LAST_WORDS' ? null : metadata.unsupportedReason
   }
 
   function getActionPresentationBlock(action: CombatScreenAction | null) {
@@ -899,6 +918,7 @@
       limit: schema?.discardCount ?? null,
       pickCount: schema?.pickCount ?? null,
       candidateIds: schema?.candidateIds ?? [],
+      canSkip: schema?.canSkip ?? null,
       destination: schema?.destination ?? null,
       shuffleAfterPick: schema?.shuffleAfterPick ?? null,
       groupIndex: schema?.groupIndex ?? null,
@@ -1484,7 +1504,7 @@
           {selectedDiscardIds}
           {selectedFieldIds}
           {pendingDecision}
-          unsupportedPendingDecisionMessage={pendingActionMetadata?.unsupportedReason ?? pendingLocalBlock}
+          unsupportedPendingDecisionMessage={getPendingUnsupportedMessage(pendingActionMetadata) ?? pendingLocalBlock}
           {pendingCandidateIds}
           orderedTieActorKeys={orderedActorKeys}
           {canResolvePendingCommand}
