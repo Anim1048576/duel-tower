@@ -11,5 +11,6 @@ public record PendingDecisionDto(
         String destination,
         Boolean shuffleAfterPick,
         Integer groupIndex,
-        List<String> actorKeys
+        List<String> actorKeys,
+        Boolean canSkip
 ) {}

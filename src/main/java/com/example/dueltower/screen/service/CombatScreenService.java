@@ -920,6 +920,12 @@ public class CombatScreenService {
                 schema.put("shuffleAfterPick", pendingDecision.shuffleAfterPick());
                 schema.put("selectedIdsField", "selectedIds");
             }
+            case "LAST_WORDS" -> {
+                schema.put("pickCount", 1);
+                schema.put("candidateIds", pendingDecision.candidateIds());
+                schema.put("canSkip", pendingDecision.canSkip());
+                schema.put("selectedIdsField", "selectedIds");
+            }
             case "INITIATIVE_TIE_ORDER" -> {
                 schema.put("groupIndex", pendingDecision.groupIndex());
                 schema.put("actorKeys", pendingDecision.actorKeys());

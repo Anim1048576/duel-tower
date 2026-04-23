@@ -109,7 +109,7 @@ public final class StateMapper {
     private static PlayerStateDto toDto(PlayerState ps, int currentRound, GameState state) {
         PendingDecisionDto pending = null;
         if (ps.pendingDecision() instanceof PendingDecision.DiscardToHandLimit dt) {
-            pending = new PendingDecisionDto("DISCARD_TO_HAND_LIMIT", dt.reason(), dt.limit(), null, null, null, null, null, null);
+            pending = new PendingDecisionDto("DISCARD_TO_HAND_LIMIT", dt.reason(), dt.limit(), null, null, null, null, null, null, null);
         } else if (ps.pendingDecision() instanceof PendingDecision.SearchPick sp) {
             pending = new PendingDecisionDto(
                     "SEARCH_PICK",
@@ -120,12 +120,26 @@ public final class StateMapper {
                     sp.destination().name(),
                     sp.shuffleAfterPick(),
                     null,
+                    null,
                     null
             );
         } else if (ps.pendingDecision() instanceof PendingDecision.InitiativeTieOrder it) {
-            pending = new PendingDecisionDto("INITIATIVE_TIE_ORDER", it.reason(), null, null, null, null, null, it.groupIndex(), List.copyOf(it.actorKeys()));
+            pending = new PendingDecisionDto("INITIATIVE_TIE_ORDER", it.reason(), null, null, null, null, null, it.groupIndex(), List.copyOf(it.actorKeys()), null);
         } else if (ps.pendingDecision() instanceof PendingDecision.JudgementChoice jc) {
-            pending = new PendingDecisionDto("JUDGEMENT", jc.reason(), null, null, List.copyOf(jc.choiceIds()), null, null, null, null);
+            pending = new PendingDecisionDto("JUDGEMENT", jc.reason(), null, null, List.copyOf(jc.choiceIds()), null, null, null, null, null);
+        } else if (ps.pendingDecision() instanceof PendingDecision.LastWordsChoice lw) {
+            pending = new PendingDecisionDto(
+                    "LAST_WORDS",
+                    lw.reason(),
+                    null,
+                    1,
+                    lw.candidateIds().stream().map(id -> id.value().toString()).toList(),
+                    null,
+                    null,
+                    null,
+                    List.of(),
+                    lw.skippable()
+            );
         }
 
         return new PlayerStateDto(
