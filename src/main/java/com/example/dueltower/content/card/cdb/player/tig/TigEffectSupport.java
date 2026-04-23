@@ -4,6 +4,7 @@ import com.example.dueltower.common.util.DiceUtility;
 import com.example.dueltower.content.keyword.kdb.K003_Installed;
 import com.example.dueltower.content.status.sdb.player.tig.Tig201_Status;
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.EffectDiscardOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.keyword.DiscardReason;
@@ -75,15 +76,13 @@ final class TigEffectSupport {
         List<String> errors = new ArrayList<>();
         if (!validateSingleDiscardSelection(ec, me, errors)) return false;
         Ids.CardInstId selectedId = ec.discardIds().get(0);
-        ZoneOps.moveToZoneOrVanishIfToken(ec.state(), ec.ctx(), me, selectedId, Zone.GRAVE, ec.out());
-        return true;
+        return EffectDiscardOps.discardFromHandByEffect(ec, me, selectedId);
     }
 
     static boolean discardOneFromHandExcludingSource(EffectContext ec, PlayerState me) {
         List<Ids.CardInstId> candidates = discardCandidatesExcludingSource(ec, me);
         if (candidates.isEmpty()) return false;
-        ZoneOps.moveToZoneOrVanishIfToken(ec.state(), ec.ctx(), me, candidates.get(0), Zone.GRAVE, ec.out());
-        return true;
+        return EffectDiscardOps.discardFromHandByEffect(ec, me, candidates.get(0));
     }
 
     static boolean requireDiscardOrAbort(EffectContext ec, PlayerState me, String cardId) {

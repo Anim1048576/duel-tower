@@ -1,12 +1,12 @@
 package com.example.dueltower.content.cardmodifier.cmdb;
 
 import com.example.dueltower.content.cardmodifier.model.CardModifierBlueprint;
-import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.core.EffectDiscardOps;
+import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierRuntime;
 import com.example.dueltower.engine.core.effect.cardmodifier.PlayCardModifierCtx;
 import com.example.dueltower.engine.core.effect.keyword.DiscardReason;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
-import com.example.dueltower.engine.core.effect.keyword.MoveReason;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 import org.springframework.stereotype.Component;
@@ -37,7 +37,8 @@ public class CM105_WeakenedDiscardOneSkill implements CardModifierBlueprint {
         List<CardInstId> candidates = discardCandidates(rt, c);
         if (candidates.isEmpty()) return;
         CardInstId picked = candidates.get(0);
-        ZoneOps.moveToZoneOrVanishIfToken(rt.state(), rt.ctx(), c.actorState(), picked, Zone.GRAVE, rt.out(), MoveReason.DISCARD);
+        EffectContext ec = new EffectContext(rt.state(), rt.ctx(), c.actorState().playerId(), c.cardId(), null, rt.out());
+        EffectDiscardOps.discardFromHandByEffect(ec, c.actorState(), picked);
     }
 
     private List<CardInstId> discardCandidates(CardModifierRuntime rt, PlayCardModifierCtx c) {
