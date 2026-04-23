@@ -203,6 +203,12 @@ public enum SessionCommandType {
             return new ResolveSearchPickCommand(commandId, expectedVersion, commandPlayerId(req), parseCardInstIds(req.selectedIds(), "selectedIds"));
         }
     },
+    LAST_WORDS("LAST_WORDS", SessionCommandAuth.PLAYER, false) {
+        @Override
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+            return new ResolveLastWordsCommand(commandId, expectedVersion, commandPlayerId(req), parseCardInstIds(req.selectedIds(), "selectedIds"));
+        }
+    },
     RESOLVE_SEARCH_PICK("RESOLVE_SEARCH_PICK", SessionCommandAuth.PLAYER, false) {
         @Override
         public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
