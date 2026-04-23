@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.core.effect.cardmodifier;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.effect.LastWordsBatchCollector;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -15,5 +16,6 @@ public record PlayCardModifierCtx(
         PlayerState actorState,
         CardInstId cardId,
         CardInstance ci,
-        CardDefinition def
+        CardDefinition def,
+        LastWordsBatchCollector lastWordsBatchCollector
 ) {}

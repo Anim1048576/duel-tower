@@ -5,6 +5,7 @@ import com.example.dueltower.engine.core.LastWordsDecisionOps;
 import com.example.dueltower.engine.core.SummonOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
+import com.example.dueltower.engine.core.effect.LastWordsBatchCollector;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.card.CardEffectOps;
 import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierOps;
@@ -167,18 +168,19 @@ public final class PlayCardCommand implements GameCommand {
         // 키워드 후처리(턴당 1장 트래킹, AP debt 기록 등)
         KeywordOps.onAfterPlayCard(state, ctx, ps, cardId, cost, have, debt);
 
-        CardModifierOps.beforeResolvePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ps, cardId, ci, def, events, "PLAY_CARD");
+        LastWordsBatchCollector lastWordsBatchCollector = new LastWordsBatchCollector();
+        CardModifierOps.beforeResolvePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ps, cardId, ci, def, events, lastWordsBatchCollector, "PLAY_CARD");
 
         // 효과 해결
         CardEffect eff = ctx.effect(ci.defId());
-        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, discardIds, selectedIds, events);
+        EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, discardIds, selectedIds, events, lastWordsBatchCollector);
         eff.resolve(ec);
         LastWordsDecisionOps.openPendingIfPossible(ec, ps, events);
 
         // 카드 사용 후 훅 순서: passive -> status
         PassiveOps.afterPlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, events, "PLAY_CARD");
         StatusOps.afterPlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, events, "PLAY_CARD");
-        CardModifierOps.afterResolvePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ps, cardId, ci, def, events, "PLAY_CARD");
+        CardModifierOps.afterResolvePlayCard(state, ctx, TargetRef.ofPlayer(playerId), ps, cardId, ci, def, events, lastWordsBatchCollector, "PLAY_CARD");
 
         // 카드 이동 (HAND -> resolveTo)
         if (ps.hand().contains(cardId) && state.card(cardId) != null) {

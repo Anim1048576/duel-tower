@@ -49,6 +49,18 @@ public record EffectContext(
             CardInstId cardId,
             TargetSelection selection,
             List<GameEvent> out,
+            LastWordsBatchCollector lastWordsBatchCollector
+    ) {
+        this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, null, null, lastWordsBatchCollector);
+    }
+
+    public EffectContext(
+            GameState state,
+            EngineContext ctx,
+            PlayerId actor,
+            CardInstId cardId,
+            TargetSelection selection,
+            List<GameEvent> out,
             SummonInstId statSourceSummonId
     ) {
         this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, statSourceSummonId, null, null);
@@ -77,6 +89,20 @@ public record EffectContext(
             List<GameEvent> out
     ) {
         this(state, ctx, actor, cardId, selection, discardIds, List.of(), out, null, null, null);
+    }
+
+    public EffectContext(
+            GameState state,
+            EngineContext ctx,
+            PlayerId actor,
+            CardInstId cardId,
+            TargetSelection selection,
+            List<CardInstId> discardIds,
+            List<CardInstId> selectedIds,
+            List<GameEvent> out,
+            LastWordsBatchCollector lastWordsBatchCollector
+    ) {
+        this(state, ctx, actor, cardId, selection, discardIds, selectedIds, out, null, null, lastWordsBatchCollector);
     }
 
     public EffectContext(
@@ -122,5 +148,28 @@ public record EffectContext(
             return actorSourceSummonId.value().toString();
         }
         return actor.value();
+    }
+
+    public EffectContext withSameTiming(
+            PlayerId actor,
+            CardInstId cardId,
+            TargetSelection selection,
+            List<CardInstId> discardIds,
+            List<CardInstId> selectedIds,
+            List<GameEvent> out
+    ) {
+        return new EffectContext(
+                state,
+                ctx,
+                actor,
+                cardId,
+                selection,
+                discardIds,
+                selectedIds,
+                out,
+                statSourceSummonId,
+                actorSourceSummonId,
+                lastWordsBatchCollector
+        );
     }
 }

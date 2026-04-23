@@ -2,6 +2,7 @@ package com.example.dueltower.engine.core.effect.cardmodifier;
 
 import com.example.dueltower.content.card.model.OwnedCardModifier;
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.effect.LastWordsBatchCollector;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
@@ -71,7 +72,7 @@ public final class CardModifierOps {
         for (HookEntry it : collectEntries(ctx, ci)) {
             if (!ctx.hasCardModifierEffect(it.modifierId())) continue;
             CardModifierRuntime rt = new CardModifierRuntime(state, ctx, dummyOut, "VALIDATE", it.value());
-            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, dummyOut, actor, actorState, cardId, ci, def);
+            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, dummyOut, actor, actorState, cardId, ci, def, null);
             ctx.cardModifierEffect(it.modifierId()).validatePlayCard(rt, hookCtx, errors);
         }
     }
@@ -87,10 +88,25 @@ public final class CardModifierOps {
             List<GameEvent> out,
             String source
     ) {
+        beforeResolvePlayCard(state, ctx, actor, actorState, cardId, ci, def, out, null, source);
+    }
+
+    public static void beforeResolvePlayCard(
+            GameState state,
+            EngineContext ctx,
+            TargetRef actor,
+            PlayerState actorState,
+            CardInstId cardId,
+            CardInstance ci,
+            CardDefinition def,
+            List<GameEvent> out,
+            LastWordsBatchCollector lastWordsBatchCollector,
+            String source
+    ) {
         for (HookEntry it : collectEntries(ctx, ci)) {
             if (!ctx.hasCardModifierEffect(it.modifierId())) continue;
             CardModifierRuntime rt = new CardModifierRuntime(state, ctx, out, source, it.value());
-            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, out, actor, actorState, cardId, ci, def);
+            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, out, actor, actorState, cardId, ci, def, lastWordsBatchCollector);
             ctx.cardModifierEffect(it.modifierId()).beforeResolvePlayCard(rt, hookCtx);
         }
     }
@@ -106,10 +122,25 @@ public final class CardModifierOps {
             List<GameEvent> out,
             String source
     ) {
+        afterResolvePlayCard(state, ctx, actor, actorState, cardId, ci, def, out, null, source);
+    }
+
+    public static void afterResolvePlayCard(
+            GameState state,
+            EngineContext ctx,
+            TargetRef actor,
+            PlayerState actorState,
+            CardInstId cardId,
+            CardInstance ci,
+            CardDefinition def,
+            List<GameEvent> out,
+            LastWordsBatchCollector lastWordsBatchCollector,
+            String source
+    ) {
         for (HookEntry it : collectEntries(ctx, ci)) {
             if (!ctx.hasCardModifierEffect(it.modifierId())) continue;
             CardModifierRuntime rt = new CardModifierRuntime(state, ctx, out, source, it.value());
-            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, out, actor, actorState, cardId, ci, def);
+            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, out, actor, actorState, cardId, ci, def, lastWordsBatchCollector);
             ctx.cardModifierEffect(it.modifierId()).afterResolvePlayCard(rt, hookCtx);
         }
     }
@@ -129,7 +160,7 @@ public final class CardModifierOps {
         for (HookEntry it : collectEntries(ctx, ci)) {
             if (!ctx.hasCardModifierEffect(it.modifierId())) continue;
             CardModifierRuntime rt = new CardModifierRuntime(state, ctx, dummyOut, "VALIDATE", it.value());
-            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, dummyOut, actor, actorState, cardId, ci, def);
+            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, dummyOut, actor, actorState, cardId, ci, def, null);
             ctx.cardModifierEffect(it.modifierId()).validateUseEx(rt, hookCtx, errors);
         }
     }
@@ -148,7 +179,7 @@ public final class CardModifierOps {
         for (HookEntry it : collectEntries(ctx, ci)) {
             if (!ctx.hasCardModifierEffect(it.modifierId())) continue;
             CardModifierRuntime rt = new CardModifierRuntime(state, ctx, out, source, it.value());
-            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, out, actor, actorState, cardId, ci, def);
+            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, out, actor, actorState, cardId, ci, def, null);
             ctx.cardModifierEffect(it.modifierId()).beforeResolveUseEx(rt, hookCtx);
         }
     }
@@ -167,7 +198,7 @@ public final class CardModifierOps {
         for (HookEntry it : collectEntries(ctx, ci)) {
             if (!ctx.hasCardModifierEffect(it.modifierId())) continue;
             CardModifierRuntime rt = new CardModifierRuntime(state, ctx, out, source, it.value());
-            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, out, actor, actorState, cardId, ci, def);
+            PlayCardModifierCtx hookCtx = new PlayCardModifierCtx(state, ctx, out, actor, actorState, cardId, ci, def, null);
             ctx.cardModifierEffect(it.modifierId()).afterResolveUseEx(rt, hookCtx);
         }
     }

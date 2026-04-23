@@ -37,7 +37,15 @@ public class CM105_WeakenedDiscardOneSkill implements CardModifierBlueprint {
         List<CardInstId> candidates = discardCandidates(rt, c);
         if (candidates.isEmpty()) return;
         CardInstId picked = candidates.get(0);
-        EffectContext ec = new EffectContext(rt.state(), rt.ctx(), c.actorState().playerId(), c.cardId(), null, rt.out());
+        EffectContext ec = new EffectContext(
+                rt.state(),
+                rt.ctx(),
+                c.actorState().playerId(),
+                c.cardId(),
+                null,
+                rt.out(),
+                c.lastWordsBatchCollector()
+        );
         EffectDiscardOps.discardFromHandByEffect(ec, c.actorState(), picked);
     }
 
