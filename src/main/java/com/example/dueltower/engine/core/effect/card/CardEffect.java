@@ -18,6 +18,8 @@ public interface CardEffect extends PersistentFieldEffect {
 
     void resolve(EffectContext ec);
 
+    default void resolveLastWords(LastWordsContext lc) {}
+
     @Override
     default void onEnterField(EffectContext ec, CardInstId sourceCardId) {}
 
