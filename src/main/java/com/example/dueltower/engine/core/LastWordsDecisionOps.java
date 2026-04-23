@@ -20,7 +20,15 @@ public final class LastWordsDecisionOps {
             return false;
         }
 
-        List<Ids.CardInstId> candidateIds = ec.lastWordsBatchCollector().candidateIds().stream()
+        List<Ids.CardInstId> collectedCandidateIds = ec.lastWordsBatchCollector().candidateIds();
+        if (collectedCandidateIds.isEmpty()) {
+            events.add(new GameEvent.LogAppended(
+                    ps.playerId().value() + " last words skipped: no candidates"
+            ));
+            return false;
+        }
+
+        List<Ids.CardInstId> candidateIds = collectedCandidateIds.stream()
                 .filter(candidateId -> {
                     int cost = KeywordOps.keywordValue(ec.state(), ec.ctx(), candidateId, K014_LastWords.ID);
                     return cost > 0 && ps.ap() >= cost;
@@ -28,6 +36,9 @@ public final class LastWordsDecisionOps {
                 .toList();
 
         if (candidateIds.isEmpty()) {
+            events.add(new GameEvent.LogAppended(
+                    ps.playerId().value() + " last words skipped: no payable candidates"
+            ));
             return false;
         }
 
@@ -45,6 +56,9 @@ public final class LastWordsDecisionOps {
                 ec.lastWordsBatchCollector().correlationId()
         ));
         events.add(new GameEvent.PendingDecisionSet(ps.playerId().value(), "LAST_WORDS", REASON));
+        events.add(new GameEvent.LogAppended(
+                ps.playerId().value() + " opens last words choice " + candidateIds.size()
+        ));
         return true;
     }
 }

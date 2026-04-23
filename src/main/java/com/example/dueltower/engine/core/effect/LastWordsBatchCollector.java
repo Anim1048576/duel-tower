@@ -4,6 +4,7 @@ import com.example.dueltower.engine.model.Ids;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public final class LastWordsBatchCollector {
@@ -15,7 +16,7 @@ public final class LastWordsBatchCollector {
     }
 
     public LastWordsBatchCollector(UUID correlationId) {
-        this.correlationId = correlationId;
+        this.correlationId = Objects.requireNonNull(correlationId);
     }
 
     public UUID correlationId() {
