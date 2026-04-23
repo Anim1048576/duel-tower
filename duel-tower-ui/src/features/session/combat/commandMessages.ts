@@ -34,12 +34,10 @@ export function getUnsupportedPendingDecisionMessage(pendingDecision: PendingDec
   }
 
   switch (pendingDecision.type) {
-    case 'HAND_SWAP':
     case 'DISCARD_TO_HAND_LIMIT':
     case 'SEARCH_PICK':
+    case 'INITIATIVE_TIE_ORDER':
     case 'LAST_WORDS':
-    case 'RESOLVE_SEARCH_PICK':
-    case 'RESOLVE_INITIATIVE_TIE':
       return null
     default:
       return `${pendingDecision.type} is not supported in this step yet.`

@@ -40,6 +40,7 @@
   } from '../lib/components/combat/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
+  import { getUnsupportedPendingDecisionMessage } from '../features/session/combat/commandMessages'
   import { pathBuilders } from '../lib/navigation'
   import {
     acceptsBoardSelectionKey,
@@ -811,10 +812,6 @@
       return null
     }
 
-    if (metadata.unsupportedReason && metadata.pendingDecisionType !== 'LAST_WORDS') {
-      return metadata.unsupportedReason
-    }
-
     const schema = metadata.schema
     if (!schema) {
       return metadata.blocked ? 'Pending decision schema is unavailable.' : null
@@ -850,14 +847,6 @@
       default:
         return null
     }
-  }
-
-  function getPendingUnsupportedMessage(metadata: CombatPendingActionMetadataDto | null) {
-    if (!metadata?.unsupportedReason) {
-      return null
-    }
-
-    return metadata.pendingDecisionType === 'LAST_WORDS' ? null : metadata.unsupportedReason
   }
 
   function getActionPresentationBlock(action: CombatScreenAction | null) {
@@ -1504,7 +1493,7 @@
           {selectedDiscardIds}
           {selectedFieldIds}
           {pendingDecision}
-          unsupportedPendingDecisionMessage={getPendingUnsupportedMessage(pendingActionMetadata) ?? pendingLocalBlock}
+          unsupportedPendingDecisionMessage={getUnsupportedPendingDecisionMessage(pendingDecision) ?? pendingLocalBlock}
           {pendingCandidateIds}
           orderedTieActorKeys={orderedActorKeys}
           {canResolvePendingCommand}
