@@ -5,6 +5,7 @@ import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.keyword.DiscardReason;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.keyword.MoveReason;
+import com.example.dueltower.engine.model.CardInstance;
 import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.engine.model.Zone;
@@ -28,8 +29,9 @@ public final class EffectDiscardOps {
         }
 
         ZoneOps.moveToZoneOrVanishIfToken(ec.state(), ec.ctx(), owner, targetId, Zone.GRAVE, ec.out(), MoveReason.DISCARD);
+        CardInstance discarded = ec.state().card(targetId);
         int lastWordsValue = KeywordOps.keywordValue(ec.state(), ec.ctx(), targetId, K014_LastWords.ID);
-        if (lastWordsValue > 0) {
+        if (discarded != null && discarded.zone() == Zone.GRAVE && lastWordsValue >= 1) {
             ec.lastWordsBatchCollector().register(targetId);
         }
         return true;
