@@ -36,23 +36,23 @@
     {
       key: 'equipment',
       title: 'Equipment',
-      note: 'Gear-linked entries, bound equipment, and ammunition-linked stock.',
+      note: '장비와 탄약입니다.',
       tone: 'warning',
-      emptyMessage: 'No equipment-linked supply entries are stored for this run.',
+      emptyMessage: '표시할 장비가 없습니다.',
     },
     {
       key: 'consumable',
       title: 'Consumables',
-      note: 'Battle-use or repeatedly consumed expedition supplies.',
+      note: '사용 가능한 소모품입니다.',
       tone: 'success',
-      emptyMessage: 'No consumable supply entries are stored for this run.',
+      emptyMessage: '표시할 소모품이 없습니다.',
     },
     {
       key: 'special',
       title: 'Special stock',
-      note: 'Reserve, utility, or uncategorized support entries from the run inventory.',
+      note: '기타 보급품입니다.',
       tone: 'accent',
-      emptyMessage: 'No special or reserve supply entries are stored for this run.',
+      emptyMessage: '표시할 보급품이 없습니다.',
     },
   ]
 
@@ -92,15 +92,15 @@
 
   function getContextMessage(nextCode: string | null, nextAccess: StoredSessionAccess | null) {
     if (!nextCode) {
-      return 'Open or rejoin a session first. The supply locker follows the expedition you entered most recently.'
+      return '먼저 세션에 참가해 주세요.'
     }
 
     if (!nextAccess) {
-      return `Session ${nextCode} is known, but this browser no longer has the access needed to reopen its supplies.`
+      return `Session ${nextCode} 접근 권한이 없습니다.`
     }
 
     if (!toSessionReadAccess(nextAccess)) {
-      return `Session ${nextCode} was found, but the saved access details are incomplete. Return to Session Entry to restore them.`
+      return `Session ${nextCode} 접근 정보가 부족합니다.`
     }
 
     return null
@@ -115,7 +115,7 @@
     }
 
     if (normalizedHandoff && normalizedHandoff !== nextCode) {
-      return `Another session code (${normalizedHandoff}) is waiting in handoff, but the supply locker is currently showing ${nextCode}.`
+      return `다른 세션 코드(${normalizedHandoff})가 대기 중입니다.`
     }
 
     if (isStoredPlayerSessionAccess(nextAccess)) {
@@ -123,7 +123,7 @@
     }
 
     if (isStoredGmSessionAccess(nextAccess)) {
-      return `Viewing expedition supplies in GM mode for session ${nextCode}. This screen stays read-only here.`
+      return `GM 모드로 Session ${nextCode} 보급품을 확인 중입니다.`
     }
 
     return null
@@ -301,7 +301,7 @@
         return
       }
 
-      errorMessage = getApiErrorMessage(error, 'The expedition supplies could not be loaded right now.')
+      errorMessage = getApiErrorMessage(error, '보급품을 불러오지 못했습니다.')
     } finally {
       if (requestId === requestSequence) {
         loading = false
@@ -366,18 +366,18 @@
     <SectionFrame
       eyebrow="Supply Locker"
       title="Expedition Supply"
-      description="Opening the current expedition pack from the session you entered most recently."
+      description="보유 자원을 불러오는 중입니다."
     >
       <ContentStatePanel
         title="Loading supply locker"
-        message="Gathering gold, keys, chests, and carried supplies for the active expedition."
+        message="불러오는 중입니다."
       />
     </SectionFrame>
   {:else if contextMessage}
     <SectionFrame
       eyebrow="Supply Locker"
       title="Inventory context is unavailable"
-      description="Inventory follows a live session, so it needs a recent session entry before it can open."
+      description="먼저 세션에 참가해 주세요."
     >
       <ContentStatePanel
         title="Session context required"
@@ -397,7 +397,7 @@
     <SectionFrame
       eyebrow="Supply Locker"
       title="Expedition supply could not be restored"
-      description="The session is known, but the expedition supplies could not be refreshed."
+      description="보급품을 불러오지 못했습니다."
     >
       <ContentStatePanel
         title="Could not load supplies"
@@ -417,12 +417,12 @@
     <SectionFrame
       eyebrow="Supply Locker"
       title="Expedition Supply"
-      description="Review the resources and supplies the expedition already carries. This screen stays read-only for now."
+      description="현재 보유 자원을 확인합니다."
     >
       <div class="inventory-page__hero">
         <div class="inventory-page__hero-copy">
           <p>Expedition overview</p>
-          <h3>Check what the party is carrying right now, then inspect one stored item at a time.</h3>
+          <h3>현재 보유 자원을 확인합니다.</h3>
         </div>
 
         <div class="inventory-page__hero-tags">
@@ -455,7 +455,7 @@
     <div class="inventory-page__main">
       <SectionFrame
         title="Supply tray"
-        description="These five slots highlight the most visible supplies in the current expedition pack."
+        description="주요 보유 자원입니다."
       >
         {#if inventoryItems.length > 0}
           <div class="inventory-page__tray">
@@ -542,7 +542,7 @@
 
                   <div class="inventory-page__detail-block">
                     <strong>Description</strong>
-                    <p>{selectedItem.description ?? 'No extended description is stored for this entry.'}</p>
+                    <p>{selectedItem.description ?? '상세 설명이 없습니다.'}</p>
                   </div>
 
                   <div class="inventory-page__detail-block">
@@ -569,7 +569,7 @@
                       </li>
                       <li>
                         {selectedItem.bound
-                          ? 'This entry is currently bound to the expedition state.'
+                          ? '현재 세션에 연결된 항목입니다.'
                           : 'This entry is not marked as bound.'}
                       </li>
                       <li>
@@ -591,9 +591,9 @@
         {:else}
           <ContentStatePanel
             title="No stored supplies yet"
-            message="The expedition still has its shared resources, but there are no carried item entries to show here yet."
+            message="표시할 항목이 없습니다."
           >
-            <p>Gold, keys, and chest counts stay visible above even when the supply tray is empty.</p>
+            <p>자원 수량은 위에서 확인할 수 있습니다.</p>
           </ContentStatePanel>
         {/if}
       </SectionFrame>
@@ -601,7 +601,7 @@
       <div class="inventory-page__sidebar">
         <SectionFrame
           title="Session context"
-          description="This screen follows the session you opened most recently, so you can quickly switch back if the wrong expedition is showing."
+          description="최근 세션 기준으로 표시됩니다."
         >
           <div class="inventory-page__context-grid">
             <div class="inventory-page__context-row">
@@ -640,7 +640,7 @@
                 title: item.name,
                 subtitle: buildSupplyNote(item),
                 meta: buildSupplyMeta(item),
-                note: item.description ?? 'No extended description is stored for this supply entry.',
+                note: item.description ?? '상세 설명이 없습니다.',
                 tags: buildSupplyTags(item),
               }))}
               selectedId={selectedItemId}

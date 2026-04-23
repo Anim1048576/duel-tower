@@ -151,7 +151,7 @@
           <ContentStatePanel
             title="No visible hand yet"
             message={catalogLoading
-              ? 'Loading the card archive before resolving live hand cards.'
+              ? '손패를 불러오는 중입니다.'
               : emptyMessage}
           />
         {/if}

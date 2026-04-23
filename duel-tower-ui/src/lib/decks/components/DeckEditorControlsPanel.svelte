@@ -80,8 +80,8 @@
 <SectionFrame
   title="Editor actions"
   description={screen.mode === 'create'
-    ? 'Create a new deck record from the current local input state.'
-    : 'Validate, save, or delete by invoking the screen-declared actions.'}
+    ? '새 덱을 생성합니다.'
+    : '덱을 검증, 저장, 삭제합니다.'}
 >
   <div class="controls-panel__actions">
     <a class="controls-panel__link-action" data-nav href={pathBuilders.deckList()}>
@@ -138,8 +138,8 @@
     <p>Current draft title: {localPresentation?.title ?? screen.derived.title}</p>
     <p>Current local dirty flag: {localPresentation?.dirty ? 'Changed' : 'Synced'}</p>
     <p>Current validation state: {serverValidation?.valid ? 'Valid' : 'Invalid'}</p>
-    <p>Validation issues come from the latest server validation snapshot.</p>
-    <p>Local freshness is derived in the editor from the current draft and validated signature.</p>
+    <p>검증 결과를 확인합니다.</p>
+    <p>현재 입력값과 마지막 검증값을 비교합니다.</p>
     {#if getDisabledReason(validateAction)}
       <p>{getDisabledReason(validateAction)}</p>
     {/if}
@@ -170,7 +170,7 @@
   {#if deleteConfirmOpen}
     <ContentStatePanel
       title="Delete this deck?"
-      message="This deck will be removed from the archive. This action cannot be undone."
+      message="이 덱을 삭제합니다. 되돌릴 수 없습니다."
       tone="error"
     >
       <div class="controls-panel__confirm-actions">
@@ -183,7 +183,7 @@
 
 <SectionFrame
   title="Validation"
-  description="The panel renders the validation block carried by the latest screen model."
+  description="덱 검증 결과입니다."
 >
   <div class="controls-panel__validation">
     <div class="controls-panel__validation-header">
@@ -209,13 +209,13 @@
         value={serverValidation?.valid ? 'Valid' : 'Invalid'}
         label="Draft state"
         note={localValidationState?.isLocallyStale
-          ? 'The current local draft differs from the last validated draft'
+          ? '마지막 검증 이후 변경됨'
           : 'Validation matches the current local draft'}
       />
       <StatBlock
         value={serverValidation?.normalizedTotalCards ?? 0}
         label="Normalized cards"
-        note="Total cards reported by server-side validation"
+        note="검증 기준 총 카드 수"
       />
       <StatBlock
         value={serverValidation?.issues.length ?? 0}
@@ -237,7 +237,7 @@
       </ul>
     {:else}
       <div class="controls-panel__note">
-        <p>The validation endpoint did not return any issues for the current deck card draft.</p>
+        <p>검증 문제가 없습니다.</p>
       </div>
     {/if}
   </div>

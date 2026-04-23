@@ -49,7 +49,7 @@ export class ApiError extends Error {
 
 export function getApiErrorMessage(
   error: unknown,
-  fallback = 'An unexpected error occurred while processing the request.',
+  fallback = '요청 처리 중 오류가 발생했습니다.',
 ) {
   if (error instanceof ApiError) return error.message
   if (error instanceof Error && error.message) return error.message

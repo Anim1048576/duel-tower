@@ -144,7 +144,7 @@
       {:else}
         <ContentStatePanel
           title="No player roster yet"
-          message="No player state is available for this session yet."
+          message="표시할 플레이어 상태가 없습니다."
         />
       {/if}
     </SectionFrame>
@@ -196,7 +196,7 @@
       {:else}
         <ContentStatePanel
           title="Enemy state not active yet"
-          message="Combat enemies are not present in the current session state yet."
+          message="표시할 적이 없습니다."
         />
       {/if}
 

@@ -49,7 +49,7 @@
     const normalized = description?.trim()
 
     if (!normalized) {
-      return 'No card description is currently registered for this record.'
+      return '카드 설명이 없습니다.'
     }
 
     if (normalized.length <= maxLength) {
@@ -224,7 +224,7 @@
     }
 
     if (cardsErrorMessage) {
-      return 'The card archive could not be restored with the current filters.'
+      return '카드 목록을 불러오지 못했습니다.'
     }
 
     const filterSummary = [
@@ -244,8 +244,8 @@
   )
   const emptyStateMessage = $derived.by(() =>
     activeFilterCount > 0
-      ? 'Try a broader query, clear the selected keyword, or switch back to all card types.'
-      : 'No cards are currently registered in the archive.',
+      ? '필터를 줄여 다시 검색해 주세요.'
+      : '표시할 카드가 없습니다.',
   )
 </script>
 
@@ -301,7 +301,7 @@
         actionLabel="Retry keywords"
         onAction={() => void loadKeywordArchive()}
       >
-        <p>Card browsing remains available while the keyword glossary is unavailable.</p>
+        <p>키워드 없이 카드만 표시합니다.</p>
       </ContentStatePanel>
     {/if}
   </SectionFrame>
@@ -309,7 +309,7 @@
   <div class="card-library-page__content">
     <SectionFrame
       title="Archive catalog"
-      description="Search by name, id, or description, then narrow the archive by card type and linked keyword."
+      description="카드를 검색하고 필터링합니다."
     >
       <SearchFilterBar
         query={query}
@@ -367,7 +367,7 @@
       {#if cardsLoading}
         <ContentStatePanel
           title="Loading card archive"
-          message="Pulling the latest card collection into the archive."
+          message="카드 목록을 불러오는 중입니다."
         />
       {:else if cardsErrorMessage}
         <ContentStatePanel
@@ -383,9 +383,9 @@
           message={emptyStateMessage}
         >
           {#if activeFilterCount > 0}
-            <p>Clear one or more filters to broaden the archive view.</p>
+            <p>필터를 줄여 다시 검색해 주세요.</p>
           {:else}
-            <p>Populate the card registry to make library entries visible here.</p>
+            <p>표시할 카드가 없습니다.</p>
           {/if}
         </ContentStatePanel>
       {:else}
@@ -431,12 +431,12 @@
 
     <SectionFrame
       title="Archive focus"
-      description="Keep one card in view while filtering so the detail transition remains readable."
+      description="선택한 카드를 확인합니다."
     >
       {#if cardsLoading}
         <ContentStatePanel
           title="Preparing archive focus"
-          message="The spotlight card will appear once the current result set is loaded."
+          message="카드를 불러오는 중입니다."
         />
       {:else if cardsErrorMessage}
         <ContentStatePanel
@@ -449,7 +449,7 @@
           <div class="card-library-page__focus-copy">
             <p>Spotlight card</p>
             <h3>{selectedCard.name}</h3>
-            <p>{selectedCard.description || 'No description is currently stored for this card.'}</p>
+            <p>{selectedCard.description || '카드 설명이 없습니다.'}</p>
           </div>
 
           <div class="card-library-page__focus-tags">
@@ -471,7 +471,7 @@
                 {/each}
               </div>
             {:else}
-              <p>No keyword references are linked to this card.</p>
+              <p>연결된 키워드가 없습니다.</p>
             {/if}
           </div>
 
@@ -486,7 +486,7 @@
       {:else}
         <ContentStatePanel
           title="No spotlight card"
-          message="Once the archive returns cards, the current focus card will appear here."
+          message="표시할 카드가 없습니다."
         />
       {/if}
     </SectionFrame>

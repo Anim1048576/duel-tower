@@ -161,7 +161,7 @@
 
   function getInvalidCombatAccessMessage(nextCode: string | null) {
     if (!nextCode) {
-      return 'No session code is available in the combat route or session handoff yet.'
+      return '전투 세션 코드가 없습니다.'
     }
 
     return null
@@ -761,7 +761,7 @@
 
       if (requiresBoardCountChoice(requirement) && resolveBoardSelectionLimit(requirement, selectedCount) == null) {
         const options = getBoardCountChoiceOptions(requirement)
-        return `Choose how many board objects to select first (${options.join(' or ')}).`
+        return `선택할 대상 수를 먼저 고르세요 (${options.join(' or ')}).`
       }
 
       const resolvedLimit = resolveBoardSelectionLimit(requirement, selectedCount)
@@ -833,7 +833,7 @@
         return null
       case 'INITIATIVE_TIE_ORDER':
         if ((schema.actorKeys?.length ?? 0) !== orderedActorKeys.length) {
-          return 'Order all tie-group actor keys before resolving the pending decision.'
+          return '동률 대상 순서를 먼저 정해 주세요.'
         }
         return null
       default:
@@ -865,7 +865,7 @@
       }
 
       if (!selectedSource.supported) {
-        return selectedSource.unsupportedReason ?? 'Selected card is not supported in this combat step yet.'
+        return selectedSource.unsupportedReason ?? '지금은 선택한 카드를 사용할 수 없습니다.'
       }
 
       return getRequirementLocalBlock(selectedSource.requirementView)
@@ -873,7 +873,7 @@
 
     if (action.metadata.kind === 'useEx') {
       if (!action.metadata.supported) {
-        return action.metadata.unsupportedReason ?? 'EX action is not supported in this combat step yet.'
+        return action.metadata.unsupportedReason ?? '지금은 EX 액션을 사용할 수 없습니다.'
       }
 
       return getRequirementLocalBlock(action.metadata.requirementView)
@@ -1211,12 +1211,12 @@
       phase: screen.status.phase,
       currentTurnLabel: screen.status.currentActor?.label ?? 'No active turn',
       currentTurnTone: normalizeTone(screen.status.currentActor?.tone),
-      currentTurnNote: screen.status.currentActor?.note ?? 'Combat turn owner is not available in the current state.',
+      currentTurnNote: screen.status.currentActor?.note ?? '현재 턴 대상이 없습니다.',
       turnOrderSummary: screen.status.turnOrderSummary,
       battlefieldSummary: screen.status.battlefieldSummary,
       runSummary: screen.status.runSummary,
       initiativeSummary: screen.status.currentActor?.note ?? 'Initiative summary unavailable.',
-      tieGroupSummary: screen.status.tieGroupSummary ?? 'No initiative tie group is active.',
+      tieGroupSummary: screen.status.tieGroupSummary ?? '동률 그룹이 없습니다.',
     } satisfies CombatStatusViewModel
   })
   const accessRoleLabel = $derived.by(() => getAccessRoleLabel(screen))
@@ -1360,21 +1360,21 @@
     <SectionFrame
       eyebrow="Combat Status"
       title="Loading combat screen"
-      description="Restoring the current combat screen model from the Screen API."
+      description="전투 화면을 불러오는 중입니다."
     >
       <ContentStatePanel
         title="Loading combat"
-        message="Fetching the current combat screen by session code."
+        message="불러오는 중입니다."
       />
     </SectionFrame>
   {:else if invalidAccessMessage}
     <SectionFrame
       eyebrow="Combat Access"
       title="Combat screen is unavailable"
-      description="This page needs a session code first, then it can restore the combat screen model."
+      description="세션 코드가 필요합니다."
     >
       <ContentStatePanel title="Combat code required" message={invalidAccessMessage} tone="error">
-        <p>Open the session entry screen or a lobby route first, then return with a session code.</p>
+        <p>세션 입장 또는 로비에서 다시 열어 주세요.</p>
       </ContentStatePanel>
       <div class="combat-page__action-buttons">
         <a class="combat-page__nav-link" data-nav href={pathBuilders.sessionEntry()}>
@@ -1386,11 +1386,11 @@
     <SectionFrame
       eyebrow="Session Missing"
       title="Combat session not found"
-      description="The requested combat code did not resolve to a live combat screen."
+      description="요청한 전투 화면을 찾을 수 없습니다."
     >
       <ContentStatePanel
         title="Combat session not found"
-        message="Check the current session code and reopen the combat route."
+        message="세션 코드를 확인하고 다시 열어 주세요."
         tone="error"
       >
         <p>Requested code: {requestedSessionCode ?? 'Unavailable'}</p>
@@ -1405,7 +1405,7 @@
     <SectionFrame
       eyebrow="Combat Status"
       title="Combat screen could not be loaded"
-      description="The session code was valid, but the combat screen could not be restored."
+      description="전투 화면을 불러오지 못했습니다."
     >
       <ContentStatePanel
         title="Unable to load combat screen"
@@ -1534,7 +1534,7 @@
           pendingDecisionType={pendingDecision?.type ?? null}
           handExpanded={combatPresentationState.handExpanded}
           catalogLoading={false}
-          emptyMessage="Visible hand cards will render here once the current visible player has hand instances in the combat screen."
+          emptyMessage="표시할 손패가 없습니다."
           onCommandButtonClick={handleCommandButtonClick}
           onToggleExpanded={toggleHandExpanded}
           onSelectHandCard={handleSelectHandCard}

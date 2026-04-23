@@ -157,7 +157,7 @@
         return
       }
 
-      errorMessage = getApiErrorMessage(error, 'Unable to load the selected preset editor screen.')
+      errorMessage = getApiErrorMessage(error, '프리셋 편집 화면을 불러오지 못했습니다.')
     } finally {
       if (requestId === requestSequence) {
         loading = false
@@ -349,7 +349,7 @@
         replaceWithPresetEditor(nextPresetId)
       }
     } catch (error) {
-      actionErrorMessage = getApiErrorMessage(error, 'Unable to complete the requested preset action.')
+      actionErrorMessage = getApiErrorMessage(error, '프리셋 작업을 완료하지 못했습니다.')
     } finally {
       pendingActionId = null
     }
@@ -428,7 +428,7 @@
     <SectionFrame
       eyebrow="Preset Editor"
       title="Loading preset editor"
-      description="Resolving the current preset editor screen from the URL."
+      description="프리셋 편집 화면을 불러오는 중입니다."
     >
       <ContentStatePanel
         title="Loading preset"
@@ -439,11 +439,11 @@
     <SectionFrame
       eyebrow="Preset Missing"
       title="Preset not found"
-      description="The requested preset id could not be restored from the current route or the preset screen API."
+      description="요청한 프리셋을 찾을 수 없습니다."
     >
       <div class="preset-editor-page__copy">
         <p>Requested id: {notFoundId}</p>
-        <p>Open a saved preset from the preset archive and try again.</p>
+        <p>프리셋 목록에서 다시 열어 주세요.</p>
       </div>
 
       <div class="preset-editor-page__actions">
@@ -456,7 +456,7 @@
     <SectionFrame
       eyebrow="Preset Error"
       title="Preset could not be loaded"
-      description="The editor could not retrieve the current preset screen response."
+      description="프리셋 편집 화면을 불러오지 못했습니다."
     >
       <ContentStatePanel
         title="Unable to load preset editor"
@@ -478,8 +478,8 @@
         eyebrow={isCreateMode ? 'New Preset' : 'Selected Preset'}
         title={localPresentation.title}
         description={isCreateMode
-          ? 'Create a new preset from the current local draft.'
-          : 'The editor renders the current preset screen model and keeps only local input state in the browser.'}
+          ? '새 프리셋을 생성합니다.'
+          : '프리셋을 확인하고 수정합니다.'}
       >
         {#if feedback}
           <ContentStatePanel title={feedback.title} message={feedback.message} />
@@ -597,21 +597,21 @@
       <div class="preset-editor-page__grid">
         <SectionFrame
           title="Deck card preview"
-          description="The preview reflects the current local draft and reuses the latest resolved screen metadata when ids still match."
+          description="현재 덱 카드 id입니다."
         >
           <EntityListPane
             items={localPresentation.deckItems}
-            emptyMessage="No deck card ids are currently present in the local draft."
+            emptyMessage="표시할 덱 카드 id가 없습니다."
           />
         </SectionFrame>
 
         <SectionFrame
           title="Passive preview"
-          description="The preview reflects the current local draft and reuses the latest resolved screen metadata when ids still match."
+          description="현재 패시브 id입니다."
         >
           <EntityListPane
             items={localPresentation.passiveItems}
-            emptyMessage="No passive ids are currently present in the local draft."
+            emptyMessage="표시할 패시브 id가 없습니다."
           />
         </SectionFrame>
       </div>
@@ -619,7 +619,7 @@
       <div class="preset-editor-page__grid">
         <SectionFrame
           title="Character reference"
-          description="The reference follows the current local character selection and falls back to the latest resolved server snapshot."
+          description="선택한 캐릭터입니다."
         >
           <div class="preset-editor-page__copy">
             <p><strong>{localPresentation.character.label}</strong></p>
@@ -629,7 +629,7 @@
 
         <SectionFrame
           title="EX card reference"
-          description="The reference follows the current local EX selection and falls back to the latest resolved server snapshot."
+          description="선택한 EX 카드입니다."
         >
           <div class="preset-editor-page__copy">
             <p><strong>{localPresentation.ex.label}</strong></p>
@@ -640,7 +640,7 @@
 
       <SectionFrame
         title="Editor actions"
-        description="Save, create, clone, and delete are invoked through screen-declared actions."
+        description="프리셋을 저장하거나 삭제합니다."
       >
         <div class="preset-editor-page__actions">
           <a class="preset-editor-page__link-action" data-nav href={pathBuilders.presetList()}>
@@ -693,15 +693,15 @@
         <div class="preset-editor-page__status">
           <p>
             {localPresentation.dirty
-              ? 'Local changes are pending on top of the last loaded preset screen.'
-              : 'Local draft matches the last loaded preset screen.'}
+              ? '저장되지 않은 변경사항이 있습니다.'
+              : '변경사항이 없습니다.'}
           </p>
           <p>
             {localPresentation.previewNeedsResolveRefresh
-              ? 'Changed ids are reflected immediately in the local preview. Save, create, or clone to refresh server-resolved metadata for those ids.'
-              : 'Local preview is aligned with the latest resolved screen snapshot.'}
+              ? '저장하면 최신 정보로 갱신됩니다.'
+              : '미리보기가 최신 상태입니다.'}
           </p>
-          <p>Character, deck card ids, EX card id, and passive ids are normalized when an action is invoked.</p>
+          <p>저장 시 입력값을 정리합니다.</p>
         </div>
 
         {#if actionErrorMessage}
@@ -728,11 +728,11 @@
     <SectionFrame
       eyebrow="Preset Selection"
       title="Preset selection unavailable"
-      description="Open a preset from the preset archive to restore the expected editor context."
+      description="프리셋 목록에서 프리셋을 열어 주세요."
     >
       <div class="preset-editor-page__copy">
         <p>No preset id is present in the current URL.</p>
-        <p>Use the preset archive to open an existing preset or start a new draft.</p>
+        <p>프리셋을 열거나 새로 생성해 주세요.</p>
       </div>
 
       <div class="preset-editor-page__actions">

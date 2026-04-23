@@ -163,7 +163,7 @@
         return
       }
 
-      errorMessage = getApiErrorMessage(error, 'Unable to load the selected deck editor screen.')
+      errorMessage = getApiErrorMessage(error, '덱 편집 화면을 불러오지 못했습니다.')
     } finally {
       if (requestId === requestSequence) {
         loading = false
@@ -477,7 +477,7 @@
     <SectionFrame
       eyebrow="Deck Editor"
       title={deckEditorStateCopy.loadingTitle}
-      description="Resolving the current deck editor screen from the URL."
+      description="덱 편집 화면을 불러오는 중입니다."
     >
       <ContentStatePanel
         title={deckEditorStateCopy.loadingTitle}
@@ -505,7 +505,7 @@
     <SectionFrame
       eyebrow="Deck Error"
       title={deckEditorStateCopy.loadErrorTitle}
-      description="The editor could not retrieve the current screen response."
+      description="편집 화면을 불러오지 못했습니다."
     >
       <ContentStatePanel
         title={deckEditorStateCopy.loadErrorMessageTitle}

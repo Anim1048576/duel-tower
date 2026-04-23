@@ -18,7 +18,7 @@
 
 <SectionFrame
   title="Deck cards"
-  description="This list and the editor summary above both render from the same local draft state."
+  description="현재 덱 카드 목록입니다."
 >
   <EntityListPane
     {items}

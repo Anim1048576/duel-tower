@@ -130,7 +130,7 @@ runTest('character change keeps deck editing locked until the next server sync',
   assert.equal(presentation.deckEditingLocked, true)
   assert.equal(
     presentation.deckEditingLockReason,
-    'Save the new character first to refresh owned card options and unlock deck editing.',
+    '캐릭터 선택을 먼저 저장해 주세요.',
   )
   assert.equal(presentation.passiveItems[0].title, 'Heavy Step')
 })
@@ -153,7 +153,7 @@ runTest('server deck lock is exposed even without a local character change', () 
 
   assert.equal(presentation.characterChangePending, false)
   assert.equal(presentation.deckEditingLocked, true)
-  assert.equal(presentation.deckEditingLockReason, 'Deck editing is locked in the latest server snapshot.')
+  assert.equal(presentation.deckEditingLockReason, '덱 편집이 잠겨 있습니다.')
 })
 
 runTest('preset preview only uses the latest server-selected preset snapshot', () => {
@@ -167,6 +167,6 @@ runTest('preset preview only uses the latest server-selected preset snapshot', (
   assert.equal(unsyncedPresentation.preset.previewStale, true)
   assert.equal(
     unsyncedPresentation.preset.summary,
-    'Resolved preview is available only for the latest server-selected preset snapshot.',
+    '최신 프리셋 미리보기만 표시됩니다.',
   )
 })

@@ -41,8 +41,8 @@
   eyebrow={screen.mode === 'create' ? 'New Deck' : 'Selected Deck'}
   {title}
   description={screen.mode === 'create'
-    ? 'Create a new deck record from the current draft.'
-    : 'Review the current deck, adjust its cards, run validation, save changes, or delete it.'}
+    ? '새 덱을 생성합니다.'
+    : '덱을 수정하고 저장합니다.'}
 >
   <div class="editor-header__hero">
     <div class="editor-header__hero-copy">
@@ -66,12 +66,12 @@
     <StatBlock
       value={draftEntries}
       label="Draft entries"
-      note="Card entries currently present in local editor state"
+      note="현재 카드 수"
     />
     <StatBlock
       value={deckTypeLabel}
       label="Deck type"
-      note="Deck classification from the current local draft"
+      note="현재 덱 타입"
     />
   </div>
 

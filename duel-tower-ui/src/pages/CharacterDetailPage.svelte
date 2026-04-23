@@ -233,13 +233,13 @@
 
   function handleApplySavedDeck() {
     if (isCreateMode || !requestedCharacterId || saving || deleting || loading) {
-      saveErrorMessage = 'Save this character before applying a saved deck.'
+      saveErrorMessage = '덱 적용 전 캐릭터를 저장해 주세요.'
       saveMessage = null
       return
     }
 
     if (formDirty) {
-      saveErrorMessage = 'Save or discard your profile changes before applying a saved deck.'
+      saveErrorMessage = '덱 적용 전 변경사항을 저장하거나 취소해 주세요.'
       saveMessage = null
       return
     }
@@ -304,7 +304,7 @@
   const displayedSummary = $derived.by(() =>
     form.oneLiner.trim() ||
     (isCreateMode
-      ? 'Prepare a new archive entry before saving the record.'
+      ? '새 캐릭터 정보를 입력합니다.'
       : 'No one-line summary has been recorded yet.'),
   )
 
@@ -330,7 +330,7 @@
       if (error instanceof ApiError && error.code === 'not_found') {
         notFound = true
       } else {
-        errorMessage = getApiErrorMessage(error, 'Unable to load the character record.')
+        errorMessage = getApiErrorMessage(error, '캐릭터를 불러오지 못했습니다.')
       }
     } finally {
       loading = false
@@ -364,7 +364,7 @@
       syncCharacterState(response)
       notFound = false
       errorMessage = null
-      saveMessage = isCreateMode ? 'Character record created.' : 'Character record saved.'
+      saveMessage = isCreateMode ? '캐릭터를 생성했습니다.' : '캐릭터를 저장했습니다.'
 
       if (isCreateMode) {
         navigateTo(pathBuilders.characterDetail(String(response.id)), 'replace')
@@ -372,7 +372,7 @@
     } catch (error) {
       saveErrorMessage = getApiErrorMessage(
         error,
-        isCreateMode ? 'Unable to create the character record.' : 'Unable to save the character record.',
+        isCreateMode ? '캐릭터를 생성하지 못했습니다.' : '캐릭터를 저장하지 못했습니다.',
       )
     } finally {
       saving = false
@@ -385,7 +385,7 @@
     }
 
     const confirmed = window.confirm(
-      `Delete ${character?.name || 'this character record'}? This action cannot be undone.`,
+      `${character?.name || '이 캐릭터'}를 삭제할까요? 되돌릴 수 없습니다.`,
     )
 
     if (!confirmed) {
@@ -401,10 +401,10 @@
       await deleteCharacter(requestedCharacterId)
       removeSelectionHandoff(selectionHandoffKeys.characterId)
       navigateTo(pathBuilders.characterList(), 'replace', {
-        characterFeedback: 'Character record deleted.',
+        characterFeedback: '캐릭터를 삭제했습니다.',
       })
     } catch (error) {
-      deleteErrorMessage = getApiErrorMessage(error, 'Unable to delete the character record.')
+      deleteErrorMessage = getApiErrorMessage(error, '캐릭터를 삭제하지 못했습니다.')
     } finally {
       deleting = false
     }
@@ -432,10 +432,10 @@
     <SectionFrame
       eyebrow="Record Loading"
       title="Loading character detail"
-      description="The selected record is being restored from the character API."
+      description="캐릭터를 불러오는 중입니다."
     >
       <div class="detail-page__todo">
-        <p>Preparing the selected character record...</p>
+        <p>캐릭터를 불러오는 중입니다.</p>
       </div>
       <div class="detail-page__actions">
         <a class="detail-page__link-action" data-nav href={pathBuilders.characterList()}>
@@ -451,8 +451,8 @@
       title={displayedTitle}
       description={
         isCreateMode
-          ? 'Fill the draft fields below to create a new character record.'
-          : 'Character detail is loaded from the URL id first, then saved back through the update API.'
+          ? '새 캐릭터를 생성합니다.'
+          : '캐릭터 정보를 확인하고 수정합니다.'
       }
     >
       <div class="detail-page__hero">
@@ -496,7 +496,7 @@
     <div class="detail-page__grid">
       <SectionFrame
         title="Combat profile"
-        description="Core identity and stat fields stay in the same area while the form is now wired to the create and update APIs."
+        description="기본 정보와 능력치를 수정합니다."
       >
         <fieldset class="detail-page__fieldset" disabled={saving || deleting}>
           <div class="detail-page__form-grid">
@@ -560,7 +560,7 @@
 
       <SectionFrame
         title="Loadout and notes"
-        description="Profile notes remain editable here. The current skill deck is displayed from the latest character API response."
+        description="프로필 메모와 적용 덱을 확인합니다."
       >
         <fieldset class="detail-page__fieldset" disabled={saving || deleting}>
           <div class="detail-page__form-grid">
@@ -587,7 +587,7 @@
                     <span>{index + 1}. {card}</span>
                   {/each}
                 {:else}
-                  <span>No saved deck has been applied.</span>
+                  <span>적용된 덱이 없습니다.</span>
                 {/if}
               </div>
             </div>
@@ -626,7 +626,7 @@
                 {/each}
               </ul>
             {:else}
-              <p>No saved deck has been applied yet.</p>
+              <p>적용된 덱이 없습니다.</p>
             {/if}
           </div>
         </div>
@@ -635,7 +635,7 @@
 
     <SectionFrame
       title={isCreateMode ? 'Create queue' : 'Edit queue'}
-      description="Save profile fields here, or send this saved character to the deck archive to apply a server-validated saved deck."
+      description="변경사항을 저장하거나 덱을 적용합니다."
     >
       <div class="detail-page__actions">
         <a class="detail-page__link-action" data-nav href={pathBuilders.characterList()}>
@@ -682,11 +682,11 @@
 
       <div class="detail-page__todo">
         {#if isCreateMode}
-          <p>Save this character before applying a saved deck.</p>
+          <p>덱 적용 전 캐릭터를 저장해 주세요.</p>
         {:else if formDirty}
-          <p>Save or discard profile changes before applying a saved deck.</p>
+          <p>덱 적용 전 변경사항을 저장하거나 취소해 주세요.</p>
         {:else}
-          <p>Saved deck application is persisted by the server. This screen reloads the character detail before showing the result.</p>
+          <p>저장된 덱을 캐릭터에 적용합니다.</p>
         {/if}
       </div>
     </SectionFrame>
@@ -696,11 +696,11 @@
     <SectionFrame
       eyebrow="Record Missing"
       title="Character not found"
-      description="The requested character id could not be restored from the current route."
+      description="요청한 캐릭터를 찾을 수 없습니다."
     >
       <div class="detail-page__todo">
         <p>Requested id: {missingCharacterId ?? requestedCharacterId ?? 'Unknown'}</p>
-        <p>Check the roster list and open a valid character record.</p>
+        <p>캐릭터 목록에서 다시 열어 주세요.</p>
       </div>
       <div class="detail-page__actions">
         <a class="detail-page__link-action" data-nav href={pathBuilders.characterList()}>
@@ -717,7 +717,7 @@
     <SectionFrame
       eyebrow="Record Error"
       title="Unable to load character detail"
-      description="The character record could not be restored from the API."
+      description="캐릭터를 불러오지 못했습니다."
     >
       <div class="detail-page__todo">
         <p>{errorMessage}</p>
@@ -742,11 +742,11 @@
     <SectionFrame
       eyebrow="Record Missing"
       title="Character selection unavailable"
-      description="Open a character from the roster list or use a valid detail URL to restore this page."
+      description="캐릭터 목록에서 캐릭터를 열어 주세요."
     >
       <div class="detail-page__todo">
-        <p>No character id was found in the URL, and no handoff selection is available.</p>
-        <p>Open a character from the roster list to restore the expected detail context.</p>
+        <p>현재 경로에 캐릭터 id가 없습니다.</p>
+        <p>캐릭터 목록에서 캐릭터를 열어 주세요.</p>
       </div>
       <div class="detail-page__actions">
         <a class="detail-page__link-action" data-nav href={pathBuilders.characterList()}>

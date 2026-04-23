@@ -44,12 +44,12 @@
 
 <SectionFrame
   title="Current deck"
-  description="The current draft order is local, while remove availability and reason codes come from the latest server preview."
+  description="현재 덱 카드 목록입니다."
 >
   {#if !entries.length}
     <ContentStatePanel
       title="No deck entries"
-      message="The current local draft does not contain any owned card entries yet."
+      message="표시할 카드가 없습니다."
     />
   {:else}
     <div class="current-deck-panel">

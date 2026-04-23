@@ -18,7 +18,7 @@
   {#if loading}
     <ContentStatePanel
       title="Loading recent results"
-      message="Restoring the latest recent-result summary for this session."
+      message="전투 결과를 불러오는 중입니다."
     />
   {:else if errorMessage}
     <ContentStatePanel
@@ -41,7 +41,7 @@
   {:else}
     <ContentStatePanel
       title="No recent results"
-      message="No recent result summary is available for this session yet."
+      message="최근 결과가 없습니다."
     />
   {/if}
 </div>

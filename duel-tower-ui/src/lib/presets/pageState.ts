@@ -7,16 +7,16 @@ const presetPageFeedbackKey = 'duel-tower:preset-page-feedback'
 
 export const presetListStateCopy = {
   loadingTitle: 'Loading preset archive',
-  loadingMessage: 'Restoring the current preset list from the preset API.',
+  loadingMessage: '프리셋 목록을 불러오는 중입니다.',
   loadErrorTitle: 'Unable to load the preset archive',
-  emptyMessage: 'No preset records are available yet.',
+  emptyMessage: '표시할 프리셋이 없습니다.',
   detailLoadingTitle: 'Preparing selected preset',
-  detailLoadingMessage: 'The current preset selection is being summarized.',
+  detailLoadingMessage: '선택한 프리셋을 불러오는 중입니다.',
   detailErrorTitle: 'Selected preset summary is unavailable',
   detailEmptyTitle: 'No preset is selected',
   deletedFeedback: {
     title: 'Preset deleted',
-    message: 'The selected preset was removed from the archive.',
+    message: '선택한 프리셋을 삭제했습니다.',
   },
   createActionLabel: 'Create new preset',
 } as const
@@ -25,12 +25,12 @@ export const presetEditorStateCopy = {
   cloneErrorTitle: 'Clone failed',
   cloneSuccessFeedback: {
     title: 'Preset cloned',
-    message: 'A new preset copy was created from the current record.',
+    message: '프리셋 복사본을 생성했습니다.',
   },
   deleteConfirmTitle: 'Delete this preset?',
-  deleteConfirmMessage: 'This preset will be removed from the archive. This action cannot be undone.',
+  deleteConfirmMessage: '이 프리셋을 삭제합니다. 되돌릴 수 없습니다.',
   deleteLoadingTitle: 'Deleting preset',
-  deleteLoadingMessage: 'Removing the current preset from the archive and returning to the preset list.',
+  deleteLoadingMessage: '프리셋을 삭제하는 중입니다.',
   deleteErrorTitle: 'Delete failed',
 } as const
 

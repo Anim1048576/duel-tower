@@ -177,7 +177,7 @@
     if (loading) return 'Loading preset archive...'
     if (errorMessage) return 'Preset archive could not be loaded.'
     if (!presets.length) return 'No presets are currently available.'
-    return `${presets.length} live preset records are available from the API.`
+    return `${presets.length}개 프리셋 표시 중`
   })
   const emptyListMessage = $derived.by(() => 'No preset records are available yet.')
   const selectedPresetEditorPath = $derived.by(() =>
@@ -189,7 +189,7 @@
   <SectionFrame
     eyebrow="Preset Overview"
     title="프리셋 보관소"
-    description="The preset archive restores live records from GET /api/me/presets while keeping the editor entry flow URL-based."
+    description="프리셋을 조회하고 편집합니다."
   >
     <div class="list-page__stats">
       <StatBlock
@@ -226,7 +226,7 @@
   <div class="list-page__content">
     <SectionFrame
       title="프리셋 목록"
-      description="Each row comes from GET /api/me/presets and keeps the existing open-editor flow on click."
+      description="프리셋을 선택합니다."
     >
       <p class="list-page__summary">{listSummary}</p>
 
@@ -255,7 +255,7 @@
 
     <SectionFrame
       title="선택된 프리셋"
-      description="The summary panel keeps the current archive mood while showing live preset metadata."
+      description="선택한 프리셋 요약입니다."
     >
       {#if loading}
         <ContentStatePanel

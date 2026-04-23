@@ -43,7 +43,7 @@
       title: 'Join by session code',
       subtitle: 'Player entry',
       meta: 'POST /api/sessions/{code}/join',
-      note: 'Use the current signed-in account as the player id and move directly into the player lobby on success.',
+      note: '현재 계정으로 플레이어 로비에 입장합니다.',
       tags: [
         { label: 'Player', tone: 'accent' },
         { label: 'Login session', tone: 'success' },
@@ -54,7 +54,7 @@
       title: 'Create GM session',
       subtitle: 'GM control entry',
       meta: 'POST /api/sessions',
-      note: 'Create a fresh session from the current signed-in account and move straight into the GM lobby.',
+      note: '현재 계정으로 GM 세션을 만듭니다.',
       tags: [
         { label: 'GM', tone: 'warning' },
         { label: 'Live API', tone: 'success' },
@@ -64,8 +64,8 @@
       id: 'route-handoff',
       title: 'Route and runtime handoff',
       subtitle: 'Session access storage',
-      meta: 'Store code and token for the next lobby step',
-      note: 'Successful create and join actions persist the session code and role-specific token for the next player or GM lobby page.',
+      meta: '다음 로비에 code와 token 저장',
+      note: '세션 코드와 권한 토큰을 저장합니다.',
       tags: [
         { label: 'Code-first', tone: 'accent' },
         { label: 'Session storage', tone: 'muted' },
@@ -104,7 +104,7 @@
   const actionPending = $derived.by(() => pendingAction !== null)
   const currentUsername = $derived.by(() => authState.user?.username?.trim() ?? '')
   const filteredActionSummary = $derived.by(() =>
-    `${filteredActions.length} entry actions are available in the current live session flow.`,
+    `${filteredActions.length}개 작업 표시 중`,
   )
   const selectedActionPlayerPath = $derived.by(() =>
     pathBuilders.sessionLobbyPlayer(sessionCode.trim() ? normalizeSessionCode(sessionCode) : undefined),
@@ -197,7 +197,7 @@
     clearErrors()
 
     if (!username) {
-      formErrorMessage = 'Sign in again before joining a player session.'
+      formErrorMessage = '다시 로그인해 주세요.'
       return
     }
 
@@ -247,7 +247,7 @@
   <SectionFrame
     eyebrow="Session Overview"
     title="Session Entry"
-    description="Session creation and code-based join now use the live session API while keeping the current entry layout intact."
+    description="세션을 만들거나 코드로 참가합니다."
   >
     <div class="session-entry-page__stats">
       <StatBlock
@@ -286,7 +286,7 @@
   <div class="session-entry-page__top">
     <SectionFrame
       title="Join by code"
-      description="Enter a live session code and join the table as the current authenticated user."
+      description="세션 코드를 입력해 참가합니다."
     >
       <form class="session-entry-page__form" onsubmit={handleSubmit} aria-busy={joinPending}>
         <fieldset class="session-entry-page__fieldset" disabled={actionPending || authState.loading}>
@@ -307,19 +307,18 @@
       </form>
 
       <p class="session-entry-page__feedback">
-        The join request sends the signed-in username as `playerId`, stores the returned
-        `playerToken`, and moves into the player lobby route.
+        참가 후 플레이어 로비로 이동합니다.
       </p>
     </SectionFrame>
 
     <SectionFrame
       title="Create GM session"
-      description="Create a new session from the current authenticated account and move directly into the GM lobby."
+      description="새 세션을 만들고 GM 로비로 이동합니다."
     >
       <div class="session-entry-page__guide">
         <p>Signed-in account: {currentUsername || 'Unavailable'}</p>
-        <p>Successful creation stores the session code and GM token for the next lobby step.</p>
-        <p>The entry page now prioritizes code-based routing over the old session id handoff.</p>
+        <p>생성 후 세션 코드와 GM 토큰을 저장합니다.</p>
+        <p>세션 코드를 기준으로 이동합니다.</p>
       </div>
 
       <div class="session-entry-page__actions">
@@ -337,7 +336,7 @@
 
   <SectionFrame
     title="Session entry flow"
-    description="The lower section keeps the same two-panel rhythm while showing the real create and join flow instead of mock lobby shortcuts."
+    description="세션 작업을 확인합니다."
   >
     <SearchFilterBar
       query={query}
@@ -362,12 +361,12 @@
         items={filteredActions}
         selectedId={selectedId}
         onSelect={handleSelectAction}
-        emptyMessage="No entry actions match the current search."
+        emptyMessage="검색 결과가 없습니다."
       />
 
       <SectionFrame
         title="Selected action"
-        description="Review the current action path and continue into the next live session step."
+        description="선택한 작업을 실행합니다."
       >
         {#if selectedAction}
           <div class="session-entry-page__detail">
@@ -418,13 +417,13 @@
               </div>
             {:else}
               <div class="session-entry-page__todo">
-                <p>Stored runtime access uses `code`, `role`, and the role-specific token.</p>
-                <p>The compatibility handoff keeps `sessionCode` only and clears stale `sessionId`.</p>
+                <p>저장 값은 `code`, `role`, 역할별 token입니다.</p>
+                <p>`sessionCode`만 유지합니다.</p>
               </div>
             {/if}
           </div>
         {:else}
-          <p class="session-entry-page__empty">No session entry action is selected.</p>
+          <p class="session-entry-page__empty">선택한 작업이 없습니다.</p>
         {/if}
       </SectionFrame>
     </div>

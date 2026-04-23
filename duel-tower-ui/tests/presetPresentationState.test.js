@@ -85,7 +85,7 @@ runTest('deck 목록 변경 직후 local preview가 새 id를 즉시 반영한�
   assert.equal(presentation.previewNeedsResolveRefresh, true)
   assert.equal(presentation.deckItems[0].title, 'Guard')
   assert.equal(presentation.deckItems[1].title, 'C999')
-  assert.equal(presentation.deckItems[1].note, 'Resolved metadata refreshes after save, create, or clone.')
+  assert.equal(presentation.deckItems[1].note, '저장 후 갱신됩니다.')
 })
 
 runTest('name 변경 직후 local dirty=true', () => {

@@ -88,7 +88,7 @@
 <SectionFrame
   eyebrow="Combat Status"
   title="Combat HUD"
-  description="Core turn state stays visible. Extended overview opens on demand."
+  description="현재 턴 상태입니다."
 >
   <div class="combat-header" class:combat-header--readonly={accessRoleLabel === 'Read-only shell'}>
     <div class="combat-header__always-visible">
@@ -176,7 +176,7 @@
             <strong>Recent feedback</strong>
             {#if recentResultsLoading}
               <h3>Loading recent results</h3>
-              <p>Restoring the latest combat-facing result summary.</p>
+              <p>전투 결과를 불러오는 중입니다.</p>
             {:else if recentResultsErrorMessage}
               <h3>Recent result unavailable</h3>
               <p>{recentResultsErrorMessage}</p>
@@ -186,7 +186,7 @@
               <p>{latestRecentResult.type} | {latestRecentResult.at ?? 'Time unavailable'}</p>
             {:else}
               <h3>No recent result yet</h3>
-              <p>The current combat flow has not produced a recent-result summary yet.</p>
+              <p>최근 결과가 없습니다.</p>
             {/if}
           </article>
         </div>

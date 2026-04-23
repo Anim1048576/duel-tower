@@ -174,16 +174,16 @@
   )
 
   const listSummary = $derived.by(() => {
-    if (loading) return 'Loading character roster...'
-    if (errorMessage) return 'Character roster could not be loaded.'
-    if (!characters.length) return 'No character records are currently available.'
-    return `${filteredCharacters.length} character records visible from ${characters.length} total.`
+    if (loading) return '캐릭터를 불러오는 중입니다.'
+    if (errorMessage) return '캐릭터를 불러오지 못했습니다.'
+    if (!characters.length) return '표시할 캐릭터가 없습니다.'
+    return `${characters.length}개 중 ${filteredCharacters.length}개 표시 중`
   })
   const rosterEmpty = $derived.by(() => !loading && !errorMessage && characters.length === 0)
   const emptyListMessage = $derived.by(() =>
     characters.length === 0
-      ? 'No character records are available yet.'
-      : 'No character records matched the current search.',
+      ? '표시할 캐릭터가 없습니다.'
+      : '검색 결과가 없습니다.',
   )
 
   function handleSelectCharacter(id: string) {
@@ -204,12 +204,12 @@
   <SectionFrame
     eyebrow="Roster Summary"
     title="Available Characters"
-    description="The roster loads from the character API and keeps the existing URL-based detail flow intact."
+    description="캐릭터 목록을 확인합니다."
   >
     <div class="list-page__stats">
-      <StatBlock value={characters.length} label="Total roster" note="Loaded from the character API" />
-      <StatBlock value={deckAppliedCount} label="Deck applied" note="Characters with an applied current skill deck" />
-      <StatBlock value={traitTaggedCount} label="Trait tagged" note="Characters with at least one saved trait" />
+      <StatBlock value={characters.length} label="Total roster" note="불러온 캐릭터 수" />
+      <StatBlock value={deckAppliedCount} label="Deck applied" note="덱이 적용된 캐릭터" />
+      <StatBlock value={traitTaggedCount} label="Trait tagged" note="특성이 있는 캐릭터" />
     </div>
     <div class="list-page__actions">
       <a class="list-page__link-action" data-nav href={pathBuilders.characterCreate()}>
@@ -226,7 +226,7 @@
   <div class="list-page__content">
     <SectionFrame
       title="Character roster"
-      description="Search stays local for now, while list data is restored from the API each time the page is opened."
+      description="캐릭터를 검색합니다."
     >
       <SearchFilterBar
         query={query}
@@ -247,7 +247,7 @@
       </SearchFilterBar>
 
       {#if loading}
-        <p class="list-page__status">Loading character roster...</p>
+        <p class="list-page__status">캐릭터를 불러오는 중입니다.</p>
       {:else if errorMessage}
         <div class="list-page__status list-page__status--error">
           <p>{errorMessage}</p>
@@ -267,18 +267,18 @@
 
     <SectionFrame
       title="Selected summary"
-      description="Selection stays local to this page, while detail navigation keeps the existing URL-based character route."
+      description="선택한 캐릭터 요약입니다."
     >
       {#if loading}
-        <p class="list-page__empty">Preparing the selected character summary...</p>
+        <p class="list-page__empty">요약을 불러오는 중입니다.</p>
       {:else if errorMessage}
         <div class="list-page__todo">
-          <p>The selected summary is unavailable until the roster is restored.</p>
+          <p>요약을 표시할 수 없습니다.</p>
           <p>{errorMessage}</p>
         </div>
       {:else if rosterEmpty}
         <div class="list-page__detail">
-          <p class="list-page__empty">No character records are available yet.</p>
+          <p class="list-page__empty">표시할 캐릭터가 없습니다.</p>
           <a class="list-page__link-action" data-nav href={pathBuilders.characterCreate()}>
             Create the first character
           </a>

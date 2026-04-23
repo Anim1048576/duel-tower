@@ -23,7 +23,7 @@ function runTest(name, fn) {
 runTest('Character detail exposes Apply saved deck only for saved character flow', () => {
   assert.match(characterDetailSource, />\s*Apply saved deck\s*</)
   assert.match(characterDetailSource, /disabled=\{applySavedDeckBlocked\}/)
-  assert.match(characterDetailSource, /Save this character before applying a saved deck\./)
+  assert.match(characterDetailSource, /덱 적용 전 캐릭터를 저장해 주세요\./)
   assert.match(characterDetailSource, /setSelectionHandoff\(selectionHandoffKeys\.deckApplyCharacterId, requestedCharacterId\)/)
   assert.match(characterDetailSource, /navigateTo\(pathBuilders\.deckList\(\)\)/)
 })
@@ -38,8 +38,8 @@ runTest('Character detail blocks saved deck apply when the loaded profile form i
     characterDetailSource,
     /const applySavedDeckBlocked = \$derived\.by\(\(\) =>\s*isCreateMode \|\| !requestedCharacterId \|\| saving \|\| deleting \|\| loading \|\| formDirty,\s*\)/,
   )
-  assert.match(characterDetailSource, /if \(formDirty\) \{[\s\S]*Save or discard your profile changes before applying a saved deck\./)
-  assert.match(characterDetailSource, /Save or discard profile changes before applying a saved deck\./)
+  assert.match(characterDetailSource, /if \(formDirty\) \{[\s\S]*덱 적용 전 변경사항을 저장하거나 취소해 주세요\./)
+  assert.match(characterDetailSource, /덱 적용 전 변경사항을 저장하거나 취소해 주세요\./)
 })
 
 runTest('Character detail renders applied deck from server-loaded character state', () => {
@@ -67,7 +67,7 @@ runTest('Saved deck application wording avoids link or assignment language', () 
 
   assert.match(characterDetailSource, /Deck Applied/)
   assert.match(characterDetailSource, /No Applied Deck/)
-  assert.match(characterDetailSource, /No saved deck has been applied yet\./)
+  assert.match(characterDetailSource, /적용된 덱이 없습니다\./)
   assert.doesNotMatch(combinedFlowSource, /Deck Linked|No Deck|No linked deck|Assign to deck|deck assignment|No deck has been assigned/i)
 })
 
@@ -75,11 +75,11 @@ runTest('Deck apply success calls API, consumes context, and returns to characte
   assert.match(deckListSource, /await applySavedDeckToCharacter\(deckApplyCharacterId, getDeckId\(selectedDeck\)\)/)
   assert.match(deckListSource, /removeSelectionHandoff\(selectionHandoffKeys\.deckApplyCharacterId\)/)
   assert.match(deckListSource, /navigateTo\(pathBuilders\.characterDetail\(String\(response\.id\)\)/)
-  assert.match(deckListSource, /Character detail was refreshed from the server\./)
+  assert.match(deckListSource, /저장된 덱을 적용했습니다\./)
 })
 
 runTest('Deck apply failure stays on deck list and displays API error', () => {
-  assert.match(deckListSource, /applyErrorMessage = getApiErrorMessage\(error, 'Unable to apply the selected deck to this character\.'\)/)
+  assert.match(deckListSource, /applyErrorMessage = getApiErrorMessage\(error, '선택한 덱을 적용하지 못했습니다\.'\)/)
   assert.match(deckListSource, /title="Unable to apply deck"/)
   assert.match(deckListSource, /tone="error"/)
 })

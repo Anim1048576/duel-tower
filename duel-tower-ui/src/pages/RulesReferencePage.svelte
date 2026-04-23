@@ -50,19 +50,19 @@
       key: 'keywords',
       label: 'Keywords',
       tone: 'accent',
-      emptyMessage: 'No keyword definitions are currently available.',
+      emptyMessage: '표시할 키워드가 없습니다.',
     },
     {
       key: 'statuses',
       label: 'Statuses',
       tone: 'warning',
-      emptyMessage: 'No status definitions are currently available.',
+      emptyMessage: '표시할 상태가 없습니다.',
     },
     {
       key: 'passives',
       label: 'Passives',
       tone: 'success',
-      emptyMessage: 'No passive definitions are currently available.',
+      emptyMessage: '표시할 패시브가 없습니다.',
     },
   ]
 
@@ -229,7 +229,7 @@
       title: keyword.name,
       subtitle: keyword.description,
       meta: `ID ${keyword.id}`,
-      note: keyword.parameterized ? 'Requires parameter input when referenced.' : 'Static keyword definition.',
+      note: keyword.parameterized ? '파라미터가 필요합니다.' : '고정 키워드입니다.',
       tags: [
         {
           label: getKeywordStateLabel(keyword.parameterized),
@@ -246,8 +246,8 @@
       subtitle: status.description,
       meta: `${formatContentEnumLabel(status.kind)} · ${formatContentEnumLabel(status.scope)}`,
       note: status.persistsAfterCombat
-        ? 'Persists after combat.'
-        : 'Removed when combat resolution ends.',
+        ? '전투 후에도 유지됩니다.'
+        : '전투 종료 시 제거됩니다.',
       tags: [
         { label: formatContentEnumLabel(status.kind), tone: 'warning' },
         { label: formatContentEnumLabel(status.scope), tone: 'muted' },
@@ -261,8 +261,8 @@
       id: passive.id,
       title: passive.name,
       subtitle: passive.description,
-      meta: getPassivePriorityLabel(passive.priority, 'No explicit priority registered'),
-      note: 'Passive effect reference from the live content archive.',
+      meta: getPassivePriorityLabel(passive.priority, '우선순위 없음'),
+      note: '패시브 효과입니다.',
       tags: [{ label: 'Passive', tone: 'success' }],
     })),
   )
@@ -358,19 +358,19 @@
 
   const currentSummary = $derived.by(() => {
     if (currentLoading) {
-      return 'Loading live reference data...'
+      return '규칙 정보를 불러오는 중입니다.'
     }
 
     if (currentErrorMessage) {
-      return 'The current reference section could not be restored.'
+      return '규칙 정보를 불러오지 못했습니다.'
     }
 
-    return `${currentItems.length} records visible in the current reference section.`
+    return `${currentItems.length}개 표시 중`
   })
 
   const emptyMessage = $derived.by(() => {
     if (query.trim()) {
-      return 'No reference records matched the current filter.'
+      return '검색 결과가 없습니다.'
     }
 
     return getSectionMeta(activeSection).emptyMessage
@@ -399,7 +399,7 @@
   <SectionFrame
     eyebrow="Rules Codex"
     title="Tactical Reference"
-    description="Keywords, statuses, and passive definitions load from the live content API in a dedicated reference route, separate from the future inventory front."
+    description="키워드, 상태, 패시브를 확인합니다."
   >
     <div class="rules-page__stats">
       <StatBlock value={keywords.length} label="Keywords" note="Live keyword definitions" />
@@ -409,7 +409,7 @@
     {#if sectionErrors.length > 0}
       <ContentStatePanel
         title="Some reference sections are unavailable"
-        message="One or more encyclopedia sections could not be restored from the content API."
+        message="일부 규칙 정보를 불러오지 못했습니다."
         tone="error"
         actionLabel="Reload all"
         onAction={() => void reloadAllSections()}
@@ -424,7 +424,7 @@
   <div class="rules-page__content">
     <SectionFrame
       title="Codex catalog"
-      description="Use the section switcher and local filter to inspect the live tactical reference without mixing it with inventory terminology."
+      description="섹션을 선택하고 검색합니다."
     >
       <SearchFilterBar
         query={query}
@@ -464,7 +464,7 @@
       {#if currentLoading}
         <ContentStatePanel
           title="Loading reference data"
-          message="Refreshing the current encyclopedia section from the content API."
+          message="규칙 정보를 불러오는 중입니다."
         />
       {:else if currentErrorMessage}
         <ContentStatePanel
@@ -486,12 +486,12 @@
 
     <SectionFrame
       title="Selected codex entry"
-      description="The same list-detail shell can absorb more encyclopedia sections later while keeping the reference route focused on rules data."
+      description="선택한 항목의 상세 정보입니다."
     >
       {#if currentLoading}
         <ContentStatePanel
           title="Preparing selected reference"
-          message="The current encyclopedia selection is being summarized."
+          message="선택 항목을 불러오는 중입니다."
         />
       {:else if currentErrorMessage}
         <ContentStatePanel
@@ -536,8 +536,8 @@
               <p>ID: {selectedKeyword.id}</p>
               <p>
                 {selectedKeyword.parameterized
-                  ? 'This keyword expects parameter input when used by cards or rules.'
-                  : 'This keyword is defined as a static rule reference.'}
+                  ? '파라미터가 필요한 키워드입니다.'
+                  : '고정 키워드입니다.'}
               </p>
             </div>
           {:else if selectedStatus}
@@ -559,7 +559,7 @@
                   {/each}
                 </div>
               {:else}
-                <p>No status tags are registered for this definition.</p>
+                <p>상태 태그가 없습니다.</p>
               {/if}
             </div>
           {:else}
@@ -567,8 +567,8 @@
               <p>ID: {selectedPassive?.id}</p>
               <p>
                 {selectedPassive?.priority !== null
-                  ? `Priority ${selectedPassive?.priority} is registered for this passive.`
-                  : 'No explicit priority is registered for this passive.'}
+                  ? `우선순위 ${selectedPassive?.priority}`
+                  : '우선순위가 없습니다.'}
               </p>
             </div>
           {/if}

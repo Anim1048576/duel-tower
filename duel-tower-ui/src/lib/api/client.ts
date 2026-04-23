@@ -57,18 +57,18 @@ function getMessageFromBody(body: unknown) {
 function getStatusMessage(status: number) {
   switch (status) {
     case 400:
-      return 'The request could not be processed. Check the input and try again.'
+      return '요청을 처리하지 못했습니다. 입력값을 확인해 주세요.'
     case 401:
-      return 'Authentication is required or the session has expired.'
+      return '로그인이 필요합니다.'
     case 403:
-      return 'You do not have permission to perform this action.'
+      return '권한이 없습니다.'
     case 404:
       return 'The requested resource could not be found.'
     case 409:
-      return 'The request could not be completed because of a conflicting state.'
+      return '현재 상태와 충돌했습니다.'
     default:
       return status >= 500
-        ? 'The server failed while processing the request. Try again shortly.'
+        ? '서버 오류입니다. 잠시 후 다시 시도해 주세요.'
         : 'The request failed unexpectedly.'
   }
 }
@@ -124,7 +124,7 @@ export async function apiRequest<TResponse>(input: string, options: ApiRequestOp
     throw new ApiError({
       status: null,
       code: 'network_error',
-      message: 'Unable to reach the server. Check the connection and try again.',
+      message: '서버에 연결할 수 없습니다. 다시 시도해 주세요.',
       cause,
     })
   }

@@ -28,7 +28,7 @@
 
 <SectionFrame
   title="Selected card"
-  description="This panel only manages local input state for the currently selected entry."
+  description="선택한 카드 항목입니다."
 >
   {#if selectedCardEntry}
     <div class="selected-card__detail">
@@ -80,13 +80,13 @@
 
       <div class="selected-card__note">
         <p>Edits stay local until an action is invoked.</p>
-        <p>Deck summary, dirty state, and validation freshness update immediately from the same local draft.</p>
+        <p>현재 입력값 기준으로 표시됩니다.</p>
       </div>
     </div>
   {:else}
     <ContentStatePanel
       title="No cards are assigned"
-      message="This deck currently has no saved card entries."
+      message="저장된 카드가 없습니다."
     />
   {/if}
 </SectionFrame>

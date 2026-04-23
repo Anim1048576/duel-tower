@@ -32,9 +32,7 @@
     <div class="app-layout__brand">
       <p class="app-layout__eyebrow">Archive Node</p>
       <h1>Duel Tower</h1>
-      <p class="app-layout__copy">
-        Central archive for roster, decks, presets, sessions, and live reference screens.
-      </p>
+      <p class="app-layout__copy">캐릭터, 덱, 세션을 관리합니다.</p>
 
       {#if currentUsername}
         <div class="app-layout__session-block">

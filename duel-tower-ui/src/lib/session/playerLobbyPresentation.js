@@ -147,7 +147,7 @@ function buildReferencePreview(option, emptyLabel, missingKind) {
 
   return {
     label: `${missingKind} (unresolved)`,
-    subtitle: 'The current local draft refers to a value that is not available in the latest server references.',
+    subtitle: '현재 선택값을 사용할 수 없습니다.',
     tags: /** @type {EntityListTag[]} */ ([{ label: 'Unresolved', tone: 'warning' }]),
   }
 }
@@ -167,7 +167,7 @@ function buildPassiveItems(identifiers, options) {
         title: passiveId,
         subtitle: 'Passive id in the current local draft',
         meta: `Entry ${index + 1}`,
-        note: 'This passive id is not available in the latest server reference options.',
+        note: '이 패시브 id를 사용할 수 없습니다.',
         tags: /** @type {EntityListTag[]} */ ([{ label: 'Unresolved', tone: 'warning' }]),
       }
     }
@@ -237,8 +237,8 @@ export function createPlayerLobbyLocalPresentation(screen, loadoutDraft, selecte
     deckEditingLocked,
     deckEditingLockReason: deckEditingLocked
       ? characterChangePending
-        ? 'Save the new character first to refresh owned card options and unlock deck editing.'
-        : 'Deck editing is locked in the latest server snapshot.'
+        ? '캐릭터 선택을 먼저 저장해 주세요.'
+        : '덱 편집이 잠겨 있습니다.'
       : '',
     requiredFieldsMissing,
     summary: localSummary,
@@ -259,15 +259,15 @@ export function createPlayerLobbyLocalPresentation(screen, loadoutDraft, selecte
     preset: {
       selectedId: normalizeText(selectedPresetId),
       label: selectedPreset?.label ?? 'No preset selected',
-      subtitle: selectedPreset?.subtitle ?? 'Choose a saved preset from the current server-provided list.',
+      subtitle: selectedPreset?.subtitle ?? '저장된 프리셋을 선택해 주세요.',
       previewSynced: presetPreviewSynced,
       previewStale: presetPreviewStale,
       name: presetPreviewSynced ? screen.presets.preview?.name ?? '' : selectedPreset?.label ?? '',
       summary: presetPreviewSynced
         ? screen.presets.preview?.summary ?? ''
         : selectedPreset
-          ? 'Resolved preview is available only for the latest server-selected preset snapshot.'
-          : 'Choose a saved preset before applying it to the current session.',
+          ? '최신 프리셋 미리보기만 표시됩니다.'
+          : '적용할 프리셋을 선택해 주세요.',
       characterLabel: presetPreviewSynced ? screen.presets.preview?.characterLabel ?? '' : '',
       exLabel: presetPreviewSynced ? screen.presets.preview?.exLabel ?? '' : '',
       deckItems: presetPreviewSynced

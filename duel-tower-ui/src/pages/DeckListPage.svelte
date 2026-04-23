@@ -204,10 +204,10 @@
       setSelectionHandoff(selectionHandoffKeys.characterId, String(response.id))
       clearDeckApplyContext()
       navigateTo(pathBuilders.characterDetail(String(response.id)), {
-        characterFeedback: 'Saved deck applied. Character detail was refreshed from the server.',
+        characterFeedback: '저장된 덱을 적용했습니다.',
       })
     } catch (error) {
-      applyErrorMessage = getApiErrorMessage(error, 'Unable to apply the selected deck to this character.')
+      applyErrorMessage = getApiErrorMessage(error, '선택한 덱을 적용하지 못했습니다.')
     } finally {
       applying = false
     }
@@ -274,7 +274,7 @@
     {#if inCharacterApplyFlow}
       <ContentStatePanel
         title="Applying a saved deck"
-        message="Choose a deck below. The server will validate and persist the character current skill deck."
+        message="적용할 덱을 선택해 주세요."
       />
     {/if}
 
@@ -290,8 +290,8 @@
     <SectionFrame
       title="덱 목록"
       description={inCharacterApplyFlow
-        ? 'Select a saved deck, then apply it through the character deck API.'
-        : 'Each row comes from GET /api/content/decks and keeps the existing open-editor flow on click.'}
+        ? '저장된 덱을 선택해 적용합니다.'
+        : '덱을 선택하고 편집합니다.'}
     >
       <p class="list-page__summary">{listSummary}</p>
 

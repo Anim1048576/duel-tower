@@ -112,8 +112,8 @@
   const summary = $derived.by(() => {
     if (!deckEditor) {
       return previewPending
-        ? 'Refreshing the current deck preview from the server.'
-        : 'No server deck preview is available for the current draft.'
+        ? '덱 미리보기를 불러오는 중입니다.'
+        : '표시할 덱 미리보기가 없습니다.'
     }
     return `Deck ${deckEditor.deck.draftDeckSize}/${deckEditor.deck.requiredDeckSize} cards | Changed ${deckEditor.deck.changedCardCount} | ${deckEditor.deck.saveAllowed ? 'Save allowed' : 'Save blocked'}`
   })
@@ -133,7 +133,7 @@
     <ContentStatePanel
       title={previewStale ? 'Preview refresh failed, showing last server result' : 'Preview refresh failed'}
       message={previewStale
-        ? `${previewErrorMessage} The last successful server preview is still shown below and may be outdated.`
+        ? `${previewErrorMessage} 이전 미리보기를 표시합니다.`
         : previewErrorMessage}
       tone="error"
       actionLabel={onRetryPreview ? 'Retry preview' : undefined}
@@ -145,8 +145,8 @@
     <ContentStatePanel
       title="Preview refreshing"
       message={previewStale
-        ? 'Refreshing the latest server preview while keeping the previous resolved add/remove state visible.'
-        : 'The latest canAdd, canRemove, reason codes, and deck counters are being resolved by the server.'}
+        ? '미리보기를 새로고침하는 중입니다.'
+        : '덱 상태를 불러오는 중입니다.'}
     />
   {/if}
 

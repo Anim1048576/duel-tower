@@ -6,17 +6,17 @@
   const statusItems = [
     {
       label: 'Session-bound screens',
-      value: 'Inventory and Shop follow the session you opened most recently.',
+      value: 'Inventory와 Shop은 최근 세션을 기준으로 표시됩니다.',
       tone: 'warning' as const,
     },
     {
       label: 'Always-available reference',
-      value: 'Reference stays useful even before a session starts.',
+      value: 'Reference는 세션 없이도 사용할 수 있습니다.',
       tone: 'success' as const,
     },
     {
       label: 'Fast return paths',
-      value: 'Hub, Session, Inventory, and Shop stay one click apart.',
+      value: '주요 화면으로 바로 이동할 수 있습니다.',
       tone: 'accent' as const,
     },
   ]
@@ -24,7 +24,7 @@
   const quickLinks = [
     {
       title: 'Session Entry',
-      description: 'Create or rejoin a session before opening run-bound screens.',
+      description: '세션을 만들거나 다시 참가합니다.',
       href: pathBuilders.sessionEntry(),
       action: 'Open session gate',
       badge: 'Recommended first step',
@@ -32,7 +32,7 @@
     },
     {
       title: 'Inventory',
-      description: 'Check gold, keys, chests, and carried supplies for the active expedition.',
+      description: '보유 자원을 확인합니다.',
       href: pathBuilders.inventory(),
       action: 'Open inventory',
       badge: 'Needs session context',
@@ -40,7 +40,7 @@
     },
     {
       title: 'Shop',
-      description: 'Browse merchant offers and buy while the expedition is stopped on an event node.',
+      description: '상점 상품을 확인하고 구매합니다.',
       href: pathBuilders.shop(),
       action: 'Open shop',
       badge: 'Needs session context',
@@ -48,7 +48,7 @@
     },
     {
       title: 'Reference',
-      description: 'Look up keywords, statuses, and passives without leaving the archive.',
+      description: '키워드, 상태, 패시브를 확인합니다.',
       href: pathBuilders.reference(),
       action: 'Open reference',
       badge: 'Always available',
@@ -57,9 +57,9 @@
   ]
 
   const guidance = [
-    'Open Session Entry first when you need Inventory or Shop to restore the correct expedition context.',
-    'Use Inventory for carried stock and resources, Shop for merchant offers, and Reference for rules lookup.',
-    'If a session-bound page says its context is unavailable, returning to Session Entry is the fastest reset path.',
+    'Inventory나 Shop은 Session Entry에서 먼저 세션을 선택하세요.',
+    'Inventory는 보유 자원, Shop은 구매, Reference는 규칙 확인용입니다.',
+    '세션 화면이 열리지 않으면 Session Entry에서 다시 들어가세요.',
   ]
 </script>
 
@@ -67,16 +67,14 @@
   <SectionFrame
     eyebrow="Central Ledger"
     title="Duel Tower Hub"
-    description="Start from here when you need a quick route into the active expedition, merchant stop, or rules reference."
+    description="주요 화면으로 이동합니다."
   >
     <div class="hub-page__hero">
       <div class="hub-page__hero-copy">
         <p class="hub-page__hero-label">Hub Overview</p>
-        <h3>Keep expedition screens, merchant access, and rules lookup clearly separated</h3>
+        <h3>필요한 화면으로 이동하세요</h3>
         <p>
-          The hub now calls out which screens need a live session and which ones can open on their own.
-          Inventory focuses on what the expedition already carries, Shop focuses on what can be bought,
-          and Reference stays available as a pure rules lookup.
+          Inventory와 Shop은 세션 정보가 필요합니다. Reference는 바로 열 수 있습니다.
         </p>
       </div>
 
@@ -90,7 +88,7 @@
   <div class="hub-page__grid">
     <SectionFrame
       title="Current UX Focus"
-      description="These notes explain how the expedition screens fit into the rest of the app."
+      description="화면별 용도입니다."
     >
       <ul class="hub-page__status-list">
         {#each statusItems as item}
@@ -107,7 +105,7 @@
 
     <SectionFrame
       title="Quick Routes"
-      description="Use these entry cards when moving between session setup, expedition stock, merchant offers, and rules lookup."
+      description="원하는 화면을 선택합니다."
     >
       <div class="hub-page__link-grid">
         {#each quickLinks as item}
@@ -125,7 +123,7 @@
 
     <SectionFrame
       title="Route Notes"
-      description="A short checklist for the most common movement between the new run-bound pages."
+      description="자주 쓰는 이동 순서입니다."
     >
       <div class="hub-page__memo">
         {#each guidance as memo}

@@ -61,14 +61,14 @@
 
 <SectionFrame
   title="Card pool"
-  description="Card groups and add availability come directly from the latest server preview. Each owned card copy keeps its own add state."
+  description="추가할 수 있는 카드 목록입니다."
 >
   {#if !groups.length}
     <ContentStatePanel
       title={previewPending ? 'Refreshing preview' : 'No card groups'}
       message={previewPending
-        ? 'Waiting for the current server preview before rendering the latest add availability.'
-        : 'No card pool groups are available for the current draft.'}
+        ? '카드 목록을 불러오는 중입니다.'
+        : '표시할 카드가 없습니다.'}
     />
   {:else}
     <div class="deck-pool-panel">

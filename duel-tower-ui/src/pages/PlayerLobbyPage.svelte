@@ -102,12 +102,12 @@
   }
 
   function getInvalidAccessMessage(nextRouteCode: string | null, nextAccess: StoredSessionAccess | null) {
-    if (!nextRouteCode) return 'No session code is present in the current player lobby URL.'
+    if (!nextRouteCode) return '현재 플레이어 로비 URL에 세션 코드가 없습니다.'
     if (!isStoredPlayerSessionAccess(nextAccess)) {
-      return 'Player session access is not available. Re-enter through the session entry page first.'
+      return '플레이어 권한이 없습니다. 세션 입장에서 다시 들어가 주세요.'
     }
     if (!hasStoredSessionCode(nextAccess, nextRouteCode)) {
-      return 'The stored player session access does not match the requested session code.'
+      return '저장된 세션 권한이 요청 코드와 다릅니다.'
     }
     return null
   }
@@ -216,7 +216,7 @@
         }
       },
       onError: (error) => {
-        errorMessage = getApiErrorMessage(error, 'Unable to refresh the current player lobby screen.')
+        errorMessage = getApiErrorMessage(error, '플레이어 로비를 새로고침하지 못했습니다.')
       },
     })
   }
@@ -357,8 +357,8 @@
       await refreshPlayerLobbyScreen('action-toggle-ready')
       actionSuccessTitle = 'Ready updated'
       actionSuccessMessage = requestedReady
-        ? 'You are marked ready in the current session.'
-        : 'You are no longer marked ready in the current session.'
+        ? '준비 상태입니다.'
+        : '준비 상태를 해제했습니다.'
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to update the current ready state.')
     } finally {
@@ -399,7 +399,7 @@
 
     if (normalizedDraft.characterId === null) {
       actionErrorTitle = 'Loadout save failed'
-      actionErrorMessage = 'Character selection is required before saving the current loadout.'
+      actionErrorMessage = '로드아웃 저장 전 캐릭터를 선택해 주세요.'
       actionSuccessTitle = null
       actionSuccessMessage = null
       return
@@ -409,7 +409,7 @@
     const requiresExCard = 'exCardId' in savePayload && typeof savePayload.exCardId === 'string'
     if (requiresExCard && !normalizedDraft.exCardId) {
       actionErrorTitle = 'Loadout save failed'
-      actionErrorMessage = 'EX card selection is required before saving the current loadout.'
+      actionErrorMessage = '로드아웃 저장 전 EX 카드를 선택해 주세요.'
       actionSuccessTitle = null
       actionSuccessMessage = null
       return
@@ -443,7 +443,7 @@
     const presetItem = screen.presets.items.find((item) => String(item.presetId) === selectedPresetId) ?? null
     if (!Number.isInteger(presetId) || presetId <= 0 || !presetItem) {
       actionErrorTitle = 'Preset apply failed'
-      actionErrorMessage = 'Choose a saved preset before applying it to the current session.'
+      actionErrorMessage = '적용할 프리셋을 선택해 주세요.'
       actionSuccessTitle = null
       actionSuccessMessage = null
       return
@@ -463,7 +463,7 @@
       actionSuccessTitle = playerLobbyStateCopy.presetAppliedFeedback.title
       actionSuccessMessage = `${playerLobbyStateCopy.presetAppliedFeedback.message} (${presetItem.label})`
     } catch (error) {
-      actionErrorMessage = getApiErrorMessage(error, 'Unable to apply the selected preset.')
+      actionErrorMessage = getApiErrorMessage(error, '선택한 프리셋을 적용하지 못했습니다.')
     } finally {
       pendingActionId = null
     }
@@ -512,7 +512,7 @@
       ) {
         return
       }
-      deckPreviewErrorMessage = getApiErrorMessage(error, 'Unable to refresh the current deck preview.')
+      deckPreviewErrorMessage = getApiErrorMessage(error, '덱 미리보기를 새로고침하지 못했습니다.')
     } finally {
       if (
         requestId === latestDeckPreviewRequestId &&
@@ -654,35 +654,35 @@
 
 <div class="player-lobby-page">
   {#if loading}
-    <SectionFrame eyebrow="Player Lobby" title="Loading player lobby" description="Resolving the current player lobby screen from the URL.">
+    <SectionFrame eyebrow="Player Lobby" title="Loading player lobby" description="플레이어 로비를 불러오는 중입니다.">
       <ContentStatePanel title={sessionPageStateCopy.loading.title} message={sessionPageStateCopy.loading.message} />
     </SectionFrame>
   {:else if invalidAccessMessage}
-    <SectionFrame eyebrow="Player Access" title={sessionPageStateCopy.invalidPlayerAccess.title} description="Player lobby requires stored player session access for the requested code.">
+    <SectionFrame eyebrow="Player Access" title={sessionPageStateCopy.invalidPlayerAccess.title} description="플레이어 권한이 필요합니다.">
       <ContentStatePanel title={sessionPageStateCopy.invalidPlayerAccess.title} message={invalidAccessMessage} tone="error" />
       <div class="player-lobby-page__actions">
         <a class="player-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Back to session entry</a>
       </div>
     </SectionFrame>
   {:else if notFound}
-    <SectionFrame eyebrow="Session Missing" title="Session not found" description="The requested player lobby code did not resolve to a live session.">
+    <SectionFrame eyebrow="Session Missing" title="Session not found" description="요청한 세션을 찾을 수 없습니다.">
       <ContentStatePanel title={sessionPageStateCopy.notFound.title} message={sessionPageStateCopy.notFound.message} tone="error">
         <p>Requested code: {requestedSessionCode ?? 'Unavailable'}</p>
-        <p>Check the code from the session entry page and try again.</p>
+        <p>세션 코드를 확인하고 다시 시도해 주세요.</p>
       </ContentStatePanel>
       <div class="player-lobby-page__actions">
         <a class="player-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Back to session entry</a>
       </div>
     </SectionFrame>
   {:else if errorMessage}
-    <SectionFrame eyebrow="Session Summary" title="Player lobby could not be loaded" description="The session code was valid, but the current lobby screen could not be restored.">
+    <SectionFrame eyebrow="Session Summary" title="Player lobby could not be loaded" description="플레이어 로비를 불러오지 못했습니다.">
       <ContentStatePanel title="Unable to load player lobby" message={errorMessage} tone="error" actionLabel="Retry load" onAction={retryLoad} />
       <div class="player-lobby-page__actions">
         <a class="player-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Back to session entry</a>
       </div>
     </SectionFrame>
   {:else if screen && localPresentation}
-    <SectionFrame eyebrow="Session Summary" title={`Session ${screen.sessionCode}`} description="Player lobby now renders the server-provided screen model and keeps only local loadout input in the browser.">
+    <SectionFrame eyebrow="Session Summary" title={`Session ${screen.sessionCode}`} description="플레이어 로비 상태를 확인합니다.">
       <div class="player-lobby-page__summary">
         <div class="player-lobby-page__summary-copy">
           <p>Player lobby</p>
@@ -698,8 +698,8 @@
         </div>
       </div>
       <div class="player-lobby-page__stats">
-        <StatBlock value={participantCount} label="Joined" note="Current participant slots from the lobby screen" />
-        <StatBlock value={readyCount} label="Ready" note="Players marked ready in the current screen response" />
+        <StatBlock value={participantCount} label="Joined" note="참가자 수" />
+        <StatBlock value={readyCount} label="Ready" note="준비 완료 인원" />
         <StatBlock value={screen.me.summary.readyLabel} label="My state" note={screen.me.playerId} />
       </div>
       {#if feedback}
@@ -713,7 +713,7 @@
     </SectionFrame>
 
     <div class="player-lobby-page__main">
-      <SectionFrame title="Participant slots" description="The participant grid now renders directly from the server-curated lobby screen.">
+      <SectionFrame title="Participant slots" description="참가자 목록입니다.">
         {#if screen.participantSlots.length > 0}
           <div class="player-lobby-page__slots">
             {#each screen.participantSlots as participant}
@@ -721,11 +721,11 @@
             {/each}
           </div>
         {:else}
-          <ContentStatePanel title="No participants yet" message="The current session does not have any joined player slots to show yet." />
+          <ContentStatePanel title="No participants yet" message="아직 참가자가 없습니다." />
         {/if}
       </SectionFrame>
 
-      <SectionFrame title="Current loadout" description="The server snapshot and the local draft stay separate so the form can reflect unsaved changes immediately.">
+      <SectionFrame title="Current loadout" description="현재 로드아웃을 편집합니다.">
         <div class="player-lobby-page__guide">
           <p>Current player id: {screen.me.playerId}</p>
           <p>Ready state: {screen.me.summary.readyLabel}</p>
@@ -751,35 +751,35 @@
           </div>
         </div>
         <div class="player-lobby-page__todo">
-          <p>{localPresentation.dirty ? 'Current draft has unsaved loadout changes.' : 'Current draft matches the last synced loadout state.'}</p>
+          <p>{localPresentation.dirty ? '저장되지 않은 변경사항이 있습니다.' : '변경사항이 없습니다.'}</p>
           <p>
             {#if localPresentation.characterChangePending}
-              Save the new character first to refresh server-owned cards and character defaults before editing the deck again.
+              덱을 수정하기 전에 캐릭터 선택을 저장해 주세요.
             {:else if deckPreviewErrorMessage && staleDeckPreviewVisible}
-              The latest preview refresh failed, so the last successful server deck state is still shown below until retry succeeds.
+              미리보기를 불러오지 못해 이전 결과를 표시합니다.
             {:else if localPresentation.dirty && !currentDeckPreviewMatchesDraft}
-              Waiting for the latest server preview before updating add/remove controls and deck status badges.
+              미리보기를 불러오는 중입니다.
             {:else}
-              Current deck editor state is coming from the latest server-owned lobby snapshot or preview response.
+              현재 덱 편집 상태입니다.
             {/if}
           </p>
           {#if localPresentation.deckEditingLocked}
             <p>{localPresentation.deckEditingLockReason}</p>
           {/if}
           {#if lastAppliedPresetLabel}
-            <p>Last preset applied to this live session: {lastAppliedPresetLabel}</p>
+            <p>마지막 적용 프리셋: {lastAppliedPresetLabel}</p>
           {/if}
         </div>
       </SectionFrame>
     </div>
 
     <div class="player-lobby-page__main">
-      <SectionFrame title="Direct loadout save" description="Edit the current player loadout locally and invoke the server-declared save action.">
+      <SectionFrame title="Direct loadout save" description="로드아웃을 저장합니다.">
         {#if loadoutEditGuardMessage}
           <ContentStatePanel title="Loadout editing unavailable" message={loadoutEditGuardMessage} tone="error" />
         {/if}
         {#if localPresentation.characterChangePending}
-          <ContentStatePanel title="Character change pending" message="Save this character selection first. The next screen response will refresh owned cards, deck defaults, and the synced loadout summary." />
+          <ContentStatePanel title="Character change pending" message="캐릭터 선택을 먼저 저장해 주세요." />
         {/if}
         {#if localPresentation.deckEditingLocked}
           <ContentStatePanel title="Deck editing locked" message={localPresentation.deckEditingLockReason} />
@@ -849,8 +849,8 @@
           <ContentStatePanel
             title="Draft passive summary"
             message={localPresentation.passiveItems.length
-              ? `${localPresentation.passiveItems.length} passive ids are currently assigned to the local draft.`
-              : 'No passive ids are currently assigned to the local draft.'}
+              ? `${localPresentation.passiveItems.length}개 패시브 선택됨`
+              : '선택한 패시브가 없습니다.'}
           >
             {#each localPresentation.passiveItems as passiveItem}
               <p>{passiveItem.title}{passiveItem.subtitle ? ` · ${passiveItem.subtitle}` : ''}</p>
@@ -860,32 +860,32 @@
             title="Deck preview source"
             message={localPresentation.dirty
               ? deckPreviewErrorMessage && staleDeckPreviewVisible
-                ? 'The latest preview refresh failed, so the deck editor is still showing the last successful server preview for an older local draft.'
+                ? '미리보기를 불러오지 못해 이전 결과를 표시합니다.'
                 : currentDeckPreviewMatchesDraft
-                ? 'The current deck editor state comes from the latest preview response for this local draft.'
-                : 'Waiting for the latest preview response before updating canAdd and canRemove state.'
-              : 'The current deck editor state comes from the synced player lobby screen response.'}
+                ? '최신 미리보기를 표시합니다.'
+                : '미리보기를 불러오는 중입니다.'
+              : '현재 로비 상태를 표시합니다.'}
           />
         </div>
       </SectionFrame>
 
-      <SectionFrame title="Apply saved preset" description="Choose a server-provided preset item, review the latest preview snapshot, and invoke the apply action.">
+      <SectionFrame title="Apply saved preset" description="저장된 프리셋을 적용합니다.">
         <div class="player-lobby-page__guide">
           <p>{localPresentation.preset.summary}</p>
           <p>
             {localPresentation.preset.previewStale
-              ? 'Selected preset changed locally. Resolved preview refreshes after the next server-selected preset snapshot.'
-              : 'Selected preset preview matches the latest server-selected preset snapshot.'}
+              ? '선택한 프리셋이 변경되었습니다.'
+              : '프리셋 미리보기가 최신입니다.'}
           </p>
           {#if lastAppliedPresetLabel}
-            <p>Current live session was last updated from preset: {lastAppliedPresetLabel}</p>
+            <p>마지막 적용 프리셋: {lastAppliedPresetLabel}</p>
           {/if}
         </div>
         {#if presetApplyGuardMessage}
           <ContentStatePanel title="Preset apply unavailable" message={presetApplyGuardMessage} tone="error" />
         {/if}
         {#if localPresentation.dirty}
-          <ContentStatePanel title="Preset apply replaces the current draft" message="Applying a preset updates the live session loadout and replaces the current unsaved draft with the next server screen response." />
+          <ContentStatePanel title="Preset apply replaces the current draft" message="프리셋 적용 시 현재 변경사항이 대체됩니다." />
         {/if}
         <label class="player-lobby-page__field">
           <span>Preset</span>
@@ -898,7 +898,7 @@
         </label>
 
         {#if !screen.presets.items.length}
-          <ContentStatePanel title="No saved presets yet" message="Create a preset from the preset archive first, then return here to apply it to the current session." />
+          <ContentStatePanel title="No saved presets yet" message="표시할 프리셋이 없습니다." />
         {:else if selectedPresetId}
           <div class="player-lobby-page__guide">
             <p>{localPresentation.preset.label}</p>
@@ -907,7 +907,7 @@
               <p>Character: {localPresentation.preset.characterLabel}</p>
               <p>EX: {localPresentation.preset.exLabel}</p>
             {:else}
-              <p>Resolved preview list refreshes after the next server-selected preset snapshot is loaded.</p>
+              <p>프리셋을 선택하면 미리보기가 갱신됩니다.</p>
             {/if}
           </div>
           <div class="player-lobby-page__actions">
@@ -918,19 +918,19 @@
           </div>
           {#if localPresentation.preset.previewSynced}
             <div class="player-lobby-page__grid">
-              <EntityListPane items={localPresentation.preset.deckItems} emptyMessage="This preset has no saved deck card entries." />
-              <EntityListPane items={localPresentation.preset.passiveItems} emptyMessage="This preset has no saved passive entries." />
+              <EntityListPane items={localPresentation.preset.deckItems} emptyMessage="표시할 덱 카드가 없습니다." />
+              <EntityListPane items={localPresentation.preset.passiveItems} emptyMessage="표시할 패시브가 없습니다." />
             </div>
           {:else}
             <ContentStatePanel title="Preview pending refresh" message={localPresentation.preset.summary} />
           {/if}
         {:else}
-          <ContentStatePanel message="No saved preset is currently selected." />
+          <ContentStatePanel message="선택한 프리셋이 없습니다." />
         {/if}
       </SectionFrame>
     </div>
 
-    <SectionFrame title="Action zone" description="Bottom action strip keeps readiness and membership actions separate from loadout editing.">
+    <SectionFrame title="Action zone" description="준비 상태와 퇴장을 처리합니다.">
       <div class="player-lobby-page__guide">
         <p>Current ready state: {screen.me.summary.readyLabel}</p>
         <p>{screen.me.summary.membershipSummary}</p>

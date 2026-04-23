@@ -82,7 +82,7 @@ function toInspectorMetrics(
 function formatPlayerDetailLines(player: CombatScreenResponse['actors']['players'][number]) {
   const detailLines: string[] = []
 
-  detailLines.push(player.ready ? 'Ready participant in the current combat session.' : 'Joined participant awaiting ready state.')
+  detailLines.push(player.ready ? '준비 완료 참가자입니다.' : '준비 대기 중인 참가자입니다.')
 
   if (player.passives.length > 0) {
     detailLines.push(`Passives: ${player.passives.join(', ')}`)
@@ -149,7 +149,7 @@ function buildSelectionSummaries(input: {
 
   if (!sourceOption) {
     selectionSummaries.push({
-      label: 'This card is not offered by the current play-card source options.',
+      label: '지금은 이 카드를 사용할 수 없습니다.',
       tone: 'warning',
     })
     return selectionSummaries
@@ -158,7 +158,7 @@ function buildSelectionSummaries(input: {
   selectionSummaries.push({
     label: sourceOption.supported
       ? 'Playable in the current combat step'
-      : (sourceOption.unsupportedReason ?? 'This card is not playable in the current combat step.'),
+      : (sourceOption.unsupportedReason ?? '지금은 이 카드를 사용할 수 없습니다.'),
     tone: sourceOption.supported ? 'success' : 'warning',
   })
 
@@ -320,14 +320,14 @@ export function buildCombatInspectorViewModel(
     categoryLabel: 'Hand card',
     portraitLabel: portraitLabel(card.title),
     costOrType: card.subtitle || 'Type unavailable',
-    description: card.meta ?? card.subtitle ?? 'No card description is available in the current combat payload.',
+    description: card.meta ?? card.subtitle ?? '카드 설명이 없습니다.',
     keywordTags: card.tags.map((tag) => ({
       label: tag.label,
       tone: normalizeTagTone(tag.tone),
     })),
     ruleLines: [
       `Owner: ${ownerEntry.player.playerId}`,
-      card.unresolved ? 'This hand card is still unresolved in the current payload.' : 'Resolved hand card details are available.',
+      card.unresolved ? '아직 카드 정보를 불러오지 못했습니다.' : '카드 정보를 확인할 수 있습니다.',
       ...(card.defId ? [`Definition id: ${card.defId}`] : []),
     ],
     selectionSummaries: buildSelectionSummaries({

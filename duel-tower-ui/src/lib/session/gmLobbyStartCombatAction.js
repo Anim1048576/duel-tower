@@ -47,6 +47,6 @@ export function resolveGmLobbyStartCombatFollowUp(response) {
       ? null
       : response.disabledReason?.userMessage ??
         response.message ??
-        'Unable to start combat from the current GM lobby.',
+        '전투를 시작하지 못했습니다.',
   }
 }

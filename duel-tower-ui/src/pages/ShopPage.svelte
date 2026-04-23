@@ -170,7 +170,7 @@
         itemCatalog = []
         itemCatalogNoticeMessage = getApiErrorMessage(
           nextItems.reason,
-          'Some item notes could not be loaded, so a few offers are shown with shorter fallback labels.',
+          '일부 상품 설명을 불러오지 못했습니다.',
         )
       }
 
@@ -187,9 +187,9 @@
       runtimeAccess = access
       requestedSessionCode = code
       contextMessage = !code
-        ? 'Open or rejoin a session first. The expedition shop follows the run you entered most recently.'
+        ? '먼저 세션에 참가해 주세요.'
         : !access
-          ? `Session ${code} is known, but this browser no longer has the access needed to reopen its merchant stop.`
+          ? `Session ${code} 접근 권한이 없습니다.`
           : null
       accessNoticeMessage =
         code && access
@@ -215,7 +215,7 @@
       syncShopState(nextState)
     },
     onError: (error) => {
-      errorMessage = getApiErrorMessage(error, 'The merchant catalog could not be loaded right now.')
+      errorMessage = getApiErrorMessage(error, '상점 목록을 불러오지 못했습니다.')
     },
     onLoadSettled: () => {
       loading = false
@@ -259,15 +259,15 @@
     actionSuccessMessage = null
 
     if (!selected || !requestedSessionCode || !access || access.role !== 'player' || !playerAccess) {
-      actionErrorMessage = 'Rejoin this session as a player before trying to buy from the merchant.'
+      actionErrorMessage = '플레이어로 다시 참가해 주세요.'
       return
     }
     if (!shopOpen) {
-      actionErrorMessage = 'The merchant only takes orders while the expedition is stopped on an event node.'
+      actionErrorMessage = '이벤트 노드에서만 구매할 수 있습니다.'
       return
     }
     if (typeof sessionState?.version !== 'number') {
-      actionErrorMessage = 'The page is out of date. Refresh the shop and try again.'
+      actionErrorMessage = '화면을 새로고침한 뒤 다시 시도해 주세요.'
       return
     }
     if (currentGold < selected.price) {
@@ -300,7 +300,7 @@
       }
 
       if (!response.accepted) {
-        const message = response.errors.filter(Boolean).join(' ') || 'The expedition shop rejected the purchase command.'
+        const message = response.errors.filter(Boolean).join(' ') || '구매할 수 없습니다.'
         actionErrorMessage =
           response.errors.some((error) => error.includes('version mismatch')) && response.state
             ? `${message} The page synced to the latest shop state.`
@@ -310,7 +310,7 @@
 
       actionSuccessMessage = `${selected.name} was added to the expedition supplies for ${formatGold(selected.price)}.`
     } catch (error) {
-      actionErrorMessage = getApiErrorMessage(error, 'The purchase could not be completed right now.')
+      actionErrorMessage = getApiErrorMessage(error, '구매를 완료하지 못했습니다.')
     } finally {
       purchasePendingOfferId = null
     }
@@ -350,8 +350,8 @@
   )
   const purchaseBlockedMessage = $derived.by(() => {
     if (!selectedOffer) return 'Select an offer to inspect its details.'
-    if (!isStoredPlayerSessionAccess(runtimeAccess)) return 'Rejoin this session as a player to make purchases.'
-    if (!shopOpen) return 'Buying opens only while the expedition is stopped on an event node.'
+    if (!isStoredPlayerSessionAccess(runtimeAccess)) return '플레이어로 다시 참가해 주세요.'
+    if (!shopOpen) return '이벤트 노드에서만 구매할 수 있습니다.'
     if (currentGold < selectedOffer.price) return `This offer needs ${formatGold(selectedOffer.price)}, but the run currently holds ${formatGold(currentGold)}.`
     if (purchasePendingOfferId) return 'Sending the purchase request now.'
     return null
@@ -366,11 +366,11 @@
 
 <div class="shop-page">
   {#if loading}
-    <SectionFrame eyebrow="Field Merchant" title="Expedition Shop" description="Opening the current merchant stop for the expedition you entered most recently.">
-      <ContentStatePanel title="Loading merchant stop" message="Gathering expedition funds, carried stock, and the current offer list." />
+    <SectionFrame eyebrow="Field Merchant" title="Expedition Shop" description="상점을 불러오는 중입니다.">
+      <ContentStatePanel title="Loading merchant stop" message="불러오는 중입니다." />
     </SectionFrame>
   {:else if contextMessage}
-    <SectionFrame eyebrow="Field Merchant" title="Shop context is unavailable" description="The merchant view follows a live session, so it needs a recent session entry before it can open.">
+    <SectionFrame eyebrow="Field Merchant" title="Shop context is unavailable" description="먼저 세션에 참가해 주세요.">
       <ContentStatePanel title="Session context required" message={contextMessage} />
       <div class="shop-page__actions">
         <a class="shop-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Go to Session Entry</a>
@@ -378,20 +378,20 @@
       </div>
     </SectionFrame>
   {:else if errorMessage}
-    <SectionFrame eyebrow="Field Merchant" title="Merchant stop could not be restored" description="The session is known, but the merchant catalog could not be refreshed.">
+    <SectionFrame eyebrow="Field Merchant" title="Merchant stop could not be restored" description="상점 목록을 불러오지 못했습니다.">
       <ContentStatePanel title="Could not load shop" message={errorMessage} tone="error" actionLabel="Try again" onAction={() => void loadShop()} />
     </SectionFrame>
   {:else if !runState}
-    <SectionFrame eyebrow="Field Merchant" title="This run is not ready for the shop yet" description="A session exists, but the expedition route has not exposed a merchant-ready run state yet.">
-      <ContentStatePanel title="Shop data unavailable" message="Return to Session Entry or refresh after the expedition route is fully restored." actionLabel="Refresh shop" onAction={() => void loadShop()} />
+    <SectionFrame eyebrow="Field Merchant" title="This run is not ready for the shop yet" description="아직 상점을 열 수 없습니다.">
+      <ContentStatePanel title="Shop data unavailable" message="다시 시도해 주세요." actionLabel="Refresh shop" onAction={() => void loadShop()} />
     </SectionFrame>
   {:else}
-    <SectionFrame eyebrow="Field Merchant" title="Expedition Shop" description="Browse what the current merchant stop can offer and buy when the expedition is paused on an event node.">
+    <SectionFrame eyebrow="Field Merchant" title="Expedition Shop" description="상품을 확인하고 구매합니다.">
       <div class="shop-page__hero">
         <div class="shop-page__hero-copy">
           <p class="shop-page__eyebrow">Merchant Console</p>
-          <h3>Browse merchant offers without losing track of the current expedition</h3>
-          <p>Use this screen to compare the current offer list with the supplies the party already carries. Buying opens only when the route is waiting at an event stop.</p>
+          <h3>현재 상품 목록입니다.</h3>
+          <p>이벤트 노드에서만 구매할 수 있습니다.</p>
         </div>
         <div class="shop-page__tag-row">
           <TagChip label={shopOpen ? 'Shop Open' : 'View Only'} tone={shopOpen ? 'success' : 'warning'} />
@@ -408,7 +408,7 @@
     <div class="shop-page__notice-row">
       {#if accessNoticeMessage}<ContentStatePanel message={accessNoticeMessage} />{/if}
       {#if itemCatalogNoticeMessage}<ContentStatePanel title="Some item notes are simplified" message={itemCatalogNoticeMessage} />{/if}
-      {#if !shopOpen}<ContentStatePanel title="Merchant is between stops" message={`The route is currently at ${currentNode ? `${currentNode.name} (${formatLabel(currentNode.phase)})` : 'an unavailable node'}, so the catalog is visible but purchases stay closed until the next event stop.`} />{/if}
+      {#if !shopOpen}<ContentStatePanel title="Merchant is between stops" message="지금은 구매할 수 없습니다." />{/if}
     </div>
     <div class="shop-page__layout">
       <section class="shop-page__panel">
@@ -451,7 +451,7 @@
           <span>{shopFilters.find((filter) => filter.key === selectedFilter)?.note}</span>
         </div>
         {#if filteredOffers.length === 0}
-          <ContentStatePanel title="No offers in this category" message="Try another filter to browse the rest of the merchant table." />
+          <ContentStatePanel title="No offers in this category" message="표시할 상품이 없습니다." />
         {:else}
           <div class="shop-page__offer-grid">
             {#each filteredOffers as offer}
@@ -525,7 +525,7 @@
               </div>
             </div>
             {#if recentResults.length === 0}
-              <ContentStatePanel message="No recent expedition updates are recorded yet." />
+              <ContentStatePanel message="최근 업데이트가 없습니다." />
             {:else}
               <ul>
                 {#each recentResults as result}

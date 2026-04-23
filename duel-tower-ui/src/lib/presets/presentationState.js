@@ -98,7 +98,7 @@ function buildFallbackPreviewItem(kind, identifier, index) {
     title: identifier,
     subtitle: `${kindLabel} id in the current local draft`,
     meta: `Entry ${index + 1}`,
-    note: 'Resolved metadata refreshes after save, create, or clone.',
+    note: '저장 후 갱신됩니다.',
     tags: /** @type {EntityListTag[]} */ ([{ label: 'Local Draft', tone: 'warning' }]),
   }
 }
@@ -156,7 +156,7 @@ function buildReferencePreview(kind, localId, sourceId, sourceLabel, sourceSubti
   if (localIdentifier === null || localIdentifier === '') {
     return {
       label: kind === 'character' ? 'No character selected' : 'No EX card selected',
-      subtitle: 'Select a value in the local draft to refresh this preview.',
+    subtitle: '값을 선택해 주세요.',
       tags: /** @type {EntityListTag[]} */ ([{ label: 'Local Draft', tone: 'muted' }]),
     }
   }
@@ -165,7 +165,7 @@ function buildReferencePreview(kind, localId, sourceId, sourceLabel, sourceSubti
 
   return {
     label: `${kindLabel} ${localIdentifier}`,
-    subtitle: 'Resolved metadata refreshes after save, create, or clone.',
+    subtitle: '저장 후 갱신됩니다.',
     tags: /** @type {EntityListTag[]} */ ([{ label: 'Local Draft', tone: 'warning' }]),
   }
 }

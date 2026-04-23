@@ -71,7 +71,7 @@
 
   function getInvalidAccessMessage(nextRouteCode: string | null) {
     if (!nextRouteCode) {
-      return 'No session code is present in the current GM lobby URL.'
+      return '현재 GM 로비 URL에 세션 코드가 없습니다.'
     }
     return null
   }
@@ -183,7 +183,7 @@
         screen = null
         clearRefreshError()
       } else {
-        const message = getApiErrorMessage(error, 'Unable to restore the current GM lobby screen.')
+        const message = getApiErrorMessage(error, 'GM 로비를 불러오지 못했습니다.')
         if (plan.showLoading || !screen) {
           errorMessage = message
           clearRefreshError()
@@ -210,7 +210,7 @@
         }
       },
       onError: (error) => {
-        refreshErrorMessage = getApiErrorMessage(error, 'Unable to refresh the current GM lobby screen.')
+        refreshErrorMessage = getApiErrorMessage(error, 'GM 로비를 새로고침하지 못했습니다.')
       },
     })
   }
@@ -386,7 +386,7 @@
       actionErrorTitle = followUp.errorTitle ?? 'Combat start failed'
       actionErrorMessage = followUp.errorMessage
     } catch (error) {
-      actionErrorMessage = getApiErrorMessage(error, 'Unable to start combat from the current GM lobby.')
+      actionErrorMessage = getApiErrorMessage(error, '전투를 시작하지 못했습니다.')
     } finally {
       pendingActionId = null
     }
@@ -432,18 +432,18 @@
     <SectionFrame
       eyebrow="Session Summary"
       title="Loading GM lobby"
-      description="Resolving the current GM lobby screen from the URL."
+      description="GM 로비를 불러오는 중입니다."
     >
       <ContentStatePanel
         title={sessionPageStateCopy.loading.title}
-        message="Fetching the current GM lobby screen by session code."
+        message="불러오는 중입니다."
       />
     </SectionFrame>
   {:else if invalidAccessMessage}
     <SectionFrame
       eyebrow="Session Route"
       title="GM lobby route is unavailable"
-      description="This page needs a valid session code in the URL before it can restore the GM lobby."
+      description="세션 코드가 필요합니다."
     >
       <ContentStatePanel
         title="Session code is missing"
@@ -451,7 +451,7 @@
         tone="error"
       >
         <p>Requested code: {routeSessionCode ?? 'Unavailable'}</p>
-        <p>Open the session entry screen and enter a valid session code to restore the GM lobby.</p>
+        <p>세션 입장에서 올바른 코드를 입력해 주세요.</p>
       </ContentStatePanel>
 
       <div class="gm-lobby-page__actions">
@@ -464,7 +464,7 @@
     <SectionFrame
       eyebrow="Session Missing"
       title="Session not found"
-      description="The requested GM lobby code did not resolve to a live session."
+      description="요청한 세션을 찾을 수 없습니다."
     >
       <ContentStatePanel
         title={sessionPageStateCopy.notFound.title}
@@ -472,7 +472,7 @@
         tone="error"
       >
         <p>Requested code: {routeSessionCode ?? 'Unavailable'}</p>
-        <p>Check the code from the session entry page and try again.</p>
+        <p>세션 코드를 확인하고 다시 시도해 주세요.</p>
       </ContentStatePanel>
 
       <div class="gm-lobby-page__actions">
@@ -485,7 +485,7 @@
     <SectionFrame
       eyebrow="Session Summary"
       title="GM lobby could not be loaded"
-      description="The session code was valid, but the current GM lobby screen could not be restored."
+      description="GM 로비를 불러오지 못했습니다."
     >
       <ContentStatePanel
         title="Unable to load GM lobby"
@@ -505,7 +505,7 @@
     <SectionFrame
       eyebrow="Session Summary"
       title={`Session ${screen.sessionCode}`}
-      description="GM lobby now renders the server-provided screen model and keeps only selection inputs and action feedback in the browser."
+      description="GM 로비 상태를 확인합니다."
     >
       <div class="gm-lobby-page__summary">
         <div class="gm-lobby-page__summary-copy">
@@ -521,8 +521,8 @@
       </div>
 
       <div class="gm-lobby-page__stats">
-        <StatBlock value={participantCount} label="Joined" note="Current participant cards from the GM lobby screen" />
-        <StatBlock value={readyCount} label="Ready" note="Players marked ready in the current screen response" />
+        <StatBlock value={participantCount} label="Joined" note="참가자 수" />
+        <StatBlock value={readyCount} label="Ready" note="준비 완료 인원" />
         <StatBlock value={screen.version} label="Version" note="Current GM lobby screen version" />
       </div>
 
@@ -548,7 +548,7 @@
     <div class="gm-lobby-page__main">
       <SectionFrame
         title="Participant slots"
-        description="Participant cards render directly from the server-curated GM lobby screen."
+        description="참가자 목록입니다."
       >
         {#if screen.participantCards.length > 0}
           <div class="gm-lobby-page__slots">
@@ -596,19 +596,19 @@
         {:else}
           <ContentStatePanel
             title="No participants yet"
-            message="This live session is waiting for its first player. Keep the lobby open and share the session code to collect joins."
+            message="아직 참가자가 없습니다."
           />
         {/if}
       </SectionFrame>
 
       <SectionFrame
         title="GM control panel"
-        description="Kick and reset use the server-declared action contract with only minimal local form state."
+        description="참가자 제거와 세션 초기화를 실행합니다."
       >
         <div class="gm-lobby-page__guide">
           <p>Current participant count: {participantCount}</p>
           <p>Current ready count: {readyCount}</p>
-          <p>Use kick for a single participant, or reset the current session state with the options below.</p>
+          <p>참가자를 제거하거나 세션을 초기화합니다.</p>
         </div>
 
         {#if kickAction && !kickAction.enabled}
@@ -708,7 +708,7 @@
 
     <SectionFrame
       title="Action zone"
-      description="Combat start now follows the server-declared screen action instead of a frontend retry script."
+      description="전투 시작 조건을 확인합니다."
     >
       <div class="gm-lobby-page__action-stack">
         <label class="gm-lobby-page__field">

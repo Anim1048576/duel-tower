@@ -29,64 +29,64 @@ export const defaultShopCatalog: readonly ShopCatalogOffer[] = [
 const fallbackOfferMap: Record<string, ShopOfferFallback> = {
   'E-1': {
     name: 'Sturdy Spear',
-    summary: 'Weapon offer from the default expedition shop catalog.',
+    summary: '기본 상점 무기 상품입니다.',
     description:
-      'Detailed equipment codex data is not exposed through a public content API yet, so this offer uses the stable equipment reference from the current run balance config.',
+      '상세 장비 설명이 없습니다.',
     tags: ['equipment', 'weapon'],
   },
   'E-2': {
     name: 'Portable Pistol',
-    summary: 'Ammo-based weapon offer from the default expedition shop catalog.',
+    summary: '기본 상점 탄약 무기 상품입니다.',
     description:
-      'Detailed equipment codex data is not exposed through a public content API yet, so this offer uses the stable equipment reference from the current run balance config.',
+      '상세 장비 설명이 없습니다.',
     tags: ['equipment', 'weapon', 'ammo'],
   },
   'I-1': {
     name: 'Cheap Healing Potion',
-    summary: 'Default item offer from the current expedition shop catalog.',
-    description: 'Item codex lookup is unavailable, so this offer is shown from the stable run balance reference.',
+    summary: '기본 상점 상품입니다.',
+    description: '상세 상품 설명이 없습니다.',
     tags: ['item', 'consumable'],
   },
   'I-2': {
     name: 'Healing Potion',
-    summary: 'Default item offer from the current expedition shop catalog.',
-    description: 'Item codex lookup is unavailable, so this offer is shown from the stable run balance reference.',
+    summary: '기본 상점 상품입니다.',
+    description: '상세 상품 설명이 없습니다.',
     tags: ['item', 'consumable'],
   },
   'I-3': {
     name: 'Advanced Healing Potion',
-    summary: 'Default item offer from the current expedition shop catalog.',
-    description: 'Item codex lookup is unavailable, so this offer is shown from the stable run balance reference.',
+    summary: '기본 상점 상품입니다.',
+    description: '상세 상품 설명이 없습니다.',
     tags: ['item', 'consumable'],
   },
   'I-4': {
     name: 'Cheap Barrier Generator',
-    summary: 'Default item offer from the current expedition shop catalog.',
-    description: 'Item codex lookup is unavailable, so this offer is shown from the stable run balance reference.',
+    summary: '기본 상점 상품입니다.',
+    description: '상세 상품 설명이 없습니다.',
     tags: ['item', 'consumable'],
   },
   'I-5': {
     name: 'Barrier Generator',
-    summary: 'Default item offer from the current expedition shop catalog.',
-    description: 'Item codex lookup is unavailable, so this offer is shown from the stable run balance reference.',
+    summary: '기본 상점 상품입니다.',
+    description: '상세 상품 설명이 없습니다.',
     tags: ['item', 'consumable'],
   },
   'I-6': {
     name: 'Antidote',
-    summary: 'Default item offer from the current expedition shop catalog.',
-    description: 'Item codex lookup is unavailable, so this offer is shown from the stable run balance reference.',
+    summary: '기본 상점 상품입니다.',
+    description: '상세 상품 설명이 없습니다.',
     tags: ['item', 'consumable'],
   },
   'I-7': {
     name: 'Emergency Smoke Bomb',
-    summary: 'Default item offer from the current expedition shop catalog.',
-    description: 'Item codex lookup is unavailable, so this offer is shown from the stable run balance reference.',
+    summary: '기본 상점 상품입니다.',
+    description: '상세 상품 설명이 없습니다.',
     tags: ['item', 'consumable'],
   },
   'I-8': {
     name: 'Bullet Bundle',
-    summary: 'Ammunition bundle from the default expedition shop catalog.',
-    description: 'Item codex lookup is unavailable, so this offer is shown from the stable run balance reference.',
+    summary: '기본 탄약 묶음 상품입니다.',
+    description: '상세 상품 설명이 없습니다.',
     tags: ['item', 'ammo', 'special'],
   },
 }
@@ -101,9 +101,9 @@ export function getShopOfferFallback(refId: string): ShopOfferFallback {
   return (
     fallbackOfferMap[normalizedRefId] ?? {
       name: normalizedRefId,
-      summary: 'Default expedition shop offer from the current run balance catalog.',
+      summary: '기본 상점 상품입니다.',
       description:
-        'This offer is available in the run balance config, but a richer public content definition is not exposed to the frontend yet.',
+        '상세 상품 설명이 없습니다.',
       tags: ['shop'],
     }
   )

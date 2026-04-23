@@ -133,7 +133,7 @@
 
 <SectionFrame
   title="Context panel"
-  description="Command, inspector, logs, and results stay in tabs so the battlefield remains primary."
+  description="명령, 정보, 로그, 결과를 확인합니다."
 >
   <div class="combat-sidebar">
     <div class="combat-sidebar__tab-list" role="tablist" aria-label="Combat sidebar tabs">
@@ -202,12 +202,12 @@
             title="Recent events"
             loading={eventsLoading}
             loadingTitle="Loading events"
-            loadingMessage="Restoring recent combat events for the current session."
+            loadingMessage="전투 이벤트를 불러오는 중입니다."
             errorTitle="Events unavailable"
             errorMessage={eventsErrorMessage}
             retryLabel="Retry events"
             emptyTitle="No recent events"
-            emptyMessage="No combat events have been restored for this session yet."
+            emptyMessage="표시할 전투 이벤트가 없습니다."
             entries={eventEntries}
             onRetry={onRetryEvents}
           />
@@ -216,12 +216,12 @@
             title="Recent logs"
             loading={logsLoading}
             loadingTitle="Loading logs"
-            loadingMessage="Restoring recent combat logs for the current session."
+            loadingMessage="전투 로그를 불러오는 중입니다."
             errorTitle="Logs unavailable"
             errorMessage={logsErrorMessage}
             retryLabel="Retry logs"
             emptyTitle="No recent logs"
-            emptyMessage="No combat log messages have been restored for this session yet."
+            emptyMessage="표시할 전투 로그가 없습니다."
             entries={logEntries}
             onRetry={onRetryLogs}
           />

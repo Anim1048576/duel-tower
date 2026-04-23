@@ -183,7 +183,7 @@
         <p class="app-bootstrap__eyebrow">Session Restore</p>
         <h2>Checking archive access</h2>
         <p class="app-bootstrap__copy">
-          Restoring the current session before routing into the public or internal archive.
+          세션을 확인하는 중입니다.
         </p>
       </div>
     </section>

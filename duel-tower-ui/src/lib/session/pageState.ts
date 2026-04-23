@@ -8,56 +8,56 @@ const sessionPageFeedbackKey = 'duel-tower:session-page-feedback'
 export const sessionPageStateCopy = {
   loading: {
     title: 'Loading session state',
-    message: 'Fetching the latest live session state for the current code.',
+    message: '세션 상태를 불러오는 중입니다.',
   },
   notFound: {
     title: 'Requested session is unavailable',
-    message: 'The requested session code could not be found in the session API.',
+    message: '요청한 세션을 찾을 수 없습니다.',
   },
   invalidPlayerAccess: {
     title: 'Player access required',
-    message: 'Player session access is not available for the requested code. Re-enter through the session entry page first.',
+    message: '플레이어 권한이 없습니다. 세션 입장에서 다시 들어가 주세요.',
   },
   invalidGmAccess: {
     title: 'GM access required',
-    message: 'GM session access is not available for the requested code. Re-enter through the session entry page first.',
+    message: 'GM 권한이 없습니다. 세션 입장에서 다시 들어가 주세요.',
   },
 } as const
 
 export const sessionEntryStateCopy = {
   createdFeedback: {
     title: 'GM session created',
-    message: 'The new session is ready and GM access has been restored for the current code.',
+    message: '새 세션이 준비되었습니다.',
   },
   joinedFeedback: {
     title: 'Player session joined',
-    message: 'The player lobby is ready and player access has been restored for the current code.',
+    message: '플레이어 로비에 입장했습니다.',
   },
   leftFeedback: {
     title: 'Left session',
-    message: 'The current player session was closed and the entry screen is ready for the next join or create flow.',
+    message: '세션에서 나왔습니다.',
   },
 } as const
 
 export const playerLobbyStateCopy = {
   presetAppliedFeedback: {
     title: 'Preset applied',
-    message: 'The selected preset was applied to the current live loadout.',
+    message: '선택한 프리셋을 적용했습니다.',
   },
   loadoutSavedFeedback: {
     title: 'Loadout saved',
-    message: 'The current live loadout was saved and synced from the latest session response.',
+    message: '로드아웃을 저장했습니다.',
   },
 } as const
 
 export const gmLobbyStateCopy = {
   playerRemovedFeedback: {
     title: 'Player removed',
-    message: 'The selected player was removed and the GM lobby synced from the latest session response.',
+    message: '선택한 플레이어를 제거했습니다.',
   },
   sessionResetFeedback: {
     title: 'Session reset',
-    message: 'The session was reset and the GM lobby synced from the latest session response.',
+    message: '세션을 초기화했습니다.',
   },
 } as const
 

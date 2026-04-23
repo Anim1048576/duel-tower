@@ -75,14 +75,14 @@
         {/each}
 
         {#if visiblePlayerView.graveCards.length === 0 && visiblePlayerView.excludedCards.length === 0}
-          <p>No grave or excluded cards are present for this player.</p>
+          <p>표시할 묘지/제외 카드가 없습니다.</p>
         {/if}
       </div>
     </div>
   {:else}
     <ContentStatePanel
       title="Zone summary unavailable"
-      message="A current player zone summary will render here once a player state is present."
+      message="표시할 플레이어 상태가 없습니다."
     />
   {/if}
 </div>

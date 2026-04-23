@@ -44,7 +44,7 @@
     try {
       return JSON.stringify(playSpec, null, 2)
     } catch {
-      return 'Play spec is present but could not be rendered.'
+      return 'Play spec을 표시할 수 없습니다.'
     }
   }
 
@@ -105,14 +105,14 @@
   })
   const stateMessage = $derived.by(() => {
     if (notFound) {
-      return 'The requested card record is not available in the current archive.'
+      return '요청한 카드를 찾을 수 없습니다.'
     }
 
     if (errorMessage) {
       return errorMessage
     }
 
-    return 'Open a card from the archive or use a valid /cards/:id route.'
+    return '카드 목록에서 카드를 열어 주세요.'
   })
 </script>
 
@@ -132,12 +132,12 @@
     <SectionFrame
       eyebrow="Selected Card"
       title={card.name}
-      description="Review the selected card and its registered play information."
+      description="선택한 카드 정보를 확인합니다."
     >
       <div class="card-detail-page__hero">
         <div class="card-detail-page__hero-copy">
           <p>{getCardTypeLabel(card.type)}</p>
-          <h3>{card.description || 'No card description is available for this record.'}</h3>
+          <h3>{card.description || '카드 설명이 없습니다.'}</h3>
         </div>
 
         <div class="card-detail-page__hero-tags">
@@ -152,12 +152,12 @@
       </div>
 
       <div class="card-detail-page__stats">
-        <StatBlock value={card.cost ?? 'N/A'} label="Cost" note="Card cost from the content registry" />
-        <StatBlock value={keywordCount} label="Keywords" note="Keyword references linked to this card" />
+        <StatBlock value={card.cost ?? 'N/A'} label="Cost" note="카드 비용" />
+        <StatBlock value={keywordCount} label="Keywords" note="연결된 키워드" />
         <StatBlock
           value={formatContentEnumLabel(card.resolveTo)}
           label="Resolve To"
-          note="Zone or destination resolved by the card"
+          note="카드 처리 대상"
         />
       </div>
     </SectionFrame>
@@ -165,7 +165,7 @@
     <div class="card-detail-page__grid">
       <SectionFrame
         title="Card profile"
-        description="Core fields from the selected CardDetailResponse record."
+        description="카드 기본 정보입니다."
       >
         <div class="card-detail-page__section">
           <div class="card-detail-page__field">
@@ -175,7 +175,7 @@
 
           <div class="card-detail-page__field">
             <h3>Description</h3>
-            <p>{card.description || 'No description is currently stored for this card.'}</p>
+            <p>{card.description || '카드 설명이 없습니다.'}</p>
           </div>
 
           <div class="card-detail-page__field">
@@ -190,7 +190,7 @@
                 {/each}
               </div>
             {:else}
-              <p>No keyword references are linked to this card.</p>
+              <p>연결된 키워드가 없습니다.</p>
             {/if}
           </div>
         </div>
@@ -198,17 +198,17 @@
 
       <SectionFrame
         title="Resolution and play spec"
-        description="This section shows resolve targets and play-spec payload without extra rule interpretation."
+        description="처리 대상과 play spec을 확인합니다."
       >
         <div class="card-detail-page__section">
           <div class="card-detail-page__field">
             <h3>Resolve target</h3>
-            <p>{formatContentEnumLabel(card.resolveTo, 'No resolve target is registered for this card.')}</p>
+            <p>{formatContentEnumLabel(card.resolveTo, '처리 대상이 없습니다.')}</p>
           </div>
 
           <div class="card-detail-page__field">
             <h3>Token link</h3>
-            <p>{card.token ? 'Registered' : 'No linked token is registered for this card.'}</p>
+            <p>{card.token ? 'Registered' : '연결된 토큰이 없습니다.'}</p>
           </div>
 
           <div class="card-detail-page__field">
@@ -220,7 +220,7 @@
                 <p>{formattedPlaySpec}</p>
               {/if}
             {:else}
-              <p>No play-spec payload is currently stored for this card.</p>
+              <p>Play spec이 없습니다.</p>
             {/if}
           </div>
         </div>
@@ -229,7 +229,7 @@
 
     <SectionFrame
       title="Archive actions"
-      description="This read-only record keeps the same fields the next deck picker and card reference flows can reuse."
+      description="카드 목록으로 돌아갈 수 있습니다."
     >
       <div class="card-detail-page__actions">
         <a class="card-detail-page__link-action" data-nav href={pathBuilders.cardLibrary()}>
@@ -238,7 +238,7 @@
       </div>
 
       <div class="card-detail-page__note">
-        <p>Identifier, keywords, and play-spec stay visible here so the next deck step can reuse the same content contract.</p>
+        <p>카드 식별자와 규칙 정보를 확인합니다.</p>
       </div>
     </SectionFrame>
   {:else}
@@ -256,10 +256,10 @@
       >
         {#if notFound}
           <p>Requested id: {invalidRouteId ?? cardId}</p>
-          <p>Return to the card library and open a valid card record.</p>
+          <p>카드 목록에서 다시 열어 주세요.</p>
         {:else if !errorMessage}
-          <p>No card id was found in the current route.</p>
-          <p>Open a card from the library to restore the expected detail context.</p>
+          <p>현재 경로에 카드 id가 없습니다.</p>
+          <p>카드 목록에서 카드를 열어 주세요.</p>
         {/if}
       </ContentStatePanel>
 
