@@ -133,14 +133,14 @@ public final class ResolveLastWordsCommand implements GameCommand {
         CardInstId selectedId = selectedIds.get(0);
         int cost = KeywordOps.keywordValue(state, ctx, selectedId, K014_LastWords.ID);
         ps.ap(ps.ap() - cost);
+        ps.pendingDecision(null);
+        events.add(new GameEvent.PendingDecisionCleared(ps.playerId().value(), "LAST_WORDS"));
 
         CardInstance ci = state.card(selectedId);
         CardDefinition def = ctx.def(ci.defId());
         CardEffect effect = ctx.effect(def.id());
         effect.resolveLastWords(new LastWordsContext(state, ctx, ps.playerId(), selectedId, events));
 
-        ps.pendingDecision(null);
-        events.add(new GameEvent.PendingDecisionCleared(ps.playerId().value(), "LAST_WORDS"));
         events.add(new GameEvent.LogAppended(
                 ps.playerId().value() + " resolved last words " + selectedId.value()
         ));
