@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.LastWordsDecisionOps;
 import com.example.dueltower.engine.core.SummonOps;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
@@ -172,6 +173,7 @@ public final class PlayCardCommand implements GameCommand {
         CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, cardId, selection, discardIds, selectedIds, events);
         eff.resolve(ec);
+        LastWordsDecisionOps.openPendingIfPossible(ec, ps, events);
 
         // 카드 사용 후 훅 순서: passive -> status
         PassiveOps.afterPlayCard(state, ctx, TargetRef.ofPlayer(playerId), ci, def, events, "PLAY_CARD");
