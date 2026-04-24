@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { PendingDecisionDto } from '../../api/sessionTypes'
   import ContentStatePanel from '../ContentStatePanel.svelte'
   import TargetSelectionPanel from './TargetSelectionPanel.svelte'
   import type {
     CombatCommandRequirementViewModel,
+    CombatPendingDecisionViewModel,
     CommandOptionViewModel,
   } from './types'
 
@@ -23,7 +23,7 @@
     selectedBoardObjectLabels: readonly string[]
     selectedDiscardIds: readonly string[]
     selectedFieldIds: readonly string[]
-    pendingDecision: PendingDecisionDto | null
+    pendingDecision: CombatPendingDecisionViewModel | null
     unsupportedPendingDecisionMessage: string | null
     pendingCandidateIds: readonly string[]
     orderedTieActorKeys: readonly string[]

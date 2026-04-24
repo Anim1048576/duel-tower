@@ -12,7 +12,7 @@
     type CombatScreenActionResponse,
     type CombatScreenResponse,
   } from '../lib/api/screenTypes'
-  import type { PendingDecisionDto, RunRecentResultDto, TargetRefDto } from '../lib/api/sessionTypes'
+  import type { RunRecentResultDto, TargetRefDto } from '../lib/api/sessionTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import BattlefieldPanel from '../lib/components/combat/BattlefieldPanel.svelte'
   import CombatHeader from '../lib/components/combat/CombatHeader.svelte'
@@ -28,6 +28,7 @@
     CombatPresentationState,
     CombatEnemyViewModel,
     CombatFeedEntry,
+    CombatPendingDecisionViewModel,
     CombatPlayerViewModel,
     CombatRecentResultEntry,
     CombatSidebarTab,
@@ -894,7 +895,7 @@
     return null
   }
 
-  function getPendingDecisionView(metadata: CombatPendingActionMetadataDto | null): PendingDecisionDto | null {
+  function getPendingDecisionView(metadata: CombatPendingActionMetadataDto | null): CombatPendingDecisionViewModel | null {
     if (!metadata?.pendingDecisionType) {
       return null
     }
@@ -907,6 +908,7 @@
       limit: schema?.discardCount ?? null,
       pickCount: schema?.pickCount ?? null,
       candidateIds: schema?.candidateIds ?? [],
+      candidateCards: schema?.candidateCards ?? null,
       canSkip: schema?.canSkip ?? null,
       destination: schema?.destination ?? null,
       shuffleAfterPick: schema?.shuffleAfterPick ?? null,

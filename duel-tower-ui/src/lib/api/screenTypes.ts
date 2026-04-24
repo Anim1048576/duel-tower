@@ -703,6 +703,7 @@ export type CombatPendingDecisionSchemaDto = {
   discardCount?: number | null
   pickCount?: number | null
   candidateIds?: string[] | null
+  candidateCards?: CombatCardDto[] | null
   canSkip?: boolean | null
   destination?: string | null
   shuffleAfterPick?: boolean | null

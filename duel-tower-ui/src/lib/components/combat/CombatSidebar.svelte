@@ -1,6 +1,5 @@
 <script lang="ts">
   import SectionFrame from '../SectionFrame.svelte'
-  import type { PendingDecisionDto } from '../../api/sessionTypes'
   import CombatLogPanel from './CombatLogPanel.svelte'
   import CombatInspectorPanel from './CombatInspectorPanel.svelte'
   import CombatResultsPanel from './CombatResultsPanel.svelte'
@@ -11,6 +10,7 @@
     CombatCommandRequirementViewModel,
     CombatFeedEntry,
     CombatInspectorViewModel,
+    CombatPendingDecisionViewModel,
     CombatPlayerViewModel,
     CombatRecentResultEntry,
     CombatSidebarTab,
@@ -34,7 +34,7 @@
     selectedBoardObjectLabels: readonly string[]
     selectedDiscardIds: readonly string[]
     selectedFieldIds: readonly string[]
-    pendingDecision: PendingDecisionDto | null
+    pendingDecision: CombatPendingDecisionViewModel | null
     unsupportedPendingDecisionMessage: string | null
     pendingCandidateIds: readonly string[]
     orderedTieActorKeys: readonly string[]

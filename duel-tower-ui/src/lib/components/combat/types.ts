@@ -1,3 +1,6 @@
+import type { CombatCardDto } from '../../api/screenTypes'
+import type { PendingDecisionDto } from '../../api/sessionTypes'
+
 export type CombatTone = 'accent' | 'muted' | 'success' | 'warning'
 
 export const COMBAT_SIDEBAR_TABS = ['command', 'log', 'result', 'inspector'] as const
@@ -141,6 +144,10 @@ export type CombatCommandRequirementViewModel = {
   boardCountChoiceOptions: number[]
   boardCountChoiceRequired: boolean
   boardCandidateCount: number | null
+}
+
+export type CombatPendingDecisionViewModel = PendingDecisionDto & {
+  candidateCards: CombatCardDto[] | null
 }
 
 export type CombatPlayerViewModel = {
