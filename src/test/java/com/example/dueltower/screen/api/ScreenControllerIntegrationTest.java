@@ -6,8 +6,10 @@ import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.deck.domain.Deck;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.repository.DeckRepository;
+import com.example.dueltower.engine.model.CardInstance;
 import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.PendingDecision;
+import com.example.dueltower.engine.model.Zone;
 import com.example.dueltower.member.MemberRepository;
 import com.example.dueltower.preset.domain.Preset;
 import com.example.dueltower.preset.repository.PresetRepository;
@@ -30,6 +32,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -826,6 +829,33 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     @Test
+    void combatScreenEnablesResolvePendingActionForLastWordsDecision() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-last-words-screen-gm", "combat-last-words-screen-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-last-words-screen-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-last-words-screen-p1", "combat-last-words-screen-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-last-words-screen-p1", characterId);
+        markPlayerReady(session.code(), "combat-last-words-screen-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-last-words-screen-p1");
+
+        String candidateId = injectLastWordsPendingDecision(session.code(), "combat-last-words-screen-p1", true);
+
+        JsonNode body = getCombatScreen(session.code(), playerToken);
+        JsonNode resolvePendingAction = findAction(body, "combat.resolvePending");
+        assertActionContract(resolvePendingAction);
+        assertThat(resolvePendingAction.path("enabled").asBoolean()).isTrue();
+        assertThat(resolvePendingAction.path("payloadTemplate").path("type").asText()).isEqualTo("LAST_WORDS");
+        assertThat(resolvePendingAction.path("payloadTemplate").path("selectedIds").isArray()).isTrue();
+        assertThat(resolvePendingAction.path("payloadTemplate").path("selectedIds")).hasSize(0);
+        assertThat(resolvePendingAction.path("metadata").path("supported").asBoolean()).isTrue();
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("type").asText()).isEqualTo("LAST_WORDS");
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateIds")).hasSize(1);
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateIds").get(0).asText()).isEqualTo(candidateId);
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("canSkip").asBoolean()).isTrue();
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("selectedIdsField").asText()).isEqualTo("selectedIds");
+    }
+
+    @Test
     void combatDrawActionSucceedsAndReturnsLatestScreen() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("combat-draw-gm", "combat-draw-gm@example.com", "password123");
         SessionInfo session = createSession(gmSession, "combat-draw-gm");
@@ -950,6 +980,77 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("outcome").asText()).isEqualTo("SUCCEEDED");
         assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("DISCARD_TO_HAND_LIMIT");
         assertThat(body.path("latestScreen").path("access").path("guards").path("hasPendingDecision").asBoolean()).isFalse();
+    }
+
+    @Test
+    void combatResolvePendingActionSupportsSkippableLastWordsDecision() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-last-words-skip-gm", "combat-last-words-skip-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-last-words-skip-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-last-words-skip-p1", "combat-last-words-skip-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-last-words-skip-p1", characterId);
+        markPlayerReady(session.code(), "combat-last-words-skip-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-last-words-skip-p1");
+
+        String candidateId = injectLastWordsPendingDecision(session.code(), "combat-last-words-skip-p1", true);
+
+        JsonNode body = executeCombatAction(
+                session.code(),
+                "combat.resolvePending",
+                playerToken,
+                """
+                {
+                  "selectedIds": []
+                }
+                """
+        );
+
+        assertCombatActionResponseContract(body);
+        assertThat(body.path("success").asBoolean()).isTrue();
+        assertThat(body.path("outcome").asText()).isEqualTo("SUCCEEDED");
+        assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("LAST_WORDS");
+        assertThat(body.path("latestScreen").path("access").path("guards").path("hasPendingDecision").asBoolean()).isFalse();
+        assertThat(body.path("latestScreen").path("sidebar").path("logs").toString()).contains("skipped last words");
+        assertThat(candidateId).isNotBlank();
+    }
+
+    @Test
+    void combatResolvePendingActionSupportsSelectedLastWordsCard() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-last-words-select-gm", "combat-last-words-select-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-last-words-select-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-last-words-select-p1", "combat-last-words-select-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-last-words-select-p1", characterId);
+        markPlayerReady(session.code(), "combat-last-words-select-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-last-words-select-p1");
+
+        String candidateId = injectLastWordsPendingDecision(session.code(), "combat-last-words-select-p1", true);
+        int apBefore = sessionLifecycleService.withLockedSession(session.code(), rt -> rt.state()
+                .player(new Ids.PlayerId("combat-last-words-select-p1"))
+                .ap());
+
+        JsonNode body = executeCombatAction(
+                session.code(),
+                "combat.resolvePending",
+                playerToken,
+                """
+                {
+                  "selectedIds": ["%s"]
+                }
+                """.formatted(candidateId)
+        );
+
+        assertCombatActionResponseContract(body);
+        assertThat(body.path("success").asBoolean()).isFalse();
+        assertThat(body.path("outcome").asText()).isEqualTo("FAILED");
+        assertThat(body.path("message").asText()).contains("last words cost must be positive");
+        assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("LAST_WORDS");
+        assertThat(body.path("latestScreen").path("access").path("guards").path("hasPendingDecision").asBoolean()).isTrue();
+
+        int apAfter = sessionLifecycleService.withLockedSession(session.code(), rt -> rt.state()
+                .player(new Ids.PlayerId("combat-last-words-select-p1"))
+                .ap());
+        assertThat(apAfter).isEqualTo(apBefore);
     }
 
     @Test
@@ -1331,6 +1432,30 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andExpect(status().isOk())
                 .andReturn();
         return readJson(result);
+    }
+
+    private String injectLastWordsPendingDecision(String sessionCode,
+                                                  String playerId,
+                                                  boolean canSkip) {
+        return sessionLifecycleService.withLockedSession(sessionCode, rt -> {
+            var player = rt.state().player(new Ids.PlayerId(playerId));
+            player.ap(Math.max(player.ap(), 3));
+            Ids.CardDefId candidateDefId = rt.state().card(player.hand().get(0)).defId();
+
+            Ids.CardInstId candidateId = new Ids.CardInstId(UUID.randomUUID());
+            rt.state().cardInstances().put(
+                    candidateId,
+                    new CardInstance(candidateId, candidateDefId, new Ids.PlayerId(playerId), Zone.GRAVE)
+            );
+            player.grave().add(candidateId);
+            player.pendingDecision(new PendingDecision.LastWordsChoice(
+                    "manual last words test",
+                    List.of(candidateId),
+                    canSkip,
+                    UUID.randomUUID()
+            ));
+            return candidateId.value().toString();
+        });
     }
 
     private long createCharacter() {

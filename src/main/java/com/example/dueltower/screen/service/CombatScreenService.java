@@ -497,6 +497,7 @@ public class CombatScreenService {
             commandType = switch (pendingType) {
                 case "DISCARD_TO_HAND_LIMIT" -> "DISCARD_TO_HAND_LIMIT";
                 case "SEARCH_PICK" -> "SEARCH_PICK";
+                case "LAST_WORDS" -> "LAST_WORDS";
                 case "INITIATIVE_TIE_ORDER" -> "RESOLVE_INITIATIVE_TIE";
                 default -> null;
             };
@@ -1181,7 +1182,7 @@ public class CombatScreenService {
             return "Pending decision type is missing.";
         }
         return switch (pendingType) {
-            case "DISCARD_TO_HAND_LIMIT", "SEARCH_PICK", "INITIATIVE_TIE_ORDER" -> null;
+            case "DISCARD_TO_HAND_LIMIT", "SEARCH_PICK", "LAST_WORDS", "INITIATIVE_TIE_ORDER" -> null;
             default -> pendingType + " is not supported in this combat step yet.";
         };
     }
