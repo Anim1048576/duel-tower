@@ -28,7 +28,6 @@
     CombatPresentationState,
     CombatEnemyViewModel,
     CombatFeedEntry,
-    CombatPendingDecisionViewModel,
     CombatPlayerViewModel,
     CombatRecentResultEntry,
     CombatSidebarTab,
@@ -66,6 +65,10 @@
     reconcileCombatLocalSelectionState,
     resolveCombatScreenRefreshPlan,
   } from '../lib/session/combatScreenRefresh.js'
+  import {
+    createCombatPendingDecisionView,
+    getLastWordsPendingLocalBlock,
+  } from '../lib/session/combatPendingDecision.js'
   import { startTimedPolling, type TimedPollingHandle } from '../lib/session/liveSessionPolling'
   import { readRequestedSessionCodeFromAccessOrHandoff, readSessionCodeFromRoute } from '../lib/session/sessionRoute'
   import { syncSessionSelectionHandoff } from '../lib/session/sessionRuntime'
@@ -830,7 +833,7 @@
         }
         return null
       case 'LAST_WORDS':
-        return getLastWordsPendingLocalBlock(schema.canSkip)
+        return getLastWordsPendingLocalBlock(selectedPendingIds, schema.canSkip)
       case 'INITIATIVE_TIE_ORDER':
         if ((schema.actorKeys?.length ?? 0) !== orderedActorKeys.length) {
           return '동률 대상 순서를 먼저 정해 주세요.'
@@ -839,22 +842,6 @@
       default:
         return null
     }
-  }
-
-  function getLastWordsPendingLocalBlock(canSkip: boolean | null | undefined) {
-    if (selectedPendingIds.length >= 2) {
-      return '유언은 최대 1장만 선택할 수 있습니다.'
-    }
-
-    if (canSkip) {
-      return null
-    }
-
-    if (selectedPendingIds.length !== 1) {
-      return '유언을 발동할 카드 1장을 선택해 주세요.'
-    }
-
-    return null
   }
 
   function getActionPresentationBlock(action: CombatScreenAction | null) {
@@ -900,28 +887,6 @@
     }
 
     return null
-  }
-
-  function getPendingDecisionView(metadata: CombatPendingActionMetadataDto | null): CombatPendingDecisionViewModel | null {
-    if (!metadata?.pendingDecisionType) {
-      return null
-    }
-
-    const schema = metadata.schema
-
-    return {
-      type: metadata.pendingDecisionType,
-      reason: schema?.reason ?? null,
-      limit: schema?.discardCount ?? null,
-      pickCount: schema?.pickCount ?? null,
-      candidateIds: schema?.candidateIds ?? [],
-      candidateCards: schema?.candidateCards ?? null,
-      canSkip: schema?.canSkip ?? null,
-      destination: schema?.destination ?? null,
-      shuffleAfterPick: schema?.shuffleAfterPick ?? null,
-      groupIndex: schema?.groupIndex ?? null,
-      actorKeys: schema?.actorKeys ?? [],
-    }
   }
 
   function buildActionBody(action: CombatScreenAction) {
@@ -1189,7 +1154,7 @@
   )
   const selectedPlayCardSource = $derived.by(() => findSelectedPlayCardSource(screen, selectedCardId))
   const pendingActionMetadata = $derived.by(() => getPendingMetadata(screen))
-  const pendingDecision = $derived.by(() => getPendingDecisionView(pendingActionMetadata))
+  const pendingDecision = $derived.by(() => createCombatPendingDecisionView(pendingActionMetadata))
   const pendingLocalBlock = $derived.by(() => getPendingLocalBlock(pendingActionMetadata))
   const selectedAction = $derived.by(() =>
     screen && selectedActionId ? findCombatAction(screen, selectedActionId) : null,
