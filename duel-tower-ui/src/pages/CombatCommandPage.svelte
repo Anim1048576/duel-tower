@@ -831,13 +831,13 @@
         return null
       case 'LAST_WORDS':
         if (selectedPendingIds.length >= 2) {
-          return 'Select at most 1 candidate id to resolve the pending decision.'
+          return '유언 후보는 최대 1장만 선택할 수 있습니다.'
         }
         if (schema.canSkip) {
-          return selectedPendingIds.length <= 1 ? null : 'Select at most 1 candidate id to resolve the pending decision.'
+          return selectedPendingIds.length <= 1 ? null : '유언 후보는 최대 1장만 선택할 수 있습니다.'
         }
         if (selectedPendingIds.length !== 1) {
-          return 'Select 1 candidate id to resolve the pending decision.'
+          return '유언 효과를 발동할 카드 1장을 선택하세요.'
         }
         return null
       case 'INITIATIVE_TIE_ORDER':
@@ -1094,6 +1094,11 @@
   }
 
   function handleTogglePendingSelectedId(value: string) {
+    if (getPendingMetadata(screen)?.schema?.type === 'LAST_WORDS') {
+      selectedPendingIds = selectedPendingIds.includes(value) ? [] : [value]
+      return
+    }
+
     selectedPendingIds = toggleIdentifier(selectedPendingIds, value)
   }
 
@@ -1134,6 +1139,11 @@
   function handleResolvePendingDecision() {
     selectedActionId = 'combat.resolvePending'
     void executeAction('combat.resolvePending')
+  }
+
+  function handleSkipPendingDecision() {
+    selectedPendingIds = []
+    handleResolvePendingDecision()
   }
 
   function handlePopState() {
@@ -1523,6 +1533,7 @@
           onTogglePendingSelectedId={handleTogglePendingSelectedId}
           onToggleOrderedActorKey={handleToggleOrderedActorKey}
           onResolvePendingDecision={handleResolvePendingDecision}
+          onSkipPendingDecision={handleSkipPendingDecision}
           onToggleSelectedId={handleToggleFieldId}
           canToggleSelectedId={(instanceId) => canToggleBoardSelectionKey(fieldSelectionKey(instanceId))}
           onRetryEvents={() => void refreshCombatScreen('action-failure')}

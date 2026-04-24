@@ -40,6 +40,7 @@
     onTogglePendingSelectedId: (value: string) => void
     onToggleOrderedActorKey: (actorKey: string) => void
     onResolvePendingDecision: () => void
+    onSkipPendingDecision: () => void
   }
 
   let {
@@ -75,6 +76,7 @@
     onTogglePendingSelectedId,
     onToggleOrderedActorKey,
     onResolvePendingDecision,
+    onSkipPendingDecision,
   }: Props = $props()
 
   function handleCountInput(event: Event) {
@@ -85,6 +87,10 @@
   function handleReasonInput(event: Event) {
     const target = event.currentTarget as HTMLTextAreaElement
     onSelectedReasonChange(target.value)
+  }
+
+  function isPendingCandidateSelected(candidateId: string) {
+    return pendingCandidateIds.includes(candidateId)
   }
 </script>
 
@@ -198,6 +204,94 @@
           title="Pending decision is read-only"
           message={unsupportedPendingDecisionMessage}
         />
+      {:else if pendingDecision.type === 'LAST_WORDS'}
+        <div class="command-action-panel__last-words">
+          <div class="command-action-panel__last-words-heading">
+            <strong>유언 발동 선택</strong>
+            <p>행동력을 지불하고 유언 효과를 발동할 카드 1장을 선택합니다.</p>
+            {#if pendingDecision.reason}
+              <p class="command-action-panel__pending-note">{pendingDecision.reason}</p>
+            {/if}
+          </div>
+
+          {#if pendingDecision.candidateCards?.length}
+            <div class="command-action-panel__last-words-card-list">
+              {#each pendingDecision.candidateCards as candidateCard (candidateCard.instanceId)}
+                <article
+                  class={`command-action-panel__last-words-card${isPendingCandidateSelected(candidateCard.instanceId) ? ' command-action-panel__last-words-card--selected' : ''}`}
+                >
+                  <div class="command-action-panel__last-words-card-main">
+                    <span class="command-action-panel__last-words-card-title">
+                      {candidateCard.title || '이름 없는 카드'}
+                    </span>
+                    <span class="command-action-panel__last-words-card-subtitle">
+                      {candidateCard.subtitle || '종류 정보 없음'}
+                    </span>
+                  </div>
+
+                  {#if candidateCard.tags.length > 0}
+                    <div class="command-action-panel__card-tag-row" aria-label="카드 태그">
+                      {#each candidateCard.tags as tag}
+                        <span class="command-action-panel__card-tag">{tag.label}</span>
+                      {/each}
+                    </div>
+                  {/if}
+
+                  {#if candidateCard.meta}
+                    <p class="command-action-panel__card-meta">{candidateCard.meta}</p>
+                  {/if}
+
+                  <button
+                    type="button"
+                    class="command-action-panel__inline-button command-action-panel__card-select-button"
+                    class:selected={isPendingCandidateSelected(candidateCard.instanceId)}
+                    disabled={commandPending !== null}
+                    onclick={() => onTogglePendingSelectedId(candidateCard.instanceId)}
+                  >
+                    {isPendingCandidateSelected(candidateCard.instanceId) ? '선택됨' : '이 카드로 유언 발동'}
+                  </button>
+                </article>
+              {/each}
+            </div>
+          {:else if pendingDecision.candidateIds.length > 0}
+            <p class="command-action-panel__pending-note">카드 상세 정보가 없어 후보 ID로 선택합니다.</p>
+            <div class="command-action-panel__tag-row">
+              {#each pendingDecision.candidateIds as candidateId (candidateId)}
+                <button
+                  type="button"
+                  class="command-action-panel__inline-button"
+                  class:selected={isPendingCandidateSelected(candidateId)}
+                  disabled={commandPending !== null}
+                  onclick={() => onTogglePendingSelectedId(candidateId)}
+                >
+                  {isPendingCandidateSelected(candidateId) ? `선택됨 ${candidateId}` : candidateId}
+                </button>
+              {/each}
+            </div>
+          {:else}
+            <p class="command-action-panel__pending-note">선택 가능한 유언 후보가 없습니다.</p>
+          {/if}
+
+          <div class="command-action-panel__actions">
+            {#if pendingDecision.canSkip}
+              <button
+                type="button"
+                class="command-action-panel__skip-button"
+                disabled={!canResolvePendingCommand || commandPending !== null}
+                onclick={() => onSkipPendingDecision()}
+              >
+                유언 발동하지 않고 넘기기
+              </button>
+            {/if}
+            <button
+              type="button"
+              disabled={!canResolvePendingCommand || pendingCandidateIds.length !== 1 || commandPending !== null}
+              onclick={() => onResolvePendingDecision()}
+            >
+              {commandPending === 'combat.resolvePending' ? '유언 처리 중...' : '선택한 유언 발동'}
+            </button>
+          </div>
+        </div>
       {:else}
         {#if pendingDecision.candidateIds.length > 0}
           <div class="command-action-panel__tag-row">
@@ -383,6 +477,88 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.65rem;
+  }
+
+  .command-action-panel__last-words,
+  .command-action-panel__last-words-heading,
+  .command-action-panel__last-words-card-list,
+  .command-action-panel__last-words-card,
+  .command-action-panel__last-words-card-main {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .command-action-panel__last-words-heading {
+    gap: 0.35rem;
+  }
+
+  .command-action-panel__last-words-heading strong {
+    color: var(--combat-primary, var(--color-accent-strong));
+    font-size: 1rem;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .command-action-panel__pending-note,
+  .command-action-panel__card-meta {
+    color: var(--combat-text-soft, var(--color-text-soft));
+    line-height: 1.55;
+  }
+
+  .command-action-panel__last-words-card-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .command-action-panel__last-words-card {
+    padding: 0.9rem;
+    border: 1px solid rgba(226, 193, 155, 0.22);
+    background: rgba(16, 14, 12, 0.52);
+    transition:
+      border-color 120ms ease,
+      background 120ms ease,
+      box-shadow 120ms ease;
+  }
+
+  .command-action-panel__last-words-card--selected {
+    border-color: rgba(255, 179, 175, 0.72);
+    background: rgba(107, 24, 26, 0.34);
+    box-shadow: var(--combat-focus, 0 0 0 1px rgba(255, 179, 175, 0.34));
+  }
+
+  .command-action-panel__last-words-card-title {
+    color: var(--combat-text, var(--color-text));
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  .command-action-panel__last-words-card-subtitle {
+    color: var(--combat-text-soft, var(--color-text-soft));
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+
+  .command-action-panel__card-tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .command-action-panel__card-tag {
+    padding: 0.2rem 0.45rem;
+    border: 1px solid rgba(226, 193, 155, 0.22);
+    background: rgba(226, 193, 155, 0.08);
+    color: var(--combat-secondary, var(--color-accent));
+    font-size: 0.72rem;
+    line-height: 1.25;
+  }
+
+  .command-action-panel__card-select-button {
+    justify-self: start;
+  }
+
+  .command-action-panel__skip-button {
+    border-color: rgba(226, 193, 155, 0.32);
+    background: rgba(226, 193, 155, 0.08);
   }
 
   .command-action-panel__inline-button,

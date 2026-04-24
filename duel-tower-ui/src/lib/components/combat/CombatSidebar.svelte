@@ -63,6 +63,7 @@
     onTogglePendingSelectedId: (value: string) => void
     onToggleOrderedActorKey: (actorKey: string) => void
     onResolvePendingDecision: () => void
+    onSkipPendingDecision: () => void
     onToggleSelectedId: (instanceId: string) => void
     canToggleSelectedId: (instanceId: string) => boolean
     onRetryEvents: () => void
@@ -116,6 +117,7 @@
     onTogglePendingSelectedId,
     onToggleOrderedActorKey,
     onResolvePendingDecision,
+    onSkipPendingDecision,
     onToggleSelectedId,
     canToggleSelectedId,
     onRetryEvents,
@@ -187,6 +189,7 @@
             onTogglePendingSelectedId={onTogglePendingSelectedId}
             onToggleOrderedActorKey={onToggleOrderedActorKey}
             onResolvePendingDecision={onResolvePendingDecision}
+            onSkipPendingDecision={onSkipPendingDecision}
           />
 
           <CombatZoneSummary
