@@ -830,16 +830,7 @@
         }
         return null
       case 'LAST_WORDS':
-        if (selectedPendingIds.length >= 2) {
-          return '유언 후보는 최대 1장만 선택할 수 있습니다.'
-        }
-        if (schema.canSkip) {
-          return selectedPendingIds.length <= 1 ? null : '유언 후보는 최대 1장만 선택할 수 있습니다.'
-        }
-        if (selectedPendingIds.length !== 1) {
-          return '유언 효과를 발동할 카드 1장을 선택하세요.'
-        }
-        return null
+        return getLastWordsPendingLocalBlock(schema.canSkip)
       case 'INITIATIVE_TIE_ORDER':
         if ((schema.actorKeys?.length ?? 0) !== orderedActorKeys.length) {
           return '동률 대상 순서를 먼저 정해 주세요.'
@@ -848,6 +839,22 @@
       default:
         return null
     }
+  }
+
+  function getLastWordsPendingLocalBlock(canSkip: boolean | null | undefined) {
+    if (selectedPendingIds.length >= 2) {
+      return '유언은 최대 1장만 선택할 수 있습니다.'
+    }
+
+    if (canSkip) {
+      return null
+    }
+
+    if (selectedPendingIds.length !== 1) {
+      return '유언을 발동할 카드 1장을 선택해 주세요.'
+    }
+
+    return null
   }
 
   function getActionPresentationBlock(action: CombatScreenAction | null) {
