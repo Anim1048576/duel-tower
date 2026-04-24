@@ -93,7 +93,7 @@ public class CombatScreenService {
                     ScreenRouteSpec.COMBAT.screenKey(),
                     OffsetDateTime.now(ZoneId.of("Asia/Seoul")),
                     notices(decision, visiblePlayerId),
-                    possibleActions(state, decision),
+                    possibleActions(state, decision, cardDefinitions),
                     state.sessionCode(),
                     state.version(),
                     state.version() > normalizedAfterVersion,
@@ -351,7 +351,8 @@ public class CombatScreenService {
     }
 
     private List<ScreenActionDto> possibleActions(SessionStateDto state,
-                                                  SessionAccessDecision decision) {
+                                                  SessionAccessDecision decision,
+                                                  Map<CardDefId, CardDefinition> cardDefinitions) {
         String runtimePlayerId = decision.playerId();
         String currentActorPlayerId = currentActorPlayerId(state);
         PlayerStateDto runtimePlayer = runtimePlayerId == null ? null : state.players().get(runtimePlayerId);
@@ -377,7 +378,7 @@ public class CombatScreenService {
         Map<String, Object> useExMetadata = new LinkedHashMap<>();
         useExMetadata.put("kind", "useEx");
         useExMetadata.put("note", "Server-calculated EX command requirement view.");
-        useExMetadata.put("sourceCard", runtimePlayer == null ? null : cardView(runtimePlayer.exCard(), state, cardService.asMap()));
+        useExMetadata.put("sourceCard", runtimePlayer == null ? null : cardView(runtimePlayer.exCard(), state, cardDefinitions));
         RequirementMetadata useExRequirement = runtimePlayer == null ? RequirementMetadata.empty(null)
                 : requirementMetadataForInstance(runtimePlayer.exCard(), state);
         useExMetadata.put("requirementView", useExRequirement.view());
@@ -478,7 +479,7 @@ public class CombatScreenService {
                 ))
         ));
 
-        actions.add(resolvePendingAction(state, runtimePlayerId, runtimePlayer, hasPlayerToken, hasPendingDecision));
+        actions.add(resolvePendingAction(state, runtimePlayerId, runtimePlayer, hasPlayerToken, hasPendingDecision, cardDefinitions));
 
         return List.copyOf(actions);
     }
@@ -487,7 +488,8 @@ public class CombatScreenService {
                                                  String runtimePlayerId,
                                                  PlayerStateDto runtimePlayer,
                                                  boolean hasPlayerToken,
-                                                 boolean hasPendingDecision) {
+                                                 boolean hasPendingDecision,
+                                                 Map<CardDefId, CardDefinition> cardDefinitions) {
         PendingDecisionDto pendingDecision = runtimePlayer == null ? null : runtimePlayer.pendingDecision();
         String pendingType = pendingDecision == null ? null : pendingDecision.type();
         String commandType;
@@ -521,7 +523,7 @@ public class CombatScreenService {
         metadata.put("supported", supported);
         metadata.put("unsupportedReason", pendingUnsupportedReason(pendingType));
         metadata.put("pendingDecisionType", pendingType);
-        metadata.put("schema", pendingDecisionSchema(pendingDecision));
+        metadata.put("schema", pendingDecisionSchema(pendingDecision, state, cardDefinitions));
         metadata.put("blocked", !enabled);
 
         return playerCommandAction(
@@ -902,7 +904,9 @@ public class CombatScreenService {
                 .orElse(null);
     }
 
-    private Map<String, Object> pendingDecisionSchema(PendingDecisionDto pendingDecision) {
+    private Map<String, Object> pendingDecisionSchema(PendingDecisionDto pendingDecision,
+                                                      SessionStateDto state,
+                                                      Map<CardDefId, CardDefinition> cardDefinitions) {
         if (pendingDecision == null || pendingDecision.type() == null || pendingDecision.type().isBlank()) {
             return null;
         }
@@ -924,6 +928,7 @@ public class CombatScreenService {
             case "LAST_WORDS" -> {
                 schema.put("pickCount", 1);
                 schema.put("candidateIds", pendingDecision.candidateIds());
+                schema.put("candidateCards", cardViews(pendingDecision.candidateIds(), state, cardDefinitions));
                 schema.put("canSkip", pendingDecision.canSkip());
                 schema.put("selectedIdsField", "selectedIds");
             }

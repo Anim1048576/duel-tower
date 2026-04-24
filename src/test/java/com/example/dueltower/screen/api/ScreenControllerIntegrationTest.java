@@ -851,6 +851,12 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(resolvePendingAction.path("metadata").path("schema").path("type").asText()).isEqualTo("LAST_WORDS");
         assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateIds")).hasSize(1);
         assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateIds").get(0).asText()).isEqualTo(candidateId);
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards")).hasSize(1);
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards").get(0).path("instanceId").asText()).isEqualTo(candidateId);
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards").get(0).path("title").asText()).isNotBlank();
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards").get(0).path("subtitle").asText()).isNotBlank();
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards").get(0).path("tags").isArray()).isTrue();
+        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards").get(0).path("meta").asText()).contains("Cost ");
         assertThat(resolvePendingAction.path("metadata").path("schema").path("canSkip").asBoolean()).isTrue();
         assertThat(resolvePendingAction.path("metadata").path("schema").path("selectedIdsField").asText()).isEqualTo("selectedIds");
     }
