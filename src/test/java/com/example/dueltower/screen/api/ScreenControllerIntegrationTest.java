@@ -838,7 +838,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         markPlayerReady(session.code(), "combat-last-words-screen-p1", playerToken);
         startCombat(session.code(), session.gmToken(), "combat-last-words-screen-p1");
 
-        String candidateId = injectLastWordsPendingDecision(session.code(), "combat-last-words-screen-p1", true);
+        List<String> candidateIds = injectLastWordsPendingDecision(session.code(), "combat-last-words-screen-p1", true, 2);
 
         JsonNode body = getCombatScreen(session.code(), playerToken);
         JsonNode resolvePendingAction = findAction(body, "combat.resolvePending");
@@ -848,17 +848,30 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(resolvePendingAction.path("payloadTemplate").path("selectedIds").isArray()).isTrue();
         assertThat(resolvePendingAction.path("payloadTemplate").path("selectedIds")).hasSize(0);
         assertThat(resolvePendingAction.path("metadata").path("supported").asBoolean()).isTrue();
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("type").asText()).isEqualTo("LAST_WORDS");
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateIds")).hasSize(1);
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateIds").get(0).asText()).isEqualTo(candidateId);
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards")).hasSize(1);
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards").get(0).path("instanceId").asText()).isEqualTo(candidateId);
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards").get(0).path("title").asText()).isNotBlank();
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards").get(0).path("subtitle").asText()).isNotBlank();
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards").get(0).path("tags").isArray()).isTrue();
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("candidateCards").get(0).path("meta").asText()).contains("Cost ");
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("canSkip").asBoolean()).isTrue();
-        assertThat(resolvePendingAction.path("metadata").path("schema").path("selectedIdsField").asText()).isEqualTo("selectedIds");
+        JsonNode schema = resolvePendingAction.path("metadata").path("schema");
+        JsonNode responseCandidateIds = schema.path("candidateIds");
+        JsonNode candidateCards = schema.path("candidateCards");
+        assertThat(schema.path("type").asText()).isEqualTo("LAST_WORDS");
+        assertThat(responseCandidateIds.isArray()).isTrue();
+        assertThat(responseCandidateIds.size()).isPositive();
+        assertThat(StreamSupport.stream(responseCandidateIds.spliterator(), false)
+                .map(JsonNode::asText)
+                .toList()).containsExactlyElementsOf(candidateIds);
+        assertThat(schema.has("candidateCards")).isTrue();
+        assertThat(candidateCards.isArray()).isTrue();
+        assertThat(candidateCards).hasSize(candidateIds.size());
+        for (JsonNode candidateCard : candidateCards) {
+            assertCombatCardContract(candidateCard);
+            String instanceId = candidateCard.path("instanceId").asText();
+            assertThat(instanceId).isNotBlank();
+            assertThat(candidateIds).contains(instanceId);
+            assertThat(hasLastWordsCandidateDisplayMarker(candidateCard)).isTrue();
+            assertThat(candidateCard.path("meta").asText()).contains("Cost ");
+        }
+        assertThat(schema.has("canSkip")).isTrue();
+        assertThat(schema.path("canSkip").isBoolean()).isTrue();
+        assertThat(schema.path("canSkip").asBoolean()).isTrue();
+        assertThat(schema.path("selectedIdsField").asText()).isEqualTo("selectedIds");
     }
 
     @Test
@@ -1443,25 +1456,43 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     private String injectLastWordsPendingDecision(String sessionCode,
                                                   String playerId,
                                                   boolean canSkip) {
+        return injectLastWordsPendingDecision(sessionCode, playerId, canSkip, 1).get(0);
+    }
+
+    private List<String> injectLastWordsPendingDecision(String sessionCode,
+                                                        String playerId,
+                                                        boolean canSkip,
+                                                        int candidateCount) {
         return sessionLifecycleService.withLockedSession(sessionCode, rt -> {
             var player = rt.state().player(new Ids.PlayerId(playerId));
             player.ap(Math.max(player.ap(), 3));
             Ids.CardDefId candidateDefId = rt.state().card(player.hand().get(0)).defId();
 
-            Ids.CardInstId candidateId = new Ids.CardInstId(UUID.randomUUID());
-            rt.state().cardInstances().put(
-                    candidateId,
-                    new CardInstance(candidateId, candidateDefId, new Ids.PlayerId(playerId), Zone.GRAVE)
-            );
-            player.grave().add(candidateId);
+            List<Ids.CardInstId> candidateIds = java.util.stream.IntStream.range(0, candidateCount)
+                    .mapToObj(ignored -> new Ids.CardInstId(UUID.randomUUID()))
+                    .toList();
+            for (Ids.CardInstId candidateId : candidateIds) {
+                rt.state().cardInstances().put(
+                        candidateId,
+                        new CardInstance(candidateId, candidateDefId, new Ids.PlayerId(playerId), Zone.GRAVE)
+                );
+                player.grave().add(candidateId);
+            }
             player.pendingDecision(new PendingDecision.LastWordsChoice(
                     "manual last words test",
-                    List.of(candidateId),
+                    candidateIds,
                     canSkip,
                     UUID.randomUUID()
             ));
-            return candidateId.value().toString();
+            return candidateIds.stream()
+                    .map(candidateId -> candidateId.value().toString())
+                    .toList();
         });
+    }
+
+    private boolean hasLastWordsCandidateDisplayMarker(JsonNode candidateCard) {
+        return candidateCard.path("title").isTextual() && !candidateCard.path("title").asText().isBlank()
+                || candidateCard.path("unresolved").isBoolean();
     }
 
     private long createCharacter() {
