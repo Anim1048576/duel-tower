@@ -5,7 +5,6 @@ import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.domain.HiddenTraitIds;
 import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
-import com.example.dueltower.content.deck.service.DeckService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,13 +35,10 @@ class CharacterProfileServiceTest {
     private CharacterCombatStatCalculator combatStatCalculator;
 
     @Mock
-    private DeckService deckService;
+    private CharacterCardCollectionService cardCollectionService;
 
     @Mock
-    private CharacterCurrentSkillDeckService currentSkillDeckService;
-
-    @Mock
-    private CharacterCurrentSkillDeckReadService currentSkillDeckReadService;
+    private CharacterLoadoutService loadoutService;
 
     @InjectMocks
     private CharacterProfileService service;
@@ -58,9 +55,8 @@ class CharacterProfileServiceTest {
     @Test
     @DisplayName("create: disposition 유효 조합(질서/선, 중립/중용, 혼돈/악)을 허용한다")
     void dispositionAcceptsValidValues() {
-        when(repository.save(any(CharacterProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
-                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        stubProfileSave();
+        stubResponseReadModels("[]", List.of(), "{}");
 
         service.create(validRequestWithDisposition("질서/선"));
         service.create(validRequestWithDisposition("중립/중용"));
@@ -105,9 +101,8 @@ class CharacterProfileServiceTest {
     @Test
     @DisplayName("create: hiddenTraitIds 공백/null/중복은 정규화한다")
     void hiddenTraitIdsAreNormalized() {
-        when(repository.save(any(CharacterProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
-                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        stubProfileSave();
+        stubResponseReadModels("[]", List.of(), "{}");
 
         CharacterProfileRequest req = validRequestWithHiddenTraits(Arrays.asList(
                 "  " + HiddenTraitIds.HUMAN + "  ",
@@ -162,9 +157,8 @@ class CharacterProfileServiceTest {
     @Test
     @DisplayName("create: trait1/trait2 공백 문자열은 null로 정규화한다")
     void optionalTextNormalizationBlankTraitsBecomeNull() {
-        when(repository.save(any(CharacterProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
-                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        stubProfileSave();
+        stubResponseReadModels("[]", List.of(), "{}");
         CharacterProfileRequest req = validRequestWithTraits("   ", "   ");
 
         service.create(req);
@@ -180,9 +174,8 @@ class CharacterProfileServiceTest {
     @Test
     @DisplayName("create: 필수 텍스트 필드는 trim 후 저장한다")
     void createTrimsRequiredTextFields() {
-        when(repository.save(any(CharacterProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
-                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        stubProfileSave();
+        stubResponseReadModels("[\"card-1\"]", List.of(), "{\"id\":\"ex-1\"}");
         CharacterProfileRequest req = validRequest(
                 "  이름  ",
                 "  소원  ",
@@ -205,9 +198,11 @@ class CharacterProfileServiceTest {
         assertEquals("한줄소개", saved.getOneLiner());
         assertEquals("이야기", saved.getStory());
         assertEquals("질서/선", saved.getDisposition());
-        assertEquals("[\"card-1\"]", saved.getOwnedCards());
-        assertEquals("{\"id\":\"ex-1\"}", saved.getExCard());
+        assertEquals("[]", saved.getOwnedCards());
+        assertEquals("{}", saved.getExCard());
         assertNull(saved.getCurrentSkillDeck());
+        verify(cardCollectionService).replaceOwnedCardsFromJson(1L, "[\"card-1\"]");
+        verify(loadoutService).replaceExCard(1L, "ex-1");
     }
 
     @Test
@@ -216,12 +211,13 @@ class CharacterProfileServiceTest {
         CharacterProfile existing = existingProfile();
         existing.setCurrentSkillDeck(List.of("old-1", "old-2"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
-                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(validRequestWithDisposition(existing.getDisposition()).ownedCards());
+        stubResponseReadModels("[]", List.of("old-1", "old-2"), "{}");
 
         service.update(1L, validRequestWithDisposition(existing.getDisposition()));
 
         assertIterableEquals(List.of("old-1", "old-2"), existing.getCurrentSkillDeck());
+        verify(loadoutService, never()).clearCurrentSkillDeck(1L);
     }
 
     @Test
@@ -230,8 +226,8 @@ class CharacterProfileServiceTest {
         CharacterProfile existing = existingProfile();
         existing.setCurrentSkillDeck(List.of("old"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
-                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(validRequestWithDisposition(existing.getDisposition()).ownedCards());
+        stubResponseReadModels("[]", List.of("old"), "{}");
 
         service.update(1L, validRequestWithDisposition(existing.getDisposition()));
 
@@ -245,12 +241,8 @@ class CharacterProfileServiceTest {
         existing.setOwnedCards("[\"old-card\"]");
         existing.setCurrentSkillDeck(List.of("old"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        when(currentSkillDeckService.clearCurrentSkillDeck(existing)).thenAnswer(invocation -> {
-            existing.setCurrentSkillDeck(null);
-            return existing;
-        });
-        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
-                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        stubResponseReadModels("[\"new-card\"]", List.of(), "{}");
+        when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn("[\"old-card\"]", "[\"new-card\"]");
 
         var response = service.update(1L, validRequest(
                 "name",
@@ -263,9 +255,9 @@ class CharacterProfileServiceTest {
                 "{}"
         ));
 
-        assertNull(existing.getCurrentSkillDeck());
         assertTrue(response.currentSkillDeckPreviewCardIds().isEmpty());
-        verify(currentSkillDeckService).clearCurrentSkillDeck(existing);
+        verify(cardCollectionService).replaceOwnedCardsFromJson(1L, "[\"new-card\"]");
+        verify(loadoutService).clearCurrentSkillDeck(1L);
     }
 
     @Test
@@ -274,28 +266,15 @@ class CharacterProfileServiceTest {
         CharacterProfile existing = existingProfile();
         existing.setCurrentSkillDeck(List.of("old"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        when(deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(10L))
-                .thenReturn(List.of("C001", "C001", "C002", "C003"));
-        when(currentSkillDeckService.replaceCurrentSkillDeckFromCardIds(existing, List.of("C001", "C001", "C002", "C003")))
-                .thenAnswer(invocation -> {
-                    existing.setCurrentSkillDeck(invocation.getArgument(1));
-                    return existing;
-                });
-        when(currentSkillDeckReadService.resolveStoredCurrentSkillDeckToCardIds(
-                List.of("C001", "C001", "C002", "C003"),
-                existing.getOwnedCards()
-        )).thenReturn(List.of("C001", "C001", "C002", "C003"));
-        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
-                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        stubResponseReadModels("[]", List.of("C001", "C001", "C002", "C003"), "{}");
 
         var response = service.applyDeckToCurrentSkillDeck(1L, 10L);
 
-        assertIterableEquals(List.of("C001", "C001", "C002", "C003"), existing.getCurrentSkillDeck());
         assertIterableEquals(List.of("C001", "C001", "C002", "C003"), response.currentSkillDeckPreviewCardIds());
-        assertEquals(existing.getOwnedCards(), response.ownedCards());
-        assertEquals(existing.getExCard(), response.exCard());
+        assertEquals("[]", response.ownedCards());
+        assertEquals("{}", response.exCard());
         assertEquals(20, response.combatStats().maxHp());
-        verify(currentSkillDeckService).replaceCurrentSkillDeckFromCardIds(existing, List.of("C001", "C001", "C002", "C003"));
+        verify(loadoutService).applyDeckTemplate(1L, 10L);
     }
 
     @Test
@@ -307,8 +286,7 @@ class CharacterProfileServiceTest {
                 () -> service.applyDeckToCurrentSkillDeck(999L, 10L));
 
         assertEquals(NOT_FOUND, ex.getStatusCode());
-        verify(deckService, never()).expandPlayerDeckCardIdsForCurrentSkillDeck(anyLong());
-        verify(currentSkillDeckService, never()).replaceCurrentSkillDeckFromCardIds(any(), any());
+        verify(loadoutService, never()).applyDeckTemplate(anyLong(), anyLong());
     }
 
     @Test
@@ -316,14 +294,14 @@ class CharacterProfileServiceTest {
     void applyDeckToCurrentSkillDeckPropagatesDeckFailure() {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        when(deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(404L))
-                .thenThrow(new ResponseStatusException(NOT_FOUND, "deck not found: 404"));
+        doThrow(new ResponseStatusException(NOT_FOUND, "deck not found: 404"))
+                .when(loadoutService)
+                .applyDeckTemplate(1L, 404L);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> service.applyDeckToCurrentSkillDeck(1L, 404L));
 
         assertEquals(NOT_FOUND, ex.getStatusCode());
-        verify(currentSkillDeckService, never()).replaceCurrentSkillDeckFromCardIds(any(), any());
     }
 
     @Test
@@ -343,7 +321,8 @@ class CharacterProfileServiceTest {
 
         service.delete(1L);
 
-        verify(currentSkillDeckService).deleteCurrentSkillDeckMirror(1L);
+        verify(loadoutService).deleteLoadout(1L);
+        verify(cardCollectionService).deleteOwnedCards(1L);
         verify(repository).deleteById(1L);
     }
 
@@ -455,5 +434,32 @@ class CharacterProfileServiceTest {
                 .currentSkillDeck(List.of("deck-1"))
                 .exCard("{}")
                 .build();
+    }
+
+    private void stubProfileSave() {
+        when(repository.save(any(CharacterProfile.class))).thenAnswer(invocation -> {
+            CharacterProfile profile = invocation.getArgument(0);
+            setId(profile, 1L);
+            return profile;
+        });
+    }
+
+    private void stubResponseReadModels(String ownedCards, List<String> previewCardIds, String exCardJson) {
+        when(combatStatCalculator.calculate(any(CharacterProfile.class)))
+                .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
+        when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(ownedCards);
+        when(loadoutService.getCurrentSkillDeckPreviewCardIds(1L)).thenReturn(previewCardIds);
+        String exCardId = exCardJson.equals("{}") ? null : exCardJson.replace("{\"id\":\"", "").replace("\"}", "");
+        when(loadoutService.getExCardId(1L)).thenReturn(exCardId);
+    }
+
+    private static void setId(CharacterProfile profile, Long id) {
+        try {
+            Field field = CharacterProfile.class.getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(profile, id);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

@@ -33,6 +33,6 @@ public class CharacterOwnedCardModifier {
     @Column(name = "modifier_id", nullable = false, length = 80)
     private String modifierId;
 
-    @Column(nullable = false)
+    @Column(name = "modifier_value", nullable = false)
     private int value;
 }

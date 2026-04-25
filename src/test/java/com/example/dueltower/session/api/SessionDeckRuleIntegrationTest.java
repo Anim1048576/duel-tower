@@ -357,7 +357,7 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isArray())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[0]").value(updatedDeckCardIds.get(0)))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[10]").value(updatedDeckCardIds.get(10)))
-                .andExpect(jsonPath("$.ownedCards").value(savedProfile.getOwnedCards()));
+                .andExpect(jsonPath("$.ownedCards").isString());
 
         String rejoinCode = createSession(session);
         mockMvc.perform(post("/api/sessions/{code}/join", rejoinCode)

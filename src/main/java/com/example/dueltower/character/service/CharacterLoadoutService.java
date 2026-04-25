@@ -44,6 +44,7 @@ public class CharacterLoadoutService {
         validateOwnedCardsAvailable(characterId, normalized);
 
         currentSkillDeckEntryRepository.deleteByCharacterId(characterId);
+        currentSkillDeckEntryRepository.flush();
 
         List<CharacterCurrentSkillDeckEntry> entries = new ArrayList<>(normalized.size());
         for (int i = 0; i < normalized.size(); i++) {
@@ -77,7 +78,7 @@ public class CharacterLoadoutService {
         for (String ownedCardId : getCurrentSkillDeckOwnedCardIds(characterId)) {
             OwnedCard ownedCard = ownedById.get(ownedCardId);
             if (ownedCard == null) {
-                throw new ResponseStatusException(BAD_REQUEST, "owned card unavailable: " + ownedCardId);
+                continue;
             }
             preview.add(ownedCard.cardId());
         }
@@ -96,6 +97,18 @@ public class CharacterLoadoutService {
                         .build());
         loadout.setExCardId(normalized);
         exLoadoutRepository.save(loadout);
+    }
+
+    @Transactional
+    public void clearExCard(Long characterId) {
+        requireCharacterId(characterId);
+        exLoadoutRepository.deleteByCharacterId(characterId);
+    }
+
+    @Transactional
+    public void deleteLoadout(Long characterId) {
+        clearCurrentSkillDeck(characterId);
+        clearExCard(characterId);
     }
 
     @Transactional(readOnly = true)

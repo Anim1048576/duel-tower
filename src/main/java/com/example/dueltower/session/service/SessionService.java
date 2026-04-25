@@ -71,6 +71,8 @@ public class SessionService {
                         characterProfileRepository,
                         new CharacterCurrentSkillDeckReadService(),
                         new CharacterCurrentSkillDeckService(characterProfileRepository, deckService),
+                        null,
+                        null,
                         cardService,
                         passiveService,
                         gameRules,

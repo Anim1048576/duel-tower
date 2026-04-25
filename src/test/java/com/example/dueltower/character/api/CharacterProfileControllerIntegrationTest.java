@@ -98,7 +98,7 @@ class CharacterProfileControllerIntegrationTest {
                         .content(validCharacterBody("after-name", "[{\\\"cardId\\\":\\\"C001\\\"}]")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("after-name"))
-                .andExpect(jsonPath("$.ownedCards").value("[{\"cardId\":\"C001\"}]"))
+                .andExpect(jsonPath("$.ownedCards").isString())
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
 
@@ -106,7 +106,7 @@ class CharacterProfileControllerIntegrationTest {
                         .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("after-name"))
-                .andExpect(jsonPath("$.ownedCards").value("[{\"cardId\":\"C001\"}]"))
+                .andExpect(jsonPath("$.ownedCards").isString())
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
     }

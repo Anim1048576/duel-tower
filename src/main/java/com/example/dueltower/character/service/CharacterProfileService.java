@@ -7,10 +7,11 @@ import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.dto.CombatStatsDto;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
-import com.example.dueltower.content.deck.service.DeckService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -20,24 +21,25 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 @Service
 public class CharacterProfileService {
 
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String EMPTY_OWNED_CARDS_JSON = "[]";
+    private static final String EMPTY_EX_CARD_JSON = "{}";
+
     private final CharacterProfileRepository repository;
     private final CharacterCombatStatCalculator combatStatCalculator;
-    private final DeckService deckService;
-    private final CharacterCurrentSkillDeckService currentSkillDeckService;
-    private final CharacterCurrentSkillDeckReadService currentSkillDeckReadService;
+    private final CharacterCardCollectionService cardCollectionService;
+    private final CharacterLoadoutService loadoutService;
 
     public CharacterProfileService(
             CharacterProfileRepository repository,
             CharacterCombatStatCalculator combatStatCalculator,
-            DeckService deckService,
-            CharacterCurrentSkillDeckService currentSkillDeckService,
-            CharacterCurrentSkillDeckReadService currentSkillDeckReadService
+            CharacterCardCollectionService cardCollectionService,
+            CharacterLoadoutService loadoutService
     ) {
         this.repository = repository;
         this.combatStatCalculator = combatStatCalculator;
-        this.deckService = deckService;
-        this.currentSkillDeckService = currentSkillDeckService;
-        this.currentSkillDeckReadService = currentSkillDeckReadService;
+        this.cardCollectionService = cardCollectionService;
+        this.loadoutService = loadoutService;
     }
 
     @Transactional(readOnly = true)
@@ -69,12 +71,15 @@ public class CharacterProfileService {
                 .trait1(normalizeOptionalText(req.trait1()))
                 .trait2(normalizeOptionalText(req.trait2()))
                 .hiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()))
-                .ownedCards(req.ownedCards().trim())
+                .ownedCards(EMPTY_OWNED_CARDS_JSON)
                 .currentSkillDeck(null)
-                .exCard(req.exCard().trim())
+                .exCard(EMPTY_EX_CARD_JSON)
                 .build();
 
-        return toResponse(repository.save(profile));
+        CharacterProfile saved = repository.save(profile);
+        cardCollectionService.replaceOwnedCardsFromJson(saved.getId(), req.ownedCards().trim());
+        replaceExCardFromJson(saved.getId(), req.exCard());
+        return toResponse(saved);
     }
 
     @Transactional
@@ -97,21 +102,20 @@ public class CharacterProfileService {
         profile.setTrait2(normalizeOptionalText(req.trait2()));
         profile.setHiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()));
         String ownedCards = req.ownedCards().trim();
-        boolean ownedCardsChanged = !ownedCards.equals(profile.getOwnedCards());
-        profile.setOwnedCards(ownedCards);
-        profile.setExCard(req.exCard().trim());
+        boolean ownedCardsChanged = !ownedCards.equals(cardCollectionService.toOwnedCardsJson(id));
+        cardCollectionService.replaceOwnedCardsFromJson(id, ownedCards);
         if (ownedCardsChanged) {
-            profile = currentSkillDeckService.clearCurrentSkillDeck(profile);
+            loadoutService.clearCurrentSkillDeck(id);
         }
+        replaceExCardFromJson(id, req.exCard());
         return toResponse(profile);
     }
 
     @Transactional
     public CharacterProfileResponse applyDeckToCurrentSkillDeck(long characterId, long deckId) {
         CharacterProfile profile = getByIdOrThrow(characterId);
-        List<String> currentSkillDeck = deckService.expandPlayerDeckCardIdsForCurrentSkillDeck(deckId);
-        CharacterProfile saved = currentSkillDeckService.replaceCurrentSkillDeckFromCardIds(profile, currentSkillDeck);
-        return toResponse(saved);
+        loadoutService.applyDeckTemplate(characterId, deckId);
+        return toResponse(profile);
     }
 
     @Transactional
@@ -119,7 +123,8 @@ public class CharacterProfileService {
         if (!repository.existsById(id)) {
             throw new ResponseStatusException(NOT_FOUND, "character not found: " + id);
         }
-        currentSkillDeckService.deleteCurrentSkillDeckMirror(id);
+        loadoutService.deleteLoadout(id);
+        cardCollectionService.deleteOwnedCards(id);
         repository.deleteById(id);
     }
 
@@ -145,12 +150,9 @@ public class CharacterProfileService {
                 profile.getWillpower(),
                 profile.getTrait1(),
                 profile.getTrait2(),
-                profile.getOwnedCards(),
-                currentSkillDeckReadService.resolveStoredCurrentSkillDeckToCardIds(
-                        profile.getCurrentSkillDeck(),
-                        profile.getOwnedCards()
-                ),
-                profile.getExCard(),
+                cardCollectionService.toOwnedCardsJson(profile.getId()),
+                loadoutService.getCurrentSkillDeckPreviewCardIds(profile.getId()),
+                toExCardJson(loadoutService.getExCardId(profile.getId())),
                 new CombatStatsDto(
                         combatStats.maxHp(),
                         combatStats.maxAp(),
@@ -160,6 +162,43 @@ public class CharacterProfileService {
                 profile.getCreateDate(),
                 profile.getUpdateDate()
         );
+    }
+
+    private void replaceExCardFromJson(Long characterId, String raw) {
+        String exCardId = parseExCardId(raw);
+        if (exCardId == null) {
+            loadoutService.clearExCard(characterId);
+            return;
+        }
+        loadoutService.replaceExCard(characterId, exCardId);
+    }
+
+    private static String parseExCardId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode node = JSON.readTree(raw);
+            if (node == null || node.isNull()) {
+                return null;
+            }
+            if (node.isTextual()) {
+                String value = node.asText("").trim();
+                return value.isEmpty() ? null : value;
+            }
+            String id = node.path("id").asText("").trim();
+            return id.isEmpty() ? null : id;
+        } catch (Exception e) {
+            String value = raw.trim();
+            return value.isEmpty() ? null : value;
+        }
+    }
+
+    private static String toExCardJson(String exCardId) {
+        if (exCardId == null || exCardId.isBlank()) {
+            return EMPTY_EX_CARD_JSON;
+        }
+        return JSON.createObjectNode().put("id", exCardId.trim()).toString();
     }
 
     private static void validateRequired(CharacterProfileRequest req) {

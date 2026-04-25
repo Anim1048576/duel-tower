@@ -2,8 +2,10 @@ package com.example.dueltower.session.service;
 
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCardCollectionService;
 import com.example.dueltower.character.service.CharacterCurrentSkillDeckReadService;
 import com.example.dueltower.character.service.CharacterCurrentSkillDeckService;
+import com.example.dueltower.character.service.CharacterLoadoutService;
 import com.example.dueltower.common.api.ApiErrorException;
 import com.example.dueltower.common.api.ApiErrorResolver;
 import com.example.dueltower.config.GameRules;
@@ -65,6 +67,8 @@ public class SessionLoadoutSupport {
     private final CharacterProfileRepository characterProfileRepository;
     private final CharacterCurrentSkillDeckReadService currentSkillDeckReadService;
     private final CharacterCurrentSkillDeckService currentSkillDeckService;
+    private final CharacterCardCollectionService cardCollectionService;
+    private final CharacterLoadoutService loadoutService;
     private final CardService cardService;
     private final PassiveService passiveService;
     private final GameRules gameRules;
@@ -73,6 +77,8 @@ public class SessionLoadoutSupport {
     public SessionLoadoutSupport(CharacterProfileRepository characterProfileRepository,
                                  CharacterCurrentSkillDeckReadService currentSkillDeckReadService,
                                  CharacterCurrentSkillDeckService currentSkillDeckService,
+                                 CharacterCardCollectionService cardCollectionService,
+                                 CharacterLoadoutService loadoutService,
                                  CardService cardService,
                                  PassiveService passiveService,
                                  GameRules gameRules,
@@ -80,6 +86,8 @@ public class SessionLoadoutSupport {
         this.characterProfileRepository = characterProfileRepository;
         this.currentSkillDeckReadService = currentSkillDeckReadService;
         this.currentSkillDeckService = currentSkillDeckService;
+        this.cardCollectionService = cardCollectionService;
+        this.loadoutService = loadoutService;
         this.cardService = cardService;
         this.passiveService = passiveService;
         this.gameRules = gameRules;
@@ -379,6 +387,25 @@ public class SessionLoadoutSupport {
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId));
 
         profile.setOwnedCards(toCanonicalOwnedCardsJson(ownedCards));
+        if (cardCollectionService != null) {
+            cardCollectionService.replaceOwnedCards(profile.getId(), ownedCards.stream()
+                    .map(ownedCard -> new OwnedCardDto(
+                            ownedCard.ownedCardId(),
+                            ownedCard.cardId(),
+                            ownedCard.modifiers().stream()
+                                    .map(modifier -> new OwnedCardModifierDto(modifier.modifierId(), modifier.value()))
+                                    .toList(),
+                            ownedCard.strengthened(),
+                            ownedCard.weakened(),
+                            ownedCard.lockedInDeck(),
+                            true,
+                            null
+                    ))
+                    .toList());
+        }
+        if (loadoutService != null) {
+            loadoutService.replaceCurrentSkillDeckFromOwnedCardIds(profile.getId(), deckOwnedCardIds);
+        }
         currentSkillDeckService.replaceCurrentSkillDeckFromOwnedCardIds(profile, deckOwnedCardIds, ownedCards);
     }
 
@@ -519,9 +546,9 @@ public class SessionLoadoutSupport {
         if (profile.getTrait1() != null && !profile.getTrait1().isBlank()) passiveIds.add(profile.getTrait1().trim());
         if (profile.getTrait2() != null && !profile.getTrait2().isBlank()) passiveIds.add(profile.getTrait2().trim());
 
-        List<OwnedCardDto> ownedCards = parseOwnedCardsJson(profile.getOwnedCards());
-        List<String> currentSkillDeck = SessionNormalizationSupport.normalizeStoredCurrentSkillDeck(profile.getCurrentSkillDeck());
-        String exCardId = parseExCardId(profile.getExCard());
+        List<OwnedCardDto> ownedCards = loadOwnedCardDtos(profile);
+        List<String> currentSkillDeck = loadCurrentSkillDeck(profile);
+        String exCardId = loadExCardId(profile);
 
         return new CharacterJoinTemplate(
                 List.copyOf(passiveIds),
@@ -529,6 +556,36 @@ public class SessionLoadoutSupport {
                 exCardId,
                 ownedCards
         );
+    }
+
+    private List<OwnedCardDto> loadOwnedCardDtos(CharacterProfile profile) {
+        if (cardCollectionService != null && profile.getId() != null) {
+            List<OwnedCardDto> rows = cardCollectionService.toOwnedCardDtos(profile.getId());
+            if (!rows.isEmpty()) {
+                return rows;
+            }
+        }
+        return parseOwnedCardsJson(profile.getOwnedCards());
+    }
+
+    private List<String> loadCurrentSkillDeck(CharacterProfile profile) {
+        if (loadoutService != null && profile.getId() != null) {
+            List<String> rows = loadoutService.getCurrentSkillDeckOwnedCardIds(profile.getId());
+            if (!rows.isEmpty()) {
+                return rows;
+            }
+        }
+        return SessionNormalizationSupport.normalizeStoredCurrentSkillDeck(profile.getCurrentSkillDeck());
+    }
+
+    private String loadExCardId(CharacterProfile profile) {
+        if (loadoutService != null && profile.getId() != null) {
+            String exCardId = loadoutService.getExCardId(profile.getId());
+            if (exCardId != null && !exCardId.isBlank()) {
+                return exCardId;
+            }
+        }
+        return parseExCardId(profile.getExCard());
     }
 
     public List<OwnedCardDto> parseOwnedCardsJson(String raw) {

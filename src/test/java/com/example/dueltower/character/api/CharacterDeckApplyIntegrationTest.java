@@ -1,8 +1,14 @@
 package com.example.dueltower.character.api;
 
 import com.example.dueltower.character.domain.CharacterGender;
+import com.example.dueltower.character.domain.CharacterCurrentSkillDeckEntry;
 import com.example.dueltower.character.domain.CharacterProfile;
+import com.example.dueltower.character.repository.CharacterCurrentSkillDeckEntryRepository;
+import com.example.dueltower.character.repository.CharacterExLoadoutRepository;
+import com.example.dueltower.character.repository.CharacterOwnedCardModifierRepository;
+import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCardCollectionService;
 import com.example.dueltower.content.deck.domain.Deck;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.repository.DeckRepository;
@@ -48,11 +54,30 @@ class CharacterDeckApplyIntegrationTest {
     private CharacterProfileRepository characterProfileRepository;
 
     @Autowired
+    private CharacterOwnedCardRepository characterOwnedCardRepository;
+
+    @Autowired
+    private CharacterOwnedCardModifierRepository characterOwnedCardModifierRepository;
+
+    @Autowired
+    private CharacterCurrentSkillDeckEntryRepository currentSkillDeckEntryRepository;
+
+    @Autowired
+    private CharacterExLoadoutRepository characterExLoadoutRepository;
+
+    @Autowired
+    private CharacterCardCollectionService cardCollectionService;
+
+    @Autowired
     private DeckRepository deckRepository;
 
     @BeforeEach
     void setUp() {
         memberRepository.deleteAll();
+        currentSkillDeckEntryRepository.deleteAll();
+        characterExLoadoutRepository.deleteAll();
+        characterOwnedCardModifierRepository.deleteAll();
+        characterOwnedCardRepository.deleteAll();
         characterProfileRepository.deleteAll();
         deckRepository.deleteAll();
     }
@@ -81,27 +106,24 @@ class CharacterDeckApplyIntegrationTest {
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[2]").value("C001"))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[3]").value("C002"))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[11]").value("C004"))
-                .andExpect(jsonPath("$.ownedCards").value("[]"))
+                .andExpect(jsonPath("$.ownedCards").isString())
                 .andExpect(jsonPath("$.exCard").value("{}"))
                 .andExpect(jsonPath("$.combatStats.maxHp").exists());
 
         CharacterProfile reloaded = characterProfileRepository.findById(character.getId()).orElseThrow();
+        assertEquals(null, reloaded.getCurrentSkillDeck());
         assertIterableEquals(List.of(
-                "C001", "C001", "C001",
-                "C002", "C002", "C002",
-                "C003", "C003", "C003",
-                "C004", "C004", "C004"
-        ), reloaded.getCurrentSkillDeck());
-
-        Deck syncedDeck = deckRepository.findFirstByTypeAndName(
+                "oc-c001-1", "oc-c001-2", "oc-c001-3",
+                "oc-c002-1", "oc-c002-2", "oc-c002-3",
+                "oc-c003-1", "oc-c003-2", "oc-c003-3",
+                "oc-c004-1", "oc-c004-2", "oc-c004-3"
+        ), currentSkillDeckEntryRepository.findByCharacterIdOrderByPositionAsc(character.getId()).stream()
+                .map(CharacterCurrentSkillDeckEntry::getOwnedCardId)
+                .toList());
+        assertTrue(deckRepository.findFirstByTypeAndName(
                 DeckType.PLAYER,
                 "character:" + character.getId() + ":currentSkillDeck"
-        ).orElseThrow();
-        assertEquals(4, syncedDeck.getCards().size());
-        assertTrue(syncedDeck.getCards().stream()
-                .anyMatch(card -> card.hasCardId("C001") && card.getCount() == 3));
-        assertTrue(syncedDeck.getCards().stream()
-                .anyMatch(card -> card.hasCardId("C004") && card.getCount() == 3));
+        ).isEmpty());
 
         mockMvc.perform(get("/api/content/characters/{id}", character.getId())
                 .session(session))
@@ -142,12 +164,15 @@ class CharacterDeckApplyIntegrationTest {
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[11]").value("C004"));
 
-        Deck syncedDeck = deckRepository.findFirstByTypeAndName(
+        List<String> savedOwnedCardIds = currentSkillDeckEntryRepository.findByCharacterIdOrderByPositionAsc(character.getId()).stream()
+                .map(CharacterCurrentSkillDeckEntry::getOwnedCardId)
+                .toList();
+        assertFalse(savedOwnedCardIds.stream().anyMatch(id -> id.contains("tig")));
+        assertTrue(savedOwnedCardIds.contains("oc-c004-3"));
+        assertTrue(deckRepository.findFirstByTypeAndName(
                 DeckType.PLAYER,
                 "character:" + character.getId() + ":currentSkillDeck"
-        ).orElseThrow();
-        assertFalse(syncedDeck.getCards().stream().anyMatch(card -> card.hasCardId("Tig001_Card")));
-        assertTrue(syncedDeck.getCards().stream().anyMatch(card -> card.hasCardId("C004") && card.getCount() == 3));
+        ).isEmpty());
     }
 
     @Test
@@ -167,25 +192,20 @@ class CharacterDeckApplyIntegrationTest {
                         .session(session))
                 .andExpect(status().isOk());
 
-        assertTrue(deckRepository.findFirstByTypeAndName(
-                DeckType.PLAYER,
-                "character:" + character.getId() + ":currentSkillDeck"
-        ).isPresent());
+        assertFalse(currentSkillDeckEntryRepository.findByCharacterId(character.getId()).isEmpty());
 
         mockMvc.perform(delete("/api/content/characters/{id}", character.getId())
                         .session(session))
                 .andExpect(status().isOk());
 
         assertTrue(characterProfileRepository.findById(character.getId()).isEmpty());
-        assertTrue(deckRepository.findFirstByTypeAndName(
-                DeckType.PLAYER,
-                "character:" + character.getId() + ":currentSkillDeck"
-        ).isEmpty());
+        assertTrue(currentSkillDeckEntryRepository.findByCharacterId(character.getId()).isEmpty());
+        assertTrue(characterOwnedCardRepository.findByCharacterId(character.getId()).isEmpty());
     }
 
     @Test
-    @DisplayName("ownedCards 변경 저장 시 stale currentSkillDeck와 미러 덱을 비운다")
-    void updatingOwnedCardsClearsCurrentSkillDeckAndMirrorDeck() throws Exception {
+    @DisplayName("ownedCards 변경 저장 시 stale currentSkillDeck entry를 비운다")
+    void updatingOwnedCardsClearsCurrentSkillDeckEntries() throws Exception {
         MockHttpSession session = signUpAndLogin("applyDeckOwnedCardsChanged");
         CharacterProfile character = createCharacter(List.of("OLD_CARD"));
         Deck deck = createDeck("player-apply-owned-cards-change", DeckType.PLAYER, orderedCards(
@@ -227,10 +247,7 @@ class CharacterDeckApplyIntegrationTest {
 
         CharacterProfile reloaded = characterProfileRepository.findById(character.getId()).orElseThrow();
         assertEquals(null, reloaded.getCurrentSkillDeck());
-        assertTrue(deckRepository.findFirstByTypeAndName(
-                DeckType.PLAYER,
-                "character:" + character.getId() + ":currentSkillDeck"
-        ).isEmpty());
+        assertTrue(currentSkillDeckEntryRepository.findByCharacterId(character.getId()).isEmpty());
     }
 
     @Test
@@ -335,7 +352,7 @@ class CharacterDeckApplyIntegrationTest {
     }
 
     private CharacterProfile createCharacter(List<String> currentSkillDeck) {
-        return createCharacter("[]", currentSkillDeck);
+        return createCharacter(defaultOwnedCardsJson(), currentSkillDeck);
     }
 
     private CharacterProfile createCharacter(String ownedCards, List<String> currentSkillDeck) {
@@ -354,11 +371,51 @@ class CharacterDeckApplyIntegrationTest {
                 .trait1("trait1")
                 .trait2("trait2")
                 .hiddenTraitIds(List.of())
-                .ownedCards(ownedCards)
-                .currentSkillDeck(currentSkillDeck)
+                .ownedCards("[]")
+                .currentSkillDeck(null)
                 .exCard("{}")
                 .build();
-        return characterProfileRepository.save(profile);
+        CharacterProfile saved = characterProfileRepository.save(profile);
+        cardCollectionService.replaceOwnedCardsFromJson(saved.getId(), ownedCards);
+        insertCurrentSkillDeckEntries(saved.getId(), currentSkillDeck);
+        return saved;
+    }
+
+    private void insertCurrentSkillDeckEntries(Long characterId, List<String> currentSkillDeck) {
+        if (currentSkillDeck == null || currentSkillDeck.isEmpty()) {
+            return;
+        }
+        List<CharacterCurrentSkillDeckEntry> entries = new java.util.ArrayList<>();
+        for (int i = 0; i < currentSkillDeck.size(); i++) {
+            entries.add(CharacterCurrentSkillDeckEntry.builder()
+                    .characterId(characterId)
+                    .ownedCardId(currentSkillDeck.get(i))
+                    .position(i)
+                    .build());
+        }
+        currentSkillDeckEntryRepository.saveAll(entries);
+    }
+
+    private String defaultOwnedCardsJson() {
+        return """
+                [
+                  {"ownedCardId":"oc-c001-1","cardId":"C001"},
+                  {"ownedCardId":"oc-c001-2","cardId":"C001"},
+                  {"ownedCardId":"oc-c001-3","cardId":"C001"},
+                  {"ownedCardId":"oc-c002-1","cardId":"C002"},
+                  {"ownedCardId":"oc-c002-2","cardId":"C002"},
+                  {"ownedCardId":"oc-c002-3","cardId":"C002"},
+                  {"ownedCardId":"oc-c003-1","cardId":"C003"},
+                  {"ownedCardId":"oc-c003-2","cardId":"C003"},
+                  {"ownedCardId":"oc-c003-3","cardId":"C003"},
+                  {"ownedCardId":"oc-c004-1","cardId":"C004"},
+                  {"ownedCardId":"oc-c004-2","cardId":"C004"},
+                  {"ownedCardId":"oc-c004-3","cardId":"C004"},
+                  {"ownedCardId":"oc-tig-1","cardId":"Tig001_Card"},
+                  {"ownedCardId":"oc-tig-2","cardId":"Tig001_Card"},
+                  {"ownedCardId":"oc-tig-3","cardId":"Tig001_Card"}
+                ]
+                """;
     }
 
     private Deck createDeck(String name, DeckType type, Map<String, Integer> cards) {
