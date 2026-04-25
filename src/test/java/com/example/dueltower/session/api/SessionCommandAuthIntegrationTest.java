@@ -1,8 +1,9 @@
 package com.example.dueltower.session.api;
 
+import com.example.dueltower.character.domain.CharacterGender;
+import com.example.dueltower.character.domain.CharacterProfile;
+import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.member.MemberRepository;
-import com.example.dueltower.engine.model.Ids.PlayerId;
-import com.example.dueltower.session.service.SessionLifecycleService;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,12 +42,13 @@ class SessionCommandAuthIntegrationTest {
     private MemberRepository memberRepository;
 
     @Autowired
-    private SessionLifecycleService sessionLifecycleService;
+    private CharacterProfileRepository characterProfileRepository;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
+        characterProfileRepository.deleteAll();
         memberRepository.deleteAll();
     }
 
@@ -240,13 +242,9 @@ class SessionCommandAuthIntegrationTest {
         MockHttpSession gmSession = signUpAndLogin("gm-raw-invalid-deck", "gm-raw-invalid-deck@example.com", "password123");
         SessionInfo info = createSessionInfo(gmSession, "gm-raw-invalid-deck");
         MockHttpSession playerSession = signUpAndLogin("raw-invalid-deck-p1", "raw-invalid-deck-p1@example.com", "password123");
-        String playerToken = joinAsPlayer(playerSession, info.code(), "raw-invalid-deck-p1");
+        long characterId = createCharacterWithEmptySkillDeck();
+        String playerToken = joinAsPlayer(playerSession, info.code(), "raw-invalid-deck-p1", characterId);
         markReady(info.code(), "raw-invalid-deck-p1", playerToken);
-
-        sessionLifecycleService.withLockedSession(info.code(), rt -> {
-            rt.state().player(new PlayerId("raw-invalid-deck-p1")).deckOwnedCardIds(List.of("oc1"));
-            return null;
-        });
 
         mockMvc.perform(post("/api/sessions/{code}/command", info.code())
                         .header("X-GM-Token", info.gmToken())
@@ -530,6 +528,23 @@ class SessionCommandAuthIntegrationTest {
         return node.get("playerToken").asText();
     }
 
+    private String joinAsPlayer(MockHttpSession session, String code, String playerId, long characterId) throws Exception {
+        MvcResult join = mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "%s",
+                                  "characterId": %d
+                                }
+                                """.formatted(playerId, characterId)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode node = JSON.readTree(join.getResponse().getContentAsString());
+        return node.get("playerToken").asText();
+    }
+
     private void markReady(String code, String playerId, String playerToken) throws Exception {
         mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, playerId)
                         .header("X-Player-Token", playerToken)
@@ -540,6 +555,28 @@ class SessionCommandAuthIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isOk());
+    }
+
+    private long createCharacterWithEmptySkillDeck() {
+        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
+                .name("Raw Command Empty Deck Character")
+                .gender(CharacterGender.OTHER)
+                .age(20)
+                .wish("test")
+                .disposition("neutral")
+                .oneLiner("raw command")
+                .story("raw command")
+                .physical(10)
+                .technique(10)
+                .sense(10)
+                .willpower(10)
+                .trait1("P001")
+                .trait2(null)
+                .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
+                .currentSkillDeck(List.of())
+                .exCard("{\"id\":\"EX901\"}")
+                .build());
+        return profile.getId();
     }
 
     private record SessionInfo(String code, String gmToken) {}

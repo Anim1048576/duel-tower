@@ -435,17 +435,34 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     @Test
+    void rawStartCombatRejectionMatchesGmLobbyScreenReasonWhenParticipantIsUnready() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-unready-match", "gm-unready-match@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-unready-match");
+        MockHttpSession playerSession = signUpAndLogin("gm-unready-match-p1", "gm-unready-match-p1@example.com", "password123");
+        joinAsPlayer(playerSession, session.code(), "gm-unready-match-p1");
+
+        MvcResult screenResult = mockMvc.perform(get("/api/screens/sessions/{code}/gm-lobby", session.code())
+                        .header("X-GM-Token", session.gmToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode screen = assertBaseScreenContract(screenResult, "GmLobby");
+        String screenReasonCode = findAction(screen, "gmLobby.startCombat").path("disabledReason").path("code").asText();
+        assertThat(screenReasonCode).isEqualTo("READY_PARTICIPANT_REQUIRED");
+
+        JsonNode rawCommand = rawStartCombat(session.code(), session.gmToken(), "gm-unready-match-p1");
+
+        assertThat(rawCommand.path("accepted").asBoolean()).isFalse();
+        assertThat(rawCommand.path("errorDetails").get(0).path("code").asText()).isEqualTo(screenReasonCode);
+    }
+
+    @Test
     void gmLobbyScreenBlocksStartWhenParticipantDeckIsInvalid() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm-invalid-deck", "gm-invalid-deck@example.com", "password123");
         SessionInfo session = createSession(gmSession, "gm-invalid-deck");
         MockHttpSession playerSession = signUpAndLogin("gm-invalid-deck-p1", "gm-invalid-deck-p1@example.com", "password123");
-        String playerToken = joinAsPlayer(playerSession, session.code(), "gm-invalid-deck-p1");
+        long characterId = createCharacterWithCurrentSkillDeck(List.of());
+        String playerToken = joinAsPlayer(playerSession, session.code(), "gm-invalid-deck-p1", characterId);
         markPlayerReady(session.code(), "gm-invalid-deck-p1", playerToken);
-
-        sessionLifecycleService.withLockedSession(session.code(), rt -> {
-            rt.state().player(new Ids.PlayerId("gm-invalid-deck-p1")).deckOwnedCardIds(List.of("oc1"));
-            return null;
-        });
 
         MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/gm-lobby", session.code())
                         .header("X-GM-Token", session.gmToken()))
@@ -458,6 +475,29 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         JsonNode startCombatAction = findAction(body, "gmLobby.startCombat");
         assertDisabledActionContract(startCombatAction);
         assertThat(startCombatAction.path("disabledReason").path("code").asText()).isEqualTo("DECK_INVALID");
+    }
+
+    @Test
+    void rawStartCombatRejectionMatchesGmLobbyScreenReasonWhenParticipantDeckIsInvalid() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-invalid-deck-match", "gm-invalid-deck-match@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-invalid-deck-match");
+        MockHttpSession playerSession = signUpAndLogin("gm-invalid-deck-match-p1", "gm-invalid-deck-match-p1@example.com", "password123");
+        long characterId = createCharacterWithCurrentSkillDeck(List.of());
+        String playerToken = joinAsPlayer(playerSession, session.code(), "gm-invalid-deck-match-p1", characterId);
+        markPlayerReady(session.code(), "gm-invalid-deck-match-p1", playerToken);
+
+        MvcResult screenResult = mockMvc.perform(get("/api/screens/sessions/{code}/gm-lobby", session.code())
+                        .header("X-GM-Token", session.gmToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode screen = assertBaseScreenContract(screenResult, "GmLobby");
+        String screenReasonCode = findAction(screen, "gmLobby.startCombat").path("disabledReason").path("code").asText();
+        assertThat(screenReasonCode).isEqualTo("DECK_INVALID");
+
+        JsonNode rawCommand = rawStartCombat(session.code(), session.gmToken(), "gm-invalid-deck-match-p1");
+
+        assertThat(rawCommand.path("accepted").asBoolean()).isFalse();
+        assertThat(rawCommand.path("errorDetails").get(0).path("code").asText()).isEqualTo(screenReasonCode);
     }
 
     @Test
@@ -1467,6 +1507,28 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andExpect(jsonPath("$.accepted").value(true));
     }
 
+    private JsonNode rawStartCombat(String code, String gmToken, String playerId) throws Exception {
+        long expectedVersion = readJson(mockMvc.perform(get("/api/sessions/{code}", code))
+                        .andExpect(status().isOk())
+                        .andReturn())
+                .path("version")
+                .asLong();
+
+        MvcResult result = mockMvc.perform(post("/api/sessions/{code}/command", code)
+                        .header("X-GM-Token", gmToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "START_COMBAT",
+                                  "expectedVersion": %d,
+                                  "playerId": "%s"
+                                }
+                                """.formatted(expectedVersion, playerId)))
+                .andExpect(status().isOk())
+                .andReturn();
+        return readJson(result);
+    }
+
     private JsonNode getCombatScreen(String code, String playerToken) throws Exception {
         MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/combat", code)
                         .header("X-Player-Token", playerToken))
@@ -1535,6 +1597,17 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     private long createCharacter(String exCardId) {
+        return createCharacterWithCurrentSkillDeck(
+                exCardId,
+                List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004")
+        );
+    }
+
+    private long createCharacterWithCurrentSkillDeck(List<String> currentSkillDeck) {
+        return createCharacterWithCurrentSkillDeck("EX901", currentSkillDeck);
+    }
+
+    private long createCharacterWithCurrentSkillDeck(String exCardId, List<String> currentSkillDeck) {
         CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
                 .name("Screen Test Character")
                 .gender(CharacterGender.OTHER)
@@ -1550,7 +1623,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .trait1("P001")
                 .trait2(null)
                 .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
-                .currentSkillDeck(List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"))
+                .currentSkillDeck(currentSkillDeck)
                 .exCard("{\"id\":\"" + exCardId + "\"}")
                 .build());
         return profile.getId();
