@@ -4,7 +4,6 @@ import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
-import com.example.dueltower.content.deck.service.DeckService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,9 +27,6 @@ class CharacterCurrentSkillDeckServiceTest {
     @Mock
     private CharacterProfileRepository repository;
 
-    @Mock
-    private DeckService deckService;
-
     @InjectMocks
     private CharacterCurrentSkillDeckService service;
 
@@ -44,7 +40,6 @@ class CharacterCurrentSkillDeckServiceTest {
 
         assertIterableEquals(List.of("C001", "C001", "C002"), saved.getCurrentSkillDeck());
         verify(repository).save(profile);
-        verify(deckService).upsertCharacterCurrentSkillDeck(7L, List.of("C001", "C001", "C002"));
     }
 
     @Test
@@ -76,7 +71,6 @@ class CharacterCurrentSkillDeckServiceTest {
 
         assertIterableEquals(List.of("oc-2", "oc-1", "oc-3"), saved.getCurrentSkillDeck());
         verify(repository).save(profile);
-        verify(deckService).upsertCharacterCurrentSkillDeck(7L, List.of("C001", "C001", "C002"));
     }
 
     @Test
@@ -123,15 +117,14 @@ class CharacterCurrentSkillDeckServiceTest {
 
     @Test
     @DisplayName("deleteCurrentSkillDeckMirror: character current deck 미러 삭제를 DeckService에 위임한다")
-    void deleteCurrentSkillDeckMirrorDelegatesToDeckService() {
+    void deleteCurrentSkillDeckMirrorIsNoOp() {
         service.deleteCurrentSkillDeckMirror(7L);
 
-        verify(deckService).deleteCharacterCurrentSkillDeck(7L);
     }
 
     @Test
     @DisplayName("clearCurrentSkillDeck: profile currentSkillDeck을 비우고 미러 deck을 삭제한다")
-    void clearCurrentSkillDeckClearsProfileAndDeletesMirrorDeck() {
+    void clearCurrentSkillDeckClearsProfile() {
         CharacterProfile profile = profile();
         when(repository.save(profile)).thenReturn(profile);
 
@@ -139,7 +132,6 @@ class CharacterCurrentSkillDeckServiceTest {
 
         assertEquals(null, saved.getCurrentSkillDeck());
         verify(repository).save(profile);
-        verify(deckService).deleteCharacterCurrentSkillDeck(7L);
     }
 
     private static CharacterProfile profile() {

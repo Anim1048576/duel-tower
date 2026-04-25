@@ -548,7 +548,7 @@ class DeckControllerIntegrationTest {
 
     @Test
     @DisplayName("character currentSkillDeck 미러 덱은 public deck API로 변경할 수 없다")
-    void reservedCurrentSkillDeckRejectsPublicDeckMutations() throws Exception {
+    void characterCurrentSkillDeckLikeNameIsAllowedAsNormalDeckName() throws Exception {
         MockHttpSession session = signUpAndLogin("deckReservedMirror");
 
         mockMvc.perform(post("/api/content/decks")
@@ -566,76 +566,10 @@ class DeckControllerIntegrationTest {
                                   ]
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("reserved current skill deck")));
-
-        Deck mirrorDeck = createDeck("character:7:currentSkillDeck", DeckType.PLAYER,
-                Map.of("C001", 3, "C002", 3, "C003", 3, "C004", 3));
-
-        mockMvc.perform(put("/api/content/decks/{id}", mirrorDeck.getId())
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "name": "renamed-deck",
-                                  "type": "PLAYER",
-                                  "cards": [
-                                    {"cardId":"C001","count":3},
-                                    {"cardId":"C002","count":3},
-                                    {"cardId":"C003","count":3},
-                                    {"cardId":"C004","count":3}
-                                  ]
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("reserved current skill deck")));
-
-        mockMvc.perform(post("/api/content/decks/{id}/cards/add", mirrorDeck.getId())
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "cards": [
-                                    {"cardId":"C001","count":1}
-                                  ]
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("reserved current skill deck")));
-
-        mockMvc.perform(put("/api/content/decks/{id}/cards", mirrorDeck.getId())
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "cards": [
-                                    {"cardId":"C001","count":3},
-                                    {"cardId":"C002","count":3},
-                                    {"cardId":"C003","count":3},
-                                    {"cardId":"C004","count":3}
-                                  ]
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("reserved current skill deck")));
-
-        mockMvc.perform(post("/api/content/decks/{id}/cards/remove", mirrorDeck.getId())
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "cards": [
-                                    {"cardId":"C001","count":1}
-                                  ]
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("reserved current skill deck")));
-
-        mockMvc.perform(delete("/api/content/decks/{id}", mirrorDeck.getId())
-                        .session(session))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("reserved current skill deck")));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("character:7:currentSkillDeck"))
+                .andExpect(jsonPath("$.type").value("PLAYER"))
+                .andExpect(jsonPath("$.totalCards").value(12));
     }
 
     private Deck createDeck(String name, DeckType type, Map<String, Integer> cards) {

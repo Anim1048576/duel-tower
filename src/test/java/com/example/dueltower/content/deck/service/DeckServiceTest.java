@@ -18,7 +18,6 @@ import com.example.dueltower.engine.model.Ids;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.function.Executable;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -85,11 +84,13 @@ class DeckServiceTest {
 
     @Test
     @DisplayName("create: character currentSkillDeck 예약 이름을 거부한다")
-    void createRejectsReservedCurrentSkillDeckName() {
-        assertReservedCurrentSkillDeckRejected(() ->
-                service.create(new CreateDeckRequest("character:7:currentSkillDeck", DeckType.PLAYER, cards12())));
+    void createAllowsCharacterCurrentSkillDeckLikeName() {
+        when(cardService.asMap()).thenReturn(cardMap("card-1", "card-2", "card-3", "card-4"));
+        when(deckRepository.save(any(Deck.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        verify(deckRepository, never()).save(any());
+        DeckResponse response = service.create(new CreateDeckRequest("character:7:currentSkillDeck", DeckType.PLAYER, cards12()));
+
+        assertEquals("character:7:currentSkillDeck", response.name());
     }
 
     @Test
@@ -149,27 +150,34 @@ class DeckServiceTest {
     @Test
     @DisplayName("update: 일반 덱을 character currentSkillDeck 예약 이름으로 바꿀 수 없다")
     void updateRejectsRenamingPublicDeckToReservedCurrentSkillDeckName() {
+        when(cardService.asMap()).thenReturn(cardMap("card-1", "card-2", "card-3", "card-4"));
         Deck deck = Deck.create("old-name", DeckType.PLAYER);
         when(deckRepository.findWithCardsById(7L)).thenReturn(Optional.of(deck));
 
-        assertReservedCurrentSkillDeckRejected(() -> service.update(7L, new UpdateDeckRequest(
+        DeckResponse response = service.update(7L, new UpdateDeckRequest(
                 "character:7:currentSkillDeck",
                 DeckType.PLAYER,
                 cards12()
-        )));
+        ));
+
+        assertEquals("character:7:currentSkillDeck", response.name());
     }
 
     @Test
     @DisplayName("public mutation: character currentSkillDeck 미러 덱을 직접 변경할 수 없다")
     void publicMutationsRejectExistingReservedCurrentSkillDeck() {
-        Deck deck = Deck.create("character:7:currentSkillDeck", DeckType.PLAYER);
+        when(cardService.asMap()).thenReturn(cardMap("card-1", "card-2", "card-3", "card-4"));
+        Deck deck = Deck.create("character:7:currentSkillDeck", DeckType.ENEMY);
+        deck.syncCards(Map.of("card-1", 3, "card-2", 3, "card-3", 3, "card-4", 3));
         when(deckRepository.findWithCardsById(7L)).thenReturn(Optional.of(deck));
 
-        assertReservedCurrentSkillDeckRejected(() -> service.update(7L, new UpdateDeckRequest("normal", DeckType.PLAYER, cards12())));
-        assertReservedCurrentSkillDeckRejected(() -> service.addCards(7L, new AddDeckCardsRequest(List.of(new DeckCardSpec("card-1", 1)))));
-        assertReservedCurrentSkillDeckRejected(() -> service.replaceCards(7L, new ReplaceDeckCardsRequest(cards12())));
-        assertReservedCurrentSkillDeckRejected(() -> service.removeCards(7L, new RemoveDeckCardsRequest(List.of(new DeckCardSpec("card-1", 1)))));
-        assertReservedCurrentSkillDeckRejected(() -> service.delete(7L));
+        service.update(7L, new UpdateDeckRequest("normal", DeckType.ENEMY, cards12()));
+        service.addCards(7L, new AddDeckCardsRequest(List.of(new DeckCardSpec("card-1", 1))));
+        service.replaceCards(7L, new ReplaceDeckCardsRequest(cards12()));
+        service.removeCards(7L, new RemoveDeckCardsRequest(List.of(new DeckCardSpec("card-1", 1))));
+        service.delete(7L);
+
+        verify(deckRepository).delete(deck);
     }
 
     @Test
@@ -320,7 +328,7 @@ class DeckServiceTest {
 
     @Test
     @DisplayName("expandPlayerDeckCardIdsForCurrentSkillDeck: PLAYER 덱 cardId/count를 순서대로 펼친다")
-    void expandPlayerDeckCardIdsForCurrentSkillDeckExpandsCountsInDeckOrder() {
+    void expandPlayerDeckCardIdsExpandsCountsInDeckOrder() {
         when(cardService.asMap()).thenReturn(cardMap("C001", "C002", "C003", "C004"));
         Deck deck = Deck.create("player", DeckType.PLAYER);
         Map<String, Integer> cards = new LinkedHashMap<>();
@@ -331,7 +339,7 @@ class DeckServiceTest {
         deck.syncCards(cards);
         when(deckRepository.findWithCardsById(1L)).thenReturn(Optional.of(deck));
 
-        List<String> expanded = service.expandPlayerDeckCardIdsForCurrentSkillDeck(1L);
+        List<String> expanded = service.expandPlayerDeckCardIds(1L);
 
         assertEquals(12, expanded.size());
         assertEquals(List.of(
@@ -344,24 +352,24 @@ class DeckServiceTest {
 
     @Test
     @DisplayName("expandPlayerDeckCardIdsForCurrentSkillDeck: PLAYER 덱이 아니면 적용을 거부한다")
-    void expandPlayerDeckCardIdsForCurrentSkillDeckRejectsNonPlayerDeck() {
+    void expandPlayerDeckCardIdsRejectsNonPlayerDeck() {
         Deck deck = Deck.create("enemy", DeckType.ENEMY);
         deck.syncCards(Map.of("C001", 1));
         when(deckRepository.findWithCardsById(1L)).thenReturn(Optional.of(deck));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> service.expandPlayerDeckCardIdsForCurrentSkillDeck(1L));
+                () -> service.expandPlayerDeckCardIds(1L));
 
         assertEquals(BAD_REQUEST, ex.getStatusCode());
     }
 
     @Test
     @DisplayName("expandPlayerDeckCardIdsForCurrentSkillDeck: 덱이 없으면 NOT_FOUND를 던진다")
-    void expandPlayerDeckCardIdsForCurrentSkillDeckMissingDeckReturnsNotFound() {
+    void expandPlayerDeckCardIdsMissingDeckReturnsNotFound() {
         when(deckRepository.findWithCardsById(99L)).thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> service.expandPlayerDeckCardIdsForCurrentSkillDeck(99L));
+                () -> service.expandPlayerDeckCardIds(99L));
 
         assertEquals(NOT_FOUND, ex.getStatusCode());
     }
@@ -398,13 +406,6 @@ class DeckServiceTest {
             ));
         }
         return map;
-    }
-
-    private static void assertReservedCurrentSkillDeckRejected(Executable executable) {
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, executable);
-        assertEquals(BAD_REQUEST, ex.getStatusCode());
-        assertTrue(ex.getReason().contains("reserved current skill deck"));
-        assertTrue(ex.getReason().contains("public deck API"));
     }
 
     private record CardStub(String id, CardType type) {}

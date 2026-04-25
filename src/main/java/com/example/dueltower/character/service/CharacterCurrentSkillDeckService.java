@@ -3,7 +3,6 @@ package com.example.dueltower.character.service;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
-import com.example.dueltower.content.deck.service.DeckService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,14 +17,13 @@ import java.util.Set;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @Service
+@Deprecated
 public class CharacterCurrentSkillDeckService {
 
     private final CharacterProfileRepository repository;
-    private final DeckService deckService;
 
-    public CharacterCurrentSkillDeckService(CharacterProfileRepository repository, DeckService deckService) {
+    public CharacterCurrentSkillDeckService(CharacterProfileRepository repository) {
         this.repository = repository;
-        this.deckService = deckService;
     }
 
     /**
@@ -38,9 +36,7 @@ public class CharacterCurrentSkillDeckService {
         List<String> currentSkillDeck = normalizeCardIds(cardIds);
 
         target.setCurrentSkillDeck(currentSkillDeck);
-        CharacterProfile saved = repository.save(target);
-        deckService.upsertCharacterCurrentSkillDeck(saved.getId(), currentSkillDeck);
-        return saved;
+        return repository.save(target);
     }
 
     /**
@@ -55,26 +51,22 @@ public class CharacterCurrentSkillDeckService {
     ) {
         CharacterProfile target = requirePersistedProfile(profile);
         List<String> currentSkillDeck = normalizeOwnedCardIds(ownedCardIds);
-        List<String> mirrorDeckCardIds = resolveCardIdsForOwnedCardIds(currentSkillDeck, ownedCards);
+        validateOwnedCardIds(currentSkillDeck, ownedCards);
 
         target.setCurrentSkillDeck(currentSkillDeck);
-        CharacterProfile saved = repository.save(target);
-        deckService.upsertCharacterCurrentSkillDeck(saved.getId(), mirrorDeckCardIds);
-        return saved;
+        return repository.save(target);
     }
 
     @Transactional
     public void deleteCurrentSkillDeckMirror(long characterId) {
-        deckService.deleteCharacterCurrentSkillDeck(characterId);
+        // No-op: currentSkillDeck mirror Decks are no longer maintained.
     }
 
     @Transactional
     public CharacterProfile clearCurrentSkillDeck(CharacterProfile profile) {
         CharacterProfile target = requirePersistedProfile(profile);
         target.setCurrentSkillDeck(null);
-        CharacterProfile saved = repository.save(target);
-        deckService.deleteCharacterCurrentSkillDeck(saved.getId());
-        return saved;
+        return repository.save(target);
     }
 
     private static CharacterProfile requirePersistedProfile(CharacterProfile profile) {
@@ -119,7 +111,7 @@ public class CharacterCurrentSkillDeckService {
         return List.copyOf(normalized);
     }
 
-    private static List<String> resolveCardIdsForOwnedCardIds(List<String> ownedCardIds, List<OwnedCard> ownedCards) {
+    private static void validateOwnedCardIds(List<String> ownedCardIds, List<OwnedCard> ownedCards) {
         if (ownedCards == null) {
             throw new ResponseStatusException(BAD_REQUEST, "ownedCards is required for ownedCardId currentSkillDeck writes");
         }
@@ -140,8 +132,6 @@ public class CharacterCurrentSkillDeckService {
             if (ownedCard.cardId() == null || ownedCard.cardId().isBlank()) {
                 throw new ResponseStatusException(BAD_REQUEST, "owned card has blank cardId: " + ownedCardId);
             }
-            cardIds.add(ownedCard.cardId().trim());
         }
-        return List.copyOf(cardIds);
     }
 }
