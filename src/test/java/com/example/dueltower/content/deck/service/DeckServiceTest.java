@@ -9,6 +9,7 @@ import com.example.dueltower.content.deck.dto.DeckCardSpec;
 import com.example.dueltower.content.deck.dto.DeckValidationResponse;
 import com.example.dueltower.content.deck.dto.DeckResponse;
 import com.example.dueltower.content.deck.dto.ReplaceDeckCardsRequest;
+import com.example.dueltower.content.deck.dto.RemoveDeckCardsRequest;
 import com.example.dueltower.content.deck.dto.UpdateDeckRequest;
 import com.example.dueltower.content.deck.repository.DeckRepository;
 import com.example.dueltower.engine.model.CardDefinition;
@@ -17,6 +18,7 @@ import com.example.dueltower.engine.model.Ids;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.function.Executable;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -82,6 +84,15 @@ class DeckServiceTest {
     }
 
     @Test
+    @DisplayName("create: character currentSkillDeck 예약 이름을 거부한다")
+    void createRejectsReservedCurrentSkillDeckName() {
+        assertReservedCurrentSkillDeckRejected(() ->
+                service.create(new CreateDeckRequest("character:7:currentSkillDeck", DeckType.PLAYER, cards12())));
+
+        verify(deckRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("get: 존재하지 않는 덱이면 NOT_FOUND를 던진다")
     void getNonexistentDeckReturnsNotFound() {
         when(deckRepository.findWithCardsById(99L)).thenReturn(Optional.empty());
@@ -94,11 +105,22 @@ class DeckServiceTest {
     @Test
     @DisplayName("delete: 존재하지 않는 덱이면 NOT_FOUND를 던진다")
     void deleteNonexistentDeckReturnsNotFound() {
-        when(deckRepository.existsById(99L)).thenReturn(false);
+        when(deckRepository.findWithCardsById(99L)).thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.delete(99L));
 
         assertEquals(NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("delete: 일반 덱은 기존처럼 삭제한다")
+    void deletePublicDeck() {
+        Deck deck = Deck.create("public-deck", DeckType.ENEMY);
+        when(deckRepository.findWithCardsById(1L)).thenReturn(Optional.of(deck));
+
+        service.delete(1L);
+
+        verify(deckRepository).delete(deck);
     }
 
     @Test
@@ -122,6 +144,32 @@ class DeckServiceTest {
         assertEquals(DeckType.ENEMY, updated.type());
         assertEquals(5, updated.totalCards());
         assertEquals(2, updated.cards().size());
+    }
+
+    @Test
+    @DisplayName("update: 일반 덱을 character currentSkillDeck 예약 이름으로 바꿀 수 없다")
+    void updateRejectsRenamingPublicDeckToReservedCurrentSkillDeckName() {
+        Deck deck = Deck.create("old-name", DeckType.PLAYER);
+        when(deckRepository.findWithCardsById(7L)).thenReturn(Optional.of(deck));
+
+        assertReservedCurrentSkillDeckRejected(() -> service.update(7L, new UpdateDeckRequest(
+                "character:7:currentSkillDeck",
+                DeckType.PLAYER,
+                cards12()
+        )));
+    }
+
+    @Test
+    @DisplayName("public mutation: character currentSkillDeck 미러 덱을 직접 변경할 수 없다")
+    void publicMutationsRejectExistingReservedCurrentSkillDeck() {
+        Deck deck = Deck.create("character:7:currentSkillDeck", DeckType.PLAYER);
+        when(deckRepository.findWithCardsById(7L)).thenReturn(Optional.of(deck));
+
+        assertReservedCurrentSkillDeckRejected(() -> service.update(7L, new UpdateDeckRequest("normal", DeckType.PLAYER, cards12())));
+        assertReservedCurrentSkillDeckRejected(() -> service.addCards(7L, new AddDeckCardsRequest(List.of(new DeckCardSpec("card-1", 1)))));
+        assertReservedCurrentSkillDeckRejected(() -> service.replaceCards(7L, new ReplaceDeckCardsRequest(cards12())));
+        assertReservedCurrentSkillDeckRejected(() -> service.removeCards(7L, new RemoveDeckCardsRequest(List.of(new DeckCardSpec("card-1", 1)))));
+        assertReservedCurrentSkillDeckRejected(() -> service.delete(7L));
     }
 
     @Test
@@ -350,6 +398,13 @@ class DeckServiceTest {
             ));
         }
         return map;
+    }
+
+    private static void assertReservedCurrentSkillDeckRejected(Executable executable) {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, executable);
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("reserved current skill deck"));
+        assertTrue(ex.getReason().contains("public deck API"));
     }
 
     private record CardStub(String id, CardType type) {}

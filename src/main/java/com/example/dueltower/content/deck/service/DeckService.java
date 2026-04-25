@@ -13,12 +13,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 public class DeckService {
+
+    private static final Pattern CHARACTER_CURRENT_SKILL_DECK_NAME =
+            Pattern.compile("^character:\\d+:currentSkillDeck$");
+    private static final String RESERVED_CURRENT_SKILL_DECK_ERROR =
+            "reserved current skill deck cannot be modified through public deck API";
 
     private final DeckRepository deckRepository;
     private final CardService cardService;
@@ -34,6 +40,7 @@ public class DeckService {
     public DeckResponse create(CreateDeckRequest req) {
         DeckType type = (req == null || req.type() == null) ? DeckType.PLAYER : req.type();
         String name = normalizeName(req == null ? null : req.name(), type);
+        rejectReservedCurrentSkillDeckName(name);
 
         Map<String, Integer> cards = normalizeAndValidateSpecs(req == null ? null : req.cards(), false);
         applyPlayerDeckRulesOrThrow(type, cards, true);
@@ -59,9 +66,11 @@ public class DeckService {
     @Transactional
     public DeckResponse update(long id, UpdateDeckRequest req) {
         Deck deck = getDeckOrThrow(id);
+        rejectReservedCurrentSkillDeckMutation(deck);
 
         DeckType newType = (req == null || req.type() == null) ? deck.getType() : req.type();
         String newName = normalizeName(req == null ? null : req.name(), newType);
+        rejectReservedCurrentSkillDeckName(newName);
 
         Map<String, Integer> cards = normalizeAndValidateSpecs(req == null ? null : req.cards(), false);
         applyPlayerDeckRulesOrThrow(newType, cards, true);
@@ -81,6 +90,7 @@ public class DeckService {
     @Transactional
     public DeckResponse addCards(long id, AddDeckCardsRequest req) {
         Deck deck = getDeckOrThrow(id);
+        rejectReservedCurrentSkillDeckMutation(deck);
         Map<String, Integer> toAdd = normalizeAndValidateSpecs(req == null ? null : req.cards(), false);
 
         // add on current aggregate state
@@ -99,6 +109,7 @@ public class DeckService {
     @Transactional
     public DeckResponse replaceCards(long id, ReplaceDeckCardsRequest req) {
         Deck deck = getDeckOrThrow(id);
+        rejectReservedCurrentSkillDeckMutation(deck);
         Map<String, Integer> cards = normalizeAndValidateSpecs(requiredCards(req), true);
         applyPlayerDeckRulesOrThrow(deck.getType(), cards, true);
         deck.syncCards(cards);
@@ -108,6 +119,7 @@ public class DeckService {
     @Transactional
     public DeckResponse removeCards(long id, RemoveDeckCardsRequest req) {
         Deck deck = getDeckOrThrow(id);
+        rejectReservedCurrentSkillDeckMutation(deck);
         Map<String, Integer> toRemove = normalizeAndValidateSpecs(requiredCards(req), true);
         Map<String, Integer> current = toCountMap(deck);
 
@@ -208,10 +220,9 @@ public class DeckService {
 
     @Transactional
     public void delete(long id) {
-        if (!deckRepository.existsById(id)) {
-            throw notFound("deck not found: " + id);
-        }
-        deckRepository.deleteById(id);
+        Deck deck = getDeckOrThrow(id);
+        rejectReservedCurrentSkillDeckMutation(deck);
+        deckRepository.delete(deck);
     }
 
     private String normalizeName(String raw, DeckType type) {
@@ -265,6 +276,23 @@ public class DeckService {
 
     private String characterCurrentDeckName(long characterId) {
         return "character:" + characterId + ":currentSkillDeck";
+    }
+
+    private void rejectReservedCurrentSkillDeckMutation(Deck deck) {
+        if (deck != null) {
+            rejectReservedCurrentSkillDeckName(deck.getName());
+        }
+    }
+
+    private void rejectReservedCurrentSkillDeckName(String deckName) {
+        if (isReservedCurrentSkillDeckName(deckName)) {
+            throw badRequest(RESERVED_CURRENT_SKILL_DECK_ERROR);
+        }
+    }
+
+    private boolean isReservedCurrentSkillDeckName(String deckName) {
+        return deckName != null
+                && CHARACTER_CURRENT_SKILL_DECK_NAME.matcher(deckName.trim()).matches();
     }
 
     private void validateCardIdsExist(Set<String> cardIds) {
