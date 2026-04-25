@@ -312,10 +312,19 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         MockHttpSession player2Session = signUpAndLogin("gm-screen-p2", "gm-screen-p2@example.com", "password123");
         long characterId = createCharacter();
         String player1Token = joinAsPlayer(player1Session, session.code(), "gm-screen-p1", characterId);
-        joinAsPlayer(player2Session, session.code(), "gm-screen-p2", characterId);
+        String player2Token = joinAsPlayer(player2Session, session.code(), "gm-screen-p2", characterId);
 
         mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", session.code(), "gm-screen-p1")
                         .header("X-Player-Token", player1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", session.code(), "gm-screen-p2")
+                        .header("X-Player-Token", player2Token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -423,6 +432,32 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         JsonNode startCombatAction = findAction(body, "gmLobby.startCombat");
         assertDisabledActionContract(startCombatAction);
         assertThat(startCombatAction.path("disabledReason").path("code").asText()).isEqualTo("READY_PARTICIPANT_REQUIRED");
+    }
+
+    @Test
+    void gmLobbyScreenBlocksStartWhenParticipantDeckIsInvalid() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-invalid-deck", "gm-invalid-deck@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "gm-invalid-deck");
+        MockHttpSession playerSession = signUpAndLogin("gm-invalid-deck-p1", "gm-invalid-deck-p1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, session.code(), "gm-invalid-deck-p1");
+        markPlayerReady(session.code(), "gm-invalid-deck-p1", playerToken);
+
+        sessionLifecycleService.withLockedSession(session.code(), rt -> {
+            rt.state().player(new Ids.PlayerId("gm-invalid-deck-p1")).deckOwnedCardIds(List.of("oc1"));
+            return null;
+        });
+
+        MvcResult result = mockMvc.perform(get("/api/screens/sessions/{code}/gm-lobby", session.code())
+                        .header("X-GM-Token", session.gmToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = assertBaseScreenContract(result, "GmLobby");
+        assertThat(body.path("startCombat").path("blockedReason").path("code").asText()).isEqualTo("DECK_INVALID");
+
+        JsonNode startCombatAction = findAction(body, "gmLobby.startCombat");
+        assertDisabledActionContract(startCombatAction);
+        assertThat(startCombatAction.path("disabledReason").path("code").asText()).isEqualTo("DECK_INVALID");
     }
 
     @Test

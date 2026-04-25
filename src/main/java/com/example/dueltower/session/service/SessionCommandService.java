@@ -30,11 +30,14 @@ public class SessionCommandService {
 
     private final SessionLifecycleService sessionLifecycleService;
     private final SessionCommandAuthorization sessionCommandAuthorization;
+    private final StartCombatAvailabilityService startCombatAvailabilityService;
 
     public SessionCommandService(SessionLifecycleService sessionLifecycleService,
-                                 SessionCommandAuthorization sessionCommandAuthorization) {
+                                 SessionCommandAuthorization sessionCommandAuthorization,
+                                 StartCombatAvailabilityService startCombatAvailabilityService) {
         this.sessionLifecycleService = sessionLifecycleService;
         this.sessionCommandAuthorization = sessionCommandAuthorization;
+        this.startCombatAvailabilityService = startCombatAvailabilityService;
     }
 
     public EngineResponseDto handleCommand(String code,
@@ -74,6 +77,14 @@ public class SessionCommandService {
             );
 
             GameCommand cmd = commandType.toCommand(req, commandId, req.expectedVersion());
+            if (commandType == SessionCommandType.START_COMBAT) {
+                StartCombatAvailabilityService.StartCombatAvailability availability =
+                        startCombatAvailabilityService.analyze(rt, req.trimmedPlayerId());
+                if (!availability.allowed()) {
+                    return rejectedStartCombatResponse(code, req, commandId, availability, rt, startNs);
+                }
+            }
+
             final EngineResult res = rt.apply(cmd);
 
             long tookMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
@@ -95,6 +106,25 @@ public class SessionCommandService {
                     state
             );
         });
+    }
+
+    private EngineResponseDto rejectedStartCombatResponse(String code,
+                                                          CommandRequest req,
+                                                          UUID commandId,
+                                                          StartCombatAvailabilityService.StartCombatAvailability availability,
+                                                          SessionRuntime rt,
+                                                          long startNs) {
+        long tookMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
+        List<String> errors = availability.errors();
+        log.warn("command rejected code={} type={} commandId={} errors={} version={} ({}ms)",
+                code, req.type(), commandId, errors, rt.state().version(), tookMs);
+        return new EngineResponseDto(
+                false,
+                errors,
+                List.of(availability.apiError()),
+                List.of(),
+                StateMapper.toDto(rt.code(), rt.state())
+        );
     }
 
     private static UUID parseOrNewUuid(String v) {

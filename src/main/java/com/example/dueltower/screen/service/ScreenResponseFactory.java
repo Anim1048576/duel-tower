@@ -56,6 +56,7 @@ import com.example.dueltower.session.dto.SessionStateDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import com.example.dueltower.session.service.PlayerLobbyDeckEditAnalysis;
 import com.example.dueltower.session.service.SessionAccessDecision;
+import com.example.dueltower.session.service.StartCombatAvailabilityService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -82,22 +83,32 @@ public class ScreenResponseFactory {
     private final CharacterCurrentSkillDeckReadService currentSkillDeckReadService;
     private final CardService cardService;
     private final PassiveService passiveService;
+    private final StartCombatAvailabilityService startCombatAvailabilityService;
 
     @Autowired
     public ScreenResponseFactory(CharacterProfileRepository characterProfileRepository,
                                  CharacterCurrentSkillDeckReadService currentSkillDeckReadService,
                                  CardService cardService,
-                                 PassiveService passiveService) {
+                                 PassiveService passiveService,
+                                 StartCombatAvailabilityService startCombatAvailabilityService) {
         this.characterProfileRepository = characterProfileRepository;
         this.currentSkillDeckReadService = currentSkillDeckReadService;
         this.cardService = cardService;
         this.passiveService = passiveService;
+        this.startCombatAvailabilityService = startCombatAvailabilityService;
+    }
+
+    public ScreenResponseFactory(CharacterProfileRepository characterProfileRepository,
+                                 CharacterCurrentSkillDeckReadService currentSkillDeckReadService,
+                                 CardService cardService,
+                                 PassiveService passiveService) {
+        this(characterProfileRepository, currentSkillDeckReadService, cardService, passiveService, null);
     }
 
     public ScreenResponseFactory(CharacterProfileRepository characterProfileRepository,
                                  CardService cardService,
                                  PassiveService passiveService) {
-        this(characterProfileRepository, new CharacterCurrentSkillDeckReadService(), cardService, passiveService);
+        this(characterProfileRepository, new CharacterCurrentSkillDeckReadService(), cardService, passiveService, null);
     }
 
     public SessionScreenSkeletonResponse sessionSkeleton(ScreenRouteSpec route,
@@ -210,7 +221,7 @@ public class ScreenResponseFactory {
                                          List<PassiveDefinition> passives,
                                          List<String> uiNotices) {
         List<PlayerStateDto> sortedPlayers = gmLobbySortedPlayers(state);
-        GmLobbyStartCombatDto startCombat = gmLobbyStartCombat(state, sortedPlayers);
+        GmLobbyStartCombatDto startCombat = gmLobbyStartCombat(state, runtime, sortedPlayers);
         return new GmLobbyScreenResponse(
                 route.screenKey(),
                 OffsetDateTime.now(),
@@ -1006,45 +1017,12 @@ public class ScreenResponseFactory {
     }
 
     private GmLobbyStartCombatDto gmLobbyStartCombat(SessionStateDto state,
+                                                     SessionRuntime runtime,
                                                      List<PlayerStateDto> sortedPlayers) {
-        String recommendedStartPlayerId = sortedPlayers.stream()
-                .filter(PlayerStateDto::ready)
-                .map(PlayerStateDto::playerId)
-                .findFirst()
-                .orElse(null);
-
-        DisabledReasonDto blockedReason = null;
-        if (state.combat() != null && state.combat().phase() != null && !"END".equals(state.combat().phase())) {
-            blockedReason = new DisabledReasonDto(
-                    "COMBAT_ALREADY_ACTIVE",
-                    "RULE",
-                    "Combat is already active for this session.",
-                    "session.combat.phase != END",
-                    Map.of("phase", state.combat().phase()),
-                    null,
-                    null
-            );
-        } else if (sortedPlayers.isEmpty()) {
-            blockedReason = new DisabledReasonDto(
-                    "PARTICIPANT_REQUIRED",
-                    "RULE",
-                    "At least one participant must join before combat can start.",
-                    "state.players is empty",
-                    null,
-                    null,
-                    null
-            );
-        } else if (recommendedStartPlayerId == null || recommendedStartPlayerId.isBlank()) {
-            blockedReason = new DisabledReasonDto(
-                    "READY_PARTICIPANT_REQUIRED",
-                    "RULE",
-                    "Mark at least one participant ready before combat starts from the GM lobby.",
-                    "no ready participant available for recommendedStartPlayerId",
-                    null,
-                    null,
-                    null
-            );
-        }
+        StartCombatAvailabilityService.StartCombatAvailability availability =
+                startCombatAvailabilityService.analyze(runtime, null);
+        String recommendedStartPlayerId = availability.recommendedStartPlayerId();
+        DisabledReasonDto blockedReason = DisabledReasonDto.fromApiErrorResponse(availability.apiError());
 
         List<GmLobbySelectableStartPlayerDto> selectable = new ArrayList<>();
         for (int index = 0; index < sortedPlayers.size(); index++) {

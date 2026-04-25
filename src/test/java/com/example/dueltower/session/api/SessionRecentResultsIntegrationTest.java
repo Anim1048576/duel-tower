@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -286,6 +287,16 @@ class SessionRecentResultsIntegrationTest {
     }
 
     private void startCombat(SessionFixture fixture) throws Exception {
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", fixture.code, "player1")
+                        .header("X-Player-Token", fixture.playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
+
         mockMvc.perform(post("/api/sessions/{code}/command", fixture.code)
                         .header("X-GM-Token", fixture.gmToken)
                         .contentType(MediaType.APPLICATION_JSON)

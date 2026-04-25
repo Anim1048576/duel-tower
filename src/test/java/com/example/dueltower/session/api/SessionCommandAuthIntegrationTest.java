@@ -1,6 +1,8 @@
 package com.example.dueltower.session.api;
 
 import com.example.dueltower.member.MemberRepository;
+import com.example.dueltower.engine.model.Ids.PlayerId;
+import com.example.dueltower.session.service.SessionLifecycleService;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,11 +18,15 @@ import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -33,6 +39,9 @@ class SessionCommandAuthIntegrationTest {
 
     @Autowired
     private MemberRepository memberRepository;
+
+    @Autowired
+    private SessionLifecycleService sessionLifecycleService;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -187,6 +196,8 @@ class SessionCommandAuthIntegrationTest {
                                 """))
                 .andExpect(status().isUnauthorized());
 
+        markReady(info.code(), "player1", playerToken);
+
         mockMvc.perform(post("/api/sessions/{code}/command", info.code())
                         .header("X-GM-Token", info.gmToken())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -197,7 +208,60 @@ class SessionCommandAuthIntegrationTest {
                                   "expectedVersion": 0
                                 }
                                 """))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accepted").value(true));
+    }
+
+    @Test
+    void rawStartCombatRejectsUnreadyParticipants() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-raw-unready", "gm-raw-unready@example.com", "password123");
+        SessionInfo info = createSessionInfo(gmSession, "gm-raw-unready");
+        MockHttpSession playerSession = signUpAndLogin("raw-unready-p1", "raw-unready-p1@example.com", "password123");
+        joinAsPlayer(playerSession, info.code(), "raw-unready-p1");
+
+        mockMvc.perform(post("/api/sessions/{code}/command", info.code())
+                        .header("X-GM-Token", info.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "START_COMBAT",
+                                  "playerId": "raw-unready-p1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accepted").value(false))
+                .andExpect(jsonPath("$.errors[0]").value(containsString("required players are ready")))
+                .andExpect(jsonPath("$.errorDetails[0].code").value("READY_PARTICIPANT_REQUIRED"));
+    }
+
+    @Test
+    void rawStartCombatRejectsInvalidDecks() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-raw-invalid-deck", "gm-raw-invalid-deck@example.com", "password123");
+        SessionInfo info = createSessionInfo(gmSession, "gm-raw-invalid-deck");
+        MockHttpSession playerSession = signUpAndLogin("raw-invalid-deck-p1", "raw-invalid-deck-p1@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, info.code(), "raw-invalid-deck-p1");
+        markReady(info.code(), "raw-invalid-deck-p1", playerToken);
+
+        sessionLifecycleService.withLockedSession(info.code(), rt -> {
+            rt.state().player(new PlayerId("raw-invalid-deck-p1")).deckOwnedCardIds(List.of("oc1"));
+            return null;
+        });
+
+        mockMvc.perform(post("/api/sessions/{code}/command", info.code())
+                        .header("X-GM-Token", info.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "START_COMBAT",
+                                  "playerId": "raw-invalid-deck-p1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accepted").value(false))
+                .andExpect(jsonPath("$.errors[0]").value(containsString("decks are invalid")))
+                .andExpect(jsonPath("$.errorDetails[0].code").value("DECK_INVALID"));
     }
 
     @Test
@@ -464,6 +528,18 @@ class SessionCommandAuthIntegrationTest {
 
         JsonNode node = JSON.readTree(join.getResponse().getContentAsString());
         return node.get("playerToken").asText();
+    }
+
+    private void markReady(String code, String playerId, String playerToken) throws Exception {
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, playerId)
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
     }
 
     private record SessionInfo(String code, String gmToken) {}

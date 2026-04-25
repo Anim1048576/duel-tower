@@ -23,6 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -321,6 +322,8 @@ class SessionPresetApplyIntegrationTest {
                 List.of("P001")
         );
 
+        markReady(sessionInfo.code(), "player1", playerToken);
+
         mockMvc.perform(post("/api/sessions/{code}/command", sessionInfo.code())
                         .header("X-GM-Token", sessionInfo.gmToken())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -339,6 +342,18 @@ class SessionPresetApplyIntegrationTest {
                         .content(applyBody(presetId)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("DECK_EDIT_FORBIDDEN"));
+    }
+
+    private void markReady(String code, String playerId, String playerToken) throws Exception {
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, playerId)
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
     }
 
     private CharacterProfile createCharacterProfile(

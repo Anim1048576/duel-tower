@@ -20,6 +20,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -1287,6 +1288,11 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     private JsonNode startCombatAndReachPlayerMainTurn(Fixture fx) throws Exception {
+        markReady(fx.code, "player1", fx.playerToken);
+        if (fx.otherPlayerToken != null) {
+            markReady(fx.code, "player2", fx.otherPlayerToken);
+        }
+
         JsonNode start = commandAsGm(
                 fx.code,
                 fx.gmToken,
@@ -1328,6 +1334,18 @@ class SessionCommandExtensionIntegrationTest {
 
         fail("player turn was not reached for test setup");
         return state;
+    }
+
+    private void markReady(String code, String playerId, String playerToken) throws Exception {
+        mockMvc.perform(put("/api/sessions/{code}/players/{playerId}/ready", code, playerId)
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ready": true
+                                }
+                                """))
+                .andExpect(status().isOk());
     }
 
     private JsonNode advanceToPlayerMainTurn(Fixture fx, JsonNode currentState) throws Exception {

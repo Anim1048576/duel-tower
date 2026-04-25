@@ -20,6 +20,7 @@ import com.example.dueltower.session.dto.PlayerStateDto;
 import com.example.dueltower.session.dto.SessionStateDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import com.example.dueltower.session.service.SessionAccessDecision;
+import com.example.dueltower.session.service.StartCombatAvailabilityService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -218,13 +219,17 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
     private static ScreenResponseFactory factory(CharacterProfileRepository repository) {
         CardService cardService = mock(CardService.class);
         PassiveService passiveService = mock(PassiveService.class);
+        StartCombatAvailabilityService startCombatAvailabilityService = mock(StartCombatAvailabilityService.class);
         when(cardService.asMap()).thenReturn(Map.of());
         when(passiveService.defsMap()).thenReturn(Map.of());
+        when(startCombatAvailabilityService.analyze(org.mockito.ArgumentMatchers.any(SessionRuntime.class), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn(new StartCombatAvailabilityService.StartCombatAvailability("player1", null));
         return new ScreenResponseFactory(
                 repository,
                 new CharacterCurrentSkillDeckReadService(),
                 cardService,
-                passiveService
+                passiveService,
+                startCombatAvailabilityService
         );
     }
 
