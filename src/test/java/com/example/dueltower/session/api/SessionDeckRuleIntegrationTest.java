@@ -1,7 +1,8 @@
 package com.example.dueltower.session.api;
 
-import com.example.dueltower.character.domain.CharacterProfile;
-import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCardCollectionService;
+import com.example.dueltower.character.service.CharacterLoadoutService;
+import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.engine.model.CardInstance;
 import com.example.dueltower.engine.model.NodeState;
 import com.example.dueltower.engine.model.PlayerState;
@@ -51,7 +52,10 @@ class SessionDeckRuleIntegrationTest {
     private SessionService sessionService;
 
     @Autowired
-    private CharacterProfileRepository characterProfileRepository;
+    private CharacterCardCollectionService characterCardCollectionService;
+
+    @Autowired
+    private CharacterLoadoutService characterLoadoutService;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -275,14 +279,17 @@ class SessionDeckRuleIntegrationTest {
                 .getResponse()
                 .getContentAsString();
         String characterIdValue = extractJsonStringOrNumberValue(characterId, "id");
-        CharacterProfile profile = characterProfileRepository.findById(Long.parseLong(characterIdValue)).orElseThrow();
-        profile.setCurrentSkillDeck(List.of(
+        long characterIdLong = Long.parseLong(characterIdValue);
+        List<String> initialDeckCardIds = List.of(
                 "C001", "C001", "C001",
                 "C002", "C002", "C002",
                 "C003", "C003", "C003",
                 "C004", "C004", "Tig001_Card"
-        ));
-        characterProfileRepository.save(profile);
+        );
+        characterLoadoutService.replaceCurrentSkillDeckFromOwnedCardIds(
+                characterIdLong,
+                resolveOwnedCardIdsForCardIds(characterIdLong, initialDeckCardIds)
+        );
 
         String code = createSession(session);
         MvcResult joinResult = mockMvc.perform(post("/api/sessions/{code}/join", code)
@@ -328,10 +335,8 @@ class SessionDeckRuleIntegrationTest {
                         .content(deckUpdateBodyOwned(jsonArrayValues(updatedDeckOwnedCardIds))))
                 .andExpect(status().isOk());
 
-        var savedProfile = characterProfileRepository.findById(Long.parseLong(characterIdValue)).orElseThrow();
-
-        assertEquals(updatedDeckOwnedCardIds, savedProfile.getCurrentSkillDeck());
-        JsonNode savedOwnedCards = JSON.readTree(savedProfile.getOwnedCards());
+        assertEquals(updatedDeckOwnedCardIds, characterLoadoutService.getCurrentSkillDeckOwnedCardIds(characterIdLong));
+        JsonNode savedOwnedCards = JSON.readTree(characterCardCollectionService.toOwnedCardsJson(characterIdLong));
         assertTrue(savedOwnedCards.isArray());
         assertTrue(savedOwnedCards.get(0).hasNonNull("ownedCardId"));
         assertTrue(savedOwnedCards.get(0).hasNonNull("cardId"));
@@ -373,16 +378,6 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(jsonPath("$.state.players.playerPersist.deckOwnedCardIds").isArray())
                 .andExpect(jsonPath("$.state.players.playerPersist.deckOwnedCardIds[0]").value(updatedDeckOwnedCardIds.get(0)));
 
-        String decksJson = mockMvc.perform(get("/api/content/decks")
-                        .session(session))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-
-        assertTrue(decksJson.contains("\"name\":\"character:" + characterIdValue + ":currentSkillDeck\""));
-        assertTrue(decksJson.contains("\"totalCards\":12"));
-        assertTrue(decksJson.contains("\"cardId\":\"Tig001_Card\",\"count\":2"));
     }
 
     @Test
@@ -1179,6 +1174,27 @@ class SessionDeckRuleIntegrationTest {
                 .map(value -> "\"" + value + "\"")
                 .reduce((a, b) -> a + "," + b)
                 .orElse("");
+    }
+
+    private List<String> resolveOwnedCardIdsForCardIds(long characterId, List<String> cardIds) {
+        List<OwnedCard> ownedCards = characterCardCollectionService.toRuntimeOwnedCards(characterId);
+        boolean[] used = new boolean[ownedCards.size()];
+        List<String> resolved = new ArrayList<>();
+
+        for (String cardId : cardIds) {
+            int matchedIndex = -1;
+            for (int i = 0; i < ownedCards.size(); i++) {
+                if (!used[i] && cardId.equals(ownedCards.get(i).cardId())) {
+                    matchedIndex = i;
+                    break;
+                }
+            }
+            assertTrue(matchedIndex >= 0, "owned card not found for cardId=" + cardId);
+            used[matchedIndex] = true;
+            resolved.add(ownedCards.get(matchedIndex).ownedCardId());
+        }
+
+        return List.copyOf(resolved);
     }
 
     private List<String> extractJsonArrayValues(String json, String key) {

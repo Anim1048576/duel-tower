@@ -3,6 +3,9 @@ package com.example.dueltower.session.api;
 import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCardCollectionService;
+import com.example.dueltower.character.service.CharacterLoadoutService;
+import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.member.MemberRepository;
 import com.example.dueltower.preset.domain.Preset;
 import com.example.dueltower.preset.repository.PresetRepository;
@@ -20,6 +23,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -43,6 +47,12 @@ class SessionPresetApplyIntegrationTest {
 
     @Autowired
     private PresetRepository presetRepository;
+
+    @Autowired
+    private CharacterCardCollectionService characterCardCollectionService;
+
+    @Autowired
+    private CharacterLoadoutService characterLoadoutService;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -363,8 +373,8 @@ class SessionPresetApplyIntegrationTest {
             String ownedCards,
             List<String> currentSkillDeck,
             String exCard
-    ) {
-        return characterProfileRepository.save(CharacterProfile.builder()
+    ) throws Exception {
+        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
                 .name(name)
                 .gender(CharacterGender.OTHER)
                 .age(20)
@@ -378,10 +388,56 @@ class SessionPresetApplyIntegrationTest {
                 .willpower(10)
                 .trait1(trait1)
                 .trait2(trait2)
-                .ownedCards(ownedCards)
-                .currentSkillDeck(currentSkillDeck)
-                .exCard(exCard)
+                .ownedCards("[]")
+                .currentSkillDeck(List.of())
+                .exCard("{}")
                 .build());
+
+        characterCardCollectionService.replaceOwnedCardsFromJson(profile.getId(), ownedCards);
+        if (currentSkillDeck != null && !currentSkillDeck.isEmpty()) {
+            characterLoadoutService.replaceCurrentSkillDeckFromOwnedCardIds(
+                    profile.getId(),
+                    resolveOwnedCardIdsForCardIds(profile.getId(), currentSkillDeck)
+            );
+        }
+        String exCardId = extractExCardId(exCard);
+        if (exCardId != null && !exCardId.isBlank()) {
+            characterLoadoutService.replaceExCard(profile.getId(), exCardId);
+        }
+
+        return profile;
+    }
+
+    private List<String> resolveOwnedCardIdsForCardIds(long characterId, List<String> cardIds) {
+        List<OwnedCard> ownedCards = characterCardCollectionService.toRuntimeOwnedCards(characterId);
+        boolean[] used = new boolean[ownedCards.size()];
+        List<String> resolved = new ArrayList<>();
+
+        for (String cardId : cardIds) {
+            int matchedIndex = -1;
+            for (int i = 0; i < ownedCards.size(); i++) {
+                if (!used[i] && cardId.equals(ownedCards.get(i).cardId())) {
+                    matchedIndex = i;
+                    break;
+                }
+            }
+            org.junit.jupiter.api.Assertions.assertTrue(matchedIndex >= 0, "owned card not found for cardId=" + cardId);
+            used[matchedIndex] = true;
+            resolved.add(ownedCards.get(matchedIndex).ownedCardId());
+        }
+
+        return List.copyOf(resolved);
+    }
+
+    private String extractExCardId(String exCard) throws Exception {
+        if (exCard == null || exCard.isBlank()) {
+            return null;
+        }
+        JsonNode node = JSON.readTree(exCard);
+        if (node.isTextual()) {
+            return node.asText("").trim();
+        }
+        return node.path("id").asText("").trim();
     }
 
     private long createPreset(
