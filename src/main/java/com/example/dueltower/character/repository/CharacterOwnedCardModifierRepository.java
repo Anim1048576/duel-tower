@@ -12,6 +12,8 @@ public interface CharacterOwnedCardModifierRepository extends JpaRepository<Char
 
     List<CharacterOwnedCardModifier> findByOwnedCardIdIn(Collection<String> ownedCardIds);
 
+    List<CharacterOwnedCardModifier> findByOwnedCardIdInOrderByIdAsc(Collection<String> ownedCardIds);
+
     void deleteByOwnedCardId(String ownedCardId);
 
     void deleteByOwnedCardIdIn(Collection<String> ownedCardIds);

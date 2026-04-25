@@ -10,6 +10,8 @@ public interface CharacterOwnedCardRepository extends JpaRepository<CharacterOwn
 
     List<CharacterOwnedCard> findByCharacterId(Long characterId);
 
+    List<CharacterOwnedCard> findByCharacterIdOrderByCreateDateAscOwnedCardIdAsc(Long characterId);
+
     void deleteByCharacterId(Long characterId);
 
     void deleteByCharacterIdAndOwnedCardIdIn(Long characterId, Collection<String> ownedCardIds);
