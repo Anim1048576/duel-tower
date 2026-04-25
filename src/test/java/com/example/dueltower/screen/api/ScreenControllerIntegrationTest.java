@@ -220,8 +220,14 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("presets").path("selectedId").isNull()).isTrue();
         assertThat(body.path("presets").path("preview").isNull()).isTrue();
 
+        JsonNode toggleReadyAction = findAction(body, "playerLobby.toggleReady");
+        JsonNode saveLoadoutAction = findAction(body, "playerLobby.saveLoadout");
         JsonNode applyPresetAction = findAction(body, "playerLobby.applyPreset");
+        assertDisabledActionContract(toggleReadyAction);
+        assertDisabledActionContract(saveLoadoutAction);
         assertDisabledActionContract(applyPresetAction);
+        assertThat(toggleReadyAction.path("disabledReason").path("code").asText()).isEqualTo("CHARACTER_REQUIRED");
+        assertThat(saveLoadoutAction.path("disabledReason").path("code").asText()).isEqualTo("CHARACTER_REQUIRED");
         assertThat(applyPresetAction.path("disabledReason").path("code").asText()).isEqualTo("PRESET_REQUIRED");
         assertThat(applyPresetAction.path("payloadTemplate").path("presetId").asLong()).isZero();
     }
@@ -302,6 +308,16 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(StreamSupport.stream(lockedEntry.path("reasonCodes").spliterator(), false)
                 .map(JsonNode::asText))
                 .contains("LOCKED_CARD");
+
+        JsonNode toggleReadyAction = findAction(body, "playerLobby.toggleReady");
+        JsonNode saveLoadoutAction = findAction(body, "playerLobby.saveLoadout");
+        assertDisabledActionContract(toggleReadyAction);
+        assertDisabledActionContract(saveLoadoutAction);
+        assertThat(toggleReadyAction.path("disabledReason").path("code").asText()).isEqualTo("DECK_EDIT_INVALID");
+        assertThat(saveLoadoutAction.path("disabledReason").path("code").asText()).isEqualTo("DECK_EDIT_INVALID");
+        assertThat(StreamSupport.stream(saveLoadoutAction.path("disabledReason").path("details").path("reasonCodes").spliterator(), false)
+                .map(JsonNode::asText))
+                .contains("INVALID_DECK_SIZE");
     }
 
     @Test

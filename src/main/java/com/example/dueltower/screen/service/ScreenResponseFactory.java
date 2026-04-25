@@ -191,7 +191,7 @@ public class ScreenResponseFactory {
                 route.screenKey(),
                 OffsetDateTime.now(),
                 uiNotices,
-                playerLobbyActions(state.sessionCode(), me, presetSection.selectedId(), loadout),
+                playerLobbyActions(state.sessionCode(), me, presetSection.selectedId(), loadout, deckEditAnalysis),
                 state.sessionCode(),
                 state.version(),
                 route.routeTemplate(),
@@ -345,11 +345,12 @@ public class ScreenResponseFactory {
     private List<ScreenActionDto> playerLobbyActions(String sessionCode,
                                                      PlayerStateDto me,
                                                      Long selectedPresetId,
-                                                     PlayerLobbyLoadoutDto loadout) {
+                                                     PlayerLobbyLoadoutDto loadout,
+                                                     PlayerLobbyDeckEditAnalysis deckEditAnalysis) {
         List<ScreenActionDto> actions = new ArrayList<>();
-        actions.add(toggleReadyAction(sessionCode, me));
+        actions.add(toggleReadyAction(sessionCode, me, loadout, deckEditAnalysis));
         actions.add(leavePlayerLobbyAction(sessionCode));
-        actions.add(saveLoadoutAction(sessionCode, me.playerId(), loadout));
+        actions.add(saveLoadoutAction(sessionCode, me.playerId(), loadout, deckEditAnalysis));
         actions.add(applyPresetAction(sessionCode, me.playerId(), selectedPresetId));
         return List.copyOf(actions);
     }
@@ -501,16 +502,20 @@ public class ScreenResponseFactory {
         );
     }
 
-    private ScreenActionDto toggleReadyAction(String sessionCode, PlayerStateDto me) {
+    private ScreenActionDto toggleReadyAction(String sessionCode,
+                                              PlayerStateDto me,
+                                              PlayerLobbyLoadoutDto loadout,
+                                              PlayerLobbyDeckEditAnalysis deckEditAnalysis) {
         boolean nextReady = !me.ready();
+        DisabledReasonDto disabledReason = nextReady ? playerLobbyLoadoutBlockedReason(loadout, deckEditAnalysis, "ready") : null;
         return ScreenActionDto.of(
                 "playerLobby.toggleReady",
                 nextReady ? "Mark ready" : "Mark not ready",
                 "PUT",
                 "/api/sessions/" + sessionCode + "/players/" + me.playerId() + "/ready",
                 ScreenActionAuth.PLAYER_TOKEN,
-                true,
-                null,
+                disabledReason == null,
+                disabledReason,
                 Map.of("ready", nextReady)
         );
     }
@@ -530,7 +535,9 @@ public class ScreenResponseFactory {
 
     private ScreenActionDto saveLoadoutAction(String sessionCode,
                                               String playerId,
-                                              PlayerLobbyLoadoutDto loadout) {
+                                              PlayerLobbyLoadoutDto loadout,
+                                              PlayerLobbyDeckEditAnalysis deckEditAnalysis) {
+        DisabledReasonDto disabledReason = playerLobbyLoadoutBlockedReason(loadout, deckEditAnalysis, "save");
         Map<String, Object> payloadTemplate = new LinkedHashMap<>();
         payloadTemplate.put("characterId", loadout.characterId());
         payloadTemplate.put("passiveIds", loadout.passiveIds());
@@ -542,10 +549,61 @@ public class ScreenResponseFactory {
                 "POST",
                 "/api/sessions/" + sessionCode + "/players/" + playerId + "/loadout",
                 ScreenActionAuth.PLAYER_TOKEN,
-                true,
-                null,
+                disabledReason == null,
+                disabledReason,
                 payloadTemplate
         );
+    }
+
+    private DisabledReasonDto playerLobbyLoadoutBlockedReason(PlayerLobbyLoadoutDto loadout,
+                                                              PlayerLobbyDeckEditAnalysis deckEditAnalysis,
+                                                              String actionName) {
+        if (loadout == null || loadout.characterId() == null) {
+            return new DisabledReasonDto(
+                    "CHARACTER_REQUIRED",
+                    "VALIDATION",
+                    playerLobbyLoadoutBlockedMessage(actionName, "Choose a character first."),
+                    "player lobby " + actionName + " requires a selected character",
+                    null,
+                    null,
+                    null
+            );
+        }
+        if (safeTrim(loadout.exCardId()).isBlank()) {
+            return new DisabledReasonDto(
+                    "EX_CARD_REQUIRED",
+                    "VALIDATION",
+                    playerLobbyLoadoutBlockedMessage(actionName, "Choose an EX card first."),
+                    "player lobby " + actionName + " requires a selected EX card",
+                    null,
+                    null,
+                    null
+            );
+        }
+        if (deckEditAnalysis == null || !deckEditAnalysis.saveAllowed()) {
+            List<String> reasonCodes = deckEditAnalysis == null
+                    ? List.of()
+                    : deckEditAnalysis.globalIssues().stream()
+                    .map(issue -> issue.code().name())
+                    .toList();
+            return new DisabledReasonDto(
+                    "DECK_EDIT_INVALID",
+                    "VALIDATION",
+                    playerLobbyLoadoutBlockedMessage(actionName, "Fix the deck validation issues first."),
+                    "player lobby " + actionName + " blocked by deck edit analysis",
+                    Map.of("reasonCodes", reasonCodes),
+                    null,
+                    null
+            );
+        }
+        return null;
+    }
+
+    private String playerLobbyLoadoutBlockedMessage(String actionName, String reason) {
+        if ("ready".equals(actionName)) {
+            return reason + " You can mark ready after the loadout is valid.";
+        }
+        return reason + " You can save the loadout after it is valid.";
     }
 
     private ScreenActionDto applyPresetAction(String sessionCode,
