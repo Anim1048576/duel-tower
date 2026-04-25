@@ -3,8 +3,6 @@ package com.example.dueltower.session.service;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.character.service.CharacterCardCollectionService;
-import com.example.dueltower.character.service.CharacterCurrentSkillDeckReadService;
-import com.example.dueltower.character.service.CharacterCurrentSkillDeckService;
 import com.example.dueltower.character.service.CharacterLoadoutService;
 import com.example.dueltower.common.api.ApiErrorException;
 import com.example.dueltower.common.api.ApiErrorResolver;
@@ -32,8 +30,6 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -65,8 +61,6 @@ public class SessionLoadoutSupport {
     private static final PlayerLobbyDeckEditAnalyzer PLAYER_LOBBY_DECK_EDIT_ANALYZER = new PlayerLobbyDeckEditAnalyzer();
 
     private final CharacterProfileRepository characterProfileRepository;
-    private final CharacterCurrentSkillDeckReadService currentSkillDeckReadService;
-    private final CharacterCurrentSkillDeckService currentSkillDeckService;
     private final CharacterCardCollectionService cardCollectionService;
     private final CharacterLoadoutService loadoutService;
     private final CardService cardService;
@@ -75,8 +69,6 @@ public class SessionLoadoutSupport {
     private final StarterLoadoutConfig starterLoadoutConfig;
 
     public SessionLoadoutSupport(CharacterProfileRepository characterProfileRepository,
-                                 CharacterCurrentSkillDeckReadService currentSkillDeckReadService,
-                                 CharacterCurrentSkillDeckService currentSkillDeckService,
                                  CharacterCardCollectionService cardCollectionService,
                                  CharacterLoadoutService loadoutService,
                                  CardService cardService,
@@ -84,8 +76,6 @@ public class SessionLoadoutSupport {
                                  GameRules gameRules,
                                  StarterLoadoutConfig starterLoadoutConfig) {
         this.characterProfileRepository = characterProfileRepository;
-        this.currentSkillDeckReadService = currentSkillDeckReadService;
-        this.currentSkillDeckService = currentSkillDeckService;
         this.cardCollectionService = cardCollectionService;
         this.loadoutService = loadoutService;
         this.cardService = cardService;
@@ -139,11 +129,11 @@ public class SessionLoadoutSupport {
                                                     List<String> requestedPresetDeckOwnedCardIdsRaw,
                                                     List<OwnedCard> ownedCards) {
         if (characterTemplate != null) {
-            List<String> currentSkillDeck = characterTemplate.currentSkillDeck();
-            if (currentSkillDeck == null || currentSkillDeck.isEmpty()) {
+            List<String> currentSkillDeckOwnedCardIds = characterTemplate.currentSkillDeckOwnedCardIds();
+            if (currentSkillDeckOwnedCardIds == null || currentSkillDeckOwnedCardIds.isEmpty()) {
                 return List.of();
             }
-            return currentSkillDeckReadService.resolveStoredCurrentSkillDeckToOwnedCardIds(currentSkillDeck, ownedCards);
+            return List.copyOf(currentSkillDeckOwnedCardIds);
         }
 
         if (requestedPresetDeckOwnedCardIdsRaw != null) {
@@ -168,7 +158,7 @@ public class SessionLoadoutSupport {
     }
 
     public List<String> resolveStoredDeckToOwnedCardIds(List<String> storedDeckEntries, List<OwnedCard> ownedCards) {
-        return currentSkillDeckReadService.resolveStoredCurrentSkillDeckToOwnedCardIds(storedDeckEntries, ownedCards);
+        return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(storedDeckEntries, ownedCards);
     }
 
     public void validateDeckBuild(List<String> deckOwnedCardIds, List<OwnedCard> ownedCards, List<String> currentDeckOwnedCardIds) {
@@ -327,11 +317,11 @@ public class SessionLoadoutSupport {
             return resolveRequestedDeckOwnedCardIds(deckOwnedCardIdsRaw, effectiveOwnedCards);
         }
         if (characterTemplate != null) {
-            List<String> currentSkillDeck = characterTemplate.currentSkillDeck();
-            if (currentSkillDeck == null || currentSkillDeck.isEmpty()) {
+            List<String> currentSkillDeckOwnedCardIds = characterTemplate.currentSkillDeckOwnedCardIds();
+            if (currentSkillDeckOwnedCardIds == null || currentSkillDeckOwnedCardIds.isEmpty()) {
                 return List.of();
             }
-            return currentSkillDeckReadService.resolveStoredCurrentSkillDeckToOwnedCardIds(currentSkillDeck, effectiveOwnedCards);
+            return List.copyOf(currentSkillDeckOwnedCardIds);
         }
         return List.copyOf(ps.deckOwnedCardIds());
     }
@@ -383,30 +373,25 @@ public class SessionLoadoutSupport {
             return;
         }
 
-        CharacterProfile profile = characterProfileRepository.findById(characterId)
-                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId));
+        if (!characterProfileRepository.existsById(characterId)) {
+            throw new ResponseStatusException(BAD_REQUEST, "character not found: " + characterId);
+        }
 
-        profile.setOwnedCards(toCanonicalOwnedCardsJson(ownedCards));
-        if (cardCollectionService != null) {
-            cardCollectionService.replaceOwnedCards(profile.getId(), ownedCards.stream()
-                    .map(ownedCard -> new OwnedCardDto(
-                            ownedCard.ownedCardId(),
-                            ownedCard.cardId(),
-                            ownedCard.modifiers().stream()
-                                    .map(modifier -> new OwnedCardModifierDto(modifier.modifierId(), modifier.value()))
-                                    .toList(),
-                            ownedCard.strengthened(),
-                            ownedCard.weakened(),
-                            ownedCard.lockedInDeck(),
-                            true,
-                            null
-                    ))
-                    .toList());
-        }
-        if (loadoutService != null) {
-            loadoutService.replaceCurrentSkillDeckFromOwnedCardIds(profile.getId(), deckOwnedCardIds);
-        }
-        currentSkillDeckService.replaceCurrentSkillDeckFromOwnedCardIds(profile, deckOwnedCardIds, ownedCards);
+        cardCollectionService.replaceOwnedCards(characterId, ownedCards.stream()
+                .map(ownedCard -> new OwnedCardDto(
+                        ownedCard.ownedCardId(),
+                        ownedCard.cardId(),
+                        ownedCard.modifiers().stream()
+                                .map(modifier -> new OwnedCardModifierDto(modifier.modifierId(), modifier.value()))
+                                .toList(),
+                        ownedCard.strengthened(),
+                        ownedCard.weakened(),
+                        ownedCard.lockedInDeck(),
+                        true,
+                        null
+                ))
+                .toList());
+        loadoutService.replaceCurrentSkillDeckFromOwnedCardIds(characterId, deckOwnedCardIds);
     }
 
     public void loadDeck(GameState state, PlayerState ps, List<String> deckOwnedCardIds) {
@@ -546,46 +531,16 @@ public class SessionLoadoutSupport {
         if (profile.getTrait1() != null && !profile.getTrait1().isBlank()) passiveIds.add(profile.getTrait1().trim());
         if (profile.getTrait2() != null && !profile.getTrait2().isBlank()) passiveIds.add(profile.getTrait2().trim());
 
-        List<OwnedCardDto> ownedCards = loadOwnedCardDtos(profile);
-        List<String> currentSkillDeck = loadCurrentSkillDeck(profile);
-        String exCardId = loadExCardId(profile);
+        List<OwnedCardDto> ownedCards = cardCollectionService.toOwnedCardDtos(profile.getId());
+        List<String> currentSkillDeckOwnedCardIds = loadoutService.getCurrentSkillDeckOwnedCardIds(profile.getId());
+        String exCardId = loadoutService.getExCardId(profile.getId());
 
         return new CharacterJoinTemplate(
                 List.copyOf(passiveIds),
-                currentSkillDeck == null ? null : List.copyOf(currentSkillDeck),
+                currentSkillDeckOwnedCardIds == null ? null : List.copyOf(currentSkillDeckOwnedCardIds),
                 exCardId,
                 ownedCards
         );
-    }
-
-    private List<OwnedCardDto> loadOwnedCardDtos(CharacterProfile profile) {
-        if (cardCollectionService != null && profile.getId() != null) {
-            List<OwnedCardDto> rows = cardCollectionService.toOwnedCardDtos(profile.getId());
-            if (!rows.isEmpty()) {
-                return rows;
-            }
-        }
-        return parseOwnedCardsJson(profile.getOwnedCards());
-    }
-
-    private List<String> loadCurrentSkillDeck(CharacterProfile profile) {
-        if (loadoutService != null && profile.getId() != null) {
-            List<String> rows = loadoutService.getCurrentSkillDeckOwnedCardIds(profile.getId());
-            if (!rows.isEmpty()) {
-                return rows;
-            }
-        }
-        return SessionNormalizationSupport.normalizeStoredCurrentSkillDeck(profile.getCurrentSkillDeck());
-    }
-
-    private String loadExCardId(CharacterProfile profile) {
-        if (loadoutService != null && profile.getId() != null) {
-            String exCardId = loadoutService.getExCardId(profile.getId());
-            if (exCardId != null && !exCardId.isBlank()) {
-                return exCardId;
-            }
-        }
-        return parseExCardId(profile.getExCard());
     }
 
     public List<OwnedCardDto> parseOwnedCardsJson(String raw) {
@@ -633,22 +588,6 @@ public class SessionLoadoutSupport {
         return new ResponseStatusException(BAD_REQUEST, "invalid persisted ownedCards payload: " + detail);
     }
 
-    private String parseExCardId(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        try {
-            JsonNode node = JSON.readTree(raw);
-            if (node == null || node.isNull()) return null;
-            if (node.isTextual()) {
-                String exId = node.asText("").trim();
-                return exId.isEmpty() ? null : exId;
-            }
-            String exId = node.path("id").asText("").trim();
-            return exId.isEmpty() ? null : exId;
-        } catch (Exception e) {
-            throw new ResponseStatusException(BAD_REQUEST, "character exCard JSON is invalid");
-        }
-    }
-
     private List<OwnedCardModifierDto> parseOwnedCardModifierDtos(JsonNode node) {
         if (node == null || !node.isArray()) {
             return List.of();
@@ -666,25 +605,6 @@ public class SessionLoadoutSupport {
             out.add(new OwnedCardModifierDto(modifierId, value));
         }
         return List.copyOf(out);
-    }
-
-    private String toCanonicalOwnedCardsJson(List<OwnedCard> ownedCards) {
-        ArrayNode out = JSON.createArrayNode();
-        for (OwnedCard ownedCard : ownedCards) {
-            ObjectNode node = out.addObject();
-            node.put("ownedCardId", ownedCard.ownedCardId());
-            node.put("cardId", ownedCard.cardId());
-            node.put("strengthened", ownedCard.strengthened());
-            node.put("weakened", ownedCard.weakened());
-            node.put("lockedInDeck", ownedCard.lockedInDeck());
-            ArrayNode modifiers = node.putArray("modifiers");
-            for (OwnedCardModifier modifier : ownedCard.modifiers()) {
-                ObjectNode modifierNode = modifiers.addObject();
-                modifierNode.put("modifierId", modifier.modifierId());
-                modifierNode.put("value", modifier.value());
-            }
-        }
-        return out.toString();
     }
 
     private Map<String, OwnedCard> ownedCardMap(List<OwnedCard> ownedCards) {
@@ -705,7 +625,7 @@ public class SessionLoadoutSupport {
 
     public record CharacterJoinTemplate(
             List<String> passiveIds,
-            List<String> currentSkillDeck,
+            List<String> currentSkillDeckOwnedCardIds,
             String exCardId,
             List<OwnedCardDto> ownedCards
     ) {}

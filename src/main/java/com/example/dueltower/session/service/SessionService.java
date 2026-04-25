@@ -1,8 +1,6 @@
 package com.example.dueltower.session.service;
 
 import com.example.dueltower.character.repository.CharacterProfileRepository;
-import com.example.dueltower.character.service.CharacterCurrentSkillDeckReadService;
-import com.example.dueltower.character.service.CharacterCurrentSkillDeckService;
 import com.example.dueltower.config.GameRules;
 import com.example.dueltower.config.RewardTableConfig;
 import com.example.dueltower.content.card.model.OwnedCard;
@@ -19,14 +17,22 @@ import com.example.dueltower.engine.config.EncounterTables;
 import com.example.dueltower.engine.config.RunConfigs;
 import com.example.dueltower.session.config.StarterLoadoutConfig;
 import com.example.dueltower.session.dto.OwnedCardDto;
+import com.example.dueltower.session.dto.OwnedCardModifierDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import com.example.dueltower.preset.service.PresetService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 /**
  * Compatibility surface for legacy tests that still reference {@code SessionService}.
@@ -39,14 +45,18 @@ import java.util.function.Function;
 @Deprecated(forRemoval = false)
 public class SessionService {
 
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private final SessionLoadoutSupport sessionLoadoutSupport;
     private final SessionLifecycleService sessionLifecycleService;
+    private final StarterLoadoutConfig starterLoadoutConfig;
 
     @Autowired
     public SessionService(SessionLoadoutSupport sessionLoadoutSupport,
                           SessionLifecycleService sessionLifecycleService) {
         this.sessionLoadoutSupport = sessionLoadoutSupport;
         this.sessionLifecycleService = sessionLifecycleService;
+        this.starterLoadoutConfig = null;
     }
 
     SessionService(CharacterProfileRepository characterProfileRepository,
@@ -66,20 +76,9 @@ public class SessionService {
                    EncounterTables encounterTables,
                    Duration sessionTtl,
                    Duration cleanupInterval) {
-        this(
-                new SessionLoadoutSupport(
-                        characterProfileRepository,
-                        new CharacterCurrentSkillDeckReadService(),
-                        new CharacterCurrentSkillDeckService(characterProfileRepository, deckService),
-                        null,
-                        null,
-                        cardService,
-                        passiveService,
-                        gameRules,
-                        starterLoadoutConfig
-                ),
-                null
-        );
+        this.sessionLoadoutSupport = null;
+        this.sessionLifecycleService = null;
+        this.starterLoadoutConfig = starterLoadoutConfig;
     }
 
     public <T> T withSessionLock(String code, Function<SessionRuntime, T> reader) {
@@ -91,14 +90,71 @@ public class SessionService {
 
     // Legacy reflection entry points kept for parsing-focused tests.
     private List<OwnedCard> parseOwnedCards(List<OwnedCardDto> ownedCardsRaw) {
-        return sessionLoadoutSupport.parseOwnedCards(ownedCardsRaw);
+        if (ownedCardsRaw == null || ownedCardsRaw.isEmpty()) {
+            return starterLoadoutConfig.defaultOwnedCards();
+        }
+        return SessionNormalizationSupport.normalizeOwnedCards(ownedCardsRaw);
     }
 
     private List<OwnedCardDto> parseOwnedCardsJson(String raw) {
-        return sessionLoadoutSupport.parseOwnedCardsJson(raw);
+        if (raw == null || raw.isBlank()) return List.of();
+        try {
+            List<JsonNode> nodes = JSON.readValue(raw, new TypeReference<>() {});
+            List<OwnedCardDto> out = new ArrayList<>();
+            for (int i = 0; i < nodes.size(); i++) {
+                JsonNode node = nodes.get(i);
+                if (node == null || node.isNull()) continue;
+                if (node.isTextual()) {
+                    String cardId = node.asText("").trim();
+                    if (!cardId.isEmpty()) out.add(new OwnedCardDto(null, cardId, List.of(), false, false, false, true, null));
+                    continue;
+                }
+                String cardId = node.path("cardId").asText("").trim();
+                if (cardId.isEmpty()) {
+                    throw invalidPersistedOwnedCards("entry[" + i + "] has missing cardId");
+                }
+                String ownedCardId = node.path("ownedCardId").asText("").trim();
+                out.add(new OwnedCardDto(
+                        ownedCardId.isEmpty() ? null : ownedCardId,
+                        cardId,
+                        parseOwnedCardModifierDtos(node.path("modifiers")),
+                        node.path("strengthened").asBoolean(false),
+                        node.path("weakened").asBoolean(false),
+                        node.path("lockedInDeck").asBoolean(false),
+                        true,
+                        null
+                ));
+            }
+            return List.copyOf(out);
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            throw invalidPersistedOwnedCards("malformed JSON");
+        }
     }
 
     private List<OwnedCardModifier> toOwnedCardModifiers(OwnedCardDto dto) {
-        return sessionLoadoutSupport.toOwnedCardModifiers(dto);
+        return SessionNormalizationSupport.normalizeOwnedCardModifiers(dto);
+    }
+
+    private static List<OwnedCardModifierDto> parseOwnedCardModifierDtos(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return List.of();
+        }
+        List<OwnedCardModifierDto> out = new ArrayList<>();
+        for (JsonNode modifierNode : node) {
+            if (modifierNode == null || modifierNode.isNull()) {
+                continue;
+            }
+            String modifierId = modifierNode.path("modifierId").asText("").trim();
+            if (!modifierId.isEmpty()) {
+                out.add(new OwnedCardModifierDto(modifierId, modifierNode.path("value").asInt(0)));
+            }
+        }
+        return List.copyOf(out);
+    }
+
+    private static ResponseStatusException invalidPersistedOwnedCards(String detail) {
+        return new ResponseStatusException(BAD_REQUEST, "invalid persisted ownedCards payload: " + detail);
     }
 }
