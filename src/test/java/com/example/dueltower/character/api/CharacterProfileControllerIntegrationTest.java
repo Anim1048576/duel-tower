@@ -1,5 +1,7 @@
 package com.example.dueltower.character.api;
 
+import com.example.dueltower.character.repository.CharacterOwnedCardModifierRepository;
+import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,7 +13,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -26,6 +30,12 @@ class CharacterProfileControllerIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private CharacterOwnedCardRepository ownedCardRepository;
+
+    @Autowired
+    private CharacterOwnedCardModifierRepository ownedCardModifierRepository;
 
     @Test
     @DisplayName("character create rejects direct currentSkillDeck writes")
@@ -319,6 +329,44 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.ownedCards").value(containsString("oc-update-1")))
                 .andExpect(jsonPath("$.ownedCards").value(containsString("C001")))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
+    }
+
+    @Test
+    @DisplayName("character delete removes owned cards and modifiers")
+    void deleteRemovesOwnedCardsAndModifiers() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterDeleteOwnedCards");
+        MvcResult createResult = mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "delete-owned-cards",
+                                """
+                                          "ownedCardList": [
+                                            {
+                                              "ownedCardId": "oc-delete-1",
+                                              "cardId": "C001",
+                                              "modifiers": [
+                                                { "modifierId": "STRENGTHENED", "value": 1 }
+                                              ],
+                                              "strengthened": false,
+                                              "weakened": false,
+                                              "lockedInDeck": false,
+                                              "forgettable": true
+                                            }
+                                          ],
+                                          "exCardId": ""
+                                        """
+                        )))
+                .andExpect(status().isOk())
+                .andReturn();
+        String characterId = extractJsonNumber(createResult.getResponse().getContentAsString(), "id");
+
+        mockMvc.perform(delete("/api/content/characters/{id}", characterId)
+                        .session(session))
+                .andExpect(status().isOk());
+
+        assertTrue(ownedCardRepository.findByCharacterId(Long.parseLong(characterId)).isEmpty());
+        assertTrue(ownedCardModifierRepository.findByOwnedCardId("oc-delete-1").isEmpty());
     }
 
     private String validCharacterBody(String name, String ownedCards) {

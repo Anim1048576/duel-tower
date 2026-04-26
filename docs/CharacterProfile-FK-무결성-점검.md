@@ -200,3 +200,80 @@ FK 도입 전에 보강할 테스트 후보:
 - `ex_card_id`를 DB FK로 연결하는 작업
 - `hiddenTraitIds` 정규화
 - API 응답 `ownedCards`/`exCard` 문자열 JSON 제거
+
+## 6회차 1차 적용 범위
+
+이번 회차에서는 Flyway를 도입하고, CharacterProfile 정규화 테이블 중 보유 카드 계열의 가장 안전한 FK/index만 migration으로 관리하기 시작한다.
+
+추가한 migration:
+
+- `src/main/resources/db/migration/V1__character_profile_owned_card_fk_indexes.sql`
+
+추가한 FK/index:
+
+- `ix_character_owned_cards_character_id`
+  - `character_owned_cards(character_id)`
+- `ix_character_owned_card_modifiers_owned_card_id`
+  - `character_owned_card_modifiers(owned_card_id)`
+- `fk_character_owned_cards_character`
+  - `character_owned_cards.character_id -> character_profiles.id`
+- `fk_character_owned_card_modifiers_owned_card`
+  - `character_owned_card_modifiers.owned_card_id -> character_owned_cards.owned_card_id`
+
+이번 회차에서 보류한 FK:
+
+- `character_ex_loadouts.character_id -> character_profiles.id`
+- `character_current_skill_deck_entries.character_id -> character_profiles.id`
+- `character_current_skill_deck_entries.owned_card_id -> character_owned_cards.owned_card_id`
+- current skill deck의 composite FK
+
+### Flyway 설정 메모
+
+기본/로컬 설정은 Flyway를 활성화하고 `ddl-auto=update`는 유지한다. 기존 Hibernate 생성 스키마에 migration을 적용하는 이행기이므로 `spring.flyway.baseline-on-migrate=true`, `spring.flyway.baseline-version=0`을 둔다.
+
+테스트 프로필은 `ddl-auto=create-drop`를 유지하고 Flyway를 비활성화한다. 이번 V1 migration은 Hibernate가 이미 만든 테이블에 `ALTER TABLE`로 FK/index를 추가하는 형태라, JPA보다 먼저 실행되는 Flyway와 테스트 create-drop 순서가 충돌할 수 있기 때문이다.
+
+새 DB를 처음 구성하는 경우에는 이번 migration만으로 전체 스키마를 만들 수 없다. 완전한 schema migration을 도입하기 전까지는 기존 Hibernate schema 생성 이력 위에 제약을 추가하는 전환 단계로 취급한다.
+
+### 적용 전 orphan 점검 SQL
+
+운영 DB에 migration을 적용하기 전에 아래 조회 결과가 비어 있는지 확인한다.
+
+없는 character profile을 참조하는 owned card:
+
+```sql
+SELECT oc.*
+FROM character_owned_cards oc
+LEFT JOIN character_profiles cp ON cp.id = oc.character_id
+WHERE cp.id IS NULL;
+```
+
+없는 owned card를 참조하는 modifier:
+
+```sql
+SELECT m.*
+FROM character_owned_card_modifiers m
+LEFT JOIN character_owned_cards oc ON oc.owned_card_id = m.owned_card_id
+WHERE oc.owned_card_id IS NULL;
+```
+
+orphan row가 발견되면 삭제 전에 해당 row가 실제로 복구 가능한 데이터인지 먼저 검토한다. 삭제 SQL은 운영 데이터 검토 후 별도 작업으로 작성한다.
+
+### 삭제 순서 호환성
+
+이번에 추가한 FK 기준으로 현재 삭제 순서는 호환된다.
+
+- `CharacterCardCollectionService.deleteOwnedCards(...)`
+  - `character_owned_card_modifiers`를 먼저 삭제한다.
+  - 이후 `character_owned_cards`를 삭제한다.
+- `CharacterProfileService.delete(...)`
+  - loadout을 먼저 삭제한다.
+  - owned cards/modifiers를 삭제한다.
+  - 마지막에 `character_profiles`를 삭제한다.
+
+### 다음 회차 후보
+
+- `character_ex_loadouts.character_id` FK
+- `character_current_skill_deck_entries.character_id` FK
+- `character_current_skill_deck_entries.owned_card_id` FK
+- `character_owned_cards(character_id, owned_card_id)` unique와 current skill deck composite FK 검토
