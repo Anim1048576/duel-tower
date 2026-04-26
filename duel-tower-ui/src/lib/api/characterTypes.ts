@@ -44,7 +44,9 @@ export type CharacterProfileRequest = {
   trait1: string | null
   trait2: string | null
   hiddenTraitIds: string[]
+  /** @deprecated Use ownedCardList for create/update requests. */
   ownedCards?: string
+  /** @deprecated Use exCardId for create/update requests. */
   exCard?: string
   ownedCardList?: OwnedCardRequest[]
   exCardId?: string | null

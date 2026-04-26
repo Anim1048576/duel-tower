@@ -25,4 +25,21 @@ public record CharacterProfileRequest(
         List<OwnedCardDto> ownedCardList,
         String exCardId
 ) {
+    /**
+     * @deprecated Legacy JSON string request field. Use ownedCardList for create/update requests.
+     */
+    @Deprecated
+    @Override
+    public String ownedCards() {
+        return ownedCards;
+    }
+
+    /**
+     * @deprecated Legacy JSON string request field. Use exCardId for create/update requests.
+     */
+    @Deprecated
+    @Override
+    public String exCard() {
+        return exCard;
+    }
 }

@@ -39,3 +39,17 @@ raw `currentSkillDeck`은 `CharacterProfile` create/update 요청으로 직접 �
 ## 리스크와 후속 과제
 
 현재 일부 정규화 테이블은 JPA 관계, FK, cascade가 강하게 모델링되어 있지 않고 서비스 레이어 검증과 테스트 cleanup에 의존한다. 다음 회차에서 DB migration, FK 정책, 삭제 순서, cascade 적용 여부를 별도로 검토해야 한다.
+
+## Create/Update request transition
+
+CharacterProfile create/update request is in a transition period.
+
+- Preferred request fields: `ownedCardList`, `exCardId`
+- Deprecated legacy request fields: `ownedCards`, `exCard`
+- Priority rule: `ownedCardList` wins over `ownedCards`, and `exCardId` wins over `exCard`.
+- Legacy request fields are still accepted for compatibility, but server logs a deprecation warning when those legacy paths are actually used.
+- If both new and legacy fields are sent, the new field is used and the legacy field is ignored.
+
+The response shape is not migrated yet. `CharacterProfileResponse.ownedCards` and `CharacterProfileResponse.exCard` remain string JSON compatibility fields.
+
+Before removing the legacy request fields, verify that frontend save paths use only `ownedCardList` and `exCardId`, and that external clients/tests no longer depend on `ownedCards` or `exCard` request input.

@@ -7,6 +7,8 @@ import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.dto.CombatStatsDto;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -21,6 +23,7 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 @Service
 public class CharacterProfileService {
 
+    private static final Logger log = LoggerFactory.getLogger(CharacterProfileService.class);
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String EMPTY_EX_CARD_JSON = "{}";
 
@@ -54,6 +57,7 @@ public class CharacterProfileService {
     @Transactional
     public CharacterProfileResponse create(CharacterProfileRequest req) {
         validateRequired(req);
+        warnIfLegacyLoadoutInputUsed(req);
 
         CharacterProfile profile = CharacterProfile.builder()
                 .name(req.name().trim())
@@ -81,6 +85,7 @@ public class CharacterProfileService {
     @Transactional
     public CharacterProfileResponse update(long id, CharacterProfileRequest req) {
         validateRequired(req);
+        warnIfLegacyLoadoutInputUsed(req);
 
         CharacterProfile profile = getByIdOrThrow(id);
         profile.setName(req.name().trim());
@@ -171,6 +176,7 @@ public class CharacterProfileService {
 
     private void replaceOwnedCards(Long characterId, CharacterProfileRequest req) {
         if (req.ownedCardList() != null) {
+            // New structured input wins. Legacy ownedCards is ignored when both are present.
             cardCollectionService.replaceOwnedCards(characterId, req.ownedCardList());
             return;
         }
@@ -179,6 +185,8 @@ public class CharacterProfileService {
 
     private void replaceExCard(Long characterId, CharacterProfileRequest req) {
         if (req.exCardId() != null) {
+            // New scalar input wins. Legacy exCard JSON is ignored when both are present.
+            // A blank exCardId explicitly clears the equipped EX card.
             String exCardId = req.exCardId().trim();
             if (exCardId.isEmpty()) {
                 loadoutService.clearExCard(characterId);
@@ -188,6 +196,35 @@ public class CharacterProfileService {
             return;
         }
         replaceExCardFromJson(characterId, req.exCard());
+    }
+
+    private static boolean usesLegacyOwnedCardsInput(CharacterProfileRequest req) {
+        return req.ownedCardList() == null;
+    }
+
+    private static boolean usesLegacyExCardInput(CharacterProfileRequest req) {
+        return req.exCardId() == null;
+    }
+
+    private static boolean usesLegacyLoadoutInput(CharacterProfileRequest req) {
+        return usesLegacyOwnedCardsInput(req) || usesLegacyExCardInput(req);
+    }
+
+    private static void warnIfLegacyLoadoutInputUsed(CharacterProfileRequest req) {
+        if (!usesLegacyLoadoutInput(req)) {
+            return;
+        }
+        List<String> fields = new java.util.ArrayList<>(2);
+        if (usesLegacyOwnedCardsInput(req)) {
+            fields.add("ownedCards");
+        }
+        if (usesLegacyExCardInput(req)) {
+            fields.add("exCard");
+        }
+        log.warn(
+                "Deprecated CharacterProfile request fields used: {}. Use ownedCardList/exCardId instead.",
+                String.join(", ", fields)
+        );
     }
 
     private void replaceExCardFromJson(Long characterId, String raw) {

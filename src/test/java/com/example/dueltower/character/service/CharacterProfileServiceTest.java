@@ -5,6 +5,7 @@ import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.domain.HiddenTraitIds;
 import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.session.dto.OwnedCardDto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -253,6 +254,57 @@ class CharacterProfileServiceTest {
     }
 
     @Test
+    @DisplayName("create: empty ownedCardList is valid without legacy ownedCards")
+    void createAcceptsEmptyStructuredOwnedCardListWithoutLegacyOwnedCards() {
+        stubProfileSave();
+        stubResponseReadModels("[]", List.of(), "{}");
+
+        service.create(validStructuredRequest(null, null, List.of(), ""));
+
+        ArgumentCaptor<List<OwnedCardDto>> captor = ArgumentCaptor.forClass(List.class);
+        verify(cardCollectionService).replaceOwnedCards(eq(1L), captor.capture());
+        assertTrue(captor.getValue().isEmpty());
+        verify(cardCollectionService, never()).replaceOwnedCardsFromJson(anyLong(), anyString());
+        verify(loadoutService).clearExCard(1L);
+    }
+
+    @Test
+    @DisplayName("update: structured loadout fields take precedence over legacy fields")
+    void structuredLoadoutFieldsTakePrecedenceOverLegacyFields() {
+        CharacterProfile existing = existingProfile();
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        stubResponseReadModels("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", List.of(), "{\"id\":\"EX901\"}");
+
+        OwnedCardDto ownedCard = new OwnedCardDto("oc-1", "C001", List.of(), false, false, false, true, null);
+        CharacterProfileRequest req = validStructuredRequest(
+                "[{\"cardId\":\"C002\"}]",
+                "{\"id\":\"C001\"}",
+                List.of(ownedCard),
+                "EX901"
+        );
+
+        service.update(1L, req);
+
+        verify(cardCollectionService).replaceOwnedCards(1L, List.of(ownedCard));
+        verify(cardCollectionService, never()).replaceOwnedCardsFromJson(anyLong(), anyString());
+        verify(loadoutService).replaceExCard(1L, "EX901");
+        verify(loadoutService, never()).clearExCard(anyLong());
+    }
+
+    @Test
+    @DisplayName("update: blank exCardId clears EX even when legacy exCard is present")
+    void blankExCardIdClearsExCardEvenWhenLegacyExCardIsPresent() {
+        CharacterProfile existing = existingProfile();
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        stubResponseReadModels("[]", List.of(), "{}");
+
+        service.update(1L, validStructuredRequest("[]", "{\"id\":\"EX901\"}", List.of(), "   "));
+
+        verify(loadoutService).clearExCard(1L);
+        verify(loadoutService, never()).replaceExCard(anyLong(), anyString());
+    }
+
+    @Test
     @DisplayName("applyDeckToCurrentSkillDeck: PLAYER 덱 count를 펼쳐 currentSkillDeck에 적용하고 detail 응답을 반환한다")
     void applyDeckToCurrentSkillDeckExpandsCountsAndReturnsCharacterDetail() {
         CharacterProfile existing = existingProfile();
@@ -405,6 +457,34 @@ class CharacterProfileServiceTest {
                 exCard,
                 null,
                 null
+        );
+    }
+
+    private static CharacterProfileRequest validStructuredRequest(
+            String ownedCards,
+            String exCard,
+            List<OwnedCardDto> ownedCardList,
+            String exCardId
+    ) {
+        return new CharacterProfileRequest(
+                "name",
+                CharacterGender.MALE,
+                20,
+                "wish",
+                "\uC9C8\uC11C/\uC120",
+                "oneLiner",
+                "story",
+                5,
+                5,
+                5,
+                5,
+                "trait1",
+                "trait2",
+                List.of(),
+                ownedCards,
+                exCard,
+                ownedCardList,
+                exCardId
         );
     }
 
