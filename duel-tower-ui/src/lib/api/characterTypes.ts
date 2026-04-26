@@ -27,6 +27,7 @@ export type CharacterProfileRequest = {
   willpower: number | null
   trait1: string | null
   trait2: string | null
+  hiddenTraitIds: string[]
   ownedCards: string
   exCard: string
 }
@@ -46,6 +47,7 @@ export type CharacterProfileResponse = {
   willpower: number
   trait1: string | null
   trait2: string | null
+  hiddenTraitIds: string[]
   ownedCards: string
   currentSkillDeckPreviewCardIds: string[]
   exCard: string
