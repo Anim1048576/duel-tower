@@ -28,6 +28,7 @@ public record CharacterProfileResponse(
         int willpower,
         String trait1,
         String trait2,
+        List<String> hiddenTraitIds,
         String ownedCards,
         List<String> currentSkillDeckPreviewCardIds,
         String exCard,
