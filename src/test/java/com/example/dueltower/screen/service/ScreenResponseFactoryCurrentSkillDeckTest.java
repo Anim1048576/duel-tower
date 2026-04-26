@@ -315,6 +315,7 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                 5,
                 null,
                 null,
+                List.of(),
                 ownedCards,
                 currentSkillDeck,
                 "{}",
