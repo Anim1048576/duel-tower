@@ -1669,9 +1669,6 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .willpower(10)
                 .trait1("P001")
                 .trait2(null)
-                .ownedCards("[]")
-                .currentSkillDeck(null)
-                .exCard("{}")
                 .build());
 
         characterCardCollectionService.replaceOwnedCardsFromJson(profile.getId(), ownedCardsJson);

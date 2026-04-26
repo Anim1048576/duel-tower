@@ -99,9 +99,6 @@ class CharacterCombatStatCalculatorTest {
                 .technique(technique)
                 .sense(sense)
                 .willpower(willpower)
-                .ownedCards("[]")
-                .currentSkillDeck(null)
-                .exCard("{}")
                 .build();
     }
 }

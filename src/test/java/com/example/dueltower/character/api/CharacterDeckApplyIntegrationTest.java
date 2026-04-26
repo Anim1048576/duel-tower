@@ -110,8 +110,6 @@ class CharacterDeckApplyIntegrationTest {
                 .andExpect(jsonPath("$.exCard").value("{}"))
                 .andExpect(jsonPath("$.combatStats.maxHp").exists());
 
-        CharacterProfile reloaded = characterProfileRepository.findById(character.getId()).orElseThrow();
-        assertEquals(null, reloaded.getCurrentSkillDeck());
         assertIterableEquals(List.of(
                 "oc-c001-1", "oc-c001-2", "oc-c001-3",
                 "oc-c002-1", "oc-c002-2", "oc-c002-3",
@@ -245,8 +243,6 @@ class CharacterDeckApplyIntegrationTest {
                                 """))
                 .andExpect(status().isOk());
 
-        CharacterProfile reloaded = characterProfileRepository.findById(character.getId()).orElseThrow();
-        assertEquals(null, reloaded.getCurrentSkillDeck());
         assertTrue(currentSkillDeckEntryRepository.findByCharacterId(character.getId()).isEmpty());
     }
 
@@ -371,9 +367,6 @@ class CharacterDeckApplyIntegrationTest {
                 .trait1("trait1")
                 .trait2("trait2")
                 .hiddenTraitIds(List.of())
-                .ownedCards("[]")
-                .currentSkillDeck(null)
-                .exCard("{}")
                 .build();
         CharacterProfile saved = characterProfileRepository.save(profile);
         cardCollectionService.replaceOwnedCardsFromJson(saved.getId(), ownedCards);

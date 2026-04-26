@@ -198,9 +198,6 @@ class CharacterProfileServiceTest {
         assertEquals("한줄소개", saved.getOneLiner());
         assertEquals("이야기", saved.getStory());
         assertEquals("질서/선", saved.getDisposition());
-        assertEquals("[]", saved.getOwnedCards());
-        assertEquals("{}", saved.getExCard());
-        assertNull(saved.getCurrentSkillDeck());
         verify(cardCollectionService).replaceOwnedCardsFromJson(1L, "[\"card-1\"]");
         verify(loadoutService).replaceExCard(1L, "ex-1");
     }
@@ -235,7 +232,6 @@ class CharacterProfileServiceTest {
     @DisplayName("update: ownedCards가 변경되면 stale currentSkillDeck와 미러 덱을 비운다")
     void updateClearsCurrentSkillDeckWhenOwnedCardsChanges() {
         CharacterProfile existing = existingProfile();
-        existing.setOwnedCards("[\"old-card\"]");
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         stubResponseReadModels("[\"new-card\"]", List.of(), "{}");
         when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn("[\"old-card\"]", "[\"new-card\"]");
@@ -425,9 +421,6 @@ class CharacterProfileServiceTest {
                 .trait1("trait1")
                 .trait2("trait2")
                 .hiddenTraitIds(List.of())
-                .ownedCards("[]")
-                .currentSkillDeck(null)
-                .exCard("{}")
                 .build();
     }
 

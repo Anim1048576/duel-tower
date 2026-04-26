@@ -423,9 +423,6 @@ class SessionPresetApplyIntegrationTest {
                 .willpower(10)
                 .trait1(trait1)
                 .trait2(trait2)
-                .ownedCards("[]")
-                .currentSkillDeck(List.of())
-                .exCard("{}")
                 .build());
 
         characterCardCollectionService.replaceOwnedCardsFromJson(profile.getId(), ownedCards);

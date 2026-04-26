@@ -27,8 +27,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static com.example.dueltower.support.CharacterLoadoutTestFixtures.EMPTY_EX_CARD_JSON;
-import static com.example.dueltower.support.CharacterLoadoutTestFixtures.EMPTY_OWNED_CARDS_JSON;
 import static com.example.dueltower.support.CharacterLoadoutTestFixtures.seedLoadout;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -416,9 +414,6 @@ class PresetControllerIntegrationTest {
                 .willpower(10)
                 .trait1("P001")
                 .trait2(null)
-                .ownedCards(EMPTY_OWNED_CARDS_JSON)
-                .currentSkillDeck(List.of())
-                .exCard(EMPTY_EX_CARD_JSON)
                 .build());
         seedLoadout(
                 characterCardCollectionService,

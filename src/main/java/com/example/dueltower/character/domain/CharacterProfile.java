@@ -65,25 +65,10 @@ public class CharacterProfile {
     @Column(length = 100)
     private String trait2;
 
-    /** 전체 비공개 히든 특성 태그 */
+    /** 전체 비공개가 되는 특성 태그 */
     @Convert(converter = ListStringJsonConverter.class)
     @Column(columnDefinition = "TEXT")
     private List<String> hiddenTraitIds;
-
-    /** 보유 카드 현황(JSON 문자열) */
-    @Lob
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String ownedCards;
-
-    /** 현재 스킬 덱 선택 목록(세션 runtime 에서는 ownedCardId 기준으로 정규화해서 사용) */
-    @Convert(converter = ListStringJsonConverter.class)
-    @Column(columnDefinition = "TEXT")
-    private List<String> currentSkillDeck;
-
-    /** EX 카드 정보(JSON 문자열) */
-    @Lob
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String exCard;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)

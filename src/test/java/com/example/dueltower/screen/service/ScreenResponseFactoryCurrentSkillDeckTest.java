@@ -346,9 +346,6 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                 .trait1(null)
                 .trait2(null)
                 .hiddenTraitIds(List.of())
-                .ownedCards(ownedCards)
-                .currentSkillDeck(currentSkillDeck)
-                .exCard("{}")
                 .build();
     }
 }

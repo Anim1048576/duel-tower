@@ -22,7 +22,6 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 public class CharacterProfileService {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String EMPTY_OWNED_CARDS_JSON = "[]";
     private static final String EMPTY_EX_CARD_JSON = "{}";
 
     private final CharacterProfileRepository repository;
@@ -71,9 +70,6 @@ public class CharacterProfileService {
                 .trait1(normalizeOptionalText(req.trait1()))
                 .trait2(normalizeOptionalText(req.trait2()))
                 .hiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()))
-                .ownedCards(EMPTY_OWNED_CARDS_JSON)
-                .currentSkillDeck(null)
-                .exCard(EMPTY_EX_CARD_JSON)
                 .build();
 
         CharacterProfile saved = repository.save(profile);
