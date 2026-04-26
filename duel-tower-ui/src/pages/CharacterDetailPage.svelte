@@ -5,6 +5,8 @@
     CharacterGender,
     CharacterProfileRequest,
     CharacterProfileResponse,
+    OwnedCardModifierRequest,
+    OwnedCardRequest,
   } from '../lib/api/characterTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
@@ -157,6 +159,130 @@
     return normalized ? normalized : null
   }
 
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+  }
+
+  function normalizeOptionalString(value: unknown) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null
+  }
+
+  function normalizeBoolean(value: unknown, fallback: boolean) {
+    return typeof value === 'boolean' ? value : fallback
+  }
+
+  function parseOwnedCardModifierInput(value: unknown, index: number, modifierIndex: number): OwnedCardModifierRequest {
+    if (!isRecord(value)) {
+      throw new Error(`Owned cards entry[${index}].modifiers[${modifierIndex}] must be an object.`)
+    }
+
+    const modifierId = normalizeOptionalString(value.modifierId)
+    if (!modifierId) {
+      throw new Error(`Owned cards entry[${index}].modifiers[${modifierIndex}].modifierId is required.`)
+    }
+
+    const rawValue = value.value
+    if (rawValue !== null && rawValue !== undefined && typeof rawValue !== 'number') {
+      throw new Error(`Owned cards entry[${index}].modifiers[${modifierIndex}].value must be a number or null.`)
+    }
+
+    return {
+      modifierId,
+      value: rawValue ?? null,
+    }
+  }
+
+  function parseOwnedCardsInput(raw: string): OwnedCardRequest[] {
+    const normalized = raw.trim()
+    if (!normalized) return []
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(normalized)
+    } catch {
+      throw new Error('Owned cards must be a JSON array.')
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new Error('Owned cards must be a JSON array.')
+    }
+
+    return parsed
+      .map((entry, index): OwnedCardRequest | null => {
+        if (typeof entry === 'string') {
+          const cardId = entry.trim()
+          if (!cardId) return null
+          return {
+            ownedCardId: null,
+            cardId,
+            modifiers: [],
+            strengthened: false,
+            weakened: false,
+            lockedInDeck: false,
+            forgettable: true,
+            notForgettableReason: null,
+          }
+        }
+
+        if (!isRecord(entry)) {
+          throw new Error(`Owned cards entry[${index}] must be a card id string or an object.`)
+        }
+
+        const cardId = normalizeOptionalString(entry.cardId)
+        if (!cardId) {
+          throw new Error(`Owned cards entry[${index}].cardId is required.`)
+        }
+
+        const rawModifiers = entry.modifiers
+        if (rawModifiers !== undefined && rawModifiers !== null && !Array.isArray(rawModifiers)) {
+          throw new Error(`Owned cards entry[${index}].modifiers must be an array.`)
+        }
+
+        return {
+          ownedCardId: normalizeOptionalString(entry.ownedCardId),
+          cardId,
+          modifiers: Array.isArray(rawModifiers)
+            ? rawModifiers.map((modifier, modifierIndex) =>
+                parseOwnedCardModifierInput(modifier, index, modifierIndex),
+              )
+            : [],
+          strengthened: normalizeBoolean(entry.strengthened, false),
+          weakened: normalizeBoolean(entry.weakened, false),
+          lockedInDeck: normalizeBoolean(entry.lockedInDeck, false),
+          forgettable: normalizeBoolean(entry.forgettable, true),
+          notForgettableReason: normalizeOptionalString(entry.notForgettableReason),
+        }
+      })
+      .filter((entry): entry is OwnedCardRequest => entry !== null)
+  }
+
+  function parseExCardInput(raw: string): string | null {
+    const normalized = raw.trim()
+    if (!normalized) return null
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(normalized)
+    } catch {
+      if (normalized.startsWith('{') || normalized.startsWith('[') || normalized.startsWith('"')) {
+        throw new Error('EX card must be {}, a JSON string, a JSON object with id, or a plain card id.')
+      }
+      return normalized
+    }
+
+    if (parsed === null) return null
+    if (typeof parsed === 'string') {
+      const value = parsed.trim()
+      return value || null
+    }
+    if (isRecord(parsed)) {
+      if (Object.keys(parsed).length === 0) return null
+      const id = normalizeOptionalString(parsed.id)
+      if (id) return id
+    }
+    throw new Error('EX card must be {}, a JSON string, a JSON object with id, or a plain card id.')
+  }
+
   function buildCharacterTags(form: CharacterFormState): DetailTag[] {
     const tags: DetailTag[] = [{ label: getGenderLabel(form.gender), tone: 'muted' }]
     const currentDeckCount = character?.currentSkillDeckPreviewCardIds?.length ?? 0
@@ -187,8 +313,9 @@
       willpower: parseNullableNumber(form.willpower),
       trait1: normalizeOptionalText(form.trait1),
       trait2: normalizeOptionalText(form.trait2),
-      ownedCards: form.ownedCards.trim(),
-      exCard: form.exCard.trim(),
+      hiddenTraitIds: [],
+      ownedCardList: parseOwnedCardsInput(form.ownedCards),
+      exCardId: parseExCardInput(form.exCard) ?? '',
     }
   }
 
@@ -593,12 +720,12 @@
             </div>
 
             <label class="detail-page__field detail-page__field--span-2">
-              <span>Owned cards</span>
+              <span>Owned cards JSON</span>
               <textarea bind:value={form.ownedCards} name="ownedCards" rows="5"></textarea>
             </label>
 
             <label class="detail-page__field detail-page__field--span-2">
-              <span>EX card</span>
+              <span>EX card id / JSON</span>
               <textarea bind:value={form.exCard} name="exCard" rows="4"></textarea>
             </label>
           </div>

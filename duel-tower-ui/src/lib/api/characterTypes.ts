@@ -13,6 +13,22 @@ export type CharacterCombatStats = {
 
 export type CharacterTimestampValue = string | number
 
+export type OwnedCardModifierRequest = {
+  modifierId: string
+  value: number | null
+}
+
+export type OwnedCardRequest = {
+  ownedCardId: string | null
+  cardId: string
+  modifiers: OwnedCardModifierRequest[]
+  strengthened: boolean | null
+  weakened: boolean | null
+  lockedInDeck: boolean | null
+  forgettable: boolean | null
+  notForgettableReason?: string | null
+}
+
 export type CharacterProfileRequest = {
   name: string
   gender: CharacterGender | null
@@ -28,8 +44,10 @@ export type CharacterProfileRequest = {
   trait1: string | null
   trait2: string | null
   hiddenTraitIds: string[]
-  ownedCards: string
-  exCard: string
+  ownedCards?: string
+  exCard?: string
+  ownedCardList?: OwnedCardRequest[]
+  exCardId?: string | null
 }
 
 export type CharacterProfileResponse = {
