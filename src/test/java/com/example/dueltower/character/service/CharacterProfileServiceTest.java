@@ -209,14 +209,12 @@ class CharacterProfileServiceTest {
     @DisplayName("update: profile 필드 저장 시 기존 currentSkillDeck를 유지한다")
     void updateKeepsExistingCurrentSkillDeckWhenSavingProfileFields() {
         CharacterProfile existing = existingProfile();
-        existing.setCurrentSkillDeck(List.of("old-1", "old-2"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(validRequestWithDisposition(existing.getDisposition()).ownedCards());
         stubResponseReadModels("[]", List.of("old-1", "old-2"), "{}");
 
         service.update(1L, validRequestWithDisposition(existing.getDisposition()));
 
-        assertIterableEquals(List.of("old-1", "old-2"), existing.getCurrentSkillDeck());
         verify(loadoutService, never()).clearCurrentSkillDeck(1L);
     }
 
@@ -224,14 +222,13 @@ class CharacterProfileServiceTest {
     @DisplayName("update: public profile 저장 경로는 currentSkillDeck를 변경하지 않는다")
     void updateDoesNotWriteCurrentSkillDeckThroughProfileSave() {
         CharacterProfile existing = existingProfile();
-        existing.setCurrentSkillDeck(List.of("old"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(validRequestWithDisposition(existing.getDisposition()).ownedCards());
         stubResponseReadModels("[]", List.of("old"), "{}");
 
         service.update(1L, validRequestWithDisposition(existing.getDisposition()));
 
-        assertIterableEquals(List.of("old"), existing.getCurrentSkillDeck());
+        verify(loadoutService, never()).replaceCurrentSkillDeckFromOwnedCardIds(any(), any());
     }
 
     @Test
@@ -239,7 +236,6 @@ class CharacterProfileServiceTest {
     void updateClearsCurrentSkillDeckWhenOwnedCardsChanges() {
         CharacterProfile existing = existingProfile();
         existing.setOwnedCards("[\"old-card\"]");
-        existing.setCurrentSkillDeck(List.of("old"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         stubResponseReadModels("[\"new-card\"]", List.of(), "{}");
         when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn("[\"old-card\"]", "[\"new-card\"]");
@@ -264,7 +260,6 @@ class CharacterProfileServiceTest {
     @DisplayName("applyDeckToCurrentSkillDeck: PLAYER 덱 count를 펼쳐 currentSkillDeck에 적용하고 detail 응답을 반환한다")
     void applyDeckToCurrentSkillDeckExpandsCountsAndReturnsCharacterDetail() {
         CharacterProfile existing = existingProfile();
-        existing.setCurrentSkillDeck(List.of("old"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         stubResponseReadModels("[]", List.of("C001", "C001", "C002", "C003"), "{}");
 
@@ -431,7 +426,7 @@ class CharacterProfileServiceTest {
                 .trait2("trait2")
                 .hiddenTraitIds(List.of())
                 .ownedCards("[]")
-                .currentSkillDeck(List.of("deck-1"))
+                .currentSkillDeck(null)
                 .exCard("{}")
                 .build();
     }

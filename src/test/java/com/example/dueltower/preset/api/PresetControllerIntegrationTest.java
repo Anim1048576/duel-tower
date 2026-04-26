@@ -3,6 +3,8 @@ package com.example.dueltower.preset.api;
 import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCardCollectionService;
+import com.example.dueltower.character.service.CharacterLoadoutService;
 import com.example.dueltower.member.MemberRepository;
 import com.example.dueltower.preset.repository.PresetRepository;
 import jakarta.servlet.http.HttpSession;
@@ -21,6 +23,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.EMPTY_EX_CARD_JSON;
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.EMPTY_OWNED_CARDS_JSON;
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.seedLoadout;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,6 +43,12 @@ class PresetControllerIntegrationTest {
 
     @Autowired
     private CharacterProfileRepository characterProfileRepository;
+
+    @Autowired
+    private CharacterCardCollectionService characterCardCollectionService;
+
+    @Autowired
+    private CharacterLoadoutService characterLoadoutService;
 
     @Autowired
     private PresetRepository presetRepository;
@@ -385,10 +396,18 @@ class PresetControllerIntegrationTest {
                 .willpower(10)
                 .trait1("P001")
                 .trait2(null)
-                .ownedCards("[\"C001\",\"C002\",\"C003\",\"EX901\"]")
-                .currentSkillDeck(List.of("C001", "C002", "C003"))
-                .exCard("{\"id\":\"EX901\"}")
+                .ownedCards(EMPTY_OWNED_CARDS_JSON)
+                .currentSkillDeck(List.of())
+                .exCard(EMPTY_EX_CARD_JSON)
                 .build());
+        seedLoadout(
+                characterCardCollectionService,
+                characterLoadoutService,
+                profile.getId(),
+                "[\"C001\",\"C002\",\"C003\",\"EX901\"]",
+                List.of("C001", "C002", "C003"),
+                "EX901"
+        );
         return profile.getId();
     }
 

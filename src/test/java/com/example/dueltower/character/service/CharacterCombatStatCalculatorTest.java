@@ -100,7 +100,7 @@ class CharacterCombatStatCalculatorTest {
                 .sense(sense)
                 .willpower(willpower)
                 .ownedCards("[]")
-                .currentSkillDeck(List.of())
+                .currentSkillDeck(null)
                 .exCard("{}")
                 .build();
     }

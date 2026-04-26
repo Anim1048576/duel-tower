@@ -3,6 +3,8 @@ package com.example.dueltower.session.api;
 import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCardCollectionService;
+import com.example.dueltower.character.service.CharacterLoadoutService;
 import com.example.dueltower.member.MemberRepository;
 import com.example.dueltower.preset.domain.Preset;
 import com.example.dueltower.preset.repository.PresetRepository;
@@ -24,6 +26,9 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.EMPTY_EX_CARD_JSON;
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.EMPTY_OWNED_CARDS_JSON;
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.seedLoadout;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,6 +49,12 @@ class SessionManagementIntegrationTest {
 
     @Autowired
     private CharacterProfileRepository characterProfileRepository;
+
+    @Autowired
+    private CharacterCardCollectionService characterCardCollectionService;
+
+    @Autowired
+    private CharacterLoadoutService characterLoadoutService;
 
     @Autowired
     private PresetRepository presetRepository;
@@ -269,10 +280,18 @@ class SessionManagementIntegrationTest {
                 .willpower(10)
                 .trait1("P001")
                 .trait2("P002")
-                .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
-                .currentSkillDeck(List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"))
-                .exCard("{\"id\":\"EX901\"}")
+                .ownedCards(EMPTY_OWNED_CARDS_JSON)
+                .currentSkillDeck(List.of())
+                .exCard(EMPTY_EX_CARD_JSON)
                 .build());
+        seedLoadout(
+                characterCardCollectionService,
+                characterLoadoutService,
+                profile.getId(),
+                "[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]",
+                List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"),
+                "EX901"
+        );
 
         mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout", info.code(), "player1")
                         .header("X-Player-Token", playerToken)
@@ -561,10 +580,18 @@ class SessionManagementIntegrationTest {
                 .willpower(10)
                 .trait1("P001")
                 .trait2("P002")
-                .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
-                .currentSkillDeck(List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"))
-                .exCard("{\"id\":\"EX901\"}")
+                .ownedCards(EMPTY_OWNED_CARDS_JSON)
+                .currentSkillDeck(List.of())
+                .exCard(EMPTY_EX_CARD_JSON)
                 .build());
+        seedLoadout(
+                characterCardCollectionService,
+                characterLoadoutService,
+                profile.getId(),
+                "[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]",
+                List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"),
+                "EX901"
+        );
         Preset preset = presetRepository.save(Preset.create(
                 "player1",
                 "세션 적용 프리셋",
@@ -617,10 +644,18 @@ class SessionManagementIntegrationTest {
                 .willpower(10)
                 .trait1("P001")
                 .trait2(null)
-                .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
-                .currentSkillDeck(List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"))
-                .exCard("{\"id\":\"EX901\"}")
+                .ownedCards(EMPTY_OWNED_CARDS_JSON)
+                .currentSkillDeck(List.of())
+                .exCard(EMPTY_EX_CARD_JSON)
                 .build());
+        seedLoadout(
+                characterCardCollectionService,
+                characterLoadoutService,
+                profile.getId(),
+                "[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]",
+                List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"),
+                "EX901"
+        );
         Preset foreignPreset = presetRepository.save(Preset.create(
                 "player2",
                 "player2 preset",

@@ -3,6 +3,8 @@ package com.example.dueltower.session.api;
 import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterCardCollectionService;
+import com.example.dueltower.character.service.CharacterLoadoutService;
 import com.example.dueltower.member.MemberRepository;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +24,9 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.UUID;
 
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.EMPTY_EX_CARD_JSON;
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.EMPTY_OWNED_CARDS_JSON;
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.seedLoadout;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.hamcrest.Matchers.containsString;
@@ -43,6 +48,12 @@ class SessionCommandAuthIntegrationTest {
 
     @Autowired
     private CharacterProfileRepository characterProfileRepository;
+
+    @Autowired
+    private CharacterCardCollectionService characterCardCollectionService;
+
+    @Autowired
+    private CharacterLoadoutService characterLoadoutService;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -572,10 +583,18 @@ class SessionCommandAuthIntegrationTest {
                 .willpower(10)
                 .trait1("P001")
                 .trait2(null)
-                .ownedCards("[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]")
+                .ownedCards(EMPTY_OWNED_CARDS_JSON)
                 .currentSkillDeck(List.of())
-                .exCard("{\"id\":\"EX901\"}")
+                .exCard(EMPTY_EX_CARD_JSON)
                 .build());
+        seedLoadout(
+                characterCardCollectionService,
+                characterLoadoutService,
+                profile.getId(),
+                "[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]",
+                List.of(),
+                "EX901"
+        );
         return profile.getId();
     }
 
