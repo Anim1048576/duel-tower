@@ -146,6 +146,7 @@ public class CharacterProfileService {
                 profile.getWillpower(),
                 profile.getTrait1(),
                 profile.getTrait2(),
+                normalizeHiddenTraitIds(profile.getHiddenTraitIds()),
                 cardCollectionService.toOwnedCardsJson(profile.getId()),
                 loadoutService.getCurrentSkillDeckPreviewCardIds(profile.getId()),
                 toExCardJson(loadoutService.getExCardId(profile.getId())),
