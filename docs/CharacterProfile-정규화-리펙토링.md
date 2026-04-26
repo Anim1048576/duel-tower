@@ -53,3 +53,7 @@ CharacterProfile create/update request is in a transition period.
 The response shape is not migrated yet. `CharacterProfileResponse.ownedCards` and `CharacterProfileResponse.exCard` remain string JSON compatibility fields.
 
 Before removing the legacy request fields, verify that frontend save paths use only `ownedCardList` and `exCardId`, and that external clients/tests no longer depend on `ownedCards` or `exCard` request input.
+
+## Related checks
+
+- [CharacterProfile FK/Integrity Check](./CharacterProfile-FK-무결성-점검.md)
