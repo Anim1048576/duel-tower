@@ -74,10 +74,46 @@ class CharacterProfileControllerIntegrationTest {
                         .content(validCharacterBody("created-name", "[]")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("created-name"))
+                .andExpect(jsonPath("$.hiddenTraitIds").isEmpty())
                 .andExpect(jsonPath("$.ownedCards").value("[]"))
                 .andExpect(jsonPath("$.exCard").value("{}"))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
+    }
+
+    @Test
+    @DisplayName("character create/update/read responses preserve hiddenTraitIds")
+    void createUpdateReadPreservesHiddenTraitIds() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterHiddenTraitsPreserved");
+
+        MvcResult createResult = mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCharacterBody("hidden-before", "[]", "[\"HT001\", \"HT002\"]")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hiddenTraitIds.length()").value(2))
+                .andExpect(jsonPath("$.hiddenTraitIds[0]").value("HT001"))
+                .andExpect(jsonPath("$.hiddenTraitIds[1]").value("HT002"))
+                .andReturn();
+        String characterId = extractJsonNumber(createResult.getResponse().getContentAsString(), "id");
+
+        mockMvc.perform(put("/api/content/characters/{id}", characterId)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCharacterBody("hidden-after", "[]", "[\"HT001\", \"HT002\"]")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("hidden-after"))
+                .andExpect(jsonPath("$.hiddenTraitIds.length()").value(2))
+                .andExpect(jsonPath("$.hiddenTraitIds[0]").value("HT001"))
+                .andExpect(jsonPath("$.hiddenTraitIds[1]").value("HT002"));
+
+        mockMvc.perform(get("/api/content/characters/{id}", characterId)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("hidden-after"))
+                .andExpect(jsonPath("$.hiddenTraitIds.length()").value(2))
+                .andExpect(jsonPath("$.hiddenTraitIds[0]").value("HT001"))
+                .andExpect(jsonPath("$.hiddenTraitIds[1]").value("HT002"));
     }
 
     @Test
@@ -98,6 +134,7 @@ class CharacterProfileControllerIntegrationTest {
                         .content(validCharacterBody("after-name", "[{\\\"cardId\\\":\\\"C001\\\"}]")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("after-name"))
+                .andExpect(jsonPath("$.hiddenTraitIds").isEmpty())
                 .andExpect(jsonPath("$.ownedCards").isString())
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
@@ -106,12 +143,17 @@ class CharacterProfileControllerIntegrationTest {
                         .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("after-name"))
+                .andExpect(jsonPath("$.hiddenTraitIds").isEmpty())
                 .andExpect(jsonPath("$.ownedCards").isString())
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
     }
 
     private String validCharacterBody(String name, String ownedCards) {
+        return validCharacterBody(name, ownedCards, "[]");
+    }
+
+    private String validCharacterBody(String name, String ownedCards, String hiddenTraitIdsJson) {
         return """
                 {
                   "name": "%s",
@@ -127,11 +169,11 @@ class CharacterProfileControllerIntegrationTest {
                   "willpower": 5,
                   "trait1": "trait1",
                   "trait2": "trait2",
-                  "hiddenTraitIds": [],
+                  "hiddenTraitIds": %s,
                   "ownedCards": "%s",
                   "exCard": "{}"
                 }
-                """.formatted(name, ownedCards);
+                """.formatted(name, hiddenTraitIdsJson, ownedCards);
     }
 
     private String extractJsonNumber(String json, String key) {
