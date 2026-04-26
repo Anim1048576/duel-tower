@@ -95,6 +95,107 @@ class CharacterProfileControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("character create accepts structured ownedCardList without legacy ownedCards")
+    void createAcceptsStructuredOwnedCardListWithoutLegacyOwnedCards() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterCreateStructuredOwned");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "structured-owned-create",
+                                """
+                                          "ownedCardList": [
+                                            {
+                                              "ownedCardId": "oc-1",
+                                              "cardId": "C001",
+                                              "modifiers": [],
+                                              "strengthened": false,
+                                              "weakened": false,
+                                              "lockedInDeck": false,
+                                              "forgettable": true
+                                            }
+                                          ],
+                                          "exCard": "{}"
+                                        """
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownedCards").isString())
+                .andExpect(jsonPath("$.ownedCards").value(containsString("oc-1")))
+                .andExpect(jsonPath("$.ownedCards").value(containsString("C001")));
+    }
+
+    @Test
+    @DisplayName("character create accepts exCardId without legacy exCard")
+    void createAcceptsExCardIdWithoutLegacyExCard() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterCreateStructuredEx");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "structured-ex-create",
+                                """
+                                          "ownedCards": "[]",
+                                          "exCardId": "EX901"
+                                        """
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exCard").value("{\"id\":\"EX901\"}"));
+    }
+
+    @Test
+    @DisplayName("structured ownedCardList takes precedence over legacy ownedCards")
+    void structuredOwnedCardListTakesPrecedenceOverLegacyOwnedCards() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterStructuredOwnedPrecedence");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "structured-owned-precedence",
+                                """
+                                          "ownedCards": "[{\\"cardId\\":\\"C002\\"}]",
+                                          "ownedCardList": [
+                                            {
+                                              "ownedCardId": "oc-precedence",
+                                              "cardId": "C001",
+                                              "modifiers": [],
+                                              "strengthened": false,
+                                              "weakened": false,
+                                              "lockedInDeck": false,
+                                              "forgettable": true
+                                            }
+                                          ],
+                                          "exCard": "{}"
+                                        """
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownedCards").value(containsString("C001")))
+                .andExpect(jsonPath("$.ownedCards").value(org.hamcrest.Matchers.not(containsString("C002"))));
+    }
+
+    @Test
+    @DisplayName("exCardId takes precedence over legacy exCard")
+    void exCardIdTakesPrecedenceOverLegacyExCard() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterExPrecedence");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "structured-ex-precedence",
+                                """
+                                          "ownedCards": "[]",
+                                          "exCard": "{\\"id\\":\\"C001\\"}",
+                                          "exCardId": "EX901"
+                                        """
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exCard").value("{\"id\":\"EX901\"}"));
+    }
+
+    @Test
     @DisplayName("character create/update/read responses preserve hiddenTraitIds")
     void createUpdateReadPreservesHiddenTraitIds() throws Exception {
         MockHttpSession session = signUpAndLogin("characterHiddenTraitsPreserved");
@@ -182,6 +283,44 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(content().string(containsString("exCardId must reference an EX card: C001")));
     }
 
+    @Test
+    @DisplayName("character update accepts structured ownedCardList")
+    void updateAcceptsStructuredOwnedCardList() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterUpdateStructuredOwned");
+        MvcResult createResult = mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCharacterBody("before-structured-owned-update", "[]")))
+                .andExpect(status().isOk())
+                .andReturn();
+        String characterId = extractJsonNumber(createResult.getResponse().getContentAsString(), "id");
+
+        mockMvc.perform(put("/api/content/characters/{id}", characterId)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "after-structured-owned-update",
+                                """
+                                          "ownedCardList": [
+                                            {
+                                              "ownedCardId": "oc-update-1",
+                                              "cardId": "C001",
+                                              "modifiers": [],
+                                              "strengthened": false,
+                                              "weakened": false,
+                                              "lockedInDeck": false,
+                                              "forgettable": true
+                                            }
+                                          ],
+                                          "exCard": "{}"
+                                        """
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownedCards").value(containsString("oc-update-1")))
+                .andExpect(jsonPath("$.ownedCards").value(containsString("C001")))
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
+    }
+
     private String validCharacterBody(String name, String ownedCards) {
         return validCharacterBody(name, ownedCards, "[]");
     }
@@ -191,6 +330,17 @@ class CharacterProfileControllerIntegrationTest {
     }
 
     private String validCharacterBody(String name, String ownedCards, String hiddenTraitIdsJson, String exCard) {
+        return characterBodyWithLoadoutFields(name, hiddenTraitIdsJson, """
+                  "ownedCards": "%s",
+                  "exCard": "%s"
+                """.formatted(ownedCards, exCard));
+    }
+
+    private String characterBodyWithLoadoutFields(String name, String loadoutFields) {
+        return characterBodyWithLoadoutFields(name, "[]", loadoutFields);
+    }
+
+    private String characterBodyWithLoadoutFields(String name, String hiddenTraitIdsJson, String loadoutFields) {
         return """
                 {
                   "name": "%s",
@@ -207,10 +357,9 @@ class CharacterProfileControllerIntegrationTest {
                   "trait1": "trait1",
                   "trait2": "trait2",
                   "hiddenTraitIds": %s,
-                  "ownedCards": "%s",
-                  "exCard": "%s"
+                %s
                 }
-                """.formatted(name, hiddenTraitIdsJson, ownedCards, exCard);
+                """.formatted(name, hiddenTraitIdsJson, loadoutFields);
     }
 
     private String extractJsonNumber(String json, String key) {

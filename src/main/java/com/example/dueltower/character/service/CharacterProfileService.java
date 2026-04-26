@@ -73,8 +73,8 @@ public class CharacterProfileService {
                 .build();
 
         CharacterProfile saved = repository.save(profile);
-        cardCollectionService.replaceOwnedCardsFromJson(saved.getId(), req.ownedCards().trim());
-        replaceExCardFromJson(saved.getId(), req.exCard());
+        replaceOwnedCards(saved.getId(), req);
+        replaceExCard(saved.getId(), req);
         return toResponse(saved);
     }
 
@@ -97,13 +97,12 @@ public class CharacterProfileService {
         profile.setTrait1(normalizeOptionalText(req.trait1()));
         profile.setTrait2(normalizeOptionalText(req.trait2()));
         profile.setHiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()));
-        String ownedCards = req.ownedCards().trim();
-        boolean ownedCardsChanged = !ownedCards.equals(cardCollectionService.toOwnedCardsJson(id));
-        cardCollectionService.replaceOwnedCardsFromJson(id, ownedCards);
+        boolean ownedCardsChanged = ownedCardsChanged(id, req);
+        replaceOwnedCards(id, req);
         if (ownedCardsChanged) {
             loadoutService.clearCurrentSkillDeck(id);
         }
-        replaceExCardFromJson(id, req.exCard());
+        replaceExCard(id, req);
         return toResponse(profile);
     }
 
@@ -161,6 +160,36 @@ public class CharacterProfileService {
         );
     }
 
+    private boolean ownedCardsChanged(Long characterId, CharacterProfileRequest req) {
+        if (req.ownedCardList() != null) {
+            // Structured input can serialize differently from the legacy JSON string, so clear safely for this phase.
+            return true;
+        }
+        String ownedCards = req.ownedCards().trim();
+        return !ownedCards.equals(cardCollectionService.toOwnedCardsJson(characterId));
+    }
+
+    private void replaceOwnedCards(Long characterId, CharacterProfileRequest req) {
+        if (req.ownedCardList() != null) {
+            cardCollectionService.replaceOwnedCards(characterId, req.ownedCardList());
+            return;
+        }
+        cardCollectionService.replaceOwnedCardsFromJson(characterId, req.ownedCards().trim());
+    }
+
+    private void replaceExCard(Long characterId, CharacterProfileRequest req) {
+        if (req.exCardId() != null) {
+            String exCardId = req.exCardId().trim();
+            if (exCardId.isEmpty()) {
+                loadoutService.clearExCard(characterId);
+                return;
+            }
+            loadoutService.replaceExCard(characterId, exCardId);
+            return;
+        }
+        replaceExCardFromJson(characterId, req.exCard());
+    }
+
     private void replaceExCardFromJson(Long characterId, String raw) {
         String exCardId = parseExCardId(raw);
         if (exCardId == null) {
@@ -216,8 +245,12 @@ public class CharacterProfileService {
         requireNumber(req.willpower(), "willpower is required");
         validateTraits(req.trait1(), req.trait2());
         validateHiddenTraits(req.hiddenTraitIds());
-        requireText(req.ownedCards(), "ownedCards is required");
-        requireText(req.exCard(), "exCard is required");
+        if (req.ownedCardList() == null) {
+            requireText(req.ownedCards(), "ownedCards is required");
+        }
+        if (req.exCardId() == null) {
+            requireText(req.exCard(), "exCard is required");
+        }
     }
 
 

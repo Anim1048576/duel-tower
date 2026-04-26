@@ -1,6 +1,7 @@
 package com.example.dueltower.character.dto;
 
 import com.example.dueltower.character.domain.CharacterGender;
+import com.example.dueltower.session.dto.OwnedCardDto;
 
 import java.util.List;
 
@@ -20,6 +21,8 @@ public record CharacterProfileRequest(
         String trait2,
         List<String> hiddenTraitIds,
         String ownedCards,
-        String exCard
+        String exCard,
+        List<OwnedCardDto> ownedCardList,
+        String exCardId
 ) {
 }

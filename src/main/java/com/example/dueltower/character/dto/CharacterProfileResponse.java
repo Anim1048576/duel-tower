@@ -13,8 +13,10 @@ import java.sql.Timestamp;
  * ownedCardId-based rows in CharacterCurrentSkillDeckEntry, and this response exposes only
  * currentSkillDeckPreviewCardIds for UI display.</p>
  *
- * <p>ownedCards and exCard remain string JSON fields for API compatibility. Their persistence source of
- * truth is CharacterOwnedCard/CharacterOwnedCardModifier and CharacterExLoadout, not CharacterProfile.</p>
+ * <p>ownedCards and exCard remain string JSON fields for API compatibility. CharacterProfileRequest also
+ * accepts structured ownedCardList/exCardId inputs, but the response shape remains this compatibility
+ * format. Their persistence source of truth is CharacterOwnedCard/CharacterOwnedCardModifier and
+ * CharacterExLoadout, not CharacterProfile.</p>
  */
 public record CharacterProfileResponse(
         Long id,

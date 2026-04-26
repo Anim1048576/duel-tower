@@ -357,7 +357,9 @@ class CharacterProfileServiceTest {
                 trait2,
                 List.of(),
                 "[]",
-                "{}"
+                "{}",
+                null,
+                null
         );
     }
 
@@ -400,7 +402,9 @@ class CharacterProfileServiceTest {
                 "trait2",
                 hiddenTraitIds,
                 ownedCards,
-                exCard
+                exCard,
+                null,
+                null
         );
     }
 
