@@ -82,6 +82,19 @@ class CharacterProfileControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("character create rejects unknown exCard id")
+    void createRejectsUnknownExCardId() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterCreateUnknownEx");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCharacterBody("invalid-ex-create", "[]", "[]", "{\\\"id\\\":\\\"NO_SUCH_CARD\\\"}")))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("invalid exCardId: NO_SUCH_CARD")));
+    }
+
+    @Test
     @DisplayName("character create/update/read responses preserve hiddenTraitIds")
     void createUpdateReadPreservesHiddenTraitIds() throws Exception {
         MockHttpSession session = signUpAndLogin("characterHiddenTraitsPreserved");
@@ -149,11 +162,35 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
     }
 
+    @Test
+    @DisplayName("character update rejects non-EX exCard id")
+    void updateRejectsNonExCardId() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterUpdateNonEx");
+        MvcResult createResult = mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCharacterBody("before-invalid-ex", "[]")))
+                .andExpect(status().isOk())
+                .andReturn();
+        String characterId = extractJsonNumber(createResult.getResponse().getContentAsString(), "id");
+
+        mockMvc.perform(put("/api/content/characters/{id}", characterId)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCharacterBody("after-invalid-ex", "[]", "[]", "{\\\"id\\\":\\\"C001\\\"}")))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("exCardId must reference an EX card: C001")));
+    }
+
     private String validCharacterBody(String name, String ownedCards) {
         return validCharacterBody(name, ownedCards, "[]");
     }
 
     private String validCharacterBody(String name, String ownedCards, String hiddenTraitIdsJson) {
+        return validCharacterBody(name, ownedCards, hiddenTraitIdsJson, "{}");
+    }
+
+    private String validCharacterBody(String name, String ownedCards, String hiddenTraitIdsJson, String exCard) {
         return """
                 {
                   "name": "%s",
@@ -171,9 +208,9 @@ class CharacterProfileControllerIntegrationTest {
                   "trait2": "trait2",
                   "hiddenTraitIds": %s,
                   "ownedCards": "%s",
-                  "exCard": "{}"
+                  "exCard": "%s"
                 }
-                """.formatted(name, hiddenTraitIdsJson, ownedCards);
+                """.formatted(name, hiddenTraitIdsJson, ownedCards, exCard);
     }
 
     private String extractJsonNumber(String json, String key) {

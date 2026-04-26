@@ -5,7 +5,12 @@ import com.example.dueltower.character.domain.CharacterExLoadout;
 import com.example.dueltower.character.repository.CharacterCurrentSkillDeckEntryRepository;
 import com.example.dueltower.character.repository.CharacterExLoadoutRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
+import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.deck.service.DeckService;
+import com.example.dueltower.engine.model.CardDefinition;
+import com.example.dueltower.engine.model.CardType;
+import com.example.dueltower.engine.model.Ids.CardDefId;
+import com.example.dueltower.engine.model.Zone;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -15,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,6 +42,9 @@ class CharacterLoadoutServiceTest {
 
     @Mock
     private DeckService deckService;
+
+    @Mock
+    private CardService cardService;
 
     @InjectMocks
     private CharacterLoadoutService service;
@@ -99,17 +108,56 @@ class CharacterLoadoutServiceTest {
 
     @Test
     void replaceExCardSavesAndGetExCardIdReads() {
+        when(cardService.asMap()).thenReturn(cardDefinitions());
         when(exLoadoutRepository.findById(1L)).thenReturn(Optional.empty(), Optional.of(
-                CharacterExLoadout.builder().characterId(1L).exCardId("EX001").build()
+                CharacterExLoadout.builder().characterId(1L).exCardId("EX901").build()
         ));
 
-        service.replaceExCard(1L, " EX001 ");
+        service.replaceExCard(1L, " EX901 ");
 
         ArgumentCaptor<CharacterExLoadout> captor = ArgumentCaptor.forClass(CharacterExLoadout.class);
         verify(exLoadoutRepository).save(captor.capture());
         assertEquals(1L, captor.getValue().getCharacterId());
-        assertEquals("EX001", captor.getValue().getExCardId());
-        assertEquals("EX001", service.getExCardId(1L));
+        assertEquals("EX901", captor.getValue().getExCardId());
+        assertEquals("EX901", service.getExCardId(1L));
+    }
+
+    @Test
+    void replaceExCardTrimsAndSavesValidExCard() {
+        when(cardService.asMap()).thenReturn(cardDefinitions());
+        when(exLoadoutRepository.findById(1L)).thenReturn(Optional.of(
+                CharacterExLoadout.builder().characterId(1L).exCardId("OLD_EX").build()
+        ));
+
+        service.replaceExCard(1L, " EX901 ");
+
+        ArgumentCaptor<CharacterExLoadout> captor = ArgumentCaptor.forClass(CharacterExLoadout.class);
+        verify(exLoadoutRepository).save(captor.capture());
+        assertEquals("EX901", captor.getValue().getExCardId());
+    }
+
+    @Test
+    void replaceExCardRejectsUnknownCardId() {
+        when(cardService.asMap()).thenReturn(cardDefinitions());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.replaceExCard(1L, "UNKNOWN"));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertEquals("400 BAD_REQUEST \"invalid exCardId: UNKNOWN\"", ex.getMessage());
+        verify(exLoadoutRepository, never()).save(any());
+    }
+
+    @Test
+    void replaceExCardRejectsNonExCardId() {
+        when(cardService.asMap()).thenReturn(cardDefinitions());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.replaceExCard(1L, "C001"));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertEquals("400 BAD_REQUEST \"exCardId must reference an EX card: C001\"", ex.getMessage());
+        verify(exLoadoutRepository, never()).save(any());
     }
 
     @Test
@@ -160,6 +208,17 @@ class CharacterLoadoutServiceTest {
                 .ownedCardId(ownedCardId)
                 .position(position)
                 .build();
+    }
+
+    private static Map<CardDefId, CardDefinition> cardDefinitions() {
+        return Map.of(
+                new CardDefId("EX901"), cardDefinition("EX901", CardType.EX),
+                new CardDefId("C001"), cardDefinition("C001", CardType.SKILL)
+        );
+    }
+
+    private static CardDefinition cardDefinition(String id, CardType type) {
+        return new CardDefinition(new CardDefId(id), id, type, 1, Map.of(), Zone.GRAVE, false, id);
     }
 
     @SuppressWarnings("unchecked")

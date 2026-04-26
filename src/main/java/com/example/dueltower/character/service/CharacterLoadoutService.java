@@ -5,7 +5,11 @@ import com.example.dueltower.character.domain.CharacterExLoadout;
 import com.example.dueltower.character.repository.CharacterCurrentSkillDeckEntryRepository;
 import com.example.dueltower.character.repository.CharacterExLoadoutRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
+import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.deck.service.DeckService;
+import com.example.dueltower.engine.model.CardDefinition;
+import com.example.dueltower.engine.model.CardType;
+import com.example.dueltower.engine.model.Ids.CardDefId;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -26,15 +30,18 @@ public class CharacterLoadoutService {
     private final CharacterExLoadoutRepository exLoadoutRepository;
     private final CharacterCardCollectionService cardCollectionService;
     private final DeckService deckService;
+    private final CardService cardService;
 
     public CharacterLoadoutService(CharacterCurrentSkillDeckEntryRepository currentSkillDeckEntryRepository,
                                    CharacterExLoadoutRepository exLoadoutRepository,
                                    CharacterCardCollectionService cardCollectionService,
-                                   DeckService deckService) {
+                                   DeckService deckService,
+                                   CardService cardService) {
         this.currentSkillDeckEntryRepository = currentSkillDeckEntryRepository;
         this.exLoadoutRepository = exLoadoutRepository;
         this.cardCollectionService = cardCollectionService;
         this.deckService = deckService;
+        this.cardService = cardService;
     }
 
     @Transactional
@@ -89,6 +96,7 @@ public class CharacterLoadoutService {
     public void replaceExCard(Long characterId, String exCardId) {
         requireCharacterId(characterId);
         String normalized = requireText(exCardId, "exCardId is required");
+        validateExCardId(normalized);
 
         CharacterExLoadout loadout = exLoadoutRepository.findById(characterId)
                 .orElseGet(() -> CharacterExLoadout.builder()
@@ -136,6 +144,16 @@ public class CharacterLoadoutService {
             if (!cardCollectionService.hasOwnedCard(characterId, ownedCardId)) {
                 throw new ResponseStatusException(BAD_REQUEST, "owned card unavailable: " + ownedCardId);
             }
+        }
+    }
+
+    private void validateExCardId(String exCardId) {
+        CardDefinition definition = cardService.asMap().get(new CardDefId(exCardId));
+        if (definition == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "invalid exCardId: " + exCardId);
+        }
+        if (definition.type() != CardType.EX) {
+            throw new ResponseStatusException(BAD_REQUEST, "exCardId must reference an EX card: " + exCardId);
         }
     }
 
