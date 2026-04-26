@@ -14,6 +14,11 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Timestamp;
 
+/**
+ * A concrete card copy owned by a character.
+ *
+ * <p>This is the persistence source of truth for CharacterProfileResponse.ownedCards compatibility JSON.</p>
+ */
 @Getter
 @Setter
 @NoArgsConstructor

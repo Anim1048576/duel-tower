@@ -8,6 +8,13 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.sql.Timestamp;
 import java.util.List;
 
+/**
+ * Character basic profile root.
+ *
+ * <p>Owned cards, equipped current skill deck, and equipped EX card are normalized into
+ * CharacterOwnedCard, CharacterCurrentSkillDeckEntry, and CharacterExLoadout. CharacterProfile keeps only
+ * identity, profile text, stats, traits, and hiddenTraitIds.</p>
+ */
 @Getter
 @Setter
 @NoArgsConstructor

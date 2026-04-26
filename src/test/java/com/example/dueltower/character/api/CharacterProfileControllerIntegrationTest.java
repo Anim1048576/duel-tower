@@ -28,7 +28,7 @@ class CharacterProfileControllerIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    @DisplayName("character create는 currentSkillDeck 직접 쓰기를 거부한다")
+    @DisplayName("character create rejects direct currentSkillDeck writes")
     void createRejectsCurrentSkillDeckWrite() throws Exception {
         MockHttpSession session = signUpAndLogin("characterCreateBlocked");
 
@@ -46,7 +46,7 @@ class CharacterProfileControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("character update는 currentSkillDeck 직접 쓰기를 거부한다")
+    @DisplayName("character update rejects direct currentSkillDeck writes")
     void updateRejectsCurrentSkillDeckWrite() throws Exception {
         MockHttpSession session = signUpAndLogin("characterUpdateBlocked");
 
@@ -64,7 +64,7 @@ class CharacterProfileControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("character create without currentSkillDeck stores normal fields and does not expose raw currentSkillDeck")
+    @DisplayName("character create returns profile fields plus loadout preview without raw currentSkillDeck")
     void createWithoutCurrentSkillDeckStoresOtherFields() throws Exception {
         MockHttpSession session = signUpAndLogin("characterCreateAllowed");
 
@@ -117,7 +117,7 @@ class CharacterProfileControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("character update without currentSkillDeck stores normal fields")
+    @DisplayName("character update returns profile fields plus loadout preview without raw currentSkillDeck")
     void updateWithoutCurrentSkillDeckStoresOtherFields() throws Exception {
         MockHttpSession session = signUpAndLogin("characterUpdateAllowed");
         MvcResult createResult = mockMvc.perform(post("/api/content/characters")

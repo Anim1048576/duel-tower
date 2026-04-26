@@ -14,6 +14,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Equipped current skill deck entry.
+ *
+ * <p>The deck is stored by ownedCardId, not cardId, so duplicate card copies remain distinguishable.
+ * position defines the equipped deck order.</p>
+ */
 @Getter
 @Setter
 @NoArgsConstructor

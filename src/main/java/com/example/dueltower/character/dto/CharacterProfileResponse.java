@@ -7,11 +7,14 @@ import java.util.List;
 import java.sql.Timestamp;
 
 /**
- * Public character read model.
+ * Public character read model for the normalized CharacterProfile aggregate.
  *
- * <p>Raw CharacterProfile.currentSkillDeck is intentionally not exposed because it can contain either
- * cardId or ownedCardId values depending on the internal write path. UI/API clients should render
- * currentSkillDeckPreviewCardIds, which is resolved on the server as cardId-based preview data.</p>
+ * <p>The raw current skill deck is not exposed through this API. The equipped skill deck is stored as
+ * ownedCardId-based rows in CharacterCurrentSkillDeckEntry, and this response exposes only
+ * currentSkillDeckPreviewCardIds for UI display.</p>
+ *
+ * <p>ownedCards and exCard remain string JSON fields for API compatibility. Their persistence source of
+ * truth is CharacterOwnedCard/CharacterOwnedCardModifier and CharacterExLoadout, not CharacterProfile.</p>
  */
 public record CharacterProfileResponse(
         Long id,

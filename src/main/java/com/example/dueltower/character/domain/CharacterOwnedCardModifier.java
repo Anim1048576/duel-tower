@@ -13,6 +13,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Modifier row attached to a concrete owned card copy.
+ */
 @Getter
 @Setter
 @NoArgsConstructor

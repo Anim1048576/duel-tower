@@ -14,6 +14,11 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Timestamp;
 
+/**
+ * Currently equipped EX card for a character.
+ *
+ * <p>This is the persistence source of truth for CharacterProfileResponse.exCard compatibility JSON.</p>
+ */
 @Getter
 @Setter
 @NoArgsConstructor
