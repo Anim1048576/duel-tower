@@ -1,6 +1,7 @@
 package com.example.dueltower.screen.service;
 
 import com.example.dueltower.character.repository.CharacterProfileRepository;
+import com.example.dueltower.character.service.CharacterLoadoutService;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.engine.core.EngineContext;
@@ -29,10 +30,11 @@ class ScreenResponseFactoryPlayerLobbyDeckEditorTest {
     @Test
     void playerLobbyProjectsDeckEditorStateFromServerAnalysis() {
         CharacterProfileRepository characterProfileRepository = mock(CharacterProfileRepository.class);
+        CharacterLoadoutService characterLoadoutService = mock(CharacterLoadoutService.class);
         CardService cardService = mock(CardService.class);
         PassiveService passiveService = mock(PassiveService.class);
         when(cardService.asMap()).thenReturn(Map.of());
-        ScreenResponseFactory factory = new ScreenResponseFactory(characterProfileRepository, cardService, passiveService);
+        ScreenResponseFactory factory = new ScreenResponseFactory(characterProfileRepository, characterLoadoutService, cardService, passiveService);
 
         SessionRuntime runtime = runtime("player1");
         PlayerStateDto me = player(

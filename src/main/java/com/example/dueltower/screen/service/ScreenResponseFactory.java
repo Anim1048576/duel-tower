@@ -2,7 +2,7 @@ package com.example.dueltower.screen.service;
 
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
-import com.example.dueltower.character.service.CharacterCurrentSkillDeckReadService;
+import com.example.dueltower.character.service.CharacterLoadoutService;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.dto.DeckValidationResponse;
@@ -72,6 +72,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Objects;
 
 @Component
 public class ScreenResponseFactory {
@@ -80,35 +81,29 @@ public class ScreenResponseFactory {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
 
     private final CharacterProfileRepository characterProfileRepository;
-    private final CharacterCurrentSkillDeckReadService currentSkillDeckReadService;
+    private final CharacterLoadoutService characterLoadoutService;
     private final CardService cardService;
     private final PassiveService passiveService;
     private final StartCombatAvailabilityService startCombatAvailabilityService;
 
     @Autowired
     public ScreenResponseFactory(CharacterProfileRepository characterProfileRepository,
-                                 CharacterCurrentSkillDeckReadService currentSkillDeckReadService,
+                                 CharacterLoadoutService characterLoadoutService,
                                  CardService cardService,
                                  PassiveService passiveService,
                                  StartCombatAvailabilityService startCombatAvailabilityService) {
         this.characterProfileRepository = characterProfileRepository;
-        this.currentSkillDeckReadService = currentSkillDeckReadService;
+        this.characterLoadoutService = Objects.requireNonNull(characterLoadoutService, "characterLoadoutService is required");
         this.cardService = cardService;
         this.passiveService = passiveService;
         this.startCombatAvailabilityService = startCombatAvailabilityService;
     }
 
     public ScreenResponseFactory(CharacterProfileRepository characterProfileRepository,
-                                 CharacterCurrentSkillDeckReadService currentSkillDeckReadService,
+                                 CharacterLoadoutService characterLoadoutService,
                                  CardService cardService,
                                  PassiveService passiveService) {
-        this(characterProfileRepository, currentSkillDeckReadService, cardService, passiveService, null);
-    }
-
-    public ScreenResponseFactory(CharacterProfileRepository characterProfileRepository,
-                                 CardService cardService,
-                                 PassiveService passiveService) {
-        this(characterProfileRepository, new CharacterCurrentSkillDeckReadService(), cardService, passiveService, null);
+        this(characterProfileRepository, characterLoadoutService, cardService, passiveService, null);
     }
 
     public SessionScreenSkeletonResponse sessionSkeleton(ScreenRouteSpec route,
@@ -1518,10 +1513,7 @@ public class ScreenResponseFactory {
         List<PresetEditorResolvedTagDto> tags = new ArrayList<>();
         tags.add(new PresetEditorResolvedTagDto("Character", "accent"));
         tags.add(new PresetEditorResolvedTagDto("Resolved", "success"));
-        int totalCards = currentSkillDeckReadService.previewStoredCurrentSkillDeck(
-                profile.getCurrentSkillDeck(),
-                profile.getOwnedCards()
-        ).totalCards();
+        int totalCards = characterLoadoutService.getCurrentSkillDeckPreviewCardIds(profile.getId()).size();
         if (totalCards > 0) {
             tags.add(new PresetEditorResolvedTagDto(totalCards + " applied cards", "muted"));
         }

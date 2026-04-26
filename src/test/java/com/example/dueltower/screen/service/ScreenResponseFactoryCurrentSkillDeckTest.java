@@ -4,7 +4,7 @@ import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
-import com.example.dueltower.character.service.CharacterCurrentSkillDeckReadService;
+import com.example.dueltower.character.service.CharacterLoadoutService;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.engine.core.EngineContext;
@@ -156,21 +156,17 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
     }
 
     @Test
-    void presetEditorResolvedUsesAppliedCardsTagFromResolvedCurrentSkillDeckPreview() {
+    void presetEditorResolvedUsesAppliedCardsTagFromCharacterLoadoutPreview() {
         CharacterProfileRepository repository = mock(CharacterProfileRepository.class);
         when(repository.findById(7L)).thenReturn(Optional.of(characterProfile(
                 7L,
                 "Preset Character",
-                """
-                        [
-                          {"ownedCardId":"char-oc-1","cardId":"C001"},
-                          {"ownedCardId":"char-oc-2","cardId":"C001"},
-                          {"ownedCardId":"char-oc-3","cardId":"C002"}
-                        ]
-                        """,
-                List.of("char-oc-1", "char-oc-2", "char-oc-3")
+                "[]",
+                List.of()
         )));
-        ScreenResponseFactory factory = factory(repository);
+        CharacterLoadoutService loadoutService = mock(CharacterLoadoutService.class);
+        when(loadoutService.getCurrentSkillDeckPreviewCardIds(7L)).thenReturn(List.of("C001", "C001", "C002"));
+        ScreenResponseFactory factory = factory(repository, loadoutService);
 
         PresetEditorResolvedDto resolved = factory.presetEditorResolved(new PresetEditorDraftDto(
                 "preset",
@@ -187,19 +183,17 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
     }
 
     @Test
-    void presetEditorResolvedDropsStaleOwnedCardIdsFromAppliedCardsTag() {
+    void presetEditorResolvedOmitsAppliedCardsTagWhenCharacterLoadoutPreviewIsEmpty() {
         CharacterProfileRepository repository = mock(CharacterProfileRepository.class);
         when(repository.findById(7L)).thenReturn(Optional.of(characterProfile(
                 7L,
-                "Partially Stale Character",
-                """
-                        [
-                          {"ownedCardId":"char-oc-1","cardId":"C001"}
-                        ]
-                        """,
-                List.of("char-oc-1", "oc-stale")
+                "Empty Loadout Character",
+                "[]",
+                List.of()
         )));
-        ScreenResponseFactory factory = factory(repository);
+        CharacterLoadoutService loadoutService = mock(CharacterLoadoutService.class);
+        when(loadoutService.getCurrentSkillDeckPreviewCardIds(7L)).thenReturn(List.of());
+        ScreenResponseFactory factory = factory(repository, loadoutService);
 
         PresetEditorResolvedDto resolved = factory.presetEditorResolved(new PresetEditorDraftDto(
                 "preset",
@@ -211,12 +205,18 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
 
         assertThat(resolved.characterTags())
                 .extracting(tag -> tag.label())
-                .contains("1 applied cards")
+                .doesNotContain("1 applied cards")
                 .doesNotContain("2 applied cards")
-                .doesNotContain("2 linked cards");
+                .doesNotContain("linked cards");
     }
 
     private static ScreenResponseFactory factory(CharacterProfileRepository repository) {
+        CharacterLoadoutService loadoutService = mock(CharacterLoadoutService.class);
+        when(loadoutService.getCurrentSkillDeckPreviewCardIds(org.mockito.ArgumentMatchers.anyLong())).thenReturn(List.of());
+        return factory(repository, loadoutService);
+    }
+
+    private static ScreenResponseFactory factory(CharacterProfileRepository repository, CharacterLoadoutService loadoutService) {
         CardService cardService = mock(CardService.class);
         PassiveService passiveService = mock(PassiveService.class);
         StartCombatAvailabilityService startCombatAvailabilityService = mock(StartCombatAvailabilityService.class);
@@ -226,7 +226,7 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                 .thenReturn(new StartCombatAvailabilityService.StartCombatAvailability("player1", null));
         return new ScreenResponseFactory(
                 repository,
-                new CharacterCurrentSkillDeckReadService(),
+                loadoutService,
                 cardService,
                 passiveService,
                 startCombatAvailabilityService

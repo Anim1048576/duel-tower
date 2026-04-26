@@ -1,5 +1,6 @@
 package com.example.dueltower.screen.service;
 
+import com.example.dueltower.character.service.CharacterLoadoutService;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.dto.DeckValidationIssue;
 import com.example.dueltower.content.deck.dto.DeckValidationResponse;
@@ -10,10 +11,11 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class ScreenResponseFactoryDeckEditorValidationTest {
 
-    private final ScreenResponseFactory factory = new ScreenResponseFactory(null, null, null);
+    private final ScreenResponseFactory factory = new ScreenResponseFactory(null, mock(CharacterLoadoutService.class), null, null);
 
     @Test
     void deckEditorValidationCarriesValidatedDraftSnapshotMetadata() {
