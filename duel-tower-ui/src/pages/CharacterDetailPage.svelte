@@ -42,6 +42,7 @@
     willpower: string
     trait1: string
     trait2: string
+    hiddenTraitIds: string[]
     ownedCards: string
     exCard: string
   }
@@ -65,6 +66,7 @@
       willpower: '',
       trait1: '',
       trait2: '',
+      hiddenTraitIds: [],
       ownedCards: '',
       exCard: '',
     }
@@ -85,6 +87,7 @@
       willpower: String(character.willpower),
       trait1: character.trait1 ?? '',
       trait2: character.trait2 ?? '',
+      hiddenTraitIds: [...character.hiddenTraitIds],
       ownedCards: character.ownedCards,
       exCard: character.exCard,
     }
@@ -157,6 +160,10 @@
   function normalizeOptionalText(value: string) {
     const normalized = value.trim()
     return normalized ? normalized : null
+  }
+
+  function normalizeHiddenTraitIdsForPayload(values: string[]) {
+    return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
   }
 
   function isRecord(value: unknown): value is Record<string, unknown> {
@@ -313,10 +320,14 @@
       willpower: parseNullableNumber(form.willpower),
       trait1: normalizeOptionalText(form.trait1),
       trait2: normalizeOptionalText(form.trait2),
-      hiddenTraitIds: [],
+      hiddenTraitIds: normalizeHiddenTraitIdsForPayload(form.hiddenTraitIds),
       ownedCardList: parseOwnedCardsInput(form.ownedCards),
       exCardId: parseExCardInput(form.exCard) ?? '',
     }
+  }
+
+  function isSameStringArray(left: string[], right: string[]) {
+    return left.length === right.length && left.every((value, index) => value === right[index])
   }
 
   function isSameFormState(left: CharacterFormState, right: CharacterFormState) {
@@ -334,6 +345,7 @@
       left.willpower === right.willpower &&
       left.trait1 === right.trait1 &&
       left.trait2 === right.trait2 &&
+      isSameStringArray(left.hiddenTraitIds, right.hiddenTraitIds) &&
       left.ownedCards === right.ownedCards &&
       left.exCard === right.exCard
     )
