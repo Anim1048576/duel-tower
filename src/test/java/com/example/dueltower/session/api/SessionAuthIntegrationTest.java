@@ -2,6 +2,10 @@ package com.example.dueltower.session.api;
 
 import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
+import com.example.dueltower.character.repository.CharacterCurrentSkillDeckEntryRepository;
+import com.example.dueltower.character.repository.CharacterExLoadoutRepository;
+import com.example.dueltower.character.repository.CharacterOwnedCardModifierRepository;
+import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.character.service.CharacterCardCollectionService;
 import com.example.dueltower.character.service.CharacterLoadoutService;
@@ -47,6 +51,18 @@ class SessionAuthIntegrationTest {
     private CharacterProfileRepository characterProfileRepository;
 
     @Autowired
+    private CharacterCurrentSkillDeckEntryRepository characterCurrentSkillDeckEntryRepository;
+
+    @Autowired
+    private CharacterExLoadoutRepository characterExLoadoutRepository;
+
+    @Autowired
+    private CharacterOwnedCardModifierRepository characterOwnedCardModifierRepository;
+
+    @Autowired
+    private CharacterOwnedCardRepository characterOwnedCardRepository;
+
+    @Autowired
     private CharacterCardCollectionService characterCardCollectionService;
 
     @Autowired
@@ -54,6 +70,10 @@ class SessionAuthIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        characterCurrentSkillDeckEntryRepository.deleteAll();
+        characterExLoadoutRepository.deleteAll();
+        characterOwnedCardModifierRepository.deleteAll();
+        characterOwnedCardRepository.deleteAll();
         memberRepository.deleteAll();
         characterProfileRepository.deleteAll();
     }
@@ -145,7 +165,22 @@ class SessionAuthIntegrationTest {
                 characterCardCollectionService,
                 characterLoadoutService,
                 profile.getId(),
-                "[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]",
+                """
+                        [
+                          {"ownedCardId":"join-oc-c001-1","cardId":"C001"},
+                          {"ownedCardId":"join-oc-c001-2","cardId":"C001"},
+                          {"ownedCardId":"join-oc-c001-3","cardId":"C001"},
+                          {"ownedCardId":"join-oc-c002-1","cardId":"C002"},
+                          {"ownedCardId":"join-oc-c002-2","cardId":"C002"},
+                          {"ownedCardId":"join-oc-c002-3","cardId":"C002"},
+                          {"ownedCardId":"join-oc-c003-1","cardId":"C003"},
+                          {"ownedCardId":"join-oc-c003-2","cardId":"C003"},
+                          {"ownedCardId":"join-oc-c003-3","cardId":"C003"},
+                          {"ownedCardId":"join-oc-c004-1","cardId":"C004"},
+                          {"ownedCardId":"join-oc-c004-2","cardId":"C004"},
+                          {"ownedCardId":"join-oc-c004-3","cardId":"C004"}
+                        ]
+                        """,
                 List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"),
                 "EX901"
         );

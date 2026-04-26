@@ -2,6 +2,10 @@ package com.example.dueltower.session.api;
 
 import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
+import com.example.dueltower.character.repository.CharacterCurrentSkillDeckEntryRepository;
+import com.example.dueltower.character.repository.CharacterExLoadoutRepository;
+import com.example.dueltower.character.repository.CharacterOwnedCardModifierRepository;
+import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.character.service.CharacterCardCollectionService;
 import com.example.dueltower.character.service.CharacterLoadoutService;
@@ -46,6 +50,18 @@ class SessionPresetApplyIntegrationTest {
     private CharacterProfileRepository characterProfileRepository;
 
     @Autowired
+    private CharacterCurrentSkillDeckEntryRepository characterCurrentSkillDeckEntryRepository;
+
+    @Autowired
+    private CharacterExLoadoutRepository characterExLoadoutRepository;
+
+    @Autowired
+    private CharacterOwnedCardModifierRepository characterOwnedCardModifierRepository;
+
+    @Autowired
+    private CharacterOwnedCardRepository characterOwnedCardRepository;
+
+    @Autowired
     private PresetRepository presetRepository;
 
     @Autowired
@@ -58,6 +74,10 @@ class SessionPresetApplyIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        characterCurrentSkillDeckEntryRepository.deleteAll();
+        characterExLoadoutRepository.deleteAll();
+        characterOwnedCardModifierRepository.deleteAll();
+        characterOwnedCardRepository.deleteAll();
         presetRepository.deleteAll();
         characterProfileRepository.deleteAll();
         memberRepository.deleteAll();
@@ -75,7 +95,22 @@ class SessionPresetApplyIntegrationTest {
                 "세션 프리셋 적용 캐릭터",
                 "P001",
                 "P002",
-                "[\"Tig001_Card\",\"Tig001_Card\",\"Tig001_Card\",\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\"]",
+                """
+                        [
+                          {"ownedCardId":"preset-oc-a-tig-1","cardId":"Tig001_Card"},
+                          {"ownedCardId":"preset-oc-a-tig-2","cardId":"Tig001_Card"},
+                          {"ownedCardId":"preset-oc-a-tig-3","cardId":"Tig001_Card"},
+                          {"ownedCardId":"preset-oc-c001-1","cardId":"C001"},
+                          {"ownedCardId":"preset-oc-c001-2","cardId":"C001"},
+                          {"ownedCardId":"preset-oc-c001-3","cardId":"C001"},
+                          {"ownedCardId":"preset-oc-c002-1","cardId":"C002"},
+                          {"ownedCardId":"preset-oc-c002-2","cardId":"C002"},
+                          {"ownedCardId":"preset-oc-c002-3","cardId":"C002"},
+                          {"ownedCardId":"preset-oc-c003-1","cardId":"C003"},
+                          {"ownedCardId":"preset-oc-c003-2","cardId":"C003"},
+                          {"ownedCardId":"preset-oc-c003-3","cardId":"C003"}
+                        ]
+                        """,
                 List.of("Tig001_Card", "Tig001_Card", "Tig001_Card", "C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003"),
                 "{\"id\":\"Tig901_EX\"}"
         );

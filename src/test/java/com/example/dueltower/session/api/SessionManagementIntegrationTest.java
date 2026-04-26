@@ -2,6 +2,10 @@ package com.example.dueltower.session.api;
 
 import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
+import com.example.dueltower.character.repository.CharacterCurrentSkillDeckEntryRepository;
+import com.example.dueltower.character.repository.CharacterExLoadoutRepository;
+import com.example.dueltower.character.repository.CharacterOwnedCardModifierRepository;
+import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.character.service.CharacterCardCollectionService;
 import com.example.dueltower.character.service.CharacterLoadoutService;
@@ -51,6 +55,18 @@ class SessionManagementIntegrationTest {
     private CharacterProfileRepository characterProfileRepository;
 
     @Autowired
+    private CharacterCurrentSkillDeckEntryRepository characterCurrentSkillDeckEntryRepository;
+
+    @Autowired
+    private CharacterExLoadoutRepository characterExLoadoutRepository;
+
+    @Autowired
+    private CharacterOwnedCardModifierRepository characterOwnedCardModifierRepository;
+
+    @Autowired
+    private CharacterOwnedCardRepository characterOwnedCardRepository;
+
+    @Autowired
     private CharacterCardCollectionService characterCardCollectionService;
 
     @Autowired
@@ -63,6 +79,10 @@ class SessionManagementIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        characterCurrentSkillDeckEntryRepository.deleteAll();
+        characterExLoadoutRepository.deleteAll();
+        characterOwnedCardModifierRepository.deleteAll();
+        characterOwnedCardRepository.deleteAll();
         memberRepository.deleteAll();
         characterProfileRepository.deleteAll();
         presetRepository.deleteAll();
