@@ -103,10 +103,10 @@ public class CharacterProfileService {
         profile.setTrait2(normalizeOptionalText(req.trait2()));
         profile.setHiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()));
         boolean ownedCardsChanged = ownedCardsChanged(id, req);
-        replaceOwnedCards(id, req);
         if (ownedCardsChanged) {
             loadoutService.clearCurrentSkillDeck(id);
         }
+        replaceOwnedCards(id, req);
         replaceExCard(id, req);
         return toResponse(profile);
     }

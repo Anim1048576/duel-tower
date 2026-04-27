@@ -346,3 +346,27 @@ orphan row가 발견되면 migration 적용 전에 복구 또는 삭제 여부�
 - current skill deck `owned_card_id` 단일 FK
 - current skill deck composite FK 설계 전 orphan/소속 불일치 점검
 - `CharacterOwnedCardModifier(ownedCardId, modifierId)` unique 정책 판단
+
+## 8회차 사전 보정: current skill deck child-first 순서
+
+이번 회차에서는 아직 `character_current_skill_deck_entries.owned_card_id -> character_owned_cards.owned_card_id` FK를 추가하지 않는다.
+V3 migration, `character_owned_cards(character_id, owned_card_id)` unique, composite FK, JPA 연관관계, cascade/orphanRemoval도 도입하지 않는다.
+
+대신 FK 도입 전에 `CharacterProfileService.update(...)`의 owned cards 교체 순서를 보정했다.
+
+변경 후 update 순서:
+
+1. `ownedCardsChanged`를 기존 owned cards 기준으로 먼저 계산한다.
+2. owned cards가 변경된 경우 `loadoutService.clearCurrentSkillDeck(id)`를 먼저 호출한다.
+3. `CharacterCardCollectionService.replaceOwnedCards(...)` 또는 `replaceOwnedCardsFromJson(...)`로 owned cards를 교체한다.
+4. EX card를 기존 정책대로 교체한다.
+
+이 보정이 필요한 이유는 나중에 `character_current_skill_deck_entries.owned_card_id` FK를 추가하면, 기존 current deck entry가 아직 삭제되지 않은 상태에서 참조 중인 owned card를 먼저 삭제할 수 없기 때문이다. 따라서 owned cards 변경 경로에서는 current skill deck entry를 먼저 삭제하고, 그 다음 owned card modifiers와 owned cards를 삭제/재저장하는 child-first 순서를 유지해야 한다.
+
+`CharacterCardCollectionService.deleteOwnedCards(...)`에는 `CharacterLoadoutService` 의존성을 추가하지 않았다. current skill deck clear 책임은 owned card 저장소 서비스가 아니라 `CharacterProfileService`의 update orchestration에 둔다.
+
+### 8회차 다음 후보
+
+- current skill deck `owned_card_id` 단일 FK 도입
+- composite FK 도입 여부 판단
+- `character_owned_cards(character_id, owned_card_id)` unique 필요성 검토

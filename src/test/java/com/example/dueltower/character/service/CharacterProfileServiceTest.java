@@ -9,6 +9,7 @@ import com.example.dueltower.session.dto.OwnedCardDto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -251,6 +252,9 @@ class CharacterProfileServiceTest {
         assertTrue(response.currentSkillDeckPreviewCardIds().isEmpty());
         verify(cardCollectionService).replaceOwnedCardsFromJson(1L, "[\"new-card\"]");
         verify(loadoutService).clearCurrentSkillDeck(1L);
+        InOrder inOrder = inOrder(loadoutService, cardCollectionService);
+        inOrder.verify(loadoutService).clearCurrentSkillDeck(1L);
+        inOrder.verify(cardCollectionService).replaceOwnedCardsFromJson(1L, "[\"new-card\"]");
     }
 
     @Test
@@ -289,6 +293,9 @@ class CharacterProfileServiceTest {
         verify(cardCollectionService, never()).replaceOwnedCardsFromJson(anyLong(), anyString());
         verify(loadoutService).replaceExCard(1L, "EX901");
         verify(loadoutService, never()).clearExCard(anyLong());
+        InOrder inOrder = inOrder(loadoutService, cardCollectionService);
+        inOrder.verify(loadoutService).clearCurrentSkillDeck(1L);
+        inOrder.verify(cardCollectionService).replaceOwnedCards(1L, List.of(ownedCard));
     }
 
     @Test
