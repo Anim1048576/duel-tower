@@ -370,3 +370,79 @@ V3 migration, `character_owned_cards(character_id, owned_card_id)` unique, compo
 - current skill deck `owned_card_id` 단일 FK 도입
 - composite FK 도입 여부 판단
 - `character_owned_cards(character_id, owned_card_id)` unique 필요성 검토
+
+## 9회차 적용 범위: current skill deck owned_card_id 단일 FK
+
+이번 회차에서는 `character_current_skill_deck_entries.owned_card_id -> character_owned_cards.owned_card_id` 단일 FK를 도입한다. current skill deck entry가 존재하지 않는 owned card를 참조하지 못하게 하는 것이 목적이다.
+
+추가한 migration:
+
+- `src/main/resources/db/migration/V3__current_skill_deck_owned_card_fk.sql`
+
+추가한 index/FK:
+
+- `ix_character_current_skill_deck_entries_owned_card_id`
+  - `character_current_skill_deck_entries(owned_card_id)`
+- `fk_character_current_skill_deck_entries_owned_card`
+  - `character_current_skill_deck_entries.owned_card_id -> character_owned_cards.owned_card_id`
+
+이번 회차에서는 `ON DELETE CASCADE`, composite FK, `character_owned_cards(character_id, owned_card_id)` unique, JPA 관계, cascade/orphanRemoval을 추가하지 않는다.
+
+### 9회차 적용 전 orphan 점검 SQL
+
+아래 조회 결과는 V3 단일 FK 적용 전에 반드시 비어 있어야 한다. 결과가 있으면 current skill deck entry가 존재하지 않는 owned card를 참조하므로 FK 생성이 실패한다.
+
+```sql
+SELECT e.*
+FROM character_current_skill_deck_entries e
+LEFT JOIN character_owned_cards oc ON oc.owned_card_id = e.owned_card_id
+WHERE oc.owned_card_id IS NULL;
+```
+
+### 9회차 소속 불일치 점검 SQL
+
+아래 조회는 `owned_card_id` 자체는 존재하지만 current skill deck entry의 character와 owned card의 character가 다른 경우를 찾는다.
+
+```sql
+SELECT e.*, oc.character_id AS owned_card_character_id
+FROM character_current_skill_deck_entries e
+JOIN character_owned_cards oc ON oc.owned_card_id = e.owned_card_id
+WHERE e.character_id <> oc.character_id;
+```
+
+이 소속 불일치는 이번 단일 FK로는 막지 못한다. 현재 애플리케이션 저장 경로는 `CharacterLoadoutService.validateOwnedCardsAvailable(...)`에서 `CharacterCardCollectionService.hasOwnedCard(characterId, ownedCardId)`를 호출해 같은 character의 owned card인지 검증한다. B 유형까지 DB 레벨에서 막으려면 별도 회차에서 `character_owned_cards(character_id, owned_card_id)` unique와 `(character_id, owned_card_id)` composite FK를 검토해야 한다.
+
+### 9회차 삭제/교체 순서 호환성
+
+8회차에서 `CharacterProfileService.update(...)` 순서를 보정했기 때문에 owned cards 변경 시 `currentSkillDeck`이 owned cards 삭제보다 먼저 clear된다. 따라서 정상 update 경로는 이번 `owned_card_id` FK와 호환된다.
+
+`CharacterProfileService.delete(...)`도 `loadoutService.deleteLoadout(id)`를 먼저 호출한 뒤 `cardCollectionService.deleteOwnedCards(id)`를 호출하므로, current skill deck entries 삭제 후 owned cards를 삭제하는 순서를 유지한다.
+
+주의할 점은 `CharacterCardCollectionService.deleteOwnedCards(...)` 단독 호출이다. 이 메서드는 owned card 저장소 책임만 가지며 current skill deck을 clear하지 않는다. FK 도입 후 current skill deck entry가 남아 있는 character에 대해 이 메서드를 직접 호출하면 DB FK 위반이 발생할 수 있다. 정상 경로에서는 `CharacterProfileService.update/delete` orchestration을 사용해야 한다.
+
+### 9회차 보장 범위
+
+이번 단일 FK가 보장하는 것:
+
+- current skill deck entry가 존재하지 않는 `owned_card_id`를 참조하지 못한다.
+- owned card 삭제 전에 current skill deck entry를 먼저 삭제해야 하는 DB 제약이 생긴다.
+
+이번 단일 FK가 보장하지 않는 것:
+
+- current skill deck entry의 `character_id`와 referenced owned card의 `character_id`가 같은지 여부
+- owned card의 character 소속까지 포함한 DB 레벨 무결성
+- modifier 중복 정책
+
+### 9회차 보류 항목
+
+- current skill deck composite FK
+- `character_owned_cards(character_id, owned_card_id)` unique
+- JPA `@ManyToOne`, `@OneToMany`, `@JoinColumn`
+- JPA cascade/orphanRemoval
+- `ON DELETE CASCADE`
+
+### 9회차 다음 후보
+
+- composite FK 필요성 판단
+- `character_owned_cards(character_id, owned_card_id)` unique 검토
+- `CharacterOwnedCardModifier(ownedCardId, modifierId)` unique 정책 판단

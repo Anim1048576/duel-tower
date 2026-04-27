@@ -16,6 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -341,6 +342,65 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.ownedCards").value(containsString("oc-update-1")))
                 .andExpect(jsonPath("$.ownedCards").value(containsString("C001")))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
+    }
+
+    @Test
+    @DisplayName("character update clears current skill deck before replacing owned cards")
+    void updateClearsCurrentSkillDeckBeforeReplacingOwnedCards() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterUpdateOwnedCardFkSafe");
+        MvcResult createResult = mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "before-owned-card-fk-safe-update",
+                                """
+                                          "ownedCardList": [
+                                            {
+                                              "ownedCardId": "oc-fk-1",
+                                              "cardId": "C001",
+                                              "modifiers": [],
+                                              "strengthened": false,
+                                              "weakened": false,
+                                              "lockedInDeck": false,
+                                              "forgettable": true
+                                            }
+                                          ],
+                                          "exCard": "{}"
+                                        """
+                        )))
+                .andExpect(status().isOk())
+                .andReturn();
+        Long characterId = Long.parseLong(extractJsonNumber(createResult.getResponse().getContentAsString(), "id"));
+        characterLoadoutService.replaceCurrentSkillDeckFromOwnedCardIds(characterId, java.util.List.of("oc-fk-1"));
+
+        mockMvc.perform(put("/api/content/characters/{id}", characterId)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "after-owned-card-fk-safe-update",
+                                """
+                                          "ownedCardList": [
+                                            {
+                                              "ownedCardId": "oc-fk-2",
+                                              "cardId": "C002",
+                                              "modifiers": [],
+                                              "strengthened": false,
+                                              "weakened": false,
+                                              "lockedInDeck": false,
+                                              "forgettable": true
+                                            }
+                                          ],
+                                          "exCard": "{}"
+                                        """
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
+
+        assertTrue(currentSkillDeckEntryRepository.findByCharacterId(characterId).isEmpty());
+        java.util.List<String> ownedCardIds = ownedCardRepository.findByCharacterId(characterId).stream()
+                .map(com.example.dueltower.character.domain.CharacterOwnedCard::getOwnedCardId)
+                .toList();
+        assertEquals(java.util.List.of("oc-fk-2"), ownedCardIds);
     }
 
     @Test
