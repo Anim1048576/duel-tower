@@ -135,8 +135,10 @@ public class CharacterProfileService {
 
     private CharacterProfileResponse toResponse(CharacterProfile profile) {
         CharacterCombatStatCalculator.CombatStats combatStats = combatStatCalculator.calculate(profile);
+        Long characterId = profile.getId();
+        String exCardId = loadoutService.getExCardId(characterId);
         return new CharacterProfileResponse(
-                profile.getId(),
+                characterId,
                 profile.getName(),
                 profile.getGender(),
                 profile.getAge(),
@@ -151,9 +153,11 @@ public class CharacterProfileService {
                 profile.getTrait1(),
                 profile.getTrait2(),
                 normalizeHiddenTraitIds(profile.getHiddenTraitIds()),
-                cardCollectionService.toOwnedCardsJson(profile.getId()),
-                loadoutService.getCurrentSkillDeckPreviewCardIds(profile.getId()),
-                toExCardJson(loadoutService.getExCardId(profile.getId())),
+                cardCollectionService.toOwnedCardsJson(characterId),
+                cardCollectionService.toOwnedCardDtos(characterId),
+                loadoutService.getCurrentSkillDeckPreviewCardIds(characterId),
+                toExCardJson(exCardId),
+                exCardId,
                 new CombatStatsDto(
                         combatStats.maxHp(),
                         combatStats.maxAp(),

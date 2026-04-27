@@ -205,7 +205,45 @@ class CharacterProfileServiceTest {
     }
 
     @Test
-    @DisplayName("update: profile 필드 저장 시 기존 currentSkillDeck를 유지한다")
+    @DisplayName("create: response includes legacy and structured loadout fields")
+    void createResponseIncludesLegacyAndStructuredLoadoutFields() {
+        stubProfileSave();
+        OwnedCardDto ownedCard = new OwnedCardDto("oc-1", "C001", List.of(), false, false, false, true, null);
+        stubResponseReadModels(
+                "[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]",
+                List.of("C001"),
+                "{\"id\":\"EX901\"}",
+                List.of(ownedCard)
+        );
+
+        var response = service.create(validStructuredRequest(null, null, List.of(ownedCard), "EX901"));
+
+        assertEquals("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", response.ownedCards());
+        assertEquals(List.of(ownedCard), response.ownedCardList());
+        assertEquals(List.of("C001"), response.currentSkillDeckPreviewCardIds());
+        assertEquals("{\"id\":\"EX901\"}", response.exCard());
+        assertEquals("EX901", response.exCardId());
+        verify(cardCollectionService).toOwnedCardDtos(1L);
+    }
+
+    @Test
+    @DisplayName("get: response uses null exCardId when EX is not equipped")
+    void getResponseIncludesStructuredFieldsWhenExCardIsEmpty() {
+        CharacterProfile existing = existingProfile();
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        stubResponseReadModels("[]", List.of(), "{}");
+
+        var response = service.get(1L);
+
+        assertEquals("[]", response.ownedCards());
+        assertTrue(response.ownedCardList().isEmpty());
+        assertEquals("{}", response.exCard());
+        assertNull(response.exCardId());
+        verify(cardCollectionService).toOwnedCardDtos(1L);
+    }
+
+    @Test
+    @DisplayName("update keeps existing current skill deck when saving profile fields")
     void updateKeepsExistingCurrentSkillDeckWhenSavingProfileFields() {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
@@ -277,9 +315,8 @@ class CharacterProfileServiceTest {
     void structuredLoadoutFieldsTakePrecedenceOverLegacyFields() {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        stubResponseReadModels("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", List.of(), "{\"id\":\"EX901\"}");
-
         OwnedCardDto ownedCard = new OwnedCardDto("oc-1", "C001", List.of(), false, false, false, true, null);
+        stubResponseReadModels("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", List.of(), "{\"id\":\"EX901\"}", List.of(ownedCard));
         CharacterProfileRequest req = validStructuredRequest(
                 "[{\"cardId\":\"C002\"}]",
                 "{\"id\":\"C001\"}",
@@ -287,8 +324,12 @@ class CharacterProfileServiceTest {
                 "EX901"
         );
 
-        service.update(1L, req);
+        var response = service.update(1L, req);
 
+        assertEquals("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", response.ownedCards());
+        assertEquals(List.of(ownedCard), response.ownedCardList());
+        assertEquals("{\"id\":\"EX901\"}", response.exCard());
+        assertEquals("EX901", response.exCardId());
         verify(cardCollectionService).replaceOwnedCards(1L, List.of(ownedCard));
         verify(cardCollectionService, never()).replaceOwnedCardsFromJson(anyLong(), anyString());
         verify(loadoutService).replaceExCard(1L, "EX901");
@@ -524,9 +565,19 @@ class CharacterProfileServiceTest {
     }
 
     private void stubResponseReadModels(String ownedCards, List<String> previewCardIds, String exCardJson) {
+        stubResponseReadModels(ownedCards, previewCardIds, exCardJson, List.of());
+    }
+
+    private void stubResponseReadModels(
+            String ownedCards,
+            List<String> previewCardIds,
+            String exCardJson,
+            List<OwnedCardDto> ownedCardDtos
+    ) {
         when(combatStatCalculator.calculate(any(CharacterProfile.class)))
                 .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
         when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(ownedCards);
+        when(cardCollectionService.toOwnedCardDtos(1L)).thenReturn(ownedCardDtos);
         when(loadoutService.getCurrentSkillDeckPreviewCardIds(1L)).thenReturn(previewCardIds);
         String exCardId = exCardJson.equals("{}") ? null : exCardJson.replace("{\"id\":\"", "").replace("\"}", "");
         when(loadoutService.getExCardId(1L)).thenReturn(exCardId);

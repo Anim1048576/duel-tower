@@ -29,6 +29,17 @@ export type OwnedCardRequest = {
   notForgettableReason?: string | null
 }
 
+export type OwnedCardResponse = {
+  ownedCardId: string
+  cardId: string
+  modifiers: OwnedCardModifierRequest[]
+  strengthened: boolean
+  weakened: boolean
+  lockedInDeck: boolean
+  forgettable: boolean
+  notForgettableReason?: string | null
+}
+
 export type CharacterProfileRequest = {
   name: string
   gender: CharacterGender | null
@@ -68,9 +79,15 @@ export type CharacterProfileResponse = {
   trait1: string | null
   trait2: string | null
   hiddenTraitIds: string[]
+  /** @deprecated Use ownedCardList for structured reads. */
   ownedCards: string
+  /** Preferred structured owned card response. */
+  ownedCardList: OwnedCardResponse[]
   currentSkillDeckPreviewCardIds: string[]
+  /** @deprecated Use exCardId for structured reads. */
   exCard: string
+  /** Preferred structured EX card response. Null when no EX is equipped. */
+  exCardId: string | null
   combatStats: CharacterCombatStats
   createDate: CharacterTimestampValue
   updateDate: CharacterTimestampValue

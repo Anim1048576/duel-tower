@@ -7,6 +7,7 @@
     CharacterProfileResponse,
     OwnedCardModifierRequest,
     OwnedCardRequest,
+    OwnedCardResponse,
   } from '../lib/api/characterTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
@@ -88,8 +89,8 @@
       trait1: character.trait1 ?? '',
       trait2: character.trait2 ?? '',
       hiddenTraitIds: [...character.hiddenTraitIds],
-      ownedCards: character.ownedCards,
-      exCard: character.exCard,
+      ownedCards: stringifyOwnedCardList(character.ownedCardList, character.ownedCards),
+      exCard: stringifyExCardId(character.exCardId, character.exCard),
     }
   }
 
@@ -176,6 +177,14 @@
 
   function normalizeBoolean(value: unknown, fallback: boolean) {
     return typeof value === 'boolean' ? value : fallback
+  }
+
+  function stringifyOwnedCardList(ownedCardList: OwnedCardResponse[] | null | undefined, fallback: string) {
+    return Array.isArray(ownedCardList) ? JSON.stringify(ownedCardList) : fallback
+  }
+
+  function stringifyExCardId(exCardId: string | null | undefined, fallback: string) {
+    return exCardId ? JSON.stringify({ id: exCardId }) : fallback
   }
 
   function parseOwnedCardModifierInput(value: unknown, index: number, modifierIndex: number): OwnedCardModifierRequest {

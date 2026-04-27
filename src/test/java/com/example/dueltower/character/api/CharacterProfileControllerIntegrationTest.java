@@ -99,7 +99,10 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.name").value("created-name"))
                 .andExpect(jsonPath("$.hiddenTraitIds").isEmpty())
                 .andExpect(jsonPath("$.ownedCards").value("[]"))
+                .andExpect(jsonPath("$.ownedCardList").isArray())
+                .andExpect(jsonPath("$.ownedCardList").isEmpty())
                 .andExpect(jsonPath("$.exCard").value("{}"))
+                .andExpect(jsonPath("$.exCardId").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
     }
@@ -145,7 +148,13 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ownedCards").isString())
                 .andExpect(jsonPath("$.ownedCards").value(containsString("oc-1")))
-                .andExpect(jsonPath("$.ownedCards").value(containsString("C001")));
+                .andExpect(jsonPath("$.ownedCards").value(containsString("C001")))
+                .andExpect(jsonPath("$.ownedCardList[0].ownedCardId").value("oc-1"))
+                .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"))
+                .andExpect(jsonPath("$.exCard").value("{}"))
+                .andExpect(jsonPath("$.exCardId").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isArray());
     }
 
     @Test
@@ -162,9 +171,10 @@ class CharacterProfileControllerIntegrationTest {
                                           "ownedCards": "[]",
                                           "exCardId": "EX901"
                                         """
-                        )))
+                )))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.exCard").value("{\"id\":\"EX901\"}"));
+                .andExpect(jsonPath("$.exCard").value("{\"id\":\"EX901\"}"))
+                .andExpect(jsonPath("$.exCardId").value("EX901"));
     }
 
     @Test
@@ -341,6 +351,10 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ownedCards").value(containsString("oc-update-1")))
                 .andExpect(jsonPath("$.ownedCards").value(containsString("C001")))
+                .andExpect(jsonPath("$.ownedCardList[0].ownedCardId").value("oc-update-1"))
+                .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"))
+                .andExpect(jsonPath("$.exCard").value("{}"))
+                .andExpect(jsonPath("$.exCardId").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
     }
 
