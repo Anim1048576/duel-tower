@@ -277,3 +277,72 @@ orphan row가 발견되면 삭제 전에 해당 row가 실제로 복구 가능�
 - `character_current_skill_deck_entries.character_id` FK
 - `character_current_skill_deck_entries.owned_card_id` FK
 - `character_owned_cards(character_id, owned_card_id)` unique와 current skill deck composite FK 검토
+
+## 7회차 1차 loadout character FK 적용 범위
+
+이번 회차에서는 loadout 계열 테이블 중 `character_id`가 없는 `CharacterProfile`을 참조하지 못하도록 FK를 추가한다. JPA 관계, cascade, current skill deck의 `owned_card_id` FK, composite FK는 계속 보류한다.
+
+추가한 migration:
+
+- `src/main/resources/db/migration/V2__character_profile_loadout_character_fks.sql`
+
+추가한 FK/index:
+
+- `ix_character_current_skill_deck_entries_character_id`
+  - `character_current_skill_deck_entries(character_id)`
+- `fk_character_ex_loadouts_character`
+  - `character_ex_loadouts.character_id -> character_profiles.id`
+- `fk_character_current_skill_deck_entries_character`
+  - `character_current_skill_deck_entries.character_id -> character_profiles.id`
+
+`character_ex_loadouts.character_id`는 PK이므로 별도 조회 index를 추가하지 않는다. `character_current_skill_deck_entries`에는 `(character_id, position)`, `(character_id, owned_card_id)` unique가 있지만, characterId 기반 조회/삭제 의도를 명시하기 위해 단일 index를 추가한다.
+
+### 적용 전 orphan 점검 SQL
+
+운영 DB에 V2 migration을 적용하기 전에 아래 조회 결과가 비어 있는지 확인한다.
+
+없는 character profile을 참조하는 EX loadout:
+
+```sql
+SELECT ex.*
+FROM character_ex_loadouts ex
+LEFT JOIN character_profiles cp ON cp.id = ex.character_id
+WHERE cp.id IS NULL;
+```
+
+없는 character profile을 참조하는 current skill deck entry:
+
+```sql
+SELECT e.*
+FROM character_current_skill_deck_entries e
+LEFT JOIN character_profiles cp ON cp.id = e.character_id
+WHERE cp.id IS NULL;
+```
+
+orphan row가 발견되면 migration 적용 전에 복구 또는 삭제 여부를 검토한다. 삭제 SQL은 운영 데이터 확인 후 별도 작업으로 작성한다.
+
+### 삭제 순서 호환성
+
+이번 V2 FK 기준으로 현재 삭제 순서는 호환된다.
+
+- `CharacterProfileService.delete(...)`
+  - `CharacterLoadoutService.deleteLoadout(id)`를 먼저 호출한다.
+  - 이후 owned cards/modifiers를 삭제한다.
+  - 마지막에 `character_profiles`를 삭제한다.
+- `CharacterLoadoutService.deleteLoadout(...)`
+  - `clearCurrentSkillDeck(characterId)`로 `character_current_skill_deck_entries`를 character_id 기준 삭제한다.
+  - `clearExCard(characterId)`로 `character_ex_loadouts`를 character_id 기준 삭제한다.
+
+### 7회차 보류 항목
+
+- `character_current_skill_deck_entries.owned_card_id -> character_owned_cards.owned_card_id`
+- `character_owned_cards(character_id, owned_card_id)` unique
+- current skill deck composite FK
+- JPA `@ManyToOne`, `@OneToMany`, `@JoinColumn`
+- JPA cascade/orphanRemoval
+
+### 다음 회차 후보
+
+- current skill deck `owned_card_id` 단일 FK
+- current skill deck composite FK 설계 전 orphan/소속 불일치 점검
+- `CharacterOwnedCardModifier(ownedCardId, modifierId)` unique 정책 판단

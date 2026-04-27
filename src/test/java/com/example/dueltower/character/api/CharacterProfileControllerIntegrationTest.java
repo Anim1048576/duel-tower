@@ -1,7 +1,10 @@
 package com.example.dueltower.character.api;
 
+import com.example.dueltower.character.repository.CharacterCurrentSkillDeckEntryRepository;
+import com.example.dueltower.character.repository.CharacterExLoadoutRepository;
 import com.example.dueltower.character.repository.CharacterOwnedCardModifierRepository;
 import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
+import com.example.dueltower.character.service.CharacterLoadoutService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +33,15 @@ class CharacterProfileControllerIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private CharacterLoadoutService characterLoadoutService;
+
+    @Autowired
+    private CharacterCurrentSkillDeckEntryRepository currentSkillDeckEntryRepository;
+
+    @Autowired
+    private CharacterExLoadoutRepository exLoadoutRepository;
 
     @Autowired
     private CharacterOwnedCardRepository ownedCardRepository;
@@ -367,6 +379,43 @@ class CharacterProfileControllerIntegrationTest {
 
         assertTrue(ownedCardRepository.findByCharacterId(Long.parseLong(characterId)).isEmpty());
         assertTrue(ownedCardModifierRepository.findByOwnedCardId("oc-delete-1").isEmpty());
+    }
+
+    @Test
+    @DisplayName("character delete removes ex loadout and current skill deck entries")
+    void deleteRemovesExLoadoutAndCurrentSkillDeckEntries() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterDeleteLoadout");
+        MvcResult createResult = mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "delete-loadout",
+                                """
+                                          "ownedCardList": [
+                                            {
+                                              "ownedCardId": "oc-delete-loadout-1",
+                                              "cardId": "C001",
+                                              "modifiers": [],
+                                              "strengthened": false,
+                                              "weakened": false,
+                                              "lockedInDeck": false,
+                                              "forgettable": true
+                                            }
+                                          ],
+                                          "exCardId": "EX901"
+                                        """
+                        )))
+                .andExpect(status().isOk())
+                .andReturn();
+        Long characterId = Long.parseLong(extractJsonNumber(createResult.getResponse().getContentAsString(), "id"));
+        characterLoadoutService.replaceCurrentSkillDeckFromOwnedCardIds(characterId, java.util.List.of("oc-delete-loadout-1"));
+
+        mockMvc.perform(delete("/api/content/characters/{id}", characterId)
+                        .session(session))
+                .andExpect(status().isOk());
+
+        assertTrue(exLoadoutRepository.findByCharacterId(characterId).isEmpty());
+        assertTrue(currentSkillDeckEntryRepository.findByCharacterId(characterId).isEmpty());
     }
 
     private String validCharacterBody(String name, String ownedCards) {
