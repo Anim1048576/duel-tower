@@ -3,9 +3,12 @@ package com.example.dueltower.character.service;
 import com.example.dueltower.character.domain.CharacterGender;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.domain.HiddenTraitIds;
+import com.example.dueltower.character.dto.CharacterOwnedCardModifierResponse;
+import com.example.dueltower.character.dto.CharacterOwnedCardResponse;
 import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.session.dto.OwnedCardDto;
+import com.example.dueltower.session.dto.OwnedCardModifierDto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -208,22 +211,47 @@ class CharacterProfileServiceTest {
     @DisplayName("create: response includes legacy and structured loadout fields")
     void createResponseIncludesLegacyAndStructuredLoadoutFields() {
         stubProfileSave();
-        OwnedCardDto ownedCard = new OwnedCardDto("oc-1", "C001", List.of(), false, false, false, true, null);
+        OwnedCardDto ownedCard = new OwnedCardDto(
+                "oc-1",
+                "C001",
+                List.of(new OwnedCardModifierDto("strengthened", 1)),
+                false,
+                false,
+                false,
+                true,
+                null
+        );
+        CharacterOwnedCardResponse ownedCardResponse = new CharacterOwnedCardResponse(
+                "oc-1",
+                "C001",
+                List.of(new CharacterOwnedCardModifierResponse("strengthened", 1)),
+                false,
+                false,
+                false,
+                true,
+                null
+        );
         stubResponseReadModels(
                 "[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]",
                 List.of("C001"),
                 "{\"id\":\"EX901\"}",
-                List.of(ownedCard)
+                List.of(ownedCardResponse)
         );
 
         var response = service.create(validStructuredRequest(null, null, List.of(ownedCard), "EX901"));
 
         assertEquals("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", response.ownedCards());
-        assertEquals(List.of(ownedCard), response.ownedCardList());
+        assertEquals(1, response.ownedCardList().size());
+        CharacterOwnedCardResponse responseOwnedCard = response.ownedCardList().get(0);
+        assertEquals("oc-1", responseOwnedCard.ownedCardId());
+        assertEquals("C001", responseOwnedCard.cardId());
+        assertEquals(1, responseOwnedCard.modifiers().size());
+        assertEquals("strengthened", responseOwnedCard.modifiers().get(0).modifierId());
+        assertEquals(1, responseOwnedCard.modifiers().get(0).value());
         assertEquals(List.of("C001"), response.currentSkillDeckPreviewCardIds());
         assertEquals("{\"id\":\"EX901\"}", response.exCard());
         assertEquals("EX901", response.exCardId());
-        verify(cardCollectionService).toOwnedCardDtos(1L);
+        verify(cardCollectionService).toOwnedCardResponses(1L);
     }
 
     @Test
@@ -239,7 +267,7 @@ class CharacterProfileServiceTest {
         assertTrue(response.ownedCardList().isEmpty());
         assertEquals("{}", response.exCard());
         assertNull(response.exCardId());
-        verify(cardCollectionService).toOwnedCardDtos(1L);
+        verify(cardCollectionService).toOwnedCardResponses(1L);
     }
 
     @Test
@@ -316,7 +344,17 @@ class CharacterProfileServiceTest {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         OwnedCardDto ownedCard = new OwnedCardDto("oc-1", "C001", List.of(), false, false, false, true, null);
-        stubResponseReadModels("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", List.of(), "{\"id\":\"EX901\"}", List.of(ownedCard));
+        CharacterOwnedCardResponse ownedCardResponse = new CharacterOwnedCardResponse(
+                "oc-1",
+                "C001",
+                List.of(),
+                false,
+                false,
+                false,
+                true,
+                null
+        );
+        stubResponseReadModels("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", List.of(), "{\"id\":\"EX901\"}", List.of(ownedCardResponse));
         CharacterProfileRequest req = validStructuredRequest(
                 "[{\"cardId\":\"C002\"}]",
                 "{\"id\":\"C001\"}",
@@ -327,7 +365,7 @@ class CharacterProfileServiceTest {
         var response = service.update(1L, req);
 
         assertEquals("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", response.ownedCards());
-        assertEquals(List.of(ownedCard), response.ownedCardList());
+        assertEquals(List.of(ownedCardResponse), response.ownedCardList());
         assertEquals("{\"id\":\"EX901\"}", response.exCard());
         assertEquals("EX901", response.exCardId());
         verify(cardCollectionService).replaceOwnedCards(1L, List.of(ownedCard));
@@ -572,12 +610,12 @@ class CharacterProfileServiceTest {
             String ownedCards,
             List<String> previewCardIds,
             String exCardJson,
-            List<OwnedCardDto> ownedCardDtos
+            List<CharacterOwnedCardResponse> ownedCardResponses
     ) {
         when(combatStatCalculator.calculate(any(CharacterProfile.class)))
                 .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
         when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(ownedCards);
-        when(cardCollectionService.toOwnedCardDtos(1L)).thenReturn(ownedCardDtos);
+        when(cardCollectionService.toOwnedCardResponses(1L)).thenReturn(ownedCardResponses);
         when(loadoutService.getCurrentSkillDeckPreviewCardIds(1L)).thenReturn(previewCardIds);
         String exCardId = exCardJson.equals("{}") ? null : exCardJson.replace("{\"id\":\"", "").replace("\"}", "");
         when(loadoutService.getExCardId(1L)).thenReturn(exCardId);

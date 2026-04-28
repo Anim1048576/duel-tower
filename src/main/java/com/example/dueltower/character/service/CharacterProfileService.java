@@ -154,7 +154,7 @@ public class CharacterProfileService {
                 profile.getTrait2(),
                 normalizeHiddenTraitIds(profile.getHiddenTraitIds()),
                 cardCollectionService.toOwnedCardsJson(characterId),
-                cardCollectionService.toOwnedCardDtos(characterId),
+                cardCollectionService.toOwnedCardResponses(characterId),
                 loadoutService.getCurrentSkillDeckPreviewCardIds(characterId),
                 toExCardJson(exCardId),
                 exCardId,
