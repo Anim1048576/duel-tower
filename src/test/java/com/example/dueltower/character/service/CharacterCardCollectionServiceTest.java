@@ -2,6 +2,7 @@ package com.example.dueltower.character.service;
 
 import com.example.dueltower.character.domain.CharacterOwnedCard;
 import com.example.dueltower.character.domain.CharacterOwnedCardModifier;
+import com.example.dueltower.character.dto.CharacterOwnedCardResponse;
 import com.example.dueltower.character.repository.CharacterOwnedCardModifierRepository;
 import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
@@ -132,6 +133,59 @@ class CharacterCardCollectionServiceTest {
         assertTrue(card.path("lockedInDeck").asBoolean());
         assertEquals(CardModifierIds.STRENGTHENED, card.path("modifiers").get(0).path("modifierId").asText());
         assertEquals(1, card.path("modifiers").get(0).path("value").asInt());
+    }
+
+    @Test
+    void toOwnedCardResponsesConvertsSessionDtosToCharacterApiResponses() {
+        CharacterCardCollectionService spy = spy(service);
+        doReturn(List.of(new OwnedCardDto(
+                "oc-1",
+                "C001",
+                List.of(new OwnedCardModifierDto(CardModifierIds.STRENGTHENED, 7)),
+                true,
+                false,
+                true,
+                false,
+                "required-by-current-deck"
+        ))).when(spy).toOwnedCardDtos(1L);
+
+        List<CharacterOwnedCardResponse> responses = spy.toOwnedCardResponses(1L);
+
+        assertEquals(1, responses.size());
+        CharacterOwnedCardResponse response = responses.get(0);
+        assertEquals("oc-1", response.ownedCardId());
+        assertEquals("C001", response.cardId());
+        assertTrue(response.strengthened());
+        assertFalse(response.weakened());
+        assertTrue(response.lockedInDeck());
+        assertFalse(response.forgettable());
+        assertEquals("required-by-current-deck", response.notForgettableReason());
+        assertEquals(1, response.modifiers().size());
+        assertEquals(CardModifierIds.STRENGTHENED, response.modifiers().get(0).modifierId());
+        assertEquals(7, response.modifiers().get(0).value());
+    }
+
+    @Test
+    void toOwnedCardResponsesConvertsNullableBooleansNullSafely() {
+        CharacterCardCollectionService spy = spy(service);
+        doReturn(List.of(new OwnedCardDto(
+                "oc-1",
+                "C001",
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                null
+        ))).when(spy).toOwnedCardDtos(1L);
+
+        CharacterOwnedCardResponse response = spy.toOwnedCardResponses(1L).get(0);
+
+        assertFalse(response.strengthened());
+        assertFalse(response.weakened());
+        assertFalse(response.lockedInDeck());
+        assertTrue(response.forgettable());
+        assertNull(response.notForgettableReason());
     }
 
     @Test

@@ -2,6 +2,8 @@ package com.example.dueltower.character.service;
 
 import com.example.dueltower.character.domain.CharacterOwnedCard;
 import com.example.dueltower.character.domain.CharacterOwnedCardModifier;
+import com.example.dueltower.character.dto.CharacterOwnedCardModifierResponse;
+import com.example.dueltower.character.dto.CharacterOwnedCardResponse;
 import com.example.dueltower.character.repository.CharacterOwnedCardModifierRepository;
 import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
@@ -105,6 +107,13 @@ public class CharacterCardCollectionService {
     }
 
     @Transactional(readOnly = true)
+    public List<CharacterOwnedCardResponse> toOwnedCardResponses(Long characterId) {
+        return toOwnedCardDtos(characterId).stream()
+                .map(CharacterCardCollectionService::toOwnedCardResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public String toOwnedCardsJson(Long characterId) {
         ArrayNode out = JSON.createArrayNode();
         for (OwnedCard ownedCard : toRuntimeOwnedCards(characterId)) {
@@ -165,6 +174,25 @@ public class CharacterCardCollectionService {
                 .lockedInDeck(ownedCard.lockedInDeck())
                 .forgettable(forgettable == null || forgettable)
                 .build();
+    }
+
+    private static CharacterOwnedCardResponse toOwnedCardResponse(OwnedCardDto dto) {
+        List<CharacterOwnedCardModifierResponse> modifiers = dto.modifiers() == null ? List.of() : dto.modifiers().stream()
+                .map(modifier -> new CharacterOwnedCardModifierResponse(
+                        modifier.modifierId(),
+                        modifier.value() == null ? 0 : modifier.value()
+                ))
+                .toList();
+        return new CharacterOwnedCardResponse(
+                dto.ownedCardId(),
+                dto.cardId(),
+                modifiers,
+                Boolean.TRUE.equals(dto.strengthened()),
+                Boolean.TRUE.equals(dto.weakened()),
+                Boolean.TRUE.equals(dto.lockedInDeck()),
+                dto.forgettable() == null || dto.forgettable(),
+                dto.notForgettableReason()
+        );
     }
 
     private Map<String, List<OwnedCardModifierDto>> modifierDtosByOwnedCardId(List<CharacterOwnedCard> cardRows) {
