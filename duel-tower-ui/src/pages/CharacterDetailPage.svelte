@@ -44,8 +44,8 @@
     trait1: string
     trait2: string
     hiddenTraitIds: string[]
-    ownedCards: string
-    exCard: string
+    ownedCardListJson: string
+    exCardInput: string
   }
 
   type CharacterNavigationState = {
@@ -68,8 +68,8 @@
       trait1: '',
       trait2: '',
       hiddenTraitIds: [],
-      ownedCards: '',
-      exCard: '',
+      ownedCardListJson: '',
+      exCardInput: '',
     }
   }
 
@@ -89,8 +89,8 @@
       trait1: character.trait1 ?? '',
       trait2: character.trait2 ?? '',
       hiddenTraitIds: [...character.hiddenTraitIds],
-      ownedCards: stringifyOwnedCardList(character.ownedCardList),
-      exCard: stringifyExCardId(character.exCardId),
+      ownedCardListJson: stringifyOwnedCardList(character.ownedCardList),
+      exCardInput: stringifyExCardId(character.exCardId),
     }
   }
 
@@ -330,8 +330,8 @@
       trait1: normalizeOptionalText(form.trait1),
       trait2: normalizeOptionalText(form.trait2),
       hiddenTraitIds: normalizeHiddenTraitIdsForPayload(form.hiddenTraitIds),
-      ownedCardList: parseOwnedCardsInput(form.ownedCards),
-      exCardId: parseExCardInput(form.exCard) ?? '',
+      ownedCardList: parseOwnedCardsInput(form.ownedCardListJson),
+      exCardId: parseExCardInput(form.exCardInput) ?? '',
     }
   }
 
@@ -355,8 +355,8 @@
       left.trait1 === right.trait1 &&
       left.trait2 === right.trait2 &&
       isSameStringArray(left.hiddenTraitIds, right.hiddenTraitIds) &&
-      left.ownedCards === right.ownedCards &&
-      left.exCard === right.exCard
+      left.ownedCardListJson === right.ownedCardListJson &&
+      left.exCardInput === right.exCardInput
     )
   }
 
@@ -741,13 +741,13 @@
             </div>
 
             <label class="detail-page__field detail-page__field--span-2">
-              <span>Owned cards JSON</span>
-              <textarea bind:value={form.ownedCards} name="ownedCards" rows="5"></textarea>
+              <span>Owned card list JSON</span>
+              <textarea bind:value={form.ownedCardListJson} name="ownedCardListJson" rows="5"></textarea>
             </label>
 
             <label class="detail-page__field detail-page__field--span-2">
               <span>EX card id / JSON</span>
-              <textarea bind:value={form.exCard} name="exCard" rows="4"></textarea>
+              <textarea bind:value={form.exCardInput} name="exCardInput" rows="4"></textarea>
             </label>
           </div>
         </fieldset>
