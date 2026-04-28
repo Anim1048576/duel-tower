@@ -89,8 +89,8 @@
       trait1: character.trait1 ?? '',
       trait2: character.trait2 ?? '',
       hiddenTraitIds: [...character.hiddenTraitIds],
-      ownedCards: stringifyOwnedCardList(character.ownedCardList, character.ownedCards),
-      exCard: stringifyExCardId(character.exCardId, character.exCard),
+      ownedCards: stringifyOwnedCardList(character.ownedCardList),
+      exCard: stringifyExCardId(character.exCardId),
     }
   }
 
@@ -179,12 +179,12 @@
     return typeof value === 'boolean' ? value : fallback
   }
 
-  function stringifyOwnedCardList(ownedCardList: OwnedCardResponse[] | null | undefined, fallback: string) {
-    return Array.isArray(ownedCardList) ? JSON.stringify(ownedCardList) : fallback
+  function stringifyOwnedCardList(ownedCardList: OwnedCardResponse[] | null | undefined) {
+    return Array.isArray(ownedCardList) ? JSON.stringify(ownedCardList) : '[]'
   }
 
-  function stringifyExCardId(exCardId: string | null | undefined, fallback: string) {
-    return exCardId ? JSON.stringify({ id: exCardId }) : fallback
+  function stringifyExCardId(exCardId: string | null | undefined) {
+    return exCardId ? JSON.stringify({ id: exCardId }) : '{}'
   }
 
   function parseOwnedCardModifierInput(value: unknown, index: number, modifierIndex: number): OwnedCardModifierRequest {
