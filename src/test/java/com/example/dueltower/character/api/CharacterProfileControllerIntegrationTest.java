@@ -115,7 +115,7 @@ class CharacterProfileControllerIntegrationTest {
         mockMvc.perform(post("/api/content/characters")
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validCharacterBody("invalid-ex-create", "[]", "[]", "{\\\"id\\\":\\\"NO_SUCH_CARD\\\"}")))
+                        .content(validCharacterBody("invalid-ex-create", "[]", "[]", "NO_SUCH_CARD")))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(containsString("invalid exCardId: NO_SUCH_CARD")));
     }
@@ -144,7 +144,7 @@ class CharacterProfileControllerIntegrationTest {
                                               "forgettable": true
                                             }
                                           ],
-                                          "exCard": "{}"
+                                          "exCardId": ""
                                         """
                         )))
                 .andExpect(status().isOk())
@@ -180,7 +180,7 @@ class CharacterProfileControllerIntegrationTest {
                         .content(characterBodyWithLoadoutFields(
                                 "structured-ex-create",
                                 """
-                                          "ownedCards": "[]",
+                                          "ownedCardList": [],
                                           "exCardId": "EX901"
                                         """
                 )))
@@ -191,6 +191,28 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.exCardId").value("EX901"))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isArray());
+    }
+
+    @Test
+    @DisplayName("character create accepts legacy loadout fields for compatibility")
+    void createAcceptsLegacyLoadoutFieldsForCompatibility() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterCreateLegacyLoadout");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(legacyCharacterBody(
+                                "legacy-loadout-create",
+                                "[{\\\"ownedCardId\\\":\\\"oc-legacy-1\\\",\\\"cardId\\\":\\\"C001\\\"}]",
+                                "{\\\"id\\\":\\\"EX901\\\"}"
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownedCardList").isArray())
+                .andExpect(jsonPath("$.ownedCardList[0].ownedCardId").value("oc-legacy-1"))
+                .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"))
+                .andExpect(jsonPath("$.ownedCards").doesNotExist())
+                .andExpect(jsonPath("$.exCard").doesNotExist())
+                .andExpect(jsonPath("$.exCardId").value("EX901"));
     }
 
     @Test
@@ -294,7 +316,7 @@ class CharacterProfileControllerIntegrationTest {
         mockMvc.perform(put("/api/content/characters/{id}", characterId)
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validCharacterBody("after-name", "[{\\\"cardId\\\":\\\"C001\\\"}]")))
+                        .content(validCharacterBody("after-name", ownedCardListJson("oc-after-1", "C001"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("after-name"))
                 .andExpect(jsonPath("$.hiddenTraitIds").isEmpty())
@@ -329,7 +351,7 @@ class CharacterProfileControllerIntegrationTest {
         mockMvc.perform(put("/api/content/characters/{id}", characterId)
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validCharacterBody("after-invalid-ex", "[]", "[]", "{\\\"id\\\":\\\"C001\\\"}")))
+                        .content(validCharacterBody("after-invalid-ex", "[]", "[]", "C001")))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(containsString("exCardId must reference an EX card: C001")));
     }
@@ -363,7 +385,7 @@ class CharacterProfileControllerIntegrationTest {
                                               "forgettable": true
                                             }
                                           ],
-                                          "exCard": "{}"
+                                          "exCardId": ""
                                         """
                 )))
                 .andExpect(status().isOk())
@@ -395,7 +417,7 @@ class CharacterProfileControllerIntegrationTest {
                                               "forgettable": true
                                             }
                                           ],
-                                          "exCard": "{}"
+                                          "exCardId": ""
                                         """
                         )))
                 .andExpect(status().isOk())
@@ -420,7 +442,7 @@ class CharacterProfileControllerIntegrationTest {
                                               "forgettable": true
                                             }
                                           ],
-                                          "exCard": "{}"
+                                          "exCardId": ""
                                         """
                         )))
                 .andExpect(status().isOk())
@@ -508,19 +530,32 @@ class CharacterProfileControllerIntegrationTest {
         assertTrue(currentSkillDeckEntryRepository.findByCharacterId(characterId).isEmpty());
     }
 
-    private String validCharacterBody(String name, String ownedCards) {
-        return validCharacterBody(name, ownedCards, "[]");
+    private String validCharacterBody(String name, String ownedCardListJson) {
+        return validCharacterBody(name, ownedCardListJson, "[]");
     }
 
-    private String validCharacterBody(String name, String ownedCards, String hiddenTraitIdsJson) {
-        return validCharacterBody(name, ownedCards, hiddenTraitIdsJson, "{}");
+    private String validCharacterBody(String name, String ownedCardListJson, String hiddenTraitIdsJson) {
+        return validCharacterBody(name, ownedCardListJson, hiddenTraitIdsJson, "");
     }
 
-    private String validCharacterBody(String name, String ownedCards, String hiddenTraitIdsJson, String exCard) {
+    private String validCharacterBody(String name, String ownedCardListJson, String hiddenTraitIdsJson, String exCardId) {
         return characterBodyWithLoadoutFields(name, hiddenTraitIdsJson, """
+                  "ownedCardList": %s,
+                  "exCardId": "%s"
+                """.formatted(ownedCardListJson, exCardId));
+    }
+
+    private String legacyCharacterBody(String name, String ownedCards, String exCard) {
+        return characterBodyWithLoadoutFields(name, "[]", """
                   "ownedCards": "%s",
                   "exCard": "%s"
                 """.formatted(ownedCards, exCard));
+    }
+
+    private String ownedCardListJson(String ownedCardId, String cardId) {
+        return """
+                [{"ownedCardId":"%s","cardId":"%s"}]
+                """.formatted(ownedCardId, cardId).trim();
     }
 
     private String characterBodyWithLoadoutFields(String name, String loadoutFields) {
