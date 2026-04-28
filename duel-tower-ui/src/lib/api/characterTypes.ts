@@ -18,6 +18,11 @@ export type OwnedCardModifierRequest = {
   value: number | null
 }
 
+export type OwnedCardModifierResponse = {
+  modifierId: string
+  value: number
+}
+
 export type OwnedCardRequest = {
   ownedCardId: string | null
   cardId: string
@@ -32,7 +37,7 @@ export type OwnedCardRequest = {
 export type OwnedCardResponse = {
   ownedCardId: string
   cardId: string
-  modifiers: OwnedCardModifierRequest[]
+  modifiers: OwnedCardModifierResponse[]
   strengthened: boolean
   weakened: boolean
   lockedInDeck: boolean
