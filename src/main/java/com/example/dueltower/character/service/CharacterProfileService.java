@@ -92,10 +92,7 @@ public class CharacterProfileService {
         profile.setTrait1(normalizeOptionalText(req.trait1()));
         profile.setTrait2(normalizeOptionalText(req.trait2()));
         profile.setHiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()));
-        boolean ownedCardsChanged = ownedCardsChanged(id, req);
-        if (ownedCardsChanged) {
-            loadoutService.clearCurrentSkillDeck(id);
-        }
+        loadoutService.clearCurrentSkillDeck(id);
         replaceOwnedCards(id, req);
         replaceExCard(id, req);
         return toResponse(profile);
@@ -155,10 +152,6 @@ public class CharacterProfileService {
                 profile.getCreateDate(),
                 profile.getUpdateDate()
         );
-    }
-
-    private boolean ownedCardsChanged(Long characterId, CharacterProfileRequest req) {
-        return true;
     }
 
     private void replaceOwnedCards(Long characterId, CharacterProfileRequest req) {

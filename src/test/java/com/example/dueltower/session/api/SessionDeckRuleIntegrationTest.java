@@ -351,16 +351,16 @@ class SessionDeckRuleIntegrationTest {
                 .andExpect(status().isOk());
 
         assertEquals(updatedDeckOwnedCardIds, characterLoadoutService.getCurrentSkillDeckOwnedCardIds(characterIdLong));
-        JsonNode savedOwnedCards = JSON.readTree(characterCardCollectionService.toOwnedCardsJson(characterIdLong));
-        assertTrue(savedOwnedCards.isArray());
-        assertTrue(savedOwnedCards.get(0).hasNonNull("ownedCardId"));
-        assertTrue(savedOwnedCards.get(0).hasNonNull("cardId"));
+        List<OwnedCard> savedOwnedCards = characterCardCollectionService.toRuntimeOwnedCards(characterIdLong);
+        assertFalse(savedOwnedCards.isEmpty());
+        assertFalse(savedOwnedCards.get(0).ownedCardId().isBlank());
+        assertFalse(savedOwnedCards.get(0).cardId().isBlank());
 
         Map<String, String> savedOwnedCardIdToCardId = new LinkedHashMap<>();
-        for (JsonNode savedOwnedCard : savedOwnedCards) {
+        for (OwnedCard savedOwnedCard : savedOwnedCards) {
             savedOwnedCardIdToCardId.put(
-                    savedOwnedCard.path("ownedCardId").asText(),
-                    savedOwnedCard.path("cardId").asText()
+                    savedOwnedCard.ownedCardId(),
+                    savedOwnedCard.cardId()
             );
         }
         for (String deckOwnedCardId : updatedDeckOwnedCardIds) {

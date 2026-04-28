@@ -14,11 +14,6 @@ import com.example.dueltower.session.service.SessionNormalizationSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -31,8 +26,6 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @Service
 public class CharacterCardCollectionService {
-
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final CharacterOwnedCardRepository ownedCardRepository;
     private final CharacterOwnedCardModifierRepository ownedCardModifierRepository;
@@ -71,11 +64,6 @@ public class CharacterCardCollectionService {
         ownedCardModifierRepository.saveAll(modifierRows);
     }
 
-    @Transactional
-    public void replaceOwnedCardsFromJson(Long characterId, String ownedCardsJson) {
-        replaceOwnedCards(characterId, parseOwnedCardsJson(ownedCardsJson));
-    }
-
     @Transactional(readOnly = true)
     public List<OwnedCard> toRuntimeOwnedCards(Long characterId) {
         return SessionNormalizationSupport.normalizeOwnedCards(toOwnedCardDtos(characterId));
@@ -111,27 +99,6 @@ public class CharacterCardCollectionService {
         return toOwnedCardDtos(characterId).stream()
                 .map(CharacterCardCollectionService::toOwnedCardResponse)
                 .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public String toOwnedCardsJson(Long characterId) {
-        ArrayNode out = JSON.createArrayNode();
-        for (OwnedCard ownedCard : toRuntimeOwnedCards(characterId)) {
-            ObjectNode node = out.addObject();
-            node.put("ownedCardId", ownedCard.ownedCardId());
-            node.put("cardId", ownedCard.cardId());
-            node.put("strengthened", ownedCard.strengthened());
-            node.put("weakened", ownedCard.weakened());
-            node.put("lockedInDeck", ownedCard.lockedInDeck());
-
-            ArrayNode modifiers = node.putArray("modifiers");
-            for (OwnedCardModifier modifier : ownedCard.modifiers()) {
-                ObjectNode modifierNode = modifiers.addObject();
-                modifierNode.put("modifierId", modifier.modifierId());
-                modifierNode.put("value", modifier.value());
-            }
-        }
-        return out.toString();
     }
 
     @Transactional(readOnly = true)
@@ -214,67 +181,6 @@ public class CharacterCardCollectionService {
         return out;
     }
 
-    private static List<OwnedCardDto> parseOwnedCardsJson(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return List.of();
-        }
-        try {
-            List<JsonNode> nodes = JSON.readValue(raw, new TypeReference<>() {});
-            List<OwnedCardDto> out = new ArrayList<>();
-            for (int i = 0; i < nodes.size(); i++) {
-                JsonNode node = nodes.get(i);
-                if (node == null || node.isNull()) {
-                    continue;
-                }
-                if (node.isTextual()) {
-                    String cardId = node.asText("").trim();
-                    if (!cardId.isEmpty()) {
-                        out.add(new OwnedCardDto(null, cardId, List.of(), false, false, false, true, null));
-                    }
-                    continue;
-                }
-                String cardId = node.path("cardId").asText("").trim();
-                if (cardId.isEmpty()) {
-                    throw invalidPersistedOwnedCards("entry[" + i + "] has missing cardId");
-                }
-                String ownedCardId = node.path("ownedCardId").asText("").trim();
-                out.add(new OwnedCardDto(
-                        ownedCardId.isEmpty() ? null : ownedCardId,
-                        cardId,
-                        parseOwnedCardModifierDtos(node.path("modifiers")),
-                        node.path("strengthened").asBoolean(false),
-                        node.path("weakened").asBoolean(false),
-                        node.path("lockedInDeck").asBoolean(false),
-                        node.path("forgettable").isMissingNode() ? true : node.path("forgettable").asBoolean(true),
-                        null
-                ));
-            }
-            return List.copyOf(out);
-        } catch (ResponseStatusException e) {
-            throw e;
-        } catch (Exception e) {
-            throw invalidPersistedOwnedCards("malformed JSON");
-        }
-    }
-
-    private static List<OwnedCardModifierDto> parseOwnedCardModifierDtos(JsonNode node) {
-        if (node == null || !node.isArray()) {
-            return List.of();
-        }
-        List<OwnedCardModifierDto> out = new ArrayList<>();
-        for (JsonNode modifierNode : node) {
-            if (modifierNode == null || modifierNode.isNull()) {
-                continue;
-            }
-            String modifierId = modifierNode.path("modifierId").asText("").trim();
-            if (modifierId.isEmpty()) {
-                continue;
-            }
-            out.add(new OwnedCardModifierDto(modifierId, modifierNode.path("value").asInt(0)));
-        }
-        return List.copyOf(out);
-    }
-
     private static void rejectDuplicateOwnedCardIds(List<OwnedCard> ownedCards) {
         Set<String> seen = new LinkedHashSet<>();
         for (OwnedCard ownedCard : ownedCards) {
@@ -282,10 +188,6 @@ public class CharacterCardCollectionService {
                 throw new ResponseStatusException(BAD_REQUEST, "ownedCards.ownedCardId must be unique: " + ownedCard.ownedCardId());
             }
         }
-    }
-
-    private static ResponseStatusException invalidPersistedOwnedCards(String detail) {
-        return new ResponseStatusException(BAD_REQUEST, "invalid persisted ownedCards payload: " + detail);
     }
 
     private static void requireCharacterId(Long characterId) {

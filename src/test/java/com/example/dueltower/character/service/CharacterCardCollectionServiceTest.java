@@ -17,8 +17,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -29,8 +27,6 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 @ExtendWith(MockitoExtension.class)
 class CharacterCardCollectionServiceTest {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
-
     @Mock
     private CharacterOwnedCardRepository ownedCardRepository;
 
@@ -39,40 +35,6 @@ class CharacterCardCollectionServiceTest {
 
     @InjectMocks
     private CharacterCardCollectionService service;
-
-    @Test
-    void replaceOwnedCardsFromJsonAcceptsLegacyStringCardIds() {
-        when(ownedCardRepository.findByCharacterId(1L)).thenReturn(List.of());
-
-        service.replaceOwnedCardsFromJson(1L, """
-                [" C001 ", "C002"]
-                """);
-
-        List<CharacterOwnedCard> saved = capturedSavedCards();
-        assertEquals(2, saved.size());
-        assertEquals(1L, saved.get(0).getCharacterId());
-        assertEquals("C001", saved.get(0).getCardId());
-        assertNotNull(saved.get(0).getOwnedCardId());
-        assertFalse(saved.get(0).getOwnedCardId().isBlank());
-        assertEquals("C002", saved.get(1).getCardId());
-        verify(ownedCardModifierRepository).saveAll(List.of());
-    }
-
-    @Test
-    void replaceOwnedCardsFromJsonAcceptsOwnedCardIds() {
-        when(ownedCardRepository.findByCharacterId(1L)).thenReturn(List.of());
-
-        service.replaceOwnedCardsFromJson(1L, """
-                [
-                  {"ownedCardId": " oc-1 ", "cardId": " C001 "}
-                ]
-                """);
-
-        List<CharacterOwnedCard> saved = capturedSavedCards();
-        assertEquals(1, saved.size());
-        assertEquals("oc-1", saved.get(0).getOwnedCardId());
-        assertEquals("C001", saved.get(0).getCardId());
-    }
 
     @Test
     void replaceOwnedCardsPreservesLegacyBooleansAsCompatibilityFieldsAndModifiers() {
@@ -114,25 +76,6 @@ class CharacterCardCollectionServiceTest {
         assertEquals("C001", ownedCard.cardId());
         assertTrue(ownedCard.strengthened());
         assertTrue(ownedCard.lockedInDeck());
-    }
-
-    @Test
-    void toOwnedCardsJsonReturnsApiCompatibleShape() throws Exception {
-        givenStoredRows();
-
-        String json = service.toOwnedCardsJson(1L);
-
-        JsonNode root = JSON.readTree(json);
-        assertTrue(root.isArray());
-        assertEquals(1, root.size());
-        JsonNode card = root.get(0);
-        assertEquals("oc-1", card.path("ownedCardId").asText());
-        assertEquals("C001", card.path("cardId").asText());
-        assertTrue(card.path("strengthened").asBoolean());
-        assertFalse(card.path("weakened").asBoolean());
-        assertTrue(card.path("lockedInDeck").asBoolean());
-        assertEquals(CardModifierIds.STRENGTHENED, card.path("modifiers").get(0).path("modifierId").asText());
-        assertEquals(1, card.path("modifiers").get(0).path("value").asInt());
     }
 
     @Test

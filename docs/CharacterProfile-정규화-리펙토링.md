@@ -104,15 +104,15 @@ V4 이후에는 current skill deck entry가 존재하지 않는 owned card를 �
 - `CharacterProfileResponse.ownedCardList`는 response 조회용으로 boolean 필드를 non-null로 제공한다.
 - frontend `OwnedCardRequest` / `OwnedCardResponse`도 request와 response nullable 정책을 분리한다.
 
-남은 리스크는 public API DTO 경계가 아니라 내부 JSON helper(`toOwnedCardsJson`, `replaceOwnedCardsFromJson`)의 사용처 정리 여부다.
+public API DTO 경계와 legacy JSON compatibility helper 정리는 완료되었다.
 
-### 3. Legacy owned cards JSON helper 정리
+### 3. Legacy owned cards JSON helper 제거 완료
 
-`CharacterProfileRequest`에서는 `ownedCards`와 `exCard`를 제거했다. 다만 `CharacterCardCollectionService`에는 session/engine 또는 별도 전환 경로에서 사용할 수 있는 JSON helper가 남아 있다.
+`CharacterProfileRequest`에서는 `ownedCards`와 `exCard`를 제거했고, `CharacterCardCollectionService`의 ownedCards JSON compatibility helper도 제거했다.
 
-- `CharacterCardCollectionService.toOwnedCardsJson(...)` 사용처 정리 여부를 판단한다.
-- `CharacterCardCollectionService.replaceOwnedCardsFromJson(...)` 사용처 정리 여부를 판단한다.
-- session/engine의 `ownedCards` 개념과 public character API request 계약을 혼동하지 않는다.
+- `CharacterCardCollectionService.toOwnedCardsJson(...)`는 제거되었다.
+- `CharacterCardCollectionService.replaceOwnedCardsFromJson(...)`는 제거되었다.
+- 남은 `ownedCards` 표현은 session/runtime/card collection domain 용어이며, public CharacterProfile API JSON compatibility layer가 아니다.
 
 ### 4. 테스트 프로필의 FK 검증 전략
 
@@ -136,6 +136,7 @@ V4 이후에는 current skill deck entry가 존재하지 않는 owned card를 �
 - [x] frontend type check가 통과한다.
 - [x] 테스트 fixture의 기본 request가 structured-only를 사용한다.
 - [x] `CharacterProfileRequest`에서 legacy `ownedCards`/`exCard` request field를 제거했다.
+- [x] `CharacterCardCollectionService`의 ownedCards JSON compatibility helper를 제거했다.
 
 ## Related checks
 

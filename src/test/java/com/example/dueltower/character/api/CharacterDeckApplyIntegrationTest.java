@@ -13,6 +13,7 @@ import com.example.dueltower.content.deck.domain.Deck;
 import com.example.dueltower.content.deck.domain.DeckType;
 import com.example.dueltower.content.deck.repository.DeckRepository;
 import com.example.dueltower.member.MemberRepository;
+import com.example.dueltower.session.dto.OwnedCardDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -263,13 +264,11 @@ class CharacterDeckApplyIntegrationTest {
     void characterDetailPreviewResolvesOwnedCardIdStoredCurrentSkillDeck() throws Exception {
         MockHttpSession session = signUpAndLogin("detailPreviewOwnedIds");
         CharacterProfile character = createCharacter(
-                """
-                        [
-                          {"ownedCardId":"oc-1","cardId":"C001"},
-                          {"ownedCardId":"oc-2","cardId":"C001"},
-                          {"ownedCardId":"oc-3","cardId":"C002"}
-                        ]
-                        """,
+                ownedCards(
+                        "oc-1", "C001",
+                        "oc-2", "C001",
+                        "oc-3", "C002"
+                ),
                 List.of("oc-2", "oc-1", "oc-3")
         );
 
@@ -287,12 +286,10 @@ class CharacterDeckApplyIntegrationTest {
     void characterReadResponsesDropStaleOwnedCardIdsAndDoNotExposeRawCurrentSkillDeck() throws Exception {
         MockHttpSession session = signUpAndLogin("detailPreviewStaleOwnedIds");
         CharacterProfile character = createCharacter(
-                """
-                        [
-                          {"ownedCardId":"oc-1","cardId":"C001"},
-                          {"ownedCardId":"oc-2","cardId":"C002"}
-                        ]
-                        """,
+                ownedCards(
+                        "oc-1", "C001",
+                        "oc-2", "C002"
+                ),
                 List.of("oc-1", "oc-stale", "oc-2")
         );
 
@@ -360,10 +357,10 @@ class CharacterDeckApplyIntegrationTest {
     }
 
     private CharacterProfile createCharacter(List<String> currentSkillDeck) {
-        return createCharacter(defaultOwnedCardsJson(), currentSkillDeck);
+        return createCharacter(defaultOwnedCards(), currentSkillDeck);
     }
 
-    private CharacterProfile createCharacter(String ownedCards, List<String> currentSkillDeck) {
+    private CharacterProfile createCharacter(List<OwnedCardDto> ownedCards, List<String> currentSkillDeck) {
         CharacterProfile profile = CharacterProfile.builder()
                 .name("test-character")
                 .gender(CharacterGender.MALE)
@@ -381,7 +378,7 @@ class CharacterDeckApplyIntegrationTest {
                 .hiddenTraitIds(List.of())
                 .build();
         CharacterProfile saved = characterProfileRepository.save(profile);
-        cardCollectionService.replaceOwnedCardsFromJson(saved.getId(), ownedCards);
+        cardCollectionService.replaceOwnedCards(saved.getId(), ownedCards);
         insertCurrentSkillDeckEntries(saved.getId(), currentSkillDeck);
         return saved;
     }
@@ -401,26 +398,41 @@ class CharacterDeckApplyIntegrationTest {
         currentSkillDeckEntryRepository.saveAll(entries);
     }
 
-    private String defaultOwnedCardsJson() {
-        return """
-                [
-                  {"ownedCardId":"oc-c001-1","cardId":"C001"},
-                  {"ownedCardId":"oc-c001-2","cardId":"C001"},
-                  {"ownedCardId":"oc-c001-3","cardId":"C001"},
-                  {"ownedCardId":"oc-c002-1","cardId":"C002"},
-                  {"ownedCardId":"oc-c002-2","cardId":"C002"},
-                  {"ownedCardId":"oc-c002-3","cardId":"C002"},
-                  {"ownedCardId":"oc-c003-1","cardId":"C003"},
-                  {"ownedCardId":"oc-c003-2","cardId":"C003"},
-                  {"ownedCardId":"oc-c003-3","cardId":"C003"},
-                  {"ownedCardId":"oc-c004-1","cardId":"C004"},
-                  {"ownedCardId":"oc-c004-2","cardId":"C004"},
-                  {"ownedCardId":"oc-c004-3","cardId":"C004"},
-                  {"ownedCardId":"oc-tig-1","cardId":"Tig001_Card"},
-                  {"ownedCardId":"oc-tig-2","cardId":"Tig001_Card"},
-                  {"ownedCardId":"oc-tig-3","cardId":"Tig001_Card"}
-                ]
-                """;
+    private List<OwnedCardDto> defaultOwnedCards() {
+        return ownedCards(
+                "oc-c001-1", "C001",
+                "oc-c001-2", "C001",
+                "oc-c001-3", "C001",
+                "oc-c002-1", "C002",
+                "oc-c002-2", "C002",
+                "oc-c002-3", "C002",
+                "oc-c003-1", "C003",
+                "oc-c003-2", "C003",
+                "oc-c003-3", "C003",
+                "oc-c004-1", "C004",
+                "oc-c004-2", "C004",
+                "oc-c004-3", "C004",
+                "oc-tig-1", "Tig001_Card",
+                "oc-tig-2", "Tig001_Card",
+                "oc-tig-3", "Tig001_Card"
+        );
+    }
+
+    private List<OwnedCardDto> ownedCards(String... ownedCardIdAndCardIdPairs) {
+        List<OwnedCardDto> cards = new java.util.ArrayList<>();
+        for (int i = 0; i < ownedCardIdAndCardIdPairs.length; i += 2) {
+            cards.add(new OwnedCardDto(
+                    ownedCardIdAndCardIdPairs[i],
+                    ownedCardIdAndCardIdPairs[i + 1],
+                    List.of(),
+                    false,
+                    false,
+                    false,
+                    true,
+                    null
+            ));
+        }
+        return List.copyOf(cards);
     }
 
     private Deck createDeck(String name, DeckType type, Map<String, Integer> cards) {

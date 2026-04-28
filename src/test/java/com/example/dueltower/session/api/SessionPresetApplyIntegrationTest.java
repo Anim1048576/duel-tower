@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.seedOwnedCards;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -425,7 +426,7 @@ class SessionPresetApplyIntegrationTest {
                 .trait2(trait2)
                 .build());
 
-        characterCardCollectionService.replaceOwnedCardsFromJson(profile.getId(), ownedCards);
+        seedOwnedCards(characterCardCollectionService, profile.getId(), ownedCards);
         if (currentSkillDeck != null && !currentSkillDeck.isEmpty()) {
             characterLoadoutService.replaceCurrentSkillDeckFromOwnedCardIds(
                     profile.getId(),

@@ -50,6 +50,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static com.example.dueltower.support.CharacterLoadoutTestFixtures.seedOwnedCards;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -1671,7 +1672,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .trait2(null)
                 .build());
 
-        characterCardCollectionService.replaceOwnedCardsFromJson(profile.getId(), ownedCardsJson);
+        seedOwnedCards(characterCardCollectionService, profile.getId(), ownedCardsJson);
         if (currentSkillDeck != null) {
             characterLoadoutService.replaceCurrentSkillDeckFromOwnedCardIds(
                     profile.getId(),

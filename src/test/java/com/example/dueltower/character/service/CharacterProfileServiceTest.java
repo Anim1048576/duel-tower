@@ -298,7 +298,6 @@ class CharacterProfileServiceTest {
 
         assertTrue(response.currentSkillDeckPreviewCardIds().isEmpty());
         verify(cardCollectionService).replaceOwnedCards(1L, List.of(ownedCard));
-        verify(cardCollectionService, never()).replaceOwnedCardsFromJson(anyLong(), anyString());
         verify(loadoutService).clearCurrentSkillDeck(1L);
         InOrder inOrder = inOrder(loadoutService, cardCollectionService);
         inOrder.verify(loadoutService).clearCurrentSkillDeck(1L);
@@ -316,7 +315,6 @@ class CharacterProfileServiceTest {
         ArgumentCaptor<List<OwnedCardDto>> captor = ArgumentCaptor.forClass(List.class);
         verify(cardCollectionService).replaceOwnedCards(eq(1L), captor.capture());
         assertTrue(captor.getValue().isEmpty());
-        verify(cardCollectionService, never()).replaceOwnedCardsFromJson(anyLong(), anyString());
         verify(loadoutService).clearExCard(1L);
     }
 
