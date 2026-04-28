@@ -122,7 +122,7 @@ class CharacterProfileControllerIntegrationTest {
 
     @Test
     @DisplayName("character create accepts structured ownedCardList without legacy ownedCards")
-    void createAcceptsStructuredOwnedCardListWithoutLegacyOwnedCards() throws Exception {
+    void createReturnsStructuredOwnedCardListWithModifiersAndLegacyFieldsWithoutExCard() throws Exception {
         MockHttpSession session = signUpAndLogin("characterCreateStructuredOwned");
 
         mockMvc.perform(post("/api/content/characters")
@@ -135,8 +135,10 @@ class CharacterProfileControllerIntegrationTest {
                                             {
                                               "ownedCardId": "oc-1",
                                               "cardId": "C001",
-                                              "modifiers": [],
-                                              "strengthened": false,
+                                              "modifiers": [
+                                                { "modifierId": "STRENGTHENED", "value": 1 }
+                                              ],
+                                              "strengthened": true,
                                               "weakened": false,
                                               "lockedInDeck": false,
                                               "forgettable": true
@@ -149,8 +151,21 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.ownedCards").isString())
                 .andExpect(jsonPath("$.ownedCards").value(containsString("oc-1")))
                 .andExpect(jsonPath("$.ownedCards").value(containsString("C001")))
+                .andExpect(jsonPath("$.ownedCardList").isArray())
                 .andExpect(jsonPath("$.ownedCardList[0].ownedCardId").value("oc-1"))
                 .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"))
+                .andExpect(jsonPath("$.ownedCardList[0].modifiers").isArray())
+                .andExpect(jsonPath("$.ownedCardList[0].modifiers[0].modifierId").value("STRENGTHENED"))
+                .andExpect(jsonPath("$.ownedCardList[0].modifiers[0].value").value(1))
+                .andExpect(jsonPath("$.ownedCardList[0].strengthened").value(org.hamcrest.Matchers.isA(Boolean.class)))
+                .andExpect(jsonPath("$.ownedCardList[0].strengthened").value(true))
+                .andExpect(jsonPath("$.ownedCardList[0].weakened").value(org.hamcrest.Matchers.isA(Boolean.class)))
+                .andExpect(jsonPath("$.ownedCardList[0].weakened").value(false))
+                .andExpect(jsonPath("$.ownedCardList[0].lockedInDeck").value(org.hamcrest.Matchers.isA(Boolean.class)))
+                .andExpect(jsonPath("$.ownedCardList[0].lockedInDeck").value(false))
+                .andExpect(jsonPath("$.ownedCardList[0].forgettable").value(org.hamcrest.Matchers.isA(Boolean.class)))
+                .andExpect(jsonPath("$.ownedCardList[0].forgettable").value(true))
+                .andExpect(jsonPath("$.exCard").isString())
                 .andExpect(jsonPath("$.exCard").value("{}"))
                 .andExpect(jsonPath("$.exCardId").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
@@ -159,7 +174,7 @@ class CharacterProfileControllerIntegrationTest {
 
     @Test
     @DisplayName("character create accepts exCardId without legacy exCard")
-    void createAcceptsExCardIdWithoutLegacyExCard() throws Exception {
+    void createReturnsLegacyExCardAndExCardIdWhenExCardIsEquipped() throws Exception {
         MockHttpSession session = signUpAndLogin("characterCreateStructuredEx");
 
         mockMvc.perform(post("/api/content/characters")
@@ -173,8 +188,13 @@ class CharacterProfileControllerIntegrationTest {
                                         """
                 )))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownedCards").isString())
+                .andExpect(jsonPath("$.ownedCardList").isArray())
+                .andExpect(jsonPath("$.exCard").isString())
                 .andExpect(jsonPath("$.exCard").value("{\"id\":\"EX901\"}"))
-                .andExpect(jsonPath("$.exCardId").value("EX901"));
+                .andExpect(jsonPath("$.exCardId").value("EX901"))
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
+                .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isArray());
     }
 
     @Test
