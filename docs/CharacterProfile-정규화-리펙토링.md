@@ -24,25 +24,19 @@
 
 ## API 호환 필드
 
-`CharacterProfileRequest`와 `CharacterProfileResponse`에는 기존 클라이언트 호환을 위해 legacy 필드가 남아 있다.
+`CharacterProfileRequest`와 `CharacterProfileResponse`는 public character API에서 structured loadout 필드만 사용한다.
 
 ### Request
 
-Preferred request fields:
+Request fields:
 
-- `ownedCardList`: 구조화된 보유 카드 입력. 저장 원본은 `CharacterOwnedCard` / `CharacterOwnedCardModifier`다.
-- `exCardId`: EX 카드 id 입력. 빈 문자열은 EX 장착 해제를 의미한다.
+- `ownedCardList`: 필수 구조화 보유 카드 입력. 빈 배열은 허용한다. 저장 원본은 `CharacterOwnedCard` / `CharacterOwnedCardModifier`다.
+- `exCardId`: 필수 EX 카드 id 입력. 빈 문자열은 EX 장착 해제를 의미한다.
 
-Deprecated legacy request fields:
+Removed legacy request fields:
 
-- `ownedCards`: 문자열 JSON. 아직 허용하지만 새 저장 경로에서는 `ownedCardList`를 사용해야 한다.
-- `exCard`: 문자열 JSON. 아직 허용하지만 새 저장 경로에서는 `exCardId`를 사용해야 한다.
-
-Priority rule:
-
-- `ownedCardList`가 있으면 `ownedCards`는 무시한다.
-- `exCardId`가 있으면 `exCard`는 무시한다.
-- legacy request field가 실제로 사용되면 서버는 deprecation warning을 남긴다.
+- `ownedCards`: 더 이상 `CharacterProfile` create/update 계약이 아니다.
+- `exCard`: 더 이상 `CharacterProfile` create/update 계약이 아니다.
 
 ### Response
 
@@ -54,8 +48,8 @@ Preferred response fields:
 
 Removed legacy response fields:
 
-- `ownedCards`: `CharacterProfileResponse`에서 제거되었다. 같은 이름의 request field는 아직 호환 입력으로만 유지한다.
-- `exCard`: `CharacterProfileResponse`에서 제거되었다. 같은 이름의 request field는 아직 호환 입력으로만 유지한다.
+- `ownedCards`: `CharacterProfileResponse`에서 제거되었다.
+- `exCard`: `CharacterProfileResponse`에서 제거되었다.
 
 Response rule:
 
@@ -92,13 +86,13 @@ V4 이후에는 current skill deck entry가 존재하지 않는 owned card를 �
 
 ## 리스크와 후속 과제
 
-### 1. Legacy response 제거 완료
+### 1. Legacy response/request 제거 완료
 
 `ownedCards`와 `exCard`는 `CharacterProfileResponse`에서 제거되었다.
 
 - frontend read path는 `ownedCardList`와 `exCardId`를 사용한다.
 - backend service/controller tests는 structured response field 중심으로 검증한다.
-- 남은 compatibility는 request side의 `ownedCards` / `exCard` 입력이다.
+- `CharacterProfileRequest`에서도 legacy `ownedCards` / `exCard` 입력을 제거했다.
 
 ### 2. DTO 경계 정리
 
@@ -110,16 +104,15 @@ V4 이후에는 current skill deck entry가 존재하지 않는 owned card를 �
 - `CharacterProfileResponse.ownedCardList`는 response 조회용으로 boolean 필드를 non-null로 제공한다.
 - frontend `OwnedCardRequest` / `OwnedCardResponse`도 request와 response nullable 정책을 분리한다.
 
-남은 리스크는 DTO 타입 공유나 legacy response field가 아니라 legacy request field가 아직 허용된다는 점이다. 제거 시점은 별도 legacy request 제거 과제로 판단한다.
+남은 리스크는 public API DTO 경계가 아니라 내부 JSON helper(`toOwnedCardsJson`, `replaceOwnedCardsFromJson`)의 사용처 정리 여부다.
 
-### 3. Legacy request 제거 시점
+### 3. Legacy owned cards JSON helper 정리
 
-`ownedCards`와 `exCard`는 아직 request에서도 허용된다. 제거 전에는 다음 조건을 확인해야 한다.
+`CharacterProfileRequest`에서는 `ownedCards`와 `exCard`를 제거했다. 다만 `CharacterCardCollectionService`에는 session/engine 또는 별도 전환 경로에서 사용할 수 있는 JSON helper가 남아 있다.
 
-- character detail UI와 주요 프론트 저장 경로가 `ownedCardList`와 `exCardId`를 사용한다.
-- 외부 클라이언트나 수동 운영 절차가 legacy request field에 의존하지 않는다.
-- request 제거는 response 제거와 분리된 별도 변경으로 진행한다.
-- 제거 전 deprecation warning 관측 결과를 확인한다.
+- `CharacterCardCollectionService.toOwnedCardsJson(...)` 사용처 정리 여부를 판단한다.
+- `CharacterCardCollectionService.replaceOwnedCardsFromJson(...)` 사용처 정리 여부를 판단한다.
+- session/engine의 `ownedCards` 개념과 public character API request 계약을 혼동하지 않는다.
 
 ### 4. 테스트 프로필의 FK 검증 전략
 
@@ -141,8 +134,8 @@ V4 이후에는 current skill deck entry가 존재하지 않는 owned card를 �
 - [x] character detail UI가 저장 시 `ownedCardList`/`exCardId`를 사용한다.
 - [x] backend service/controller tests가 신규 필드 존재를 검증한다.
 - [x] frontend type check가 통과한다.
-- [ ] legacy request field 제거 PR 전에 외부 사용처를 한 번 더 검색한다.
-- [ ] request legacy field 제거는 별도 PR로 진행한다.
+- [x] 테스트 fixture의 기본 request가 structured-only를 사용한다.
+- [x] `CharacterProfileRequest`에서 legacy `ownedCards`/`exCard` request field를 제거했다.
 
 ## Related checks
 

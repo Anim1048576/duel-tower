@@ -270,8 +270,23 @@ class SessionDeckRuleIntegrationTest {
                                   "willpower": 5,
                                   "trait1": null,
                                   "trait2": null,
-                                  "ownedCards": "[{\\\"cardId\\\":\\\"C001\\\"},{\\\"cardId\\\":\\\"C001\\\"},{\\\"cardId\\\":\\\"C001\\\"},{\\\"cardId\\\":\\\"C002\\\"},{\\\"cardId\\\":\\\"C002\\\"},{\\\"cardId\\\":\\\"C002\\\"},{\\\"cardId\\\":\\\"C003\\\"},{\\\"cardId\\\":\\\"C003\\\"},{\\\"cardId\\\":\\\"C003\\\"},{\\\"cardId\\\":\\\"C004\\\"},{\\\"cardId\\\":\\\"C004\\\"},{\\\"cardId\\\":\\\"C004\\\"},{\\\"cardId\\\":\\\"Tig001_Card\\\"},{\\\"cardId\\\":\\\"Tig001_Card\\\"}]",
-                                  "exCard": "{\\\"id\\\":\\\"EX901\\\"}"
+                                  "ownedCardList": [
+                                    { "ownedCardId": "oc-player-1", "cardId": "C001" },
+                                    { "ownedCardId": "oc-player-2", "cardId": "C001" },
+                                    { "ownedCardId": "oc-player-3", "cardId": "C001" },
+                                    { "ownedCardId": "oc-player-4", "cardId": "C002" },
+                                    { "ownedCardId": "oc-player-5", "cardId": "C002" },
+                                    { "ownedCardId": "oc-player-6", "cardId": "C002" },
+                                    { "ownedCardId": "oc-player-7", "cardId": "C003" },
+                                    { "ownedCardId": "oc-player-8", "cardId": "C003" },
+                                    { "ownedCardId": "oc-player-9", "cardId": "C003" },
+                                    { "ownedCardId": "oc-player-10", "cardId": "C004" },
+                                    { "ownedCardId": "oc-player-11", "cardId": "C004" },
+                                    { "ownedCardId": "oc-player-12", "cardId": "C004" },
+                                    { "ownedCardId": "oc-player-13", "cardId": "Tig001_Card" },
+                                    { "ownedCardId": "oc-player-14", "cardId": "Tig001_Card" }
+                                  ],
+                                  "exCardId": "EX901"
                                 }
                                 """))
                 .andExpect(status().isOk())

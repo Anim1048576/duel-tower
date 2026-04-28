@@ -121,6 +121,61 @@ class CharacterProfileControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("character create rejects missing ownedCardList")
+    void createRejectsMissingOwnedCardList() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterCreateMissingOwnedCardList");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "missing-owned-card-list",
+                                """
+                                          "exCardId": ""
+                                        """
+                        )))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("ownedCardList is required")));
+    }
+
+    @Test
+    @DisplayName("character create rejects missing exCardId")
+    void createRejectsMissingExCardId() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterCreateMissingExCardId");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "missing-ex-card-id",
+                                """
+                                          "ownedCardList": []
+                                        """
+                        )))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("exCardId is required")));
+    }
+
+    @Test
+    @DisplayName("character create rejects legacy loadout fields")
+    void createRejectsLegacyLoadoutFields() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterCreateRejectsLegacyLoadout");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "legacy-loadout-rejected",
+                                """
+                                          "ownedCards": "[]",
+                                          "exCard": "{}"
+                                        """
+                        )))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("ownedCardList is required")));
+    }
+
+    @Test
     @DisplayName("character create accepts structured ownedCardList without legacy ownedCards")
     void createReturnsStructuredOwnedCardListWithModifiersWithoutExCard() throws Exception {
         MockHttpSession session = signUpAndLogin("characterCreateStructuredOwned");
@@ -191,79 +246,6 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.exCardId").value("EX901"))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isArray());
-    }
-
-    @Test
-    @DisplayName("character create accepts legacy loadout fields for compatibility")
-    void createAcceptsLegacyLoadoutFieldsForCompatibility() throws Exception {
-        MockHttpSession session = signUpAndLogin("characterCreateLegacyLoadout");
-
-        mockMvc.perform(post("/api/content/characters")
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(legacyCharacterBody(
-                                "legacy-loadout-create",
-                                "[{\\\"ownedCardId\\\":\\\"oc-legacy-1\\\",\\\"cardId\\\":\\\"C001\\\"}]",
-                                "{\\\"id\\\":\\\"EX901\\\"}"
-                        )))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownedCardList").isArray())
-                .andExpect(jsonPath("$.ownedCardList[0].ownedCardId").value("oc-legacy-1"))
-                .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"))
-                .andExpect(jsonPath("$.ownedCards").doesNotExist())
-                .andExpect(jsonPath("$.exCard").doesNotExist())
-                .andExpect(jsonPath("$.exCardId").value("EX901"));
-    }
-
-    @Test
-    @DisplayName("structured ownedCardList takes precedence over legacy ownedCards")
-    void structuredOwnedCardListTakesPrecedenceOverLegacyOwnedCards() throws Exception {
-        MockHttpSession session = signUpAndLogin("characterStructuredOwnedPrecedence");
-
-        mockMvc.perform(post("/api/content/characters")
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(characterBodyWithLoadoutFields(
-                                "structured-owned-precedence",
-                                """
-                                          "ownedCards": "[{\\"cardId\\":\\"C002\\"}]",
-                                          "ownedCardList": [
-                                            {
-                                              "ownedCardId": "oc-precedence",
-                                              "cardId": "C001",
-                                              "modifiers": [],
-                                              "strengthened": false,
-                                              "weakened": false,
-                                              "lockedInDeck": false,
-                                              "forgettable": true
-                                            }
-                                          ],
-                                          "exCard": "{}"
-                                        """
-                )))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownedCardList[0].ownedCardId").value("oc-precedence"))
-                .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"));
-    }
-
-    @Test
-    @DisplayName("exCardId takes precedence over legacy exCard")
-    void exCardIdTakesPrecedenceOverLegacyExCard() throws Exception {
-        MockHttpSession session = signUpAndLogin("characterExPrecedence");
-
-        mockMvc.perform(post("/api/content/characters")
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(characterBodyWithLoadoutFields(
-                                "structured-ex-precedence",
-                                """
-                                          "ownedCards": "[]",
-                                          "exCard": "{\\"id\\":\\"C001\\"}",
-                                          "exCardId": "EX901"
-                                        """
-                )))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.exCardId").value("EX901"));
     }
 
     @Test
@@ -543,13 +525,6 @@ class CharacterProfileControllerIntegrationTest {
                   "ownedCardList": %s,
                   "exCardId": "%s"
                 """.formatted(ownedCardListJson, exCardId));
-    }
-
-    private String legacyCharacterBody(String name, String ownedCards, String exCard) {
-        return characterBodyWithLoadoutFields(name, "[]", """
-                  "ownedCards": "%s",
-                  "exCard": "%s"
-                """.formatted(ownedCards, exCard));
     }
 
     private String ownedCardListJson(String ownedCardId, String cardId) {

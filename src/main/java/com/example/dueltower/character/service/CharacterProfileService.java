@@ -7,13 +7,9 @@ import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.dto.CombatStatsDto;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -22,9 +18,6 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 public class CharacterProfileService {
-
-    private static final Logger log = LoggerFactory.getLogger(CharacterProfileService.class);
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final CharacterProfileRepository repository;
     private final CharacterCombatStatCalculator combatStatCalculator;
@@ -56,7 +49,6 @@ public class CharacterProfileService {
     @Transactional
     public CharacterProfileResponse create(CharacterProfileRequest req) {
         validateRequired(req);
-        warnIfLegacyLoadoutInputUsed(req);
 
         CharacterProfile profile = CharacterProfile.builder()
                 .name(req.name().trim())
@@ -84,7 +76,6 @@ public class CharacterProfileService {
     @Transactional
     public CharacterProfileResponse update(long id, CharacterProfileRequest req) {
         validateRequired(req);
-        warnIfLegacyLoadoutInputUsed(req);
 
         CharacterProfile profile = getByIdOrThrow(id);
         profile.setName(req.name().trim());
@@ -167,95 +158,20 @@ public class CharacterProfileService {
     }
 
     private boolean ownedCardsChanged(Long characterId, CharacterProfileRequest req) {
-        if (req.ownedCardList() != null) {
-            // Structured input can serialize differently from the legacy JSON string, so clear safely for this phase.
-            return true;
-        }
-        String ownedCards = req.ownedCards().trim();
-        return !ownedCards.equals(cardCollectionService.toOwnedCardsJson(characterId));
+        return true;
     }
 
     private void replaceOwnedCards(Long characterId, CharacterProfileRequest req) {
-        if (req.ownedCardList() != null) {
-            // New structured input wins. Legacy ownedCards is ignored when both are present.
-            cardCollectionService.replaceOwnedCards(characterId, req.ownedCardList());
-            return;
-        }
-        cardCollectionService.replaceOwnedCardsFromJson(characterId, req.ownedCards().trim());
+        cardCollectionService.replaceOwnedCards(characterId, req.ownedCardList());
     }
 
     private void replaceExCard(Long characterId, CharacterProfileRequest req) {
-        if (req.exCardId() != null) {
-            // New scalar input wins. Legacy exCard JSON is ignored when both are present.
-            // A blank exCardId explicitly clears the equipped EX card.
-            String exCardId = req.exCardId().trim();
-            if (exCardId.isEmpty()) {
-                loadoutService.clearExCard(characterId);
-                return;
-            }
-            loadoutService.replaceExCard(characterId, exCardId);
-            return;
-        }
-        replaceExCardFromJson(characterId, req.exCard());
-    }
-
-    private static boolean usesLegacyOwnedCardsInput(CharacterProfileRequest req) {
-        return req.ownedCardList() == null;
-    }
-
-    private static boolean usesLegacyExCardInput(CharacterProfileRequest req) {
-        return req.exCardId() == null;
-    }
-
-    private static boolean usesLegacyLoadoutInput(CharacterProfileRequest req) {
-        return usesLegacyOwnedCardsInput(req) || usesLegacyExCardInput(req);
-    }
-
-    private static void warnIfLegacyLoadoutInputUsed(CharacterProfileRequest req) {
-        if (!usesLegacyLoadoutInput(req)) {
-            return;
-        }
-        List<String> fields = new java.util.ArrayList<>(2);
-        if (usesLegacyOwnedCardsInput(req)) {
-            fields.add("ownedCards");
-        }
-        if (usesLegacyExCardInput(req)) {
-            fields.add("exCard");
-        }
-        log.warn(
-                "Deprecated CharacterProfile request fields used: {}. Use ownedCardList/exCardId instead.",
-                String.join(", ", fields)
-        );
-    }
-
-    private void replaceExCardFromJson(Long characterId, String raw) {
-        String exCardId = parseExCardId(raw);
-        if (exCardId == null) {
+        String exCardId = req.exCardId().trim();
+        if (exCardId.isEmpty()) {
             loadoutService.clearExCard(characterId);
             return;
         }
         loadoutService.replaceExCard(characterId, exCardId);
-    }
-
-    private static String parseExCardId(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            JsonNode node = JSON.readTree(raw);
-            if (node == null || node.isNull()) {
-                return null;
-            }
-            if (node.isTextual()) {
-                String value = node.asText("").trim();
-                return value.isEmpty() ? null : value;
-            }
-            String id = node.path("id").asText("").trim();
-            return id.isEmpty() ? null : id;
-        } catch (Exception e) {
-            String value = raw.trim();
-            return value.isEmpty() ? null : value;
-        }
     }
 
     private static void validateRequired(CharacterProfileRequest req) {
@@ -277,10 +193,10 @@ public class CharacterProfileService {
         validateTraits(req.trait1(), req.trait2());
         validateHiddenTraits(req.hiddenTraitIds());
         if (req.ownedCardList() == null) {
-            requireText(req.ownedCards(), "ownedCards is required");
+            throw new ResponseStatusException(BAD_REQUEST, "ownedCardList is required");
         }
         if (req.exCardId() == null) {
-            requireText(req.exCard(), "exCard is required");
+            throw new ResponseStatusException(BAD_REQUEST, "exCardId is required");
         }
     }
 

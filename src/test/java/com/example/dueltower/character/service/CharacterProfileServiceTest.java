@@ -204,25 +204,27 @@ class CharacterProfileServiceTest {
     }
 
     @Test
-    @DisplayName("create: legacy loadout JSON 입력을 아직 허용하고 trim한다")
-    void createAcceptsLegacyLoadoutJsonAndTrimsIt() {
-        stubProfileSave();
-        stubResponseReadModels(List.of(), "{\"id\":\"ex-1\"}");
-        CharacterProfileRequest req = validLegacyRequest(
-                "name",
-                "wish",
-                "oneLiner",
-                "story",
-                "질서/선",
-                List.of(),
-                "  [\"card-1\"]  ",
-                "  {\"id\":\"ex-1\"}  "
-        );
+    @DisplayName("create: ownedCardList가 없으면 BAD_REQUEST를 던진다")
+    void createRejectsMissingOwnedCardList() {
+        CharacterProfileRequest req = validStructuredRequest(null, "");
 
-        service.create(req);
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.create(req));
 
-        verify(cardCollectionService).replaceOwnedCardsFromJson(1L, "[\"card-1\"]");
-        verify(loadoutService).replaceExCard(1L, "ex-1");
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("ownedCardList is required"));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: exCardId가 없으면 BAD_REQUEST를 던진다")
+    void createRejectsMissingExCardId() {
+        CharacterProfileRequest req = validStructuredRequest(List.of(), null);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.create(req));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("exCardId is required"));
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -285,56 +287,22 @@ class CharacterProfileServiceTest {
     }
 
     @Test
-    @DisplayName("update: legacy ownedCards가 그대로이면 기존 currentSkillDeck을 유지한다")
-    void updateKeepsExistingCurrentSkillDeckWhenLegacyOwnedCardsAreUnchanged() {
-        CharacterProfile existing = existingProfile();
-        when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(validLegacyRequestWithDisposition(existing.getDisposition()).ownedCards());
-        stubResponseReadModels(List.of("old-1", "old-2"), "{}");
-
-        service.update(1L, validLegacyRequestWithDisposition(existing.getDisposition()));
-
-        verify(loadoutService, never()).clearCurrentSkillDeck(1L);
-    }
-
-    @Test
-    @DisplayName("update: legacy profile 저장 경로는 currentSkillDeck를 직접 쓰지 않는다")
-    void updateDoesNotWriteCurrentSkillDeckThroughLegacyProfileSave() {
-        CharacterProfile existing = existingProfile();
-        when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(validLegacyRequestWithDisposition(existing.getDisposition()).ownedCards());
-        stubResponseReadModels(List.of("old"), "{}");
-
-        service.update(1L, validLegacyRequestWithDisposition(existing.getDisposition()));
-
-        verify(loadoutService, never()).replaceCurrentSkillDeckFromOwnedCardIds(any(), any());
-    }
-
-    @Test
-    @DisplayName("update: ownedCards가 변경되면 stale currentSkillDeck와 미러 덱을 비운다")
-    void updateClearsCurrentSkillDeckWhenOwnedCardsChanges() {
+    @DisplayName("update: ownedCardList가 제출되면 stale currentSkillDeck와 미러 덱을 비운다")
+    void updateClearsCurrentSkillDeckWhenOwnedCardListIsSubmitted() {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         stubResponseReadModels(List.of(), "{}");
-        when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn("[\"old-card\"]", "[\"new-card\"]");
+        OwnedCardDto ownedCard = new OwnedCardDto("oc-new", "C001", List.of(), false, false, false, true, null);
 
-        var response = service.update(1L, validLegacyRequest(
-                "name",
-                "wish",
-                "oneLiner",
-                "story",
-                existing.getDisposition(),
-                List.of(),
-                "[\"new-card\"]",
-                "{}"
-        ));
+        var response = service.update(1L, validStructuredRequest(List.of(ownedCard), ""));
 
         assertTrue(response.currentSkillDeckPreviewCardIds().isEmpty());
-        verify(cardCollectionService).replaceOwnedCardsFromJson(1L, "[\"new-card\"]");
+        verify(cardCollectionService).replaceOwnedCards(1L, List.of(ownedCard));
+        verify(cardCollectionService, never()).replaceOwnedCardsFromJson(anyLong(), anyString());
         verify(loadoutService).clearCurrentSkillDeck(1L);
         InOrder inOrder = inOrder(loadoutService, cardCollectionService);
         inOrder.verify(loadoutService).clearCurrentSkillDeck(1L);
-        inOrder.verify(cardCollectionService).replaceOwnedCardsFromJson(1L, "[\"new-card\"]");
+        inOrder.verify(cardCollectionService).replaceOwnedCards(1L, List.of(ownedCard));
     }
 
     @Test
@@ -353,50 +321,13 @@ class CharacterProfileServiceTest {
     }
 
     @Test
-    @DisplayName("update: structured loadout fields take precedence over legacy fields")
-    void structuredLoadoutFieldsTakePrecedenceOverLegacyFields() {
-        CharacterProfile existing = existingProfile();
-        when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        OwnedCardDto ownedCard = new OwnedCardDto("oc-1", "C001", List.of(), false, false, false, true, null);
-        CharacterOwnedCardResponse ownedCardResponse = new CharacterOwnedCardResponse(
-                "oc-1",
-                "C001",
-                List.of(),
-                false,
-                false,
-                false,
-                true,
-                null
-        );
-        stubResponseReadModels(List.of(), "{\"id\":\"EX901\"}", List.of(ownedCardResponse));
-        CharacterProfileRequest req = validMixedLegacyAndStructuredRequest(
-                "[{\"cardId\":\"C002\"}]",
-                "{\"id\":\"C001\"}",
-                List.of(ownedCard),
-                "EX901"
-        );
-
-        var response = service.update(1L, req);
-
-        assertEquals(List.of(ownedCardResponse), response.ownedCardList());
-        assertEquals("EX901", response.exCardId());
-        verify(cardCollectionService).replaceOwnedCards(1L, List.of(ownedCard));
-        verify(cardCollectionService, never()).replaceOwnedCardsFromJson(anyLong(), anyString());
-        verify(loadoutService).replaceExCard(1L, "EX901");
-        verify(loadoutService, never()).clearExCard(anyLong());
-        InOrder inOrder = inOrder(loadoutService, cardCollectionService);
-        inOrder.verify(loadoutService).clearCurrentSkillDeck(1L);
-        inOrder.verify(cardCollectionService).replaceOwnedCards(1L, List.of(ownedCard));
-    }
-
-    @Test
-    @DisplayName("update: blank exCardId clears EX even when legacy exCard is present")
-    void blankExCardIdClearsExCardEvenWhenLegacyExCardIsPresent() {
+    @DisplayName("update: blank exCardId clears EX")
+    void blankExCardIdClearsExCard() {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         stubResponseReadModels(List.of(), "{}");
 
-        service.update(1L, validMixedLegacyAndStructuredRequest("[]", "{\"id\":\"EX901\"}", List.of(), "   "));
+        service.update(1L, validStructuredRequest(List.of(), "   "));
 
         verify(loadoutService).clearExCard(1L);
         verify(loadoutService, never()).replaceExCard(anyLong(), anyString());
@@ -481,10 +412,6 @@ class CharacterProfileServiceTest {
         return validRequest("name", "wish", "oneLiner", "story", disposition, List.of());
     }
 
-    private static CharacterProfileRequest validLegacyRequestWithDisposition(String disposition) {
-        return validLegacyRequest("name", "wish", "oneLiner", "story", disposition, List.of(), "[]", "{}");
-    }
-
     private static CharacterProfileRequest validRequestWithTraits(String trait1, String trait2) {
         return new CharacterProfileRequest(
                 "name",
@@ -501,8 +428,6 @@ class CharacterProfileServiceTest {
                 trait1,
                 trait2,
                 List.of(),
-                null,
-                null,
                 List.of(),
                 ""
         );
@@ -535,55 +460,12 @@ class CharacterProfileServiceTest {
                 "trait1",
                 "trait2",
                 hiddenTraitIds,
-                null,
-                null,
                 List.of(),
                 ""
         );
     }
 
-    private static CharacterProfileRequest validLegacyRequest(
-            String name,
-            String wish,
-            String oneLiner,
-            String story,
-            String disposition,
-            List<String> hiddenTraitIds,
-            String ownedCards,
-            String exCard
-    ) {
-        return new CharacterProfileRequest(
-                name,
-                CharacterGender.MALE,
-                20,
-                wish,
-                disposition,
-                oneLiner,
-                story,
-                5,
-                5,
-                5,
-                5,
-                "trait1",
-                "trait2",
-                hiddenTraitIds,
-                ownedCards,
-                exCard,
-                null,
-                null
-        );
-    }
-
     private static CharacterProfileRequest validStructuredRequest(List<OwnedCardDto> ownedCardList, String exCardId) {
-        return validMixedLegacyAndStructuredRequest(null, null, ownedCardList, exCardId);
-    }
-
-    private static CharacterProfileRequest validMixedLegacyAndStructuredRequest(
-            String ownedCards,
-            String exCard,
-            List<OwnedCardDto> ownedCardList,
-            String exCardId
-    ) {
         return new CharacterProfileRequest(
                 "name",
                 CharacterGender.MALE,
@@ -599,8 +481,6 @@ class CharacterProfileServiceTest {
                 "trait1",
                 "trait2",
                 List.of(),
-                ownedCards,
-                exCard,
                 ownedCardList,
                 exCardId
         );

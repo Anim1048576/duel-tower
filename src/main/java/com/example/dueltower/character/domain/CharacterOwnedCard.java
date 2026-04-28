@@ -17,7 +17,7 @@ import java.sql.Timestamp;
 /**
  * A concrete card copy owned by a character.
  *
- * <p>This is the persistence source of truth for CharacterProfileResponse.ownedCards compatibility JSON.</p>
+ * <p>This is the persistence source of truth for CharacterProfileResponse.ownedCardList.</p>
  */
 @Getter
 @Setter

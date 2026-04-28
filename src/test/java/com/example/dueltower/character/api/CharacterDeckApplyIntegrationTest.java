@@ -239,8 +239,18 @@ class CharacterDeckApplyIntegrationTest {
                                   "trait1": "trait1",
                                   "trait2": "trait2",
                                   "hiddenTraitIds": [],
-                                  "ownedCards": "[{\\"cardId\\":\\"C001\\"}]",
-                                  "exCard": "{}"
+                                  "ownedCardList": [
+                                    {
+                                      "ownedCardId": "oc-stale-update-1",
+                                      "cardId": "C001",
+                                      "modifiers": [],
+                                      "strengthened": false,
+                                      "weakened": false,
+                                      "lockedInDeck": false,
+                                      "forgettable": true
+                                    }
+                                  ],
+                                  "exCardId": ""
                                 }
                                 """))
                 .andExpect(status().isOk());
