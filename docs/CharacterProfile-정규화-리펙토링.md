@@ -48,14 +48,14 @@ Priority rule:
 
 Preferred response fields:
 
-- `ownedCardList`: 구조화된 보유 카드 응답. 저장 원본은 `CharacterOwnedCard` / `CharacterOwnedCardModifier`다.
-- `exCardId`: 현재 장착된 EX 카드 id. 장착된 EX가 없으면 `null`이다.
+- `ownedCardList`: 구조화된 보유 카드 응답. public character API 응답 전용 DTO인 `CharacterOwnedCardResponse` / `CharacterOwnedCardModifierResponse`를 사용한다. 저장 원본은 `CharacterOwnedCard` / `CharacterOwnedCardModifier`다.
+- `exCardId`: preferred structured EX response field다. 현재 장착된 EX 카드 id이며, 장착된 EX가 없으면 `null`이다.
 - `currentSkillDeckPreviewCardIds`: UI 표시용 cardId preview. 저장 원본은 `CharacterCurrentSkillDeckEntry`의 ownedCardId 행이다.
 
 Deprecated legacy response fields:
 
-- `ownedCards`: 문자열 JSON. 기존 클라이언트 호환을 위해 당분간 유지한다.
-- `exCard`: 문자열 JSON. 기존 클라이언트 호환을 위해 당분간 유지한다.
+- `ownedCards`: deprecated legacy string JSON compatibility field다. 기존 클라이언트 호환을 위해 당분간 유지한다.
+- `exCard`: deprecated legacy string JSON compatibility field다. 기존 클라이언트 호환을 위해 당분간 유지한다.
 
 Response transition rule:
 
@@ -104,26 +104,37 @@ V4 이후에는 current skill deck entry가 존재하지 않는 owned card를 �
 
 ### 2. DTO 경계 정리
 
-현재 `ownedCardList` response는 `OwnedCardDto` 계열을 사용한다. 당장 동작에는 문제가 없지만, 장기적으로 request/session DTO와 public response DTO가 같은 타입을 공유한다.
+완료됨: `CharacterProfileResponse.ownedCardList`는 더 이상 `session.dto.OwnedCardDto`를 직접 노출하지 않는다. public character API 응답에는 `CharacterOwnedCardResponse` / `CharacterOwnedCardModifierResponse`를 사용한다.
 
-후속 후보:
+현재 상태:
 
-- `CharacterOwnedCardResponse` 또는 `OwnedCardResponse`를 백엔드에 별도 도입한다.
-- response DTO의 boolean 필드를 non-null로 명확히 한다.
-- request DTO와 response DTO의 nullable 정책을 분리한다.
+- `CharacterProfileRequest.ownedCardList`는 request 입력용으로 `OwnedCardDto` 계열을 계속 사용할 수 있다.
+- `CharacterProfileResponse.ownedCardList`는 response 조회용으로 boolean 필드를 non-null로 제공한다.
+- frontend `OwnedCardRequest` / `OwnedCardResponse`도 request와 response nullable 정책을 분리한다.
 
-### 3. 테스트 프로필의 FK 검증 전략
+남은 리스크는 DTO 타입 공유가 아니라 legacy compatibility field가 public response에 남아 있다는 점이다. 제거 시점은 별도 legacy response 제거 과제로 판단한다.
+
+### 3. Legacy request 제거 시점
+
+`ownedCards`와 `exCard`는 아직 request에서도 허용된다. 제거 전에는 다음 조건을 확인해야 한다.
+
+- character detail UI와 주요 프론트 저장 경로가 `ownedCardList`와 `exCardId`를 사용한다.
+- 외부 클라이언트나 수동 운영 절차가 legacy request field에 의존하지 않는다.
+- request 제거와 response 제거는 별도 PR 또는 명확히 분리된 변경으로 진행한다.
+- 제거 전 deprecation warning 관측 결과를 확인한다.
+
+### 4. 테스트 프로필의 FK 검증 전략
 
 테스트 프로필은 H2 `create-drop`와 Flyway disabled 조합을 사용한다. Flyway migration으로 추가한 FK가 테스트 DB에 그대로 적용되지 않을 수 있다.
 
 후속 후보:
 
-- FK/migration 전용 통합 테스트 프로필을 추가한다.
-- 또는 H2 테스트 스키마에도 핵심 FK가 반영되도록 테스트 설정을 분리한다.
+- FK/migration 전용 통합 테스트 프로필을 추가할지 판단한다.
+- 또는 H2 테스트 스키마에도 핵심 FK가 반영되도록 테스트 설정을 분리할지 판단한다.
 
-### 4. `hiddenTraitIds` 정규화
+### 5. `hiddenTraitIds` 정규화
 
-`hiddenTraitIds`를 검색, 통계, 조건식, 권한 판정에서 자주 쓰게 되면 별도 테이블로 분리하는 것을 검토한다.
+`hiddenTraitIds`를 검색, 통계, 조건식, 권한 판정에서 자주 쓰게 되면 별도 테이블로 분리할지 판단한다.
 
 ## Legacy 제거 전 체크리스트
 
