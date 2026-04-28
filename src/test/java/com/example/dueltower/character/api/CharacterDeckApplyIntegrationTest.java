@@ -106,8 +106,10 @@ class CharacterDeckApplyIntegrationTest {
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[2]").value("C001"))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[3]").value("C002"))
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds[11]").value("C004"))
-                .andExpect(jsonPath("$.ownedCards").isString())
-                .andExpect(jsonPath("$.exCard").value("{}"))
+                .andExpect(jsonPath("$.ownedCardList").isArray())
+                .andExpect(jsonPath("$.ownedCards").doesNotExist())
+                .andExpect(jsonPath("$.exCard").doesNotExist())
+                .andExpect(jsonPath("$.exCardId").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.combatStats.maxHp").exists());
 
         assertIterableEquals(List.of(

@@ -84,13 +84,9 @@ export type CharacterProfileResponse = {
   trait1: string | null
   trait2: string | null
   hiddenTraitIds: string[]
-  /** @deprecated Compatibility-only field. Use ownedCardList for structured reads. */
-  ownedCards?: string
   /** Preferred structured owned card response. */
   ownedCardList: OwnedCardResponse[]
   currentSkillDeckPreviewCardIds: string[]
-  /** @deprecated Compatibility-only field. Use exCardId for structured reads. */
-  exCard?: string
   /** Preferred structured EX card response. Null when no EX is equipped. */
   exCardId: string | null
   combatStats: CharacterCombatStats

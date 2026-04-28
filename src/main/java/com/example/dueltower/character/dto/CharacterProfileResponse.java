@@ -13,9 +13,11 @@ import java.sql.Timestamp;
  * ownedCardId-based rows in CharacterCurrentSkillDeckEntry, and this response exposes only
  * currentSkillDeckPreviewCardIds for UI display.</p>
  *
- * <p>ownedCards and exCard remain string JSON fields for API compatibility. ownedCardList and exCardId
- * are the preferred structured response fields. Their persistence source of truth is
- * CharacterOwnedCard/CharacterOwnedCardModifier and CharacterExLoadout, not CharacterProfile.</p>
+ * <p>The legacy ownedCards/exCard string JSON fields are no longer exposed by this response.
+ * ownedCardList and exCardId are the public loadout response fields. Legacy ownedCards/exCard
+ * input remains accepted only through CharacterProfileRequest for compatibility. Their persistence
+ * source of truth is CharacterOwnedCard/CharacterOwnedCardModifier and CharacterExLoadout,
+ * not CharacterProfile.</p>
  */
 public record CharacterProfileResponse(
         Long id,
@@ -33,10 +35,8 @@ public record CharacterProfileResponse(
         String trait1,
         String trait2,
         List<String> hiddenTraitIds,
-        String ownedCards,
         List<CharacterOwnedCardResponse> ownedCardList,
         List<String> currentSkillDeckPreviewCardIds,
-        String exCard,
         String exCardId,
         CombatStatsDto combatStats,
         Timestamp createDate,

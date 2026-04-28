@@ -61,7 +61,7 @@ class CharacterProfileServiceTest {
     @DisplayName("create: disposition 유효 조합(질서/선, 중립/중용, 혼돈/악)을 허용한다")
     void dispositionAcceptsValidValues() {
         stubProfileSave();
-        stubResponseReadModels("[]", List.of(), "{}");
+        stubResponseReadModels(List.of(), "{}");
 
         service.create(validRequestWithDisposition("질서/선"));
         service.create(validRequestWithDisposition("중립/중용"));
@@ -107,7 +107,7 @@ class CharacterProfileServiceTest {
     @DisplayName("create: hiddenTraitIds 공백/null/중복은 정규화한다")
     void hiddenTraitIdsAreNormalized() {
         stubProfileSave();
-        stubResponseReadModels("[]", List.of(), "{}");
+        stubResponseReadModels(List.of(), "{}");
 
         CharacterProfileRequest req = validRequestWithHiddenTraits(Arrays.asList(
                 "  " + HiddenTraitIds.HUMAN + "  ",
@@ -163,7 +163,7 @@ class CharacterProfileServiceTest {
     @DisplayName("create: trait1/trait2 공백 문자열은 null로 정규화한다")
     void optionalTextNormalizationBlankTraitsBecomeNull() {
         stubProfileSave();
-        stubResponseReadModels("[]", List.of(), "{}");
+        stubResponseReadModels(List.of(), "{}");
         CharacterProfileRequest req = validRequestWithTraits("   ", "   ");
 
         service.create(req);
@@ -180,7 +180,7 @@ class CharacterProfileServiceTest {
     @DisplayName("create: 필수 텍스트 필드는 trim 후 저장한다")
     void createTrimsRequiredTextFields() {
         stubProfileSave();
-        stubResponseReadModels("[\"card-1\"]", List.of(), "{\"id\":\"ex-1\"}");
+        stubResponseReadModels(List.of(), "{\"id\":\"ex-1\"}");
         CharacterProfileRequest req = validRequest(
                 "  이름  ",
                 "  소원  ",
@@ -232,7 +232,6 @@ class CharacterProfileServiceTest {
                 null
         );
         stubResponseReadModels(
-                "[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]",
                 List.of("C001"),
                 "{\"id\":\"EX901\"}",
                 List.of(ownedCardResponse)
@@ -257,7 +256,7 @@ class CharacterProfileServiceTest {
     void getResponseUsesStructuredFieldsWhenExCardIsEmpty() {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        stubResponseReadModels("[]", List.of(), "{}");
+        stubResponseReadModels(List.of(), "{}");
 
         var response = service.get(1L);
 
@@ -273,7 +272,7 @@ class CharacterProfileServiceTest {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(validRequestWithDisposition(existing.getDisposition()).ownedCards());
-        stubResponseReadModels("[]", List.of("old-1", "old-2"), "{}");
+        stubResponseReadModels(List.of("old-1", "old-2"), "{}");
 
         service.update(1L, validRequestWithDisposition(existing.getDisposition()));
 
@@ -286,7 +285,7 @@ class CharacterProfileServiceTest {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(validRequestWithDisposition(existing.getDisposition()).ownedCards());
-        stubResponseReadModels("[]", List.of("old"), "{}");
+        stubResponseReadModels(List.of("old"), "{}");
 
         service.update(1L, validRequestWithDisposition(existing.getDisposition()));
 
@@ -298,7 +297,7 @@ class CharacterProfileServiceTest {
     void updateClearsCurrentSkillDeckWhenOwnedCardsChanges() {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        stubResponseReadModels("[\"new-card\"]", List.of(), "{}");
+        stubResponseReadModels(List.of(), "{}");
         when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn("[\"old-card\"]", "[\"new-card\"]");
 
         var response = service.update(1L, validRequest(
@@ -324,7 +323,7 @@ class CharacterProfileServiceTest {
     @DisplayName("create: empty ownedCardList is valid without legacy ownedCards")
     void createAcceptsEmptyStructuredOwnedCardListWithoutLegacyOwnedCards() {
         stubProfileSave();
-        stubResponseReadModels("[]", List.of(), "{}");
+        stubResponseReadModels(List.of(), "{}");
 
         service.create(validStructuredRequest(null, null, List.of(), ""));
 
@@ -351,7 +350,7 @@ class CharacterProfileServiceTest {
                 true,
                 null
         );
-        stubResponseReadModels("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", List.of(), "{\"id\":\"EX901\"}", List.of(ownedCardResponse));
+        stubResponseReadModels(List.of(), "{\"id\":\"EX901\"}", List.of(ownedCardResponse));
         CharacterProfileRequest req = validStructuredRequest(
                 "[{\"cardId\":\"C002\"}]",
                 "{\"id\":\"C001\"}",
@@ -377,7 +376,7 @@ class CharacterProfileServiceTest {
     void blankExCardIdClearsExCardEvenWhenLegacyExCardIsPresent() {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        stubResponseReadModels("[]", List.of(), "{}");
+        stubResponseReadModels(List.of(), "{}");
 
         service.update(1L, validStructuredRequest("[]", "{\"id\":\"EX901\"}", List.of(), "   "));
 
@@ -390,7 +389,7 @@ class CharacterProfileServiceTest {
     void applyDeckToCurrentSkillDeckExpandsCountsAndReturnsCharacterDetail() {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        stubResponseReadModels("[]", List.of("C001", "C001", "C002", "C003"), "{}");
+        stubResponseReadModels(List.of("C001", "C001", "C002", "C003"), "{}");
 
         var response = service.applyDeckToCurrentSkillDeck(1L, 10L);
 
@@ -597,23 +596,21 @@ class CharacterProfileServiceTest {
         });
     }
 
-    private void stubResponseReadModels(String ownedCards, List<String> previewCardIds, String exCardJson) {
-        stubResponseReadModels(ownedCards, previewCardIds, exCardJson, List.of());
-    }
-
     private void stubResponseReadModels(
-            String ownedCards,
             List<String> previewCardIds,
             String exCardJson,
             List<CharacterOwnedCardResponse> ownedCardResponses
     ) {
         when(combatStatCalculator.calculate(any(CharacterProfile.class)))
                 .thenReturn(new CharacterCombatStatCalculator.CombatStats(20, 3, 4, 4));
-        when(cardCollectionService.toOwnedCardsJson(1L)).thenReturn(ownedCards);
         when(cardCollectionService.toOwnedCardResponses(1L)).thenReturn(ownedCardResponses);
         when(loadoutService.getCurrentSkillDeckPreviewCardIds(1L)).thenReturn(previewCardIds);
         String exCardId = exCardJson.equals("{}") ? null : exCardJson.replace("{\"id\":\"", "").replace("\"}", "");
         when(loadoutService.getExCardId(1L)).thenReturn(exCardId);
+    }
+
+    private void stubResponseReadModels(List<String> previewCardIds, String exCardJson) {
+        stubResponseReadModels(previewCardIds, exCardJson, List.of());
     }
 
     private static void setId(CharacterProfile profile, Long id) {

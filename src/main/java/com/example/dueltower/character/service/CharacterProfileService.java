@@ -25,7 +25,6 @@ public class CharacterProfileService {
 
     private static final Logger log = LoggerFactory.getLogger(CharacterProfileService.class);
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String EMPTY_EX_CARD_JSON = "{}";
 
     private final CharacterProfileRepository repository;
     private final CharacterCombatStatCalculator combatStatCalculator;
@@ -153,10 +152,8 @@ public class CharacterProfileService {
                 profile.getTrait1(),
                 profile.getTrait2(),
                 normalizeHiddenTraitIds(profile.getHiddenTraitIds()),
-                cardCollectionService.toOwnedCardsJson(characterId),
                 cardCollectionService.toOwnedCardResponses(characterId),
                 loadoutService.getCurrentSkillDeckPreviewCardIds(characterId),
-                toExCardJson(exCardId),
                 exCardId,
                 new CombatStatsDto(
                         combatStats.maxHp(),
@@ -259,13 +256,6 @@ public class CharacterProfileService {
             String value = raw.trim();
             return value.isEmpty() ? null : value;
         }
-    }
-
-    private static String toExCardJson(String exCardId) {
-        if (exCardId == null || exCardId.isBlank()) {
-            return EMPTY_EX_CARD_JSON;
-        }
-        return JSON.createObjectNode().put("id", exCardId.trim()).toString();
     }
 
     private static void validateRequired(CharacterProfileRequest req) {

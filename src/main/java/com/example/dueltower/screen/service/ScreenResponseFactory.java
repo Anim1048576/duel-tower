@@ -1115,7 +1115,7 @@ public class ScreenResponseFactory {
         boolean ambiguous = false;
 
         for (com.example.dueltower.character.dto.CharacterProfileResponse character : characters) {
-            String characterExCardId = normalizeCharacterExCardId(character.exCard());
+            String characterExCardId = normalizeCharacterExCardId(character.exCardId());
             boolean exMatched = !resolvedExCardId.isBlank() && resolvedExCardId.equals(characterExCardId);
             int deckOverlap = 0;
             List<String> previewCardIds = character.currentSkillDeckPreviewCardIds() == null
@@ -1237,7 +1237,7 @@ public class ScreenResponseFactory {
             return "";
         }
         long exMatchCount = characters.stream()
-                .map(com.example.dueltower.character.dto.CharacterProfileResponse::exCard)
+                .map(com.example.dueltower.character.dto.CharacterProfileResponse::exCardId)
                 .map(this::normalizeCharacterExCardId)
                 .filter(exCardId::equals)
                 .count();

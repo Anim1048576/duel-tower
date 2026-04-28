@@ -100,6 +100,8 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.hiddenTraitIds").isEmpty())
                 .andExpect(jsonPath("$.ownedCardList").isArray())
                 .andExpect(jsonPath("$.ownedCardList").isEmpty())
+                .andExpect(jsonPath("$.ownedCards").doesNotExist())
+                .andExpect(jsonPath("$.exCard").doesNotExist())
                 .andExpect(jsonPath("$.exCardId").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
@@ -160,6 +162,8 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.ownedCardList[0].lockedInDeck").value(false))
                 .andExpect(jsonPath("$.ownedCardList[0].forgettable").value(org.hamcrest.Matchers.isA(Boolean.class)))
                 .andExpect(jsonPath("$.ownedCardList[0].forgettable").value(true))
+                .andExpect(jsonPath("$.ownedCards").doesNotExist())
+                .andExpect(jsonPath("$.exCard").doesNotExist())
                 .andExpect(jsonPath("$.exCardId").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isArray());
@@ -182,6 +186,8 @@ class CharacterProfileControllerIntegrationTest {
                 )))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ownedCardList").isArray())
+                .andExpect(jsonPath("$.ownedCards").doesNotExist())
+                .andExpect(jsonPath("$.exCard").doesNotExist())
                 .andExpect(jsonPath("$.exCardId").value("EX901"))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isArray());
