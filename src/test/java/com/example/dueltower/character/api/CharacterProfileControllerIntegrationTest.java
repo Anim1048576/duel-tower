@@ -98,10 +98,8 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("created-name"))
                 .andExpect(jsonPath("$.hiddenTraitIds").isEmpty())
-                .andExpect(jsonPath("$.ownedCards").value("[]"))
                 .andExpect(jsonPath("$.ownedCardList").isArray())
                 .andExpect(jsonPath("$.ownedCardList").isEmpty())
-                .andExpect(jsonPath("$.exCard").value("{}"))
                 .andExpect(jsonPath("$.exCardId").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
@@ -122,7 +120,7 @@ class CharacterProfileControllerIntegrationTest {
 
     @Test
     @DisplayName("character create accepts structured ownedCardList without legacy ownedCards")
-    void createReturnsStructuredOwnedCardListWithModifiersAndLegacyFieldsWithoutExCard() throws Exception {
+    void createReturnsStructuredOwnedCardListWithModifiersWithoutExCard() throws Exception {
         MockHttpSession session = signUpAndLogin("characterCreateStructuredOwned");
 
         mockMvc.perform(post("/api/content/characters")
@@ -148,9 +146,6 @@ class CharacterProfileControllerIntegrationTest {
                                         """
                         )))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownedCards").isString())
-                .andExpect(jsonPath("$.ownedCards").value(containsString("oc-1")))
-                .andExpect(jsonPath("$.ownedCards").value(containsString("C001")))
                 .andExpect(jsonPath("$.ownedCardList").isArray())
                 .andExpect(jsonPath("$.ownedCardList[0].ownedCardId").value("oc-1"))
                 .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"))
@@ -165,8 +160,6 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.ownedCardList[0].lockedInDeck").value(false))
                 .andExpect(jsonPath("$.ownedCardList[0].forgettable").value(org.hamcrest.Matchers.isA(Boolean.class)))
                 .andExpect(jsonPath("$.ownedCardList[0].forgettable").value(true))
-                .andExpect(jsonPath("$.exCard").isString())
-                .andExpect(jsonPath("$.exCard").value("{}"))
                 .andExpect(jsonPath("$.exCardId").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isArray());
@@ -174,7 +167,7 @@ class CharacterProfileControllerIntegrationTest {
 
     @Test
     @DisplayName("character create accepts exCardId without legacy exCard")
-    void createReturnsLegacyExCardAndExCardIdWhenExCardIsEquipped() throws Exception {
+    void createReturnsExCardIdWhenExCardIsEquipped() throws Exception {
         MockHttpSession session = signUpAndLogin("characterCreateStructuredEx");
 
         mockMvc.perform(post("/api/content/characters")
@@ -188,10 +181,7 @@ class CharacterProfileControllerIntegrationTest {
                                         """
                 )))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownedCards").isString())
                 .andExpect(jsonPath("$.ownedCardList").isArray())
-                .andExpect(jsonPath("$.exCard").isString())
-                .andExpect(jsonPath("$.exCard").value("{\"id\":\"EX901\"}"))
                 .andExpect(jsonPath("$.exCardId").value("EX901"))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isArray());
@@ -222,10 +212,10 @@ class CharacterProfileControllerIntegrationTest {
                                           ],
                                           "exCard": "{}"
                                         """
-                        )))
+                )))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownedCards").value(containsString("C001")))
-                .andExpect(jsonPath("$.ownedCards").value(org.hamcrest.Matchers.not(containsString("C002"))));
+                .andExpect(jsonPath("$.ownedCardList[0].ownedCardId").value("oc-precedence"))
+                .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"));
     }
 
     @Test
@@ -243,9 +233,9 @@ class CharacterProfileControllerIntegrationTest {
                                           "exCard": "{\\"id\\":\\"C001\\"}",
                                           "exCardId": "EX901"
                                         """
-                        )))
+                )))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.exCard").value("{\"id\":\"EX901\"}"));
+                .andExpect(jsonPath("$.exCardId").value("EX901"));
     }
 
     @Test
@@ -302,7 +292,8 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("after-name"))
                 .andExpect(jsonPath("$.hiddenTraitIds").isEmpty())
-                .andExpect(jsonPath("$.ownedCards").isString())
+                .andExpect(jsonPath("$.ownedCardList").isArray())
+                .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
 
@@ -311,7 +302,8 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("after-name"))
                 .andExpect(jsonPath("$.hiddenTraitIds").isEmpty())
-                .andExpect(jsonPath("$.ownedCards").isString())
+                .andExpect(jsonPath("$.ownedCardList").isArray())
+                .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"))
                 .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
     }
@@ -367,14 +359,12 @@ class CharacterProfileControllerIntegrationTest {
                                           ],
                                           "exCard": "{}"
                                         """
-                        )))
+                )))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownedCards").value(containsString("oc-update-1")))
-                .andExpect(jsonPath("$.ownedCards").value(containsString("C001")))
                 .andExpect(jsonPath("$.ownedCardList[0].ownedCardId").value("oc-update-1"))
                 .andExpect(jsonPath("$.ownedCardList[0].cardId").value("C001"))
-                .andExpect(jsonPath("$.exCard").value("{}"))
                 .andExpect(jsonPath("$.exCardId").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.currentSkillDeck").doesNotExist())
                 .andExpect(jsonPath("$.currentSkillDeckPreviewCardIds").isEmpty());
     }
 

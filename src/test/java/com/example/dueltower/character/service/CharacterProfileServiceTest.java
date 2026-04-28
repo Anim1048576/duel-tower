@@ -208,8 +208,8 @@ class CharacterProfileServiceTest {
     }
 
     @Test
-    @DisplayName("create: response includes legacy and structured loadout fields")
-    void createResponseIncludesLegacyAndStructuredLoadoutFields() {
+    @DisplayName("create: response includes structured loadout fields")
+    void createResponseIncludesStructuredLoadoutFields() {
         stubProfileSave();
         OwnedCardDto ownedCard = new OwnedCardDto(
                 "oc-1",
@@ -240,7 +240,6 @@ class CharacterProfileServiceTest {
 
         var response = service.create(validStructuredRequest(null, null, List.of(ownedCard), "EX901"));
 
-        assertEquals("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", response.ownedCards());
         assertEquals(1, response.ownedCardList().size());
         CharacterOwnedCardResponse responseOwnedCard = response.ownedCardList().get(0);
         assertEquals("oc-1", responseOwnedCard.ownedCardId());
@@ -249,23 +248,21 @@ class CharacterProfileServiceTest {
         assertEquals("strengthened", responseOwnedCard.modifiers().get(0).modifierId());
         assertEquals(1, responseOwnedCard.modifiers().get(0).value());
         assertEquals(List.of("C001"), response.currentSkillDeckPreviewCardIds());
-        assertEquals("{\"id\":\"EX901\"}", response.exCard());
         assertEquals("EX901", response.exCardId());
         verify(cardCollectionService).toOwnedCardResponses(1L);
     }
 
     @Test
     @DisplayName("get: response uses null exCardId when EX is not equipped")
-    void getResponseIncludesStructuredFieldsWhenExCardIsEmpty() {
+    void getResponseUsesStructuredFieldsWhenExCardIsEmpty() {
         CharacterProfile existing = existingProfile();
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         stubResponseReadModels("[]", List.of(), "{}");
 
         var response = service.get(1L);
 
-        assertEquals("[]", response.ownedCards());
         assertTrue(response.ownedCardList().isEmpty());
-        assertEquals("{}", response.exCard());
+        assertTrue(response.currentSkillDeckPreviewCardIds().isEmpty());
         assertNull(response.exCardId());
         verify(cardCollectionService).toOwnedCardResponses(1L);
     }
@@ -364,9 +361,7 @@ class CharacterProfileServiceTest {
 
         var response = service.update(1L, req);
 
-        assertEquals("[{\"ownedCardId\":\"oc-1\",\"cardId\":\"C001\"}]", response.ownedCards());
         assertEquals(List.of(ownedCardResponse), response.ownedCardList());
-        assertEquals("{\"id\":\"EX901\"}", response.exCard());
         assertEquals("EX901", response.exCardId());
         verify(cardCollectionService).replaceOwnedCards(1L, List.of(ownedCard));
         verify(cardCollectionService, never()).replaceOwnedCardsFromJson(anyLong(), anyString());
@@ -400,8 +395,8 @@ class CharacterProfileServiceTest {
         var response = service.applyDeckToCurrentSkillDeck(1L, 10L);
 
         assertIterableEquals(List.of("C001", "C001", "C002", "C003"), response.currentSkillDeckPreviewCardIds());
-        assertEquals("[]", response.ownedCards());
-        assertEquals("{}", response.exCard());
+        assertTrue(response.ownedCardList().isEmpty());
+        assertNull(response.exCardId());
         assertEquals(20, response.combatStats().maxHp());
         verify(loadoutService).applyDeckTemplate(1L, 10L);
     }
