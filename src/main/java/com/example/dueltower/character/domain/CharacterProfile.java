@@ -1,19 +1,31 @@
 package com.example.dueltower.character.domain;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Timestamp;
-import java.util.List;
 
 /**
  * Character basic profile root.
  *
- * <p>Owned cards, equipped current skill deck, and equipped EX card are normalized into
- * CharacterOwnedCard, CharacterCurrentSkillDeckEntry, and CharacterExLoadout. CharacterProfile keeps only
- * identity, profile text, stats, traits, and hiddenTraitIds.</p>
+ * <p>Owned cards, equipped current skill deck, equipped EX card, and hidden traits are normalized into
+ * CharacterOwnedCard, CharacterCurrentSkillDeckEntry, CharacterExLoadout, and CharacterHiddenTrait.
+ * CharacterProfile keeps only identity, profile text, stats, and traits.</p>
  */
 @Getter
 @Setter
@@ -71,11 +83,6 @@ public class CharacterProfile {
 
     @Column(length = 100)
     private String trait2;
-
-    /** 전체 비공개가 되는 특성 태그 */
-    @Convert(converter = ListStringJsonConverter.class)
-    @Column(columnDefinition = "TEXT")
-    private List<String> hiddenTraitIds;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)

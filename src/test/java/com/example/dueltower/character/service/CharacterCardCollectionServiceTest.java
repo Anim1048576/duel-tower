@@ -170,6 +170,23 @@ class CharacterCardCollectionServiceTest {
     }
 
     @Test
+    void replaceOwnedCardsRejectsDuplicateModifierIdsWithinSameOwnedCardBeforeDeletingExistingRows() {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.replaceOwnedCards(1L, List.of(
+                new OwnedCardDto("oc-1", "C001", List.of(
+                        new OwnedCardModifierDto(" STRENGTHENED ", 1),
+                        new OwnedCardModifierDto("STRENGTHENED", 2)
+                ), false, false, false, true, null)
+        )));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertEquals("400 BAD_REQUEST \"ownedCards.modifiers.modifierId must be unique within an owned card: STRENGTHENED\"", ex.getMessage());
+        verify(ownedCardRepository, never()).deleteByCharacterId(anyLong());
+        verify(ownedCardModifierRepository, never()).deleteByOwnedCardIdIn(anyList());
+        verify(ownedCardRepository, never()).saveAll(anyList());
+        verify(ownedCardModifierRepository, never()).saveAll(anyList());
+    }
+
+    @Test
     void hasOwnedCardTrimsOwnedCardId() {
         when(ownedCardRepository.existsByCharacterIdAndOwnedCardId(1L, "oc-1")).thenReturn(true);
 

@@ -1,11 +1,13 @@
 package com.example.dueltower.character.service;
 
+import com.example.dueltower.character.domain.CharacterHiddenTrait;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.domain.CharacterDisposition;
 import com.example.dueltower.character.domain.HiddenTraitIds;
 import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.dto.CombatStatsDto;
+import com.example.dueltower.character.repository.CharacterHiddenTraitRepository;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,17 +25,20 @@ public class CharacterProfileService {
     private final CharacterCombatStatCalculator combatStatCalculator;
     private final CharacterCardCollectionService cardCollectionService;
     private final CharacterLoadoutService loadoutService;
+    private final CharacterHiddenTraitRepository hiddenTraitRepository;
 
     public CharacterProfileService(
             CharacterProfileRepository repository,
             CharacterCombatStatCalculator combatStatCalculator,
             CharacterCardCollectionService cardCollectionService,
-            CharacterLoadoutService loadoutService
+            CharacterLoadoutService loadoutService,
+            CharacterHiddenTraitRepository hiddenTraitRepository
     ) {
         this.repository = repository;
         this.combatStatCalculator = combatStatCalculator;
         this.cardCollectionService = cardCollectionService;
         this.loadoutService = loadoutService;
+        this.hiddenTraitRepository = hiddenTraitRepository;
     }
 
     @Transactional(readOnly = true)
@@ -64,10 +69,10 @@ public class CharacterProfileService {
                 .willpower(req.willpower())
                 .trait1(normalizeOptionalText(req.trait1()))
                 .trait2(normalizeOptionalText(req.trait2()))
-                .hiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()))
                 .build();
 
         CharacterProfile saved = repository.save(profile);
+        replaceHiddenTraits(saved.getId(), req.hiddenTraitIds());
         replaceOwnedCards(saved.getId(), req);
         replaceExCard(saved.getId(), req);
         return toResponse(saved);
@@ -91,7 +96,7 @@ public class CharacterProfileService {
         profile.setWillpower(req.willpower());
         profile.setTrait1(normalizeOptionalText(req.trait1()));
         profile.setTrait2(normalizeOptionalText(req.trait2()));
-        profile.setHiddenTraitIds(normalizeHiddenTraitIds(req.hiddenTraitIds()));
+        replaceHiddenTraits(id, req.hiddenTraitIds());
         loadoutService.clearCurrentSkillDeck(id);
         replaceOwnedCards(id, req);
         replaceExCard(id, req);
@@ -112,6 +117,7 @@ public class CharacterProfileService {
         }
         loadoutService.deleteLoadout(id);
         cardCollectionService.deleteOwnedCards(id);
+        hiddenTraitRepository.deleteByCharacterId(id);
         repository.deleteById(id);
     }
 
@@ -139,7 +145,7 @@ public class CharacterProfileService {
                 profile.getWillpower(),
                 profile.getTrait1(),
                 profile.getTrait2(),
-                normalizeHiddenTraitIds(profile.getHiddenTraitIds()),
+                getHiddenTraitIds(characterId),
                 cardCollectionService.toOwnedCardResponses(characterId),
                 loadoutService.getCurrentSkillDeckPreviewCardIds(characterId),
                 exCardId,
@@ -165,6 +171,24 @@ public class CharacterProfileService {
             return;
         }
         loadoutService.replaceExCard(characterId, exCardId);
+    }
+
+    private void replaceHiddenTraits(Long characterId, List<String> hiddenTraitIds) {
+        List<String> normalizedIds = normalizeHiddenTraitIds(hiddenTraitIds);
+        hiddenTraitRepository.deleteByCharacterId(characterId);
+        hiddenTraitRepository.flush();
+        hiddenTraitRepository.saveAll(normalizedIds.stream()
+                .map(hiddenTraitId -> CharacterHiddenTrait.builder()
+                        .characterId(characterId)
+                        .hiddenTraitId(hiddenTraitId)
+                        .build())
+                .toList());
+    }
+
+    private List<String> getHiddenTraitIds(Long characterId) {
+        return hiddenTraitRepository.findByCharacterIdOrderByIdAsc(characterId).stream()
+                .map(CharacterHiddenTrait::getHiddenTraitId)
+                .toList();
     }
 
     private static void validateRequired(CharacterProfileRequest req) {

@@ -1,11 +1,13 @@
 package com.example.dueltower.character.service;
 
 import com.example.dueltower.character.domain.CharacterGender;
+import com.example.dueltower.character.domain.CharacterHiddenTrait;
 import com.example.dueltower.character.domain.CharacterProfile;
 import com.example.dueltower.character.domain.HiddenTraitIds;
 import com.example.dueltower.character.dto.CharacterOwnedCardModifierResponse;
 import com.example.dueltower.character.dto.CharacterOwnedCardResponse;
 import com.example.dueltower.character.dto.CharacterProfileRequest;
+import com.example.dueltower.character.repository.CharacterHiddenTraitRepository;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.dto.OwnedCardModifierDto;
@@ -44,6 +46,9 @@ class CharacterProfileServiceTest {
 
     @Mock
     private CharacterLoadoutService loadoutService;
+
+    @Mock
+    private CharacterHiddenTraitRepository hiddenTraitRepository;
 
     @InjectMocks
     private CharacterProfileService service;
@@ -119,11 +124,13 @@ class CharacterProfileServiceTest {
 
         service.create(req);
 
-        ArgumentCaptor<CharacterProfile> captor = ArgumentCaptor.forClass(CharacterProfile.class);
-        verify(repository).save(captor.capture());
+        ArgumentCaptor<List<CharacterHiddenTrait>> captor = ArgumentCaptor.forClass(List.class);
+        verify(hiddenTraitRepository).saveAll(captor.capture());
 
-        CharacterProfile saved = captor.getValue();
-        assertIterableEquals(List.of(HiddenTraitIds.HUMAN, HiddenTraitIds.HYBRID), saved.getHiddenTraitIds());
+        assertEquals(List.of(HiddenTraitIds.HUMAN, HiddenTraitIds.HYBRID),
+                captor.getValue().stream().map(CharacterHiddenTrait::getHiddenTraitId).toList());
+        assertEquals(List.of(1L, 1L),
+                captor.getValue().stream().map(CharacterHiddenTrait::getCharacterId).toList());
     }
 
     @Test
@@ -393,6 +400,7 @@ class CharacterProfileServiceTest {
 
         verify(loadoutService).deleteLoadout(1L);
         verify(cardCollectionService).deleteOwnedCards(1L);
+        verify(hiddenTraitRepository).deleteByCharacterId(1L);
         verify(repository).deleteById(1L);
     }
 
@@ -500,7 +508,6 @@ class CharacterProfileServiceTest {
                 .willpower(5)
                 .trait1("trait1")
                 .trait2("trait2")
-                .hiddenTraitIds(List.of())
                 .build();
     }
 
@@ -523,6 +530,7 @@ class CharacterProfileServiceTest {
         when(loadoutService.getCurrentSkillDeckPreviewCardIds(1L)).thenReturn(previewCardIds);
         String exCardId = exCardJson.equals("{}") ? null : exCardJson.replace("{\"id\":\"", "").replace("\"}", "");
         when(loadoutService.getExCardId(1L)).thenReturn(exCardId);
+        when(hiddenTraitRepository.findByCharacterIdOrderByIdAsc(1L)).thenReturn(List.of());
     }
 
     private void stubResponseReadModels(List<String> previewCardIds, String exCardJson) {

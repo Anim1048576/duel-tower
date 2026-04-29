@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Modifier row attached to a concrete owned card copy.
+ * Hidden trait row attached to a character profile.
  */
 @Getter
 @Setter
@@ -24,25 +24,22 @@ import lombok.Setter;
 @Builder
 @Entity
 @Table(
-        name = "character_owned_card_modifiers",
+        name = "character_hidden_traits",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_character_owned_card_modifiers_owned_modifier",
-                columnNames = {"owned_card_id", "modifier_id"}
+                name = "uk_character_hidden_traits_character_trait",
+                columnNames = {"character_id", "hidden_trait_id"}
         )
 )
-public class CharacterOwnedCardModifier {
+public class CharacterHiddenTrait {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Setter(AccessLevel.PROTECTED)
     private Long id;
 
-    @Column(name = "owned_card_id", nullable = false, length = 80)
-    private String ownedCardId;
+    @Column(name = "character_id", nullable = false)
+    private Long characterId;
 
-    @Column(name = "modifier_id", nullable = false, length = 80)
-    private String modifierId;
-
-    @Column(name = "modifier_value", nullable = false)
-    private int value;
+    @Column(name = "hidden_trait_id", nullable = false, length = 80)
+    private String hiddenTraitId;
 }

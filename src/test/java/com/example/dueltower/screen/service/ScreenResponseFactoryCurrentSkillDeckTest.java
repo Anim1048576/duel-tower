@@ -346,7 +346,6 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                 .willpower(5)
                 .trait1(null)
                 .trait2(null)
-                .hiddenTraitIds(List.of())
                 .build();
     }
 }

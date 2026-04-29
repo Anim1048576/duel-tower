@@ -2,6 +2,7 @@ package com.example.dueltower.character.api;
 
 import com.example.dueltower.character.repository.CharacterCurrentSkillDeckEntryRepository;
 import com.example.dueltower.character.repository.CharacterExLoadoutRepository;
+import com.example.dueltower.character.repository.CharacterHiddenTraitRepository;
 import com.example.dueltower.character.repository.CharacterOwnedCardModifierRepository;
 import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import com.example.dueltower.character.service.CharacterLoadoutService;
@@ -49,6 +50,9 @@ class CharacterProfileControllerIntegrationTest {
 
     @Autowired
     private CharacterOwnedCardModifierRepository ownedCardModifierRepository;
+
+    @Autowired
+    private CharacterHiddenTraitRepository hiddenTraitRepository;
 
     @Test
     @DisplayName("character create rejects direct currentSkillDeck writes")
@@ -225,6 +229,40 @@ class CharacterProfileControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("character create rejects duplicate modifier ids within one owned card")
+    void createRejectsDuplicateModifierIdsWithinOneOwnedCard() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterCreateDuplicateModifier");
+
+        mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(characterBodyWithLoadoutFields(
+                                "duplicate-modifier-create",
+                                """
+                                          "ownedCardList": [
+                                            {
+                                              "ownedCardId": "oc-duplicate-modifier-1",
+                                              "cardId": "C001",
+                                              "modifiers": [
+                                                { "modifierId": "STRENGTHENED", "value": 1 },
+                                                { "modifierId": " STRENGTHENED ", "value": 2 }
+                                              ],
+                                              "strengthened": false,
+                                              "weakened": false,
+                                              "lockedInDeck": false,
+                                              "forgettable": true
+                                            }
+                                          ],
+                                          "exCardId": ""
+                                        """
+                        )))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("ownedCards.modifiers.modifierId must be unique within an owned card: STRENGTHENED")));
+
+        assertTrue(ownedCardModifierRepository.findByOwnedCardId("oc-duplicate-modifier-1").isEmpty());
+    }
+
+    @Test
     @DisplayName("character create accepts exCardId without legacy exCard")
     void createReturnsExCardIdWhenExCardIsEquipped() throws Exception {
         MockHttpSession session = signUpAndLogin("characterCreateStructuredEx");
@@ -281,6 +319,8 @@ class CharacterProfileControllerIntegrationTest {
                 .andExpect(jsonPath("$.hiddenTraitIds.length()").value(2))
                 .andExpect(jsonPath("$.hiddenTraitIds[0]").value("HT001"))
                 .andExpect(jsonPath("$.hiddenTraitIds[1]").value("HT002"));
+
+        assertEquals(2, hiddenTraitRepository.findByCharacterIdOrderByIdAsc(Long.parseLong(characterId)).size());
     }
 
     @Test
@@ -473,6 +513,27 @@ class CharacterProfileControllerIntegrationTest {
 
         assertTrue(ownedCardRepository.findByCharacterId(Long.parseLong(characterId)).isEmpty());
         assertTrue(ownedCardModifierRepository.findByOwnedCardId("oc-delete-1").isEmpty());
+    }
+
+    @Test
+    @DisplayName("character delete removes hidden trait rows")
+    void deleteRemovesHiddenTraitRows() throws Exception {
+        MockHttpSession session = signUpAndLogin("characterDeleteHiddenTraits");
+        MvcResult createResult = mockMvc.perform(post("/api/content/characters")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCharacterBody("delete-hidden-traits", "[]", "[\"HT001\", \"HT002\"]")))
+                .andExpect(status().isOk())
+                .andReturn();
+        Long characterId = Long.parseLong(extractJsonNumber(createResult.getResponse().getContentAsString(), "id"));
+
+        assertEquals(2, hiddenTraitRepository.findByCharacterIdOrderByIdAsc(characterId).size());
+
+        mockMvc.perform(delete("/api/content/characters/{id}", characterId)
+                        .session(session))
+                .andExpect(status().isOk());
+
+        assertTrue(hiddenTraitRepository.findByCharacterIdOrderByIdAsc(characterId).isEmpty());
     }
 
     @Test

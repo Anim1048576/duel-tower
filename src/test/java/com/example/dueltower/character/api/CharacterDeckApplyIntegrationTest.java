@@ -375,7 +375,6 @@ class CharacterDeckApplyIntegrationTest {
                 .willpower(5)
                 .trait1("trait1")
                 .trait2("trait2")
-                .hiddenTraitIds(List.of())
                 .build();
         CharacterProfile saved = characterProfileRepository.save(profile);
         cardCollectionService.replaceOwnedCards(saved.getId(), ownedCards);

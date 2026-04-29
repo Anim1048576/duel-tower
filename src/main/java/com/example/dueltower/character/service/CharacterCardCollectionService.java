@@ -40,6 +40,7 @@ public class CharacterCardCollectionService {
     public void replaceOwnedCards(Long characterId, List<OwnedCardDto> ownedCardDtos) {
         requireCharacterId(characterId);
         List<OwnedCardDto> source = ownedCardDtos == null ? List.of() : ownedCardDtos;
+        rejectDuplicateModifierIds(source);
         List<OwnedCard> ownedCards = SessionNormalizationSupport.normalizeOwnedCards(source);
         rejectDuplicateOwnedCardIds(ownedCards);
 
@@ -186,6 +187,24 @@ public class CharacterCardCollectionService {
         for (OwnedCard ownedCard : ownedCards) {
             if (!seen.add(ownedCard.ownedCardId())) {
                 throw new ResponseStatusException(BAD_REQUEST, "ownedCards.ownedCardId must be unique: " + ownedCard.ownedCardId());
+            }
+        }
+    }
+
+    private static void rejectDuplicateModifierIds(List<OwnedCardDto> ownedCards) {
+        for (OwnedCardDto ownedCard : ownedCards) {
+            if (ownedCard == null || ownedCard.modifiers() == null) {
+                continue;
+            }
+            Set<String> seen = new LinkedHashSet<>();
+            for (OwnedCardModifierDto modifier : ownedCard.modifiers()) {
+                if (modifier == null || modifier.modifierId() == null || modifier.modifierId().isBlank()) {
+                    continue;
+                }
+                String modifierId = modifier.modifierId().trim();
+                if (!seen.add(modifierId)) {
+                    throw new ResponseStatusException(BAD_REQUEST, "ownedCards.modifiers.modifierId must be unique within an owned card: " + modifierId);
+                }
             }
         }
     }
