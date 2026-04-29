@@ -197,7 +197,7 @@ class CharacterProfileControllerIntegrationTest {
                                               "modifiers": [
                                                 { "modifierId": "STRENGTHENED", "value": 1 }
                                               ],
-                                              "strengthened": true,
+                                              "strengthened": false,
                                               "weakened": false,
                                               "lockedInDeck": false,
                                               "forgettable": true

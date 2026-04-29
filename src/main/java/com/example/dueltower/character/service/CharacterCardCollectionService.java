@@ -8,6 +8,7 @@ import com.example.dueltower.character.repository.CharacterOwnedCardModifierRepo
 import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import com.example.dueltower.content.card.model.OwnedCard;
 import com.example.dueltower.content.card.model.OwnedCardModifier;
+import com.example.dueltower.content.cardmodifier.cmdb.CardModifierIds;
 import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.dto.OwnedCardModifierDto;
 import com.example.dueltower.session.service.SessionNormalizationSupport;
@@ -43,6 +44,7 @@ public class CharacterCardCollectionService {
         rejectDuplicateModifierIds(source);
         List<OwnedCard> ownedCards = SessionNormalizationSupport.normalizeOwnedCards(source);
         rejectDuplicateOwnedCardIds(ownedCards);
+        rejectDuplicateNormalizedModifierIds(ownedCards);
 
         deleteOwnedCards(characterId);
 
@@ -202,10 +204,32 @@ public class CharacterCardCollectionService {
                     continue;
                 }
                 String modifierId = modifier.modifierId().trim();
-                if (!seen.add(modifierId)) {
-                    throw new ResponseStatusException(BAD_REQUEST, "ownedCards.modifiers.modifierId must be unique within an owned card: " + modifierId);
-                }
+                rejectDuplicateModifierId(seen, modifierId);
             }
+            if (Boolean.TRUE.equals(ownedCard.strengthened())) {
+                rejectDuplicateModifierId(seen, CardModifierIds.STRENGTHENED);
+            }
+            if (Boolean.TRUE.equals(ownedCard.weakened())) {
+                rejectDuplicateModifierId(seen, CardModifierIds.WEAKENED);
+            }
+            if (Boolean.TRUE.equals(ownedCard.lockedInDeck())) {
+                rejectDuplicateModifierId(seen, CardModifierIds.LOCKED_IN_DECK);
+            }
+        }
+    }
+
+    private static void rejectDuplicateNormalizedModifierIds(List<OwnedCard> ownedCards) {
+        for (OwnedCard ownedCard : ownedCards) {
+            Set<String> seen = new LinkedHashSet<>();
+            for (OwnedCardModifier modifier : ownedCard.modifiers()) {
+                rejectDuplicateModifierId(seen, modifier.modifierId());
+            }
+        }
+    }
+
+    private static void rejectDuplicateModifierId(Set<String> seen, String modifierId) {
+        if (!seen.add(modifierId)) {
+            throw new ResponseStatusException(BAD_REQUEST, "ownedCards.modifiers.modifierId must be unique within an owned card: " + modifierId);
         }
     }
 

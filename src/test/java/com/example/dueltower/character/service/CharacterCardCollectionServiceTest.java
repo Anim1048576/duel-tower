@@ -187,6 +187,48 @@ class CharacterCardCollectionServiceTest {
     }
 
     @Test
+    void replaceOwnedCardsRejectsExplicitStrengthenedModifierAndLegacyStrengthenedBooleanBeforeDeletingExistingRows() {
+        assertDuplicateModifierRejectedBeforeMutation(new OwnedCardDto(
+                "oc-1",
+                "C001",
+                List.of(new OwnedCardModifierDto(CardModifierIds.STRENGTHENED, 1)),
+                true,
+                false,
+                false,
+                true,
+                null
+        ), CardModifierIds.STRENGTHENED);
+    }
+
+    @Test
+    void replaceOwnedCardsRejectsExplicitWeakenedModifierAndLegacyWeakenedBooleanBeforeDeletingExistingRows() {
+        assertDuplicateModifierRejectedBeforeMutation(new OwnedCardDto(
+                "oc-1",
+                "C001",
+                List.of(new OwnedCardModifierDto(CardModifierIds.WEAKENED, 1)),
+                false,
+                true,
+                false,
+                true,
+                null
+        ), CardModifierIds.WEAKENED);
+    }
+
+    @Test
+    void replaceOwnedCardsRejectsExplicitLockedInDeckModifierAndLegacyLockedInDeckBooleanBeforeDeletingExistingRows() {
+        assertDuplicateModifierRejectedBeforeMutation(new OwnedCardDto(
+                "oc-1",
+                "C001",
+                List.of(new OwnedCardModifierDto(CardModifierIds.LOCKED_IN_DECK, 1)),
+                false,
+                false,
+                true,
+                true,
+                null
+        ), CardModifierIds.LOCKED_IN_DECK);
+    }
+
+    @Test
     void hasOwnedCardTrimsOwnedCardId() {
         when(ownedCardRepository.existsByCharacterIdAndOwnedCardId(1L, "oc-1")).thenReturn(true);
 
@@ -218,6 +260,18 @@ class CharacterCardCollectionServiceTest {
                         .value(1)
                         .build()
         ));
+    }
+
+    private void assertDuplicateModifierRejectedBeforeMutation(OwnedCardDto ownedCard, String modifierId) {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.replaceOwnedCards(1L, List.of(ownedCard)));
+
+        assertEquals(BAD_REQUEST, ex.getStatusCode());
+        assertEquals("400 BAD_REQUEST \"ownedCards.modifiers.modifierId must be unique within an owned card: " + modifierId + "\"", ex.getMessage());
+        verify(ownedCardRepository, never()).deleteByCharacterId(anyLong());
+        verify(ownedCardModifierRepository, never()).deleteByOwnedCardIdIn(anyList());
+        verify(ownedCardRepository, never()).saveAll(anyList());
+        verify(ownedCardModifierRepository, never()).saveAll(anyList());
     }
 
     @SuppressWarnings("unchecked")
