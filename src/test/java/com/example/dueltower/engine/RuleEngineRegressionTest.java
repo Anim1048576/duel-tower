@@ -187,6 +187,74 @@ class RuleEngineRegressionTest {
         assertEquals(4, fx.state.combat().factionStatusValues(CombatState.FactionId.ENEMIES).get(S301_Barrier.ID));
     }
 
+    @Test
+    @DisplayName("\uACBD\uD654\uB294 \uC801\uC5D0\uAC8C \uBC1B\uB294 \uD53C\uD574\uB97C \uC218\uCE58\uB9CC\uD07C \uAC10\uC18C\uC2DC\uD0A4\uACE0 \uC2A4\uD0DD\uC744 \uC18C\uBAA8\uD558\uC9C0 \uC54A\uB294\uB2E4")
+    void hardeningReducesIncomingEnemyDamageWithoutConsumingStacks() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+
+        int hpBefore = fx.player.hp();
+        fx.player.statusSet(S109_Hardening.ID, 3);
+
+        DamageOps.apply(
+                fx.state,
+                fx.ctx,
+                new ArrayList<>(),
+                TargetRef.ofEnemy(fx.enemyId),
+                "hardening-test",
+                TargetRef.ofPlayer(fx.playerId),
+                5
+        );
+
+        assertEquals(hpBefore - 2, fx.player.hp());
+        assertEquals(3, fx.player.status(S109_Hardening.ID));
+    }
+
+    @Test
+    @DisplayName("\uACBD\uD654\uB294 \uD134 \uC2DC\uC791 \uC2DC \uBAA8\uB450 \uC81C\uAC70\uB41C\uB2E4")
+    void hardeningIsClearedOnTurnStart() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.player.hand().clear();
+        fx.player.deck().clear();
+        fx.player.grave().clear();
+        fx.player.statusSet(S109_Hardening.ID, 3);
+
+        TurnPhases.turnStart(fx.state, fx.ctx, TargetRef.ofPlayer(fx.playerId), new ArrayList<>(), "TEST");
+
+        assertEquals(0, fx.player.status(S109_Hardening.ID));
+    }
+
+    @Test
+    @DisplayName("Pierce\uB294 \uACBD\uD654\uB97C \uBB34\uC2DC\uD558\uC9C0 \uBABB\uD55C\uB2E4")
+    void pierceDoesNotIgnoreHardening() {
+        TestFixture fx = TestFixture.basic();
+        fx.startSimpleCombat();
+        fx.forceMainTurnForPlayer();
+
+        assertFalse(fx.ctx.statusDef(S109_Hardening.ID).hasTag(StatusTag.SHIELD));
+        assertFalse(fx.ctx.statusDef(S109_Hardening.ID).hasTag(StatusTag.BARRIER));
+
+        int hpBefore = fx.player.hp();
+        fx.player.statusSet(S109_Hardening.ID, 3);
+        CardInstId pierce = fx.addEnemyHandCard("PIERCE_STRIKE");
+
+        DamageOps.apply(
+                fx.state,
+                fx.ctx,
+                new ArrayList<>(),
+                TargetRef.ofEnemy(fx.enemyId),
+                pierce,
+                "pierce-hardening-test",
+                TargetRef.ofPlayer(fx.playerId),
+                5,
+                KeywordOps.damageFlags(fx.state, fx.ctx, TargetRef.ofEnemy(fx.enemyId), pierce, TargetRef.ofPlayer(fx.playerId))
+        );
+
+        assertEquals(hpBefore - 2, fx.player.hp());
+        assertEquals(3, fx.player.status(S109_Hardening.ID));
+    }
+
 
     @Test
     @DisplayName("치명타 확률은 keyword hook에서 결정된다")
@@ -1438,7 +1506,7 @@ class RuleEngineRegressionTest {
             for (StatusBlueprint bp : List.of(
                     new S001_Shield(), new S002_Regeneration(), new S004_Evasion(), new S005_Taunt(),
                     new S101_Pain(), new S102_Stun(), new S103_Pressure(), new S104_Destruction(),
-                    new S105_Weak(), new S106_Vulnerable(), new S107_Confusion(), new S108_Seal(), new S301_Barrier(),
+                    new S105_Weak(), new S106_Vulnerable(), new S107_Confusion(), new S108_Seal(), new S109_Hardening(), new S301_Barrier(),
                     new TestCriticalStatus(), new TestIncomingCriticalStatus(), new TestCriticalChanceOnlyStatus()
             )) {
                 statusDefs.put(bp.id(), bp.definition());
