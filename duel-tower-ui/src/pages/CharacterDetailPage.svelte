@@ -6,7 +6,6 @@
     getCharacter,
     getCharacterCreateOptions,
     previewCharacterCombatStats,
-    replaceCharacterCurrentSkillDeck,
     updateCharacter,
   } from '../lib/api/characters'
   import type {
@@ -52,7 +51,6 @@
     selectedTraitIds: string[]
     selectedHiddenTraitIds: string[]
     ownedSkillCardIds: string[]
-    currentSkillDeckOwnedCardIds: string[]
     selectedExCardId: string
   }
 
@@ -96,7 +94,6 @@
       selectedTraitIds: [],
       selectedHiddenTraitIds: [],
       ownedSkillCardIds: [],
-      currentSkillDeckOwnedCardIds: [],
       selectedExCardId: '',
     }
   }
@@ -107,12 +104,8 @@
     }
 
     const match = resolveRouteMatch(window.location.pathname)
-    if (match?.page.key === 'character-create') {
-      return { mode: 'create' as CharacterDetailMode, routeId: null as string | null }
-    }
-    if (match?.page.key !== 'character-detail') {
-      return { mode: 'edit' as CharacterDetailMode, routeId: null as string | null }
-    }
+    if (match?.page.key === 'character-create') return { mode: 'create' as CharacterDetailMode, routeId: null }
+    if (match?.page.key !== 'character-detail') return { mode: 'edit' as CharacterDetailMode, routeId: null }
     return { mode: 'edit' as CharacterDetailMode, routeId: match.params.id ?? null }
   }
 
@@ -127,18 +120,8 @@
     return Number.isFinite(parsed) ? parsed : null
   }
 
-  function parseRequiredNumber(value: string) {
-    const parsed = parseNullableNumber(value)
-    return parsed ?? null
-  }
-
   function normalizeText(value: string) {
     return value.trim()
-  }
-
-  function normalizeOptionalText(value: string) {
-    const normalized = value.trim()
-    return normalized ? normalized : null
   }
 
   function buildDisposition(formState: CharacterFormState) {
@@ -153,18 +136,18 @@
     }
   }
 
-  function makeOwnedCardId(cardId: string) {
-    return `owned-${cardId}`
+  function makeOwnedCardId(cardId: string, index: number) {
+    return `owned-${cardId}-${index + 1}`
   }
 
   function buildOwnedCards(formState: CharacterFormState): OwnedCardRequest[] {
-    return formState.ownedSkillCardIds.map((cardId) => ({
-      ownedCardId: makeOwnedCardId(cardId),
+    return formState.ownedSkillCardIds.map((cardId, index) => ({
+      ownedCardId: makeOwnedCardId(cardId, index),
       cardId,
       modifiers: [],
       strengthened: false,
       weakened: false,
-      lockedInDeck: formState.currentSkillDeckOwnedCardIds.includes(makeOwnedCardId(cardId)),
+      lockedInDeck: false,
       forgettable: true,
       notForgettableReason: null,
     }))
@@ -179,33 +162,16 @@
       disposition: buildDisposition(formState),
       oneLiner: normalizeText(formState.quote),
       story: normalizeText(formState.backstory),
-      physical: parseRequiredNumber(formState.lifeStats.body),
-      technique: parseRequiredNumber(formState.lifeStats.technique),
-      sense: parseRequiredNumber(formState.lifeStats.sense),
-      willpower: parseRequiredNumber(formState.lifeStats.will),
+      physical: parseNullableNumber(formState.lifeStats.body),
+      technique: parseNullableNumber(formState.lifeStats.technique),
+      sense: parseNullableNumber(formState.lifeStats.sense),
+      willpower: parseNullableNumber(formState.lifeStats.will),
       trait1: formState.selectedTraitIds[0] ?? null,
       trait2: formState.selectedTraitIds[1] ?? null,
       hiddenTraitIds: [...formState.selectedHiddenTraitIds],
       ownedCardList: buildOwnedCards(formState),
       exCardId: formState.selectedExCardId,
     }
-  }
-
-  function resolveCurrentDeckOwnedIds(character: CharacterProfileResponse) {
-    const available = character.ownedCardList.map((ownedCard) => ({
-      ownedCardId: ownedCard.ownedCardId,
-      cardId: ownedCard.cardId,
-      used: false,
-    }))
-    const resolved: string[] = []
-    for (const cardId of character.currentSkillDeckPreviewCardIds) {
-      const match = available.find((entry) => !entry.used && entry.cardId === cardId)
-      if (match) {
-        match.used = true
-        resolved.push(match.ownedCardId)
-      }
-    }
-    return resolved
   }
 
   function createFormStateFromResponse(character: CharacterProfileResponse): CharacterFormState {
@@ -228,7 +194,6 @@
       selectedTraitIds: [character.trait1, character.trait2].filter((value): value is string => Boolean(value)),
       selectedHiddenTraitIds: [...character.hiddenTraitIds],
       ownedSkillCardIds: character.ownedCardList.map((ownedCard) => ownedCard.cardId),
-      currentSkillDeckOwnedCardIds: resolveCurrentDeckOwnedIds(character),
       selectedExCardId: character.exCardId ?? '',
     }
   }
@@ -264,36 +229,22 @@
     return card ? `${card.name} (${card.id})` : cardId
   }
 
-  function getOwnedDeckCandidates() {
-    return form.ownedSkillCardIds.map((cardId) => ({
-      ownedCardId: makeOwnedCardId(cardId),
-      cardId,
-      label: getCardLabel(cardId),
-    }))
+  function summarizeDescription(description: string | null | undefined) {
+    const normalized = String(description ?? '').replace(/\s+/g, ' ').trim()
+    if (!normalized) return '설명이 없습니다.'
+    return normalized.length > 96 ? `${normalized.slice(0, 96)}...` : normalized
   }
 
-  function ensureDeckSubset(nextOwnedSkillCardIds: string[]) {
-    const allowedOwnedIds = new Set(nextOwnedSkillCardIds.map(makeOwnedCardId))
-    form.currentSkillDeckOwnedCardIds = form.currentSkillDeckOwnedCardIds.filter((ownedCardId) =>
-      allowedOwnedIds.has(ownedCardId),
-    )
+  function getKeywordPreview(card: CardDefinition) {
+    return card.keywords.slice(0, 3)
   }
 
-  function toggleOwnedSkillCard(cardId: string) {
-    if (form.ownedSkillCardIds.includes(cardId)) {
-      form.ownedSkillCardIds = form.ownedSkillCardIds.filter((id) => id !== cardId)
-    } else {
-      form.ownedSkillCardIds = [...form.ownedSkillCardIds, cardId]
-    }
-    ensureDeckSubset(form.ownedSkillCardIds)
+  function addOwnedSkillCard(cardId: string) {
+    form.ownedSkillCardIds = [...form.ownedSkillCardIds, cardId]
   }
 
-  function toggleCurrentDeckCard(ownedCardId: string) {
-    if (form.currentSkillDeckOwnedCardIds.includes(ownedCardId)) {
-      form.currentSkillDeckOwnedCardIds = form.currentSkillDeckOwnedCardIds.filter((id) => id !== ownedCardId)
-    } else {
-      form.currentSkillDeckOwnedCardIds = [...form.currentSkillDeckOwnedCardIds, ownedCardId]
-    }
+  function removeOwnedSkillCardAt(index: number) {
+    form.ownedSkillCardIds = form.ownedSkillCardIds.filter((_, currentIndex) => currentIndex !== index)
   }
 
   function toggleTrait(traitId: string) {
@@ -347,6 +298,9 @@
   let cardLoading = $state(false)
   let traitLoading = $state(false)
   let developerUiOpen = $state(false)
+  let traitSearch = $state('')
+  let hiddenTraitSearch = $state('')
+  let cardSearch = $state('')
   let notFound = $state(false)
   let errorMessage = $state<string | null>(null)
   let saveErrorMessage = $state<string | null>(null)
@@ -374,8 +328,46 @@
   )
   const displayedSummary = $derived.by(() => form.quote.trim() || '캐릭터의 기본 정보와 카드 구성을 입력합니다.')
   const selectedTraitCount = $derived.by(() => form.selectedTraitIds.length)
+  const selectedHiddenTraitCount = $derived.by(() => form.selectedHiddenTraitIds.length)
   const selectedOwnedCardCount = $derived.by(() => form.ownedSkillCardIds.length)
-  const currentDeckCandidates = $derived.by(() => getOwnedDeckCandidates())
+  const selectedExCard = $derived.by(() => exCards.find((card) => card.id === form.selectedExCardId) ?? null)
+  const selectedExCardLabel = $derived.by(() => selectedExCard?.name ?? form.selectedExCardId ?? '-')
+  const filteredTraitOptions = $derived.by(() => {
+    const query = traitSearch.trim().toLowerCase()
+    if (!query) return traitOptions
+    return traitOptions.filter((trait) =>
+      [trait.id, trait.name, trait.description].some((value) => String(value ?? '').toLowerCase().includes(query)),
+    )
+  })
+  const filteredHiddenTraitOptions = $derived.by(() => {
+    const query = hiddenTraitSearch.trim().toLowerCase()
+    if (!query) return hiddenTraitOptions
+    return hiddenTraitOptions.filter((trait) =>
+      [trait.id, trait.label, trait.description].some((value) => String(value ?? '').toLowerCase().includes(query)),
+    )
+  })
+  const filteredSkillCards = $derived.by(() => {
+    const query = cardSearch.trim().toLowerCase()
+    if (!query) return skillCards
+    return skillCards.filter((card) =>
+      [card.id, card.name, card.description].some((value) => String(value ?? '').toLowerCase().includes(query)),
+    )
+  })
+  const ownedCardRows = $derived.by(() =>
+    form.ownedSkillCardIds.map((cardId, index) => ({
+      key: `${cardId}-${index}`,
+      index,
+      cardId,
+      card: skillCards.find((candidate) => candidate.id === cardId) ?? null,
+    })),
+  )
+  const ownedCardCountById = $derived.by(() => {
+    const counts = new Map<string, number>()
+    for (const cardId of form.ownedSkillCardIds) {
+      counts.set(cardId, (counts.get(cardId) ?? 0) + 1)
+    }
+    return counts
+  })
 
   function syncCharacterState(response: CharacterProfileResponse) {
     character = response
@@ -421,7 +413,7 @@
       moralAxisOptions = options.moralAxisOptions.length ? options.moralAxisOptions : fallbackMoralAxisOptions
       hiddenTraitOptions = options.hiddenTraitOptions
     } catch (error) {
-      optionErrorMessage = getApiErrorMessage(error, '특성 목록을 불러오지 못했습니다.')
+      optionErrorMessage = getApiErrorMessage(error, '히든 스테이터스 목록을 불러오지 못했습니다.')
     } finally {
       optionsLoading = false
     }
@@ -451,10 +443,10 @@
     previewErrorMessage = null
     try {
       previewBattleStats = await previewCharacterCombatStats({
-        physical: parseRequiredNumber(form.lifeStats.body),
-        technique: parseRequiredNumber(form.lifeStats.technique),
-        sense: parseRequiredNumber(form.lifeStats.sense),
-        willpower: parseRequiredNumber(form.lifeStats.will),
+        physical: parseNullableNumber(form.lifeStats.body),
+        technique: parseNullableNumber(form.lifeStats.technique),
+        sense: parseNullableNumber(form.lifeStats.sense),
+        willpower: parseNullableNumber(form.lifeStats.will),
       })
     } catch (error) {
       previewErrorMessage = getApiErrorMessage(error, '서버에서 전투 스테이터스를 계산하지 못했습니다.')
@@ -463,20 +455,8 @@
     }
   }
 
-  async function applyCurrentDeckIfNeeded(response: CharacterProfileResponse) {
-    if (form.currentSkillDeckOwnedCardIds.length === 0) {
-      return response
-    }
-    return replaceCharacterCurrentSkillDeck(response.id, {
-      ownedCardIds: form.currentSkillDeckOwnedCardIds,
-    })
-  }
-
-  async function saveWithPayload(payload: CharacterProfileRequest, applyFormCurrentDeck = true) {
-    const response = isCreateMode
-      ? await createCharacter(payload)
-      : await updateCharacter(requestedCharacterId ?? '', payload)
-    return applyFormCurrentDeck ? applyCurrentDeckIfNeeded(response) : response
+  async function saveWithPayload(payload: CharacterProfileRequest) {
+    return isCreateMode ? await createCharacter(payload) : await updateCharacter(requestedCharacterId ?? '', payload)
   }
 
   async function handleFormSave(event?: SubmitEvent) {
@@ -515,7 +495,7 @@
     saveMessage = null
     saving = true
     try {
-      const response = await saveWithPayload(parseDeveloperJson(developerJsonText), false)
+      const response = await saveWithPayload(parseDeveloperJson(developerJsonText))
       syncCharacterState(response)
       saveMessage = isCreateMode ? '캐릭터를 생성했습니다.' : '캐릭터를 저장했습니다.'
       if (isCreateMode) {
@@ -592,201 +572,269 @@
       </div>
     </SectionFrame>
 
-    <form class="detail-page__grid" onsubmit={handleFormSave}>
-      <SectionFrame title="기본 정보" description="캐릭터의 기본 프로필을 입력합니다.">
-        <fieldset class="detail-page__fieldset" disabled={saving || deleting}>
-          <div class="detail-page__form-grid">
-            <label class="detail-page__field">
-              <span>이름</span>
-              <input bind:value={form.name} name="name" type="text" autocomplete="off" />
-            </label>
-            <label class="detail-page__field">
-              <span>나이</span>
-              <input bind:value={form.age} name="age" type="number" step="1" />
-            </label>
-            <label class="detail-page__field detail-page__field--span-2">
-              <span>한마디</span>
-              <input bind:value={form.quote} name="quote" type="text" />
-            </label>
-            <label class="detail-page__field detail-page__field--span-2">
-              <span>소원</span>
-              <textarea bind:value={form.wish} name="wish" rows="3"></textarea>
-            </label>
-            <label class="detail-page__field detail-page__field--span-2">
-              <span>백 스토리</span>
-              <textarea bind:value={form.backstory} name="backstory" rows="6"></textarea>
-            </label>
-            <div class="detail-page__field">
-              <span>성별</span>
-              <div class="detail-page__choice-row">
-                {#each genderOptions as option}
-                  <label><input type="radio" bind:group={form.gender} value={option.id} /> {option.label}</label>
-                {/each}
-              </div>
-            </div>
-            <div class="detail-page__field">
-              <span>성향</span>
-              <div class="detail-page__choice-row">
-                {#each orderAxisOptions as option}
-                  <label><input type="radio" bind:group={form.alignmentOrderChaos} value={option.id} /> {option.label}</label>
-                {/each}
-              </div>
-              <div class="detail-page__choice-row">
-                {#each moralAxisOptions as option}
-                  <label><input type="radio" bind:group={form.alignmentGoodEvil} value={option.id} /> {option.label}</label>
-                {/each}
-              </div>
-            </div>
-          </div>
-        </fieldset>
-      </SectionFrame>
-
-      <SectionFrame title="생활 스테이터스" description="전투 스테이터스는 서버 계산 결과를 사용합니다.">
-        <fieldset class="detail-page__fieldset" disabled={saving || deleting}>
-          <div class="detail-page__form-grid">
-            <label class="detail-page__field">
-              <span>신체</span>
-              <input bind:value={form.lifeStats.body} type="number" step="1" />
-            </label>
-            <label class="detail-page__field">
-              <span>기술</span>
-              <input bind:value={form.lifeStats.technique} type="number" step="1" />
-            </label>
-            <label class="detail-page__field">
-              <span>감각</span>
-              <input bind:value={form.lifeStats.sense} type="number" step="1" />
-            </label>
-            <label class="detail-page__field">
-              <span>의지</span>
-              <input bind:value={form.lifeStats.will} type="number" step="1" />
-            </label>
-          </div>
-        </fieldset>
-      </SectionFrame>
-
-      <SectionFrame title="전투 스테이터스" description="생활 스테이터스를 바탕으로 서버에서 계산됩니다.">
-        <div class="detail-page__stats">
-          <StatBlock value={previewBattleStats?.maxHp ?? '-'} label="체력" note="편집 불가" />
-          <StatBlock value={previewBattleStats?.maxAp ?? '-'} label="행동력" note="편집 불가" />
-          <StatBlock value={previewBattleStats?.attackPower ?? '-'} label="공격력" note="편집 불가" />
-          <StatBlock value={previewBattleStats?.healPower ?? '-'} label="치유력" note="편집 불가" />
-        </div>
-        <div class="detail-page__actions">
-          <button type="button" disabled={previewLoading} onclick={() => void refreshPreview()}>
-            {previewLoading ? '계산 중...' : '미리보기 갱신'}
-          </button>
-        </div>
-        {#if previewErrorMessage}
-          <p class="detail-page__error">{previewErrorMessage}</p>
-        {/if}
-      </SectionFrame>
-
-      <SectionFrame title="캐릭터 특성" description="일반 입력에서는 0개에서 2개까지 선택합니다.">
-        <p class="detail-page__muted">선택됨 {selectedTraitCount} / 2</p>
-        {#if traitLoading}
-          <p class="detail-page__muted">특성 목록을 불러오는 중입니다.</p>
-        {:else if traitErrorMessage}
-          <p class="detail-page__error">{traitErrorMessage}</p>
-        {:else if traitOptions.length === 0}
-          <p class="detail-page__muted">선택 가능한 특성 목록이 없습니다. 개발자 UI에서 직접 입력할 수 있습니다.</p>
-        {:else}
-          <div class="detail-page__option-list">
-            {#each traitOptions as trait}
-              <label class="detail-page__option">
-                <input
-                  type="checkbox"
-                  checked={form.selectedTraitIds.includes(trait.id)}
-                  disabled={!form.selectedTraitIds.includes(trait.id) && selectedTraitCount >= 2}
-                  onchange={() => toggleTrait(trait.id)}
-                />
-                <span><strong>{trait.name}</strong><small>{trait.id} · {trait.description}</small></span>
+    <form class="detail-page__layout" onsubmit={handleFormSave}>
+      <div class="detail-page__top-row">
+        <SectionFrame title="기본 정보" description="캐릭터의 기본 프로필을 입력합니다.">
+          <fieldset class="detail-page__fieldset" disabled={saving || deleting}>
+            <div class="detail-page__form-grid">
+              <label class="detail-page__field">
+                <span>이름</span>
+                <input bind:value={form.name} name="name" type="text" autocomplete="off" />
               </label>
+              <label class="detail-page__field">
+                <span>나이</span>
+                <input bind:value={form.age} name="age" type="number" step="1" />
+              </label>
+              <label class="detail-page__field detail-page__field--span-2">
+                <span>한마디</span>
+                <input bind:value={form.quote} name="quote" type="text" />
+              </label>
+              <label class="detail-page__field detail-page__field--span-2">
+                <span>소원</span>
+                <textarea bind:value={form.wish} name="wish" rows="3"></textarea>
+              </label>
+              <label class="detail-page__field detail-page__field--span-2">
+                <span>백 스토리</span>
+                <textarea bind:value={form.backstory} name="backstory" rows="5"></textarea>
+              </label>
+              <label class="detail-page__field">
+                <span>성별</span>
+                <select bind:value={form.gender}>
+                  <option value="">성별불명</option>
+                  {#each genderOptions as option}
+                    <option value={option.id}>{option.label}</option>
+                  {/each}
+                </select>
+              </label>
+              <div class="detail-page__field">
+                <span>성향</span>
+                <div class="detail-page__select-pair">
+                  <select bind:value={form.alignmentOrderChaos} aria-label="성향 첫 번째 축">
+                    {#each orderAxisOptions as option}
+                      <option value={option.id}>{option.label}</option>
+                    {/each}
+                  </select>
+                  <select bind:value={form.alignmentGoodEvil} aria-label="성향 두 번째 축">
+                    {#each moralAxisOptions as option}
+                      <option value={option.id}>{option.label}</option>
+                    {/each}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+        </SectionFrame>
+
+        <SectionFrame title="스테이터스" description="전투 스테이터스는 서버 계산 결과만 표시합니다.">
+          <div class="detail-page__stats-cluster">
+            <fieldset class="detail-page__fieldset" disabled={saving || deleting}>
+              <div class="detail-page__compact-grid">
+                <label class="detail-page__field">
+                  <span>신체</span>
+                  <input bind:value={form.lifeStats.body} type="number" step="1" />
+                </label>
+                <label class="detail-page__field">
+                  <span>기술</span>
+                  <input bind:value={form.lifeStats.technique} type="number" step="1" />
+                </label>
+                <label class="detail-page__field">
+                  <span>감각</span>
+                  <input bind:value={form.lifeStats.sense} type="number" step="1" />
+                </label>
+                <label class="detail-page__field">
+                  <span>의지</span>
+                  <input bind:value={form.lifeStats.will} type="number" step="1" />
+                </label>
+              </div>
+            </fieldset>
+            <div class="detail-page__stats">
+              <StatBlock value={previewBattleStats?.maxHp ?? '-'} label="체력" note="편집 불가" />
+              <StatBlock value={previewBattleStats?.maxAp ?? '-'} label="행동력" note="편집 불가" />
+              <StatBlock value={previewBattleStats?.attackPower ?? '-'} label="공격력" note="편집 불가" />
+              <StatBlock value={previewBattleStats?.healPower ?? '-'} label="치유력" note="편집 불가" />
+            </div>
+          </div>
+          <div class="detail-page__actions">
+            <button type="button" disabled={previewLoading} onclick={() => void refreshPreview()}>
+              {previewLoading ? '계산 중...' : '미리보기 갱신'}
+            </button>
+          </div>
+          {#if previewErrorMessage}
+            <p class="detail-page__error">{previewErrorMessage}</p>
+          {/if}
+        </SectionFrame>
+      </div>
+
+      <div class="detail-page__trait-row">
+        <SectionFrame title="캐릭터 특성" description="0개에서 2개까지 선택합니다.">
+          <p class="detail-page__muted">선택됨 {selectedTraitCount} / 2</p>
+          <div class="detail-page__chip-row">
+            {#each form.selectedTraitIds as traitId}
+              <TagChip label={traitOptions.find((trait) => trait.id === traitId)?.name ?? traitId} tone="accent" />
             {/each}
           </div>
-        {/if}
-      </SectionFrame>
-
-      <SectionFrame title="히든 스테이터스" description="캐릭터에 부여할 히든 스테이터스를 선택합니다.">
-        {#if optionsLoading}
-          <p class="detail-page__muted">히든 스테이터스 목록을 불러오는 중입니다.</p>
-        {:else if optionErrorMessage}
-          <p class="detail-page__error">{optionErrorMessage}</p>
-        {:else}
-          <div class="detail-page__option-list">
-            {#each hiddenTraitOptions as trait}
-              <label class="detail-page__option">
-                <input
-                  type="checkbox"
-                  checked={form.selectedHiddenTraitIds.includes(trait.id)}
-                  onchange={() => toggleHiddenTrait(trait.id)}
-                />
-                <span><strong>{trait.label}</strong><small>{trait.id}</small></span>
-              </label>
-            {/each}
-          </div>
-        {/if}
-      </SectionFrame>
-
-      <SectionFrame title="카드 설정" description="보유 카드와 현재 스킬 덱, 설정된 EX 카드를 고릅니다.">
-        {#if cardLoading}
-          <p class="detail-page__muted">카드 목록을 불러오는 중입니다.</p>
-        {:else if cardErrorMessage}
-          <p class="detail-page__error">{cardErrorMessage}</p>
-        {:else}
-          <div class="detail-page__columns">
-            <div>
-              <h4>보유 카드 목록</h4>
-              <p class="detail-page__muted">CardType.SKILL 카드만 서버에서 조회합니다. 선택됨 {selectedOwnedCardCount}</p>
-              <div class="detail-page__option-list">
-                {#each skillCards as card}
-                  <label class="detail-page__option">
-                    <input
-                      type="checkbox"
-                      checked={form.ownedSkillCardIds.includes(card.id)}
-                      onchange={() => toggleOwnedSkillCard(card.id)}
-                    />
-                    <span><strong>{card.name}</strong><small>{card.id} · 비용 {card.cost ?? '-'} · {card.description}</small></span>
-                  </label>
-                {/each}
-              </div>
+          <label class="detail-page__field">
+            <span>특성 검색</span>
+            <input bind:value={traitSearch} type="search" placeholder="이름, ID, 설명 검색" />
+          </label>
+          {#if traitLoading}
+            <p class="detail-page__muted">특성 목록을 불러오는 중입니다.</p>
+          {:else if traitErrorMessage}
+            <p class="detail-page__error">{traitErrorMessage}</p>
+          {:else if traitOptions.length === 0}
+            <p class="detail-page__muted">선택 가능한 특성 목록이 없습니다.</p>
+          {:else}
+            <div class="detail-page__option-list detail-page__scroll-panel">
+              {#each filteredTraitOptions as trait}
+                <label class="detail-page__option">
+                  <input
+                    type="checkbox"
+                    checked={form.selectedTraitIds.includes(trait.id)}
+                    disabled={!form.selectedTraitIds.includes(trait.id) && selectedTraitCount >= 2}
+                    onchange={() => toggleTrait(trait.id)}
+                  />
+                  <span><strong>{trait.name}</strong><small>{trait.id} · {trait.description}</small></span>
+                </label>
+              {/each}
             </div>
-            <div>
-              <h4>현재 스킬 덱</h4>
-              <p class="detail-page__muted">보유 카드로 선택한 SKILL 카드만 덱 후보로 표시합니다.</p>
-              <div class="detail-page__option-list">
-                {#each currentDeckCandidates as card}
-                  <label class="detail-page__option">
-                    <input
-                      type="checkbox"
-                      checked={form.currentSkillDeckOwnedCardIds.includes(card.ownedCardId)}
-                      onchange={() => toggleCurrentDeckCard(card.ownedCardId)}
-                    />
-                    <span><strong>{card.label}</strong><small>{card.ownedCardId}</small></span>
-                  </label>
-                {/each}
-              </div>
+          {/if}
+        </SectionFrame>
+
+        <SectionFrame title="히든 스테이터스" description="히든 스테이터스를 선택합니다.">
+          <p class="detail-page__muted">선택됨 {selectedHiddenTraitCount}</p>
+          <label class="detail-page__field">
+            <span>히든 스테이터스 검색</span>
+            <input bind:value={hiddenTraitSearch} type="search" placeholder="이름 또는 ID 검색" />
+          </label>
+          {#if optionsLoading}
+            <p class="detail-page__muted">히든 스테이터스 목록을 불러오는 중입니다.</p>
+          {:else if optionErrorMessage}
+            <p class="detail-page__error">{optionErrorMessage}</p>
+          {:else}
+            <div class="detail-page__option-list detail-page__scroll-panel">
+              {#each filteredHiddenTraitOptions as trait}
+                <label class="detail-page__option">
+                  <input
+                    type="checkbox"
+                    checked={form.selectedHiddenTraitIds.includes(trait.id)}
+                    onchange={() => toggleHiddenTrait(trait.id)}
+                  />
+                  <span><strong>{trait.label}</strong><small>{trait.id}</small></span>
+                </label>
+              {/each}
             </div>
-          </div>
-          <div class="detail-page__field">
-            <span>설정된 EX 카드</span>
+          {/if}
+        </SectionFrame>
+
+        <SectionFrame title="설정된 EX 카드" description="EX 카드만 별도 선택합니다.">
+          <label class="detail-page__field">
+            <span>EX 카드</span>
             <select bind:value={form.selectedExCardId}>
               <option value="">선택하지 않음</option>
               {#each exCards as card}
                 <option value={card.id}>{card.name} ({card.id}) · 비용 {card.cost ?? '-'}</option>
               {/each}
             </select>
+          </label>
+          <div class="detail-page__ex-card">
+            {#if selectedExCard}
+              <TagChip label={selectedExCard.type} tone="accent" />
+              <h4>{selectedExCard.name}</h4>
+              <p>{selectedExCard.id} · 비용 {selectedExCard.cost ?? '-'}</p>
+              <p>{summarizeDescription(selectedExCard.description)}</p>
+              <div class="detail-page__chip-row">
+                {#each getKeywordPreview(selectedExCard) as keyword}
+                  <TagChip label={keyword} tone="muted" />
+                {/each}
+              </div>
+            {:else}
+              <p class="detail-page__muted">선택된 EX 카드가 없습니다.</p>
+            {/if}
           </div>
-        {/if}
-      </SectionFrame>
+        </SectionFrame>
+      </div>
+
+      <div class="detail-page__card-row">
+        <SectionFrame title="보유 카드 선택" description="SKILL 카드를 클릭할 때마다 1장 추가됩니다.">
+          {#if cardLoading}
+            <p class="detail-page__muted">카드 목록을 불러오는 중입니다.</p>
+          {:else if cardErrorMessage}
+            <p class="detail-page__error">{cardErrorMessage}</p>
+          {:else}
+            <label class="detail-page__field">
+              <span>카드 검색</span>
+              <input bind:value={cardSearch} type="search" placeholder="카드명, ID, 설명 검색" />
+            </label>
+            <p class="detail-page__muted">CardType.SKILL 카드만 서버에서 조회합니다. TOKEN/EX는 표시하지 않습니다.</p>
+            <div class="detail-page__card-grid detail-page__scroll-panel">
+              {#each filteredSkillCards as card (card.id)}
+                <button
+                  type="button"
+                  class="detail-page__card"
+                  aria-label={`${card.name} 1장 추가`}
+                  onclick={() => addOwnedSkillCard(card.id)}
+                >
+                  <div class="detail-page__card-chrome">
+                    <strong>{card.cost ?? '-'}</strong>
+                    <span>SKILL</span>
+                  </div>
+                  <div class="detail-page__card-art"><p>{card.id}</p></div>
+                  <div class="detail-page__card-copy">
+                    <h4>{card.name}</h4>
+                    <p>{card.id} · 보유 {ownedCardCountById.get(card.id) ?? 0}장</p>
+                    <p>{summarizeDescription(card.description)}</p>
+                  </div>
+                  <div class="detail-page__chip-row">
+                    <TagChip label="SKILL" tone="success" />
+                    {#each getKeywordPreview(card) as keyword}
+                      <TagChip label={keyword} tone="accent" />
+                    {/each}
+                  </div>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </SectionFrame>
+
+        <SectionFrame title="현재 보유 카드 목록" description="항목을 클릭하면 해당 카드 1장만 제거합니다.">
+          <p class="detail-page__muted">선택됨 {selectedOwnedCardCount}장</p>
+          <div class="detail-page__owned-list detail-page__scroll-panel">
+            {#if ownedCardRows.length === 0}
+              <p class="detail-page__muted">보유 카드가 없습니다. 왼쪽에서 SKILL 카드를 클릭해 추가하세요.</p>
+            {:else}
+              {#each ownedCardRows as row (row.key)}
+                <button
+                  type="button"
+                  class="detail-page__owned-card"
+                  aria-label={`${row.card?.name ?? row.cardId} 1장 제거`}
+                  onclick={() => removeOwnedSkillCardAt(row.index)}
+                >
+                  <strong>{row.index + 1}. {row.card?.name ?? row.cardId}</strong>
+                  <span>{row.cardId} · 클릭하여 1장 제거</span>
+                </button>
+              {/each}
+            {/if}
+          </div>
+          <div class="detail-page__deck-handoff">
+            <strong>현재 스킬 덱</strong>
+            <p>{isCreateMode ? '캐릭터 생성 후 덱 편집 페이지에서 현재 스킬 덱을 설정할 수 있습니다.' : '스킬 덱 편집은 덱 편집 페이지에서 진행합니다.'}</p>
+            {#if !isCreateMode}
+              <a class="detail-page__link-action" data-nav href={pathBuilders.deckList()}>덱 편집으로 이동</a>
+            {/if}
+          </div>
+        </SectionFrame>
+      </div>
 
       <SectionFrame title="생성 확인" description="입력 요약을 확인한 뒤 저장합니다.">
         <div class="detail-page__summary">
           <p><strong>이름</strong> {form.name || '-'}</p>
+          <p><strong>나이</strong> {form.age || '-'}</p>
           <p><strong>성별</strong> {getGenderLabel(form.gender)}</p>
           <p><strong>성향</strong> {buildDisposition(form)}</p>
-          <p><strong>보유 카드</strong> {form.ownedSkillCardIds.length}장</p>
-          <p><strong>현재 스킬 덱</strong> {form.currentSkillDeckOwnedCardIds.length}장</p>
-          <p><strong>EX 카드</strong> {form.selectedExCardId || '-'}</p>
+          <p><strong>특성</strong> {selectedTraitCount}개</p>
+          <p><strong>히든 스테이터스</strong> {selectedHiddenTraitCount}개</p>
+          <p><strong>보유 카드</strong> {selectedOwnedCardCount}장</p>
+          <p><strong>EX 카드</strong> {selectedExCardLabel}</p>
         </div>
         <div class="detail-page__actions">
           <a class="detail-page__link-action" data-nav href={pathBuilders.characterList()}>취소</a>
@@ -818,11 +866,11 @@
       {#if developerUiOpen}
         <label class="detail-page__field">
           <span>JSON 직접 편집</span>
-          <textarea bind:value={developerJsonText} rows="14" spellcheck="false"></textarea>
+          <textarea class="detail-page__developer-json" bind:value={developerJsonText} rows="14" spellcheck="false"></textarea>
         </label>
         <div class="detail-page__actions">
           <button type="button" disabled={saving || loading} onclick={() => void handleDeveloperJsonSave()}>
-            JSON으로 캐릭터 생성
+            JSON으로 생성/저장
           </button>
         </div>
       {/if}
@@ -852,7 +900,7 @@
 
 <style>
   .detail-page,
-  .detail-page__grid,
+  .detail-page__layout,
   .detail-page__form-grid,
   .detail-page__option-list {
     display: grid;
@@ -869,7 +917,7 @@
   .detail-page__hero,
   .detail-page__actions,
   .detail-page__hero-tags,
-  .detail-page__choice-row {
+  .detail-page__chip-row {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
@@ -884,13 +932,17 @@
   .detail-page__hero h3,
   .detail-page__summary p,
   .detail-page__muted,
-  .detail-page__error {
+  .detail-page__error,
+  .detail-page__deck-handoff p {
     margin: 0;
   }
 
   .detail-page__hero p,
   .detail-page__muted,
-  .detail-page__option small {
+  .detail-page__option small,
+  .detail-page__card-copy p,
+  .detail-page__owned-card span,
+  .detail-page__deck-handoff p {
     color: var(--color-text-muted);
   }
 
@@ -901,17 +953,32 @@
     margin: 0.35rem 0 0;
   }
 
-  .detail-page__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .detail-page__top-row,
+  .detail-page__card-row {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: minmax(0, 1.2fr) minmax(22rem, 0.8fr);
+  }
+
+  .detail-page__trait-row {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .detail-page__form-grid,
+  .detail-page__compact-grid,
   .detail-page__stats,
-  .detail-page__columns,
-  .detail-page__summary {
+  .detail-page__summary,
+  .detail-page__select-pair {
     display: grid;
     gap: 1rem;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .detail-page__stats-cluster {
+    display: grid;
+    gap: 1rem;
   }
 
   .detail-page__field,
@@ -950,25 +1017,111 @@
     resize: vertical;
   }
 
-  .detail-page__choice-row label,
+  .detail-page__developer-json {
+    max-height: 22rem;
+    overflow-y: auto;
+  }
+
   .detail-page__option {
     align-items: start;
-    border: 1px solid var(--color-border);
     background: rgba(12, 11, 10, 0.18);
+    border: 1px solid var(--color-border);
+    grid-template-columns: auto minmax(0, 1fr);
     padding: 0.75rem;
   }
 
-  .detail-page__option {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .detail-page__option span {
+  .detail-page__option span,
+  .detail-page__card-copy {
     display: grid;
     gap: 0.25rem;
   }
 
-  .detail-page__option small {
+  .detail-page__option small,
+  .detail-page__card-copy p {
     line-height: 1.45;
+  }
+
+  .detail-page__scroll-panel {
+    max-height: 20rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.25rem;
+  }
+
+  .detail-page__ex-card,
+  .detail-page__deck-handoff {
+    background: rgba(12, 11, 10, 0.18);
+    border: 1px solid var(--color-border);
+    display: grid;
+    gap: 0.65rem;
+    max-height: 12rem;
+    overflow-y: auto;
+    padding: 0.9rem;
+  }
+
+  .detail-page__ex-card p,
+  .detail-page__ex-card h4 {
+    margin: 0;
+  }
+
+  .detail-page__card-grid {
+    display: grid;
+    gap: 0.9rem;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  }
+
+  .detail-page__card {
+    background: rgba(12, 11, 10, 0.24);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    cursor: pointer;
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.75rem;
+    text-align: left;
+  }
+
+  .detail-page__card:hover,
+  .detail-page__card:focus-visible,
+  .detail-page__owned-card:hover,
+  .detail-page__owned-card:focus-visible {
+    border-color: rgba(226, 193, 155, 0.6);
+    outline: none;
+  }
+
+  .detail-page__card-chrome {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .detail-page__card-art {
+    align-items: center;
+    aspect-ratio: 4 / 3;
+    background: rgba(226, 193, 155, 0.09);
+    border: 1px solid rgba(226, 193, 155, 0.16);
+    display: flex;
+    justify-content: center;
+  }
+
+  .detail-page__card-art p,
+  .detail-page__card-copy h4 {
+    margin: 0;
+  }
+
+  .detail-page__owned-list {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .detail-page__owned-card {
+    background: rgba(12, 11, 10, 0.2);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.75rem;
+    text-align: left;
   }
 
   .detail-page__actions button,
@@ -1008,12 +1161,20 @@
     color: rgb(224, 161, 151);
   }
 
-  @media (max-width: 960px) {
-    .detail-page__grid,
+  @media (max-width: 1080px) {
+    .detail-page__top-row,
+    .detail-page__trait-row,
+    .detail-page__card-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
     .detail-page__form-grid,
+    .detail-page__compact-grid,
     .detail-page__stats,
-    .detail-page__columns,
-    .detail-page__summary {
+    .detail-page__summary,
+    .detail-page__select-pair {
       grid-template-columns: 1fr;
     }
 
