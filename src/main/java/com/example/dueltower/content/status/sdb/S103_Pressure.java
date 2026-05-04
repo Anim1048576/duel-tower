@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * [해로운 상태 : 중압]
- * 지불해야하는 코스트가 수치만큼 증가한다.
+ * [스킬 카드] 및 [EX 카드]에 기재된 코스트가 수치만큼 증가한다.
  * 턴을 종료하면 모두 제거한다.
  */
 @Component
@@ -26,7 +26,7 @@ public class S103_Pressure implements StatusBlueprint {
                 100,
                 false,
                 """
-                        지불해야하는 코스트가 수치만큼 증가한다.
+                        [스킬 카드] 및 [EX 카드]에 기재된 코스트가 수치만큼 증가한다.
                         턴을 종료하면 모두 제거한다.
                         """
         );
