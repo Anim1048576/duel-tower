@@ -1,6 +1,6 @@
 ﻿<script lang="ts">
   import { onMount } from 'svelte'
-  import { listKeywords, listPassives, listStatuses } from '../lib/api/content'
+  import { listAttachedKeywords, listKeywords, listPassives, listStatuses } from '../lib/api/content'
   import type {
     KeywordDefinition,
     PassiveDefinition,
@@ -76,14 +76,18 @@
   let keywordErrorMessage = $state<string | null>(null)
   let statusErrorMessage = $state<string | null>(null)
   let passiveErrorMessage = $state<string | null>(null)
+  let attachedKeywordErrorMessage = $state<string | null>(null)
 
   let keywords = $state<KeywordDefinition[]>([])
   let statuses = $state<StatusDefinition[]>([])
   let passives = $state<PassiveDefinition[]>([])
+  let attachedKeywords = $state<KeywordDefinition[]>([])
 
   let selectedKeywordId = $state('')
   let selectedStatusId = $state('')
   let selectedPassiveId = $state('')
+  let attachedKeywordLoading = $state(false)
+  let attachedKeywordParentId = $state('')
 
   function normalizeText(value: string | null | undefined) {
     return value?.trim().toLowerCase() ?? ''
@@ -133,6 +137,38 @@
       keywordErrorMessage = getApiErrorMessage(error, 'Unable to load keyword definitions.')
     } finally {
       keywordLoading = false
+    }
+  }
+
+  async function loadAttachedKeywords(parentKeywordId: string | null | undefined) {
+    const normalizedId = parentKeywordId?.trim() ?? ''
+    attachedKeywordErrorMessage = null
+
+    if (!normalizedId) {
+      attachedKeywordParentId = ''
+      attachedKeywords = []
+      attachedKeywordLoading = false
+      return
+    }
+
+    attachedKeywordLoading = true
+    attachedKeywordParentId = normalizedId
+
+    try {
+      const nextAttachedKeywords = await listAttachedKeywords(normalizedId)
+
+      if (attachedKeywordParentId === normalizedId) {
+        attachedKeywords = nextAttachedKeywords
+      }
+    } catch (error) {
+      if (attachedKeywordParentId === normalizedId) {
+        attachedKeywords = []
+        attachedKeywordErrorMessage = getApiErrorMessage(error, '부속 키워드를 불러오지 못했습니다.')
+      }
+    } finally {
+      if (attachedKeywordParentId === normalizedId) {
+        attachedKeywordLoading = false
+      }
     }
   }
 
@@ -347,6 +383,24 @@
     selectedReference?.section === 'keywords' ? selectedReference.data : null,
   )
 
+  $effect(() => {
+    const parentId = selectedKeyword?.id ?? ''
+
+    if (activeSection !== 'keywords' || !parentId) {
+      attachedKeywordParentId = ''
+      attachedKeywords = []
+      attachedKeywordErrorMessage = null
+      attachedKeywordLoading = false
+      return
+    }
+
+    if (attachedKeywordParentId === parentId) {
+      return
+    }
+
+    void loadAttachedKeywords(parentId)
+  })
+
   const selectedStatus = $derived.by(() =>
     selectedReference?.section === 'statuses' ? selectedReference.data : null,
   )
@@ -540,6 +594,41 @@
                   : '고정 키워드입니다.'}
               </p>
             </div>
+
+            {#if attachedKeywordLoading}
+              <div class="rules-page__attached">
+                <h4>부속 키워드</h4>
+                <p>부속 키워드를 불러오는 중입니다.</p>
+              </div>
+            {:else if attachedKeywordErrorMessage}
+              <div class="rules-page__attached">
+                <h4>부속 키워드</h4>
+                <p>{attachedKeywordErrorMessage}</p>
+              </div>
+            {:else if attachedKeywords.length > 0}
+              <div class="rules-page__attached">
+                <div class="rules-page__attached-header">
+                  <h4>부속 키워드</h4>
+                  <TagChip label={`${attachedKeywords.length}개`} tone="muted" />
+                </div>
+
+                <div class="rules-page__attached-list">
+                  {#each attachedKeywords as attachedKeyword}
+                    <article class="rules-page__attached-card">
+                      <div class="rules-page__attached-card-header">
+                        <h5>{attachedKeyword.name}</h5>
+                        <TagChip
+                          label={getKeywordStateLabel(attachedKeyword.parameterized)}
+                          tone={attachedKeyword.parameterized ? 'warning' : 'success'}
+                        />
+                      </div>
+                      <p>{attachedKeyword.description}</p>
+                      <p class="rules-page__attached-meta">ID: {attachedKeyword.id}</p>
+                    </article>
+                  {/each}
+                </div>
+              </div>
+            {/if}
           {:else if selectedStatus}
             <div class="rules-page__note">
               <p>ID: {selectedStatus.id}</p>
@@ -661,6 +750,57 @@
   .rules-page__note {
     border-top: 1px solid var(--color-border);
     padding-top: 1rem;
+  }
+
+  .rules-page__attached {
+    display: grid;
+    gap: 0.85rem;
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+  }
+
+  .rules-page__attached-header,
+  .rules-page__attached-card-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .rules-page__attached h4,
+  .rules-page__attached h5,
+  .rules-page__attached p {
+    margin: 0;
+  }
+
+  .rules-page__attached h4 {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+  }
+
+  .rules-page__attached-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .rules-page__attached-card {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.85rem;
+    border: 1px solid var(--color-border);
+    background: rgba(12, 11, 10, 0.18);
+  }
+
+  .rules-page__attached-card p,
+  .rules-page__attached > p {
+    color: var(--color-text-soft);
+    line-height: 1.55;
+  }
+
+  .rules-page__attached-meta {
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
   }
 
   @media (max-width: 960px) {
