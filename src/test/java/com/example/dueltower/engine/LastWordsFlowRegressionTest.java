@@ -4,9 +4,12 @@ import com.example.dueltower.content.card.model.OwnedCardModifier;
 import com.example.dueltower.content.cardmodifier.cmdb.CM105_WeakenedDiscardOneSkill;
 import com.example.dueltower.content.cardmodifier.cmdb.CardModifierIds;
 import com.example.dueltower.content.keyword.kdb.K014_LastWords;
+import com.example.dueltower.content.status.sdb.S103_Pressure;
 import com.example.dueltower.engine.command.HandSwapCommand;
 import com.example.dueltower.engine.command.PlayCardCommand;
 import com.example.dueltower.engine.command.ResolveLastWordsCommand;
+import com.example.dueltower.engine.command.UseExCommand;
+import com.example.dueltower.engine.command.UseSummonActionCommand;
 import com.example.dueltower.engine.core.EffectDiscardOps;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.EngineResult;
@@ -32,6 +35,7 @@ import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SessionId;
 import com.example.dueltower.engine.model.PendingDecision;
 import com.example.dueltower.engine.model.PlayerState;
+import com.example.dueltower.engine.model.SummonState;
 import com.example.dueltower.engine.model.TargetSelection;
 import com.example.dueltower.engine.model.TargetRef;
 import com.example.dueltower.engine.model.Zone;
@@ -214,6 +218,141 @@ class LastWordsFlowRegressionTest {
         assertEquals(List.of(modifierDiscardId, mainDiscardId), decision.candidateIds());
     }
 
+    @Test
+    @DisplayName("EX effect discard opens LAST_WORDS pending")
+    void useExOpensPendingForEffectDiscardedLastWordsCandidate() {
+        Fx fx = new Fx();
+        fx.registerDiscardAllLastWordsExSource("EX_SOURCE", 0);
+        fx.registerTrackingLastWordsSkill("LW_EX", 1);
+
+        fx.addExCard("EX_SOURCE");
+        CardInstId lastWordsId = fx.addHandCard("LW_EX");
+
+        EngineResult result = fx.process(new UseExCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                TargetSelection.empty()
+        ));
+
+        assertTrue(result.accepted());
+        assertInstanceOf(PendingDecision.LastWordsChoice.class, fx.player.pendingDecision());
+        PendingDecision.LastWordsChoice decision = (PendingDecision.LastWordsChoice) fx.player.pendingDecision();
+        assertEquals(List.of(lastWordsId), decision.candidateIds());
+        assertEquals(1, KeywordOps.keywordValue(fx.state, fx.ctx, lastWordsId, K014_LastWords.ID));
+    }
+
+    @Test
+    @DisplayName("Summon action effect discard opens LAST_WORDS pending")
+    void summonActionOpensPendingForEffectDiscardedLastWordsCandidate() {
+        Fx fx = new Fx();
+        fx.registerDiscardAllLastWordsSource("SUMMON_SOURCE", 0);
+        fx.registerTrackingLastWordsSkill("LW_SUMMON", 1);
+
+        CardInstId sourceId = fx.addFieldCard("SUMMON_SOURCE");
+        com.example.dueltower.engine.model.Ids.SummonInstId summonId = fx.addSummon(sourceId, 1);
+        CardInstId lastWordsId = fx.addHandCard("LW_SUMMON");
+
+        EngineResult result = fx.process(new UseSummonActionCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                summonId,
+                TargetSelection.empty()
+        ));
+
+        assertTrue(result.accepted());
+        assertTrue(fx.state.summon(summonId).actionUsedThisTurn());
+        assertEquals(2, fx.player.ap());
+        assertInstanceOf(PendingDecision.LastWordsChoice.class, fx.player.pendingDecision());
+        PendingDecision.LastWordsChoice decision = (PendingDecision.LastWordsChoice) fx.player.pendingDecision();
+        assertEquals(List.of(lastWordsId), decision.candidateIds());
+    }
+
+    @Test
+    @DisplayName("Pressure does not increase last words cost")
+    void pressureDoesNotIncreaseLastWordsCost() {
+        Fx fx = new Fx();
+        fx.player.ap(1);
+        fx.player.statusSet(S103_Pressure.ID, 3);
+        fx.registerDiscardAllLastWordsSource("SUMMON_SOURCE", 0);
+        fx.registerTrackingLastWordsSkill("LW_PRESSURE", 1);
+
+        CardInstId sourceId = fx.addFieldCard("SUMMON_SOURCE");
+        com.example.dueltower.engine.model.Ids.SummonInstId summonId = fx.addSummon(sourceId, 0);
+        CardInstId lastWordsId = fx.addHandCard("LW_PRESSURE");
+
+        EngineResult actionResult = fx.process(new UseSummonActionCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                summonId,
+                TargetSelection.empty()
+        ));
+
+        assertTrue(actionResult.accepted());
+        assertInstanceOf(PendingDecision.LastWordsChoice.class, fx.player.pendingDecision());
+        assertEquals(List.of(lastWordsId), ((PendingDecision.LastWordsChoice) fx.player.pendingDecision()).candidateIds());
+
+        EngineResult resolveResult = fx.process(new ResolveLastWordsCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                List.of(lastWordsId)
+        ));
+
+        assertTrue(resolveResult.accepted());
+        assertEquals(0, fx.player.ap());
+    }
+
+    @Test
+    @DisplayName("Pressure does not increase summon action cost")
+    void pressureDoesNotIncreaseSummonActionCost() {
+        Fx fx = new Fx();
+        fx.player.ap(1);
+        fx.player.statusSet(S103_Pressure.ID, 3);
+        fx.registerPlainSkill("SUMMON_SOURCE", 0);
+
+        CardInstId sourceId = fx.addFieldCard("SUMMON_SOURCE");
+        com.example.dueltower.engine.model.Ids.SummonInstId summonId = fx.addSummon(sourceId, 1);
+
+        EngineResult result = fx.process(new UseSummonActionCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                summonId,
+                TargetSelection.empty()
+        ));
+
+        assertTrue(result.accepted());
+        assertEquals(0, fx.player.ap());
+        assertTrue(fx.state.summon(summonId).actionUsedThisTurn());
+    }
+
+    @Test
+    @DisplayName("EX effect-discard濡?踰꾨┛ ?좎뼵 移대뱶媛 AP 遺議깊븯硫?pending ?꾨낫?먯꽌 ?쒖쇅?쒕떎")
+    void useExFiltersOutUnpayableLastWordsCandidate() {
+        Fx fx = new Fx();
+        fx.player.ap(1);
+        fx.registerDiscardAllLastWordsExSource("EX_SOURCE", 0);
+        fx.registerTrackingLastWordsSkill("LW_EXPENSIVE_EX", 2);
+
+        fx.addExCard("EX_SOURCE");
+        fx.addHandCard("LW_EXPENSIVE_EX");
+
+        EngineResult result = fx.process(new UseExCommand(
+                UUID.randomUUID(),
+                fx.state.version(),
+                fx.playerId,
+                TargetSelection.empty()
+        ));
+
+        assertTrue(result.accepted());
+        assertNull(fx.player.pendingDecision());
+        assertTrue(result.events().stream().anyMatch(event -> event instanceof GameEvent.LogAppended log
+                && log.line().contains("no payable candidates")));
+    }
+
     private static final class Fx {
         private final GameState state = new GameState(new SessionId(UUID.randomUUID()), 321L);
         private final GameEngine engine = new GameEngine();
@@ -247,6 +386,10 @@ class LastWordsFlowRegressionTest {
             registerCard(id, CardType.SKILL, cost, Map.of(), false, new DiscardAllLastWordsInHandEffect());
         }
 
+        private void registerDiscardAllLastWordsExSource(String id, int cost) {
+            registerCard(id, CardType.EX, cost, Map.of(), false, new DiscardAllLastWordsInHandEffect());
+        }
+
         private void registerPlainSkill(String id, int cost) {
             registerCard(id, CardType.SKILL, cost, Map.of(), false, new NoOpEffect(id));
         }
@@ -275,8 +418,8 @@ class LastWordsFlowRegressionTest {
             ctx = new EngineContext(
                     defs,
                     effects,
-                    Map.of(),
-                    Map.of(),
+                    Map.of(S103_Pressure.ID, new S103_Pressure().definition()),
+                    Map.of(S103_Pressure.ID, new S103_Pressure()),
                     Map.of(),
                     Map.of(),
                     Map.of(),
@@ -303,6 +446,32 @@ class LastWordsFlowRegressionTest {
             state.cardInstances().put(instanceId, ci);
             player.hand().add(instanceId);
             return instanceId;
+        }
+
+        private CardInstId addFieldCard(String defId) {
+            CardInstId instanceId = new CardInstId(UUID.randomUUID());
+            CardDefId cardDefId = new CardDefId(defId);
+            state.cardInstances().put(instanceId, new CardInstance(instanceId, cardDefId, playerId, Zone.FIELD));
+            player.field().add(instanceId);
+            return instanceId;
+        }
+
+        private CardInstId addExCard(String defId) {
+            CardInstId instanceId = new CardInstId(UUID.randomUUID());
+            CardDefId cardDefId = new CardDefId(defId);
+            state.cardInstances().put(instanceId, new CardInstance(instanceId, cardDefId, playerId, Zone.EX));
+            player.exCard(instanceId);
+            return instanceId;
+        }
+
+        private com.example.dueltower.engine.model.Ids.SummonInstId addSummon(CardInstId sourceCardId, int actionCost) {
+            com.example.dueltower.engine.model.Ids.SummonInstId summonId =
+                    new com.example.dueltower.engine.model.Ids.SummonInstId(UUID.randomUUID());
+            SummonState summon = new SummonState(summonId, playerId, sourceCardId, 5, 5, 0, 0, actionCost, false);
+            state.summons().put(summonId, summon);
+            player.activeSummons().add(summonId);
+            player.summonByCard().put(sourceCardId, summonId);
+            return summonId;
         }
 
         private CardInstId addDeckCard(String defId) {

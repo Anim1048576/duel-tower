@@ -2,6 +2,7 @@ package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
+import com.example.dueltower.engine.core.LastWordsDecisionOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.card.CardEffectOps;
@@ -134,6 +135,7 @@ public final class UseExCommand implements GameCommand {
         CardEffect eff = ctx.effect(ci.defId());
         EffectContext ec = new EffectContext(state, ctx, playerId, exId, selection, events);
         eff.resolve(ec);
+        LastWordsDecisionOps.openPendingIfPossible(ec, ps, events);
 
         // EX 사용 후 상태 훅
         StatusOps.afterUseEx(state, ctx, TargetRef.ofPlayer(playerId), ci, def, events, "USE_EX");

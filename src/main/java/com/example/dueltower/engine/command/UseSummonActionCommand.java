@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.command;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.LastWordsDecisionOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.event.GameEvent;
@@ -94,6 +95,7 @@ public final class UseSummonActionCommand implements GameCommand {
         effect.resolve(ec);
 
         summon.actionUsedThisTurn(true);
+        LastWordsDecisionOps.openPendingIfPossible(ec, ps, events);
 
         events.add(new GameEvent.LogAppended(
                 playerId.value() + " uses summon action " + summon.id().value() + " (cost=" + cost + ")"
