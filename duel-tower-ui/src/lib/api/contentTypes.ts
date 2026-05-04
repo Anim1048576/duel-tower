@@ -18,6 +18,8 @@ export type StatusTag = FlexibleStringEnum<
   'CONTROL' | 'DOT' | 'HOT' | 'STACKING' | 'STEALTH' | 'SHIELD' | 'TURN_BASED'
 >
 
+export type StatusVisibility = 'PUBLIC' | 'IMPLEMENTATION' | 'TEST'
+
 export type CardListQueryParams = {
   type?: CardType | null
   q?: string | null
@@ -71,6 +73,7 @@ export type StatusDefinition = {
   priority: number | null
   persistsAfterCombat: boolean
   description: string
+  visibility: StatusVisibility
 }
 
 export type ItemDefinition = {

@@ -23,6 +23,11 @@ public class StatusController {
         return service.list();
     }
 
+    @GetMapping("/all")
+    public List<StatusDefinition> listAll() {
+        return service.listAll();
+    }
+
     @GetMapping("/{id}")
     public StatusDefinition get(@PathVariable String id) {
         return service.get(id);

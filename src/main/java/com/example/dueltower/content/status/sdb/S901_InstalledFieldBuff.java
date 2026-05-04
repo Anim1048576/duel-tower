@@ -24,7 +24,8 @@ public class S901_InstalledFieldBuff implements StatusBlueprint {
                 java.util.Set.of(),
                 5,
                 false,
-                "필드에 남아 있는 설치 카드 수만큼 주는 피해가 증가한다."
+                "필드에 남아 있는 설치 카드 수만큼 주는 피해가 증가한다.",
+                StatusVisibility.TEST
         );
     }
 

@@ -44,7 +44,15 @@ public class StatusService {
         this.effectsById = Map.copyOf(e);
     }
 
-    public List<StatusDefinition> list() { return all; }
+    public List<StatusDefinition> list() {
+        return all.stream()
+                .filter(StatusDefinition::publicVisible)
+                .toList();
+    }
+
+    public List<StatusDefinition> listAll() {
+        return all;
+    }
 
     public StatusDefinition get(String id) {
         return ContentLookupSupport.requireById(defsById, id, value -> value, "status");

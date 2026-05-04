@@ -172,6 +172,10 @@ export function listStatuses() {
   return apiGet<StatusDefinition[]>(`${CONTENT_API_BASE}/statuses`)
 }
 
+export function listAllStatuses() {
+  return apiGet<StatusDefinition[]>(`${CONTENT_API_BASE}/statuses/all`)
+}
+
 export function getStatus(id: ContentIdentifier) {
   return apiGet<StatusDefinition>(getContentResourcePath('statuses', id))
 }

@@ -23,7 +23,8 @@ public class Tig203_Status implements StatusBlueprint {
                 java.util.Set.of(),
                 26,
                 true,
-                "다음 자신의 턴 개시 시 회피를 제거한다."
+                "다음 자신의 턴 개시 시 회피를 제거한다.",
+                StatusVisibility.IMPLEMENTATION
         );
     }
 

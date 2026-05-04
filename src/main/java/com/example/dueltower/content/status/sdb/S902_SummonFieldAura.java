@@ -24,7 +24,8 @@ public class S902_SummonFieldAura implements StatusBlueprint {
                 java.util.Set.of(),
                 6,
                 false,
-                "필드에 남아 있는 소환 카드 수만큼 플레이어/소환체의 주는 피해가 증가한다."
+                "필드에 남아 있는 소환 카드 수만큼 플레이어/소환체의 주는 피해가 증가한다.",
+                StatusVisibility.TEST
         );
     }
 

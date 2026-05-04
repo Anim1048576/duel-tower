@@ -22,7 +22,8 @@ public class Tig202_Status implements StatusBlueprint {
                 java.util.Set.of(),
                 25,
                 true,
-                "오버 드라이브 설치로 얻는 공격 증가 효과."
+                "오버 드라이브 설치로 얻는 공격 증가 효과.",
+                StatusVisibility.IMPLEMENTATION
         );
     }
 
