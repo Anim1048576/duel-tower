@@ -523,6 +523,31 @@ class DeckControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("draft 검증은 저장된 덱 없이 현재 입력값을 검증한다")
+    void validateDraftShouldValidateWithoutExistingDeck() throws Exception {
+        MockHttpSession session = signUpAndLogin("deckValidateDraft");
+
+        mockMvc.perform(post("/api/content/decks/validate-draft")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "PLAYER",
+                                  "cards": [
+                                    {"cardId":"C001","count":3},
+                                    {"cardId":"C002","count":3},
+                                    {"cardId":"C003","count":3},
+                                    {"cardId":"C004","count":2}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(false))
+                .andExpect(jsonPath("$.issues[0].code").value("TOTAL_CARDS_INVALID"))
+                .andExpect(jsonPath("$.normalizedTotalCards").value(11));
+    }
+
+    @Test
     @DisplayName("기존 덱 PUT은 여전히 동작한다")
     void existingDeckPutShouldStillWork() throws Exception {
         MockHttpSession session = signUpAndLogin("deckUpdate1");

@@ -4,6 +4,7 @@ import type {
   CreateDeckRequest,
   DeckIdentifier,
   DeckResponse,
+  DeckValidationRequest,
   DeckValidationResponse,
   RemoveDeckCardsRequest,
   ReplaceDeckCardsRequest,
@@ -65,5 +66,12 @@ export function validateDeck(id: DeckIdentifier, payload?: ReplaceDeckCardsReque
   return apiPost<DeckValidationResponse, ReplaceDeckCardsRequest | null>(
     getDeckSubresourcePath(id, 'validate'),
     payload ?? null,
+  )
+}
+
+export function validateDeckDraft(payload: DeckValidationRequest) {
+  return apiPost<DeckValidationResponse, DeckValidationRequest>(
+    `${DECKS_API_BASE}/validate-draft`,
+    payload,
   )
 }

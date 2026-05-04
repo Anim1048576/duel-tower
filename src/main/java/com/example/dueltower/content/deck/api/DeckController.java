@@ -79,4 +79,12 @@ public class DeckController {
     ) {
         return deckService.validateDeck(id, req);
     }
+
+    @PostMapping("/validate-draft")
+    public DeckValidationResponse validateDraft(@RequestBody(required = false) DeckValidationRequest req) {
+        return deckService.validateDraft(
+                req == null ? null : req.type(),
+                req == null ? null : req.cards()
+        );
+    }
 }

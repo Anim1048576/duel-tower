@@ -32,6 +32,11 @@ export type DeckUpsertRequest = {
   cards?: readonly DeckCardSpec[] | null
 }
 
+export type DeckValidationRequest = {
+  type?: DeckType | null
+  cards?: readonly DeckCardSpec[] | null
+}
+
 export type CreateDeckRequest = DeckUpsertRequest
 
 export type UpdateDeckRequest = DeckUpsertRequest
