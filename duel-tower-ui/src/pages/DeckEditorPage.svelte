@@ -6,7 +6,7 @@
   import { invokeEditorEntityActionAndRefresh, invokeEditorScreenAction } from '../lib/api/editorScreenActions'
   import { listCards } from '../lib/api/content'
   import type { CardDefinition } from '../lib/api/contentTypes'
-  import { listCharacters } from '../lib/api/characters'
+  import { applySavedDeckToCharacter, listCharacters } from '../lib/api/characters'
   import type { CharacterProfileResponse } from '../lib/api/characterTypes'
   import {
     findDeckEditorAction,
@@ -60,6 +60,9 @@
   let deleteConfirmOpen = $state(false)
   let actionErrorMessage = $state<string | null>(null)
   let actionSuccessMessage = $state<string | null>(null)
+  let applyingDeckToCharacter = $state(false)
+  let applyDeckErrorMessage = $state<string | null>(null)
+  let applyDeckSuccessMessage = $state<string | null>(null)
   let debugOpen = $state(false)
   let selectedCharacterId = $state('')
   let candidateCardPage = $state(1)
@@ -108,6 +111,11 @@
   function clearActionFeedback() {
     actionErrorMessage = null
     actionSuccessMessage = null
+  }
+
+  function clearApplyFeedback() {
+    applyDeckErrorMessage = null
+    applyDeckSuccessMessage = null
   }
 
   function applyScreen(nextScreen: DeckEditorScreenResponse) {
@@ -221,6 +229,7 @@
   function updateType(value: DeckType | '') {
     editorState = { ...editorState, type: value }
     candidateCardPage = 1
+    clearApplyFeedback()
   }
 
   function createLocalDeckCardKey(cardId: string) {
@@ -375,6 +384,38 @@
     }
   }
 
+  async function applyCurrentDeckToSelectedCharacter() {
+    const deckId = screen?.deckId
+    const characterId = selectedCharacterId.trim()
+
+    clearApplyFeedback()
+
+    if (editorState.type !== 'PLAYER') {
+      applyDeckErrorMessage = '캐릭터 덱만 현재 스킬 덱으로 적용할 수 있습니다.'
+      return
+    }
+
+    if (!characterId) {
+      applyDeckErrorMessage = '현재 스킬 덱을 적용할 대상 캐릭터를 선택해주세요.'
+      return
+    }
+
+    if (deckId === null || deckId === undefined) {
+      applyDeckErrorMessage = '먼저 덱을 생성하거나 저장한 뒤 현재 스킬 덱으로 적용해주세요.'
+      return
+    }
+
+    applyingDeckToCharacter = true
+    try {
+      const response = await applySavedDeckToCharacter(characterId, deckId)
+      applyDeckSuccessMessage = `${response.name}의 현재 스킬 덱으로 적용했습니다. 현재 ${response.currentSkillDeckPreviewCardIds.length}장이 설정되어 있습니다.`
+    } catch (error) {
+      applyDeckErrorMessage = getApiErrorMessage(error, '현재 스킬 덱으로 적용하지 못했습니다. 캐릭터 보유 카드와 덱 구성을 확인해주세요.')
+    } finally {
+      applyingDeckToCharacter = false
+    }
+  }
+
   function openDeleteConfirmation() {
     if (!screen || !findDeckEditorAction(screen, 'deckEditor.delete') || pendingActionId) return
     clearActionFeedback()
@@ -486,6 +527,9 @@
   const deleteAction = $derived.by(() => (screen ? findDeckEditorAction(screen, 'deckEditor.delete') : null))
   const primaryAction = $derived.by(() => (screen?.mode === 'create' ? createAction : saveAction))
   const primaryActionId = $derived.by(() => (screen?.mode === 'create' ? 'deckEditor.create' : 'deckEditor.save'))
+  const canApplyDeckToCharacter = $derived.by(() =>
+    Boolean(screen?.deckId && editorState.type === 'PLAYER' && selectedCharacterId.trim()),
+  )
   const title = $derived.by(() => {
     const name = editorState.name.trim()
     if (name) return name
@@ -675,6 +719,16 @@
           <button type="button" class="editor-page__primary-action" onclick={() => void runAction(primaryActionId)} disabled={Boolean(pendingActionId) || !primaryAction?.enabled}>
             {pendingActionId === primaryActionId ? (screen.mode === 'create' ? '덱 생성 중...' : '덱 저장 중...') : (screen.mode === 'create' ? '덱 생성' : '덱 저장')}
           </button>
+          {#if editorState.type === 'PLAYER' && selectedCharacterId}
+            <button
+              type="button"
+              class="editor-page__primary-action"
+              onclick={() => void applyCurrentDeckToSelectedCharacter()}
+              disabled={!canApplyDeckToCharacter || applyingDeckToCharacter || Boolean(pendingActionId)}
+            >
+              {applyingDeckToCharacter ? '현재 스킬 덱 적용 중...' : '현재 스킬 덱으로 적용'}
+            </button>
+          {/if}
           <a class="editor-page__link-action" data-nav href={pathBuilders.deckList()}>덱 목록으로</a>
           {#if deleteAction}
             {#if deleteConfirmOpen}
@@ -690,6 +744,17 @@
         {/if}
         {#if actionSuccessMessage}
           <p class="editor-page__success">{actionSuccessMessage}</p>
+        {/if}
+        {#if editorState.type === 'ENEMY'}
+          <p class="editor-page__muted">캐릭터 덱만 현재 스킬 덱으로 적용할 수 있습니다.</p>
+        {:else if selectedCharacterId && !screen.deckId}
+          <p class="editor-page__muted">현재 스킬 덱으로 적용하려면 먼저 덱을 생성해주세요.</p>
+        {/if}
+        {#if applyDeckErrorMessage}
+          <p class="editor-page__error">{applyDeckErrorMessage}</p>
+        {/if}
+        {#if applyDeckSuccessMessage}
+          <p class="editor-page__success">{applyDeckSuccessMessage}</p>
         {/if}
       </SectionFrame>
 
