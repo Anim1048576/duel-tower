@@ -7,10 +7,14 @@ import org.springframework.stereotype.Component;
 public class CharacterCombatStatCalculator {
 
     public CombatStats calculate(CharacterProfile profile) {
-        int maxHp = calculateMaxHp(profile.getPhysical(), profile.getTechnique());
-        int maxAp = calculateMaxAp(profile.getWillpower());
-        int attackPower = calculateAttackPower(profile.getPhysical(), profile.getTechnique(), profile.getSense());
-        int healPower = calculateHealPower(profile.getSense(), profile.getTechnique());
+        return calculate(profile.getPhysical(), profile.getTechnique(), profile.getSense(), profile.getWillpower());
+    }
+
+    public CombatStats calculate(int physical, int technique, int sense, int willpower) {
+        int maxHp = calculateMaxHp(physical, technique);
+        int maxAp = calculateMaxAp(willpower);
+        int attackPower = calculateAttackPower(physical, technique, sense);
+        int healPower = calculateHealPower(sense, technique);
         return new CombatStats(maxHp, maxAp, attackPower, healPower);
     }
 

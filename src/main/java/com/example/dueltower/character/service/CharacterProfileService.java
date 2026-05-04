@@ -7,6 +7,7 @@ import com.example.dueltower.character.domain.HiddenTraitIds;
 import com.example.dueltower.character.dto.CharacterProfileRequest;
 import com.example.dueltower.character.dto.CharacterProfileResponse;
 import com.example.dueltower.character.dto.CombatStatsDto;
+import com.example.dueltower.character.dto.CharacterCombatStatsPreviewRequest;
 import com.example.dueltower.character.repository.CharacterHiddenTraitRepository;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import org.springframework.stereotype.Service;
@@ -108,6 +109,36 @@ public class CharacterProfileService {
         CharacterProfile profile = getByIdOrThrow(characterId);
         loadoutService.applyDeckTemplate(characterId, deckId);
         return toResponse(profile);
+    }
+
+    @Transactional
+    public CharacterProfileResponse replaceCurrentSkillDeck(long characterId, List<String> ownedCardIds) {
+        CharacterProfile profile = getByIdOrThrow(characterId);
+        loadoutService.replaceCurrentSkillDeckFromOwnedCardIds(characterId, ownedCardIds);
+        return toResponse(profile);
+    }
+
+    @Transactional(readOnly = true)
+    public CombatStatsDto previewCombatStats(CharacterCombatStatsPreviewRequest req) {
+        if (req == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "request body is required");
+        }
+        requireNumber(req.physical(), "physical is required");
+        requireNumber(req.technique(), "technique is required");
+        requireNumber(req.sense(), "sense is required");
+        requireNumber(req.willpower(), "willpower is required");
+        CharacterCombatStatCalculator.CombatStats combatStats = combatStatCalculator.calculate(
+                req.physical(),
+                req.technique(),
+                req.sense(),
+                req.willpower()
+        );
+        return new CombatStatsDto(
+                combatStats.maxHp(),
+                combatStats.maxAp(),
+                combatStats.attackPower(),
+                combatStats.healPower()
+        );
     }
 
     @Transactional

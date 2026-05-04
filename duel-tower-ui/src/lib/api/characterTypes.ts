@@ -11,6 +11,30 @@ export type CharacterCombatStats = {
   healPower: number
 }
 
+export type CharacterCreateOption = {
+  id: string
+  label: string
+  description: string
+}
+
+export type CharacterCreateOptionsResponse = {
+  genderOptions: CharacterCreateOption[]
+  orderAxisOptions: CharacterCreateOption[]
+  moralAxisOptions: CharacterCreateOption[]
+  hiddenTraitOptions: CharacterCreateOption[]
+}
+
+export type CharacterCombatStatsPreviewRequest = {
+  physical: number | null
+  technique: number | null
+  sense: number | null
+  willpower: number | null
+}
+
+export type CharacterCurrentSkillDeckRequest = {
+  ownedCardIds: string[]
+}
+
 export type CharacterTimestampValue = string | number
 
 export type OwnedCardModifierRequest = {
