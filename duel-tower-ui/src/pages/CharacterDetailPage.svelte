@@ -32,21 +32,22 @@
   } from '../lib/selectionHandoff'
 
   type CharacterDetailMode = 'create' | 'edit'
+  type NumericInputValue = string | number | null | undefined
 
   type CharacterFormState = {
     name: string
     quote: string
     wish: string
     backstory: string
-    age: string
+    age: NumericInputValue
     gender: CharacterGender | ''
     alignmentOrderChaos: string
     alignmentGoodEvil: string
     lifeStats: {
-      body: string
-      technique: string
-      sense: string
-      will: string
+      body: NumericInputValue
+      technique: NumericInputValue
+      sense: NumericInputValue
+      will: NumericInputValue
     }
     selectedTraitIds: string[]
     selectedHiddenTraitIds: string[]
@@ -113,8 +114,11 @@
     return typeof value === 'string' && /^\d+$/.test(value.trim())
   }
 
-  function parseNullableNumber(value: string) {
-    const normalized = value.trim()
+  function parseNullableNumber(value: NumericInputValue) {
+    if (value === null || value === undefined) return null
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null
+
+    const normalized = String(value).trim()
     if (!normalized) return null
     const parsed = Number(normalized)
     return Number.isFinite(parsed) ? parsed : null
