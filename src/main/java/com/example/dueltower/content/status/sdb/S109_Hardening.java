@@ -22,7 +22,7 @@ public class S109_Hardening implements StatusBlueprint {
                 "경화",
                 StatusKind.BUFF,
                 StatusScope.CHARACTER,
-                java.util.Set.of(StatusTag.SHIELD),
+                java.util.Set.of(),
                 8,
                 false,
                 """
