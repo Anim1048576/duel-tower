@@ -23,6 +23,16 @@ public class KeywordController {
         return service.list();
     }
 
+    @GetMapping("/all")
+    public List<KeywordDefinition> listAll() {
+        return service.listAll();
+    }
+
+    @GetMapping("/{id}/attached")
+    public List<KeywordDefinition> listAttached(@PathVariable String id) {
+        return service.listAttachedTo(id);
+    }
+
     @GetMapping("/{id}")
     public KeywordDefinition get(@PathVariable String id) {
         return service.get(id);

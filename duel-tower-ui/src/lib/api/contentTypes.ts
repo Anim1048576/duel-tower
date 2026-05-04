@@ -26,6 +26,8 @@ export type CardListQueryParams = {
 
 export type CardKeywordValues = Record<string, number>
 
+export type KeywordRole = 'STANDALONE' | 'ATTACHED' | 'INTERNAL'
+
 export type CardDefinition = {
   id: ContentIdentifier
   name: string
@@ -49,6 +51,8 @@ export type KeywordDefinition = {
   name: string
   parameterized: boolean
   description: string
+  role: KeywordRole
+  parentKeywordId: string | null
 }
 
 export type PassiveDefinition = {

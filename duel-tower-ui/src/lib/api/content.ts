@@ -146,6 +146,16 @@ export function listKeywords() {
   return apiGet<KeywordDefinition[]>(`${CONTENT_API_BASE}/keywords`)
 }
 
+export function listAllKeywords() {
+  return apiGet<KeywordDefinition[]>(`${CONTENT_API_BASE}/keywords/all`)
+}
+
+export function listAttachedKeywords(parentKeywordId: ContentIdentifier) {
+  return apiGet<KeywordDefinition[]>(
+    `${CONTENT_API_BASE}/keywords/${encodeURIComponent(String(parentKeywordId).trim())}/attached`,
+  )
+}
+
 export function getKeyword(id: ContentIdentifier) {
   return apiGet<KeywordDefinition>(getContentResourcePath('keywords', id))
 }

@@ -2,6 +2,7 @@ package com.example.dueltower.content.keyword.kdb;
 
 import com.example.dueltower.content.keyword.model.KeywordBlueprint;
 import com.example.dueltower.engine.model.KeywordDefinition;
+import com.example.dueltower.engine.model.KeywordRole;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,7 +27,9 @@ public class K903_SummonHealingPower implements KeywordBlueprint {
                 true,
                 """
                         이 [스킬 카드]가 갖는 치유력입니다.
-                        """
+                        """,
+                KeywordRole.ATTACHED,
+                K004_Summon.ID
         );
     }
 }

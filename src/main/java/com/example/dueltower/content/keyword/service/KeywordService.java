@@ -4,6 +4,7 @@ import com.example.dueltower.content.keyword.model.KeywordBlueprint;
 import com.example.dueltower.content.support.ContentLookupSupport;
 import com.example.dueltower.engine.core.effect.keyword.KeywordEffect;
 import com.example.dueltower.engine.model.KeywordDefinition;
+import com.example.dueltower.engine.model.KeywordRole;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -44,7 +45,26 @@ public class KeywordService {
         this.effectsById = Map.copyOf(e);
     }
 
-    public List<KeywordDefinition> list() { return all; }
+    public List<KeywordDefinition> list() {
+        return all.stream()
+                .filter(KeywordDefinition::standalone)
+                .toList();
+    }
+
+    public List<KeywordDefinition> listAll() {
+        return all;
+    }
+
+    public List<KeywordDefinition> listAttachedTo(String parentKeywordId) {
+        if (parentKeywordId == null || parentKeywordId.isBlank()) {
+            return List.of();
+        }
+
+        return all.stream()
+                .filter(def -> def.role() == KeywordRole.ATTACHED)
+                .filter(def -> parentKeywordId.equals(def.parentKeywordId()))
+                .toList();
+    }
 
     public KeywordDefinition get(String id) {
         return ContentLookupSupport.requireById(defsById, id, value -> value, "keyword");

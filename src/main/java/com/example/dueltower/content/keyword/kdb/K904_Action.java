@@ -2,6 +2,7 @@ package com.example.dueltower.content.keyword.kdb;
 
 import com.example.dueltower.content.keyword.model.KeywordBlueprint;
 import com.example.dueltower.engine.model.KeywordDefinition;
+import com.example.dueltower.engine.model.KeywordRole;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,7 +27,9 @@ public class K904_Action implements KeywordBlueprint {
                 true,
                 """
                         1턴에 1번, 코스트를 n 소모하여 해당 효과를 적용할 수 있습니다.
-                        """
+                        """,
+                KeywordRole.ATTACHED,
+                K004_Summon.ID
         );
     }
 }
