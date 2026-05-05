@@ -14,7 +14,6 @@
   const SESSION_NAV_KEYS = new Set<PageKey>(['lobby', 'player-lobby', 'gm-lobby'])
   const CARD_LIBRARY_NAV_KEYS = new Set<PageKey>(['cards', 'card-detail'])
   const DECK_NAV_KEYS = new Set<PageKey>(['decks', 'deck-editor'])
-  const PRESET_NAV_KEYS = new Set<PageKey>(['presets', 'preset-editor'])
 
   function isSelected(item: AppNavItem) {
     if (item.key === 'lobby' && SESSION_NAV_KEYS.has(currentKey)) {
@@ -26,10 +25,6 @@
     }
 
     if (item.key === 'decks' && DECK_NAV_KEYS.has(currentKey)) {
-      return true
-    }
-
-    if (item.key === 'presets' && PRESET_NAV_KEYS.has(currentKey)) {
       return true
     }
 

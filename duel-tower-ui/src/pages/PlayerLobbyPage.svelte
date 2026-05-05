@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onDestroy, onMount } from 'svelte'
   import { previewSessionLoadout } from '../lib/api/sessions'
   import { getScreen, invokeScreenAction } from '../lib/api/screens'
@@ -12,13 +12,11 @@
   } from '../lib/api/screenTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
-  import EntityListPane from '../lib/components/EntityListPane.svelte'
   import ParticipantSlot from '../lib/components/ParticipantSlot.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
   import { pathBuilders } from '../lib/navigation'
-  import { addPresetIdentifier, normalizePresetIdentifier } from '../lib/presets/editorModel'
   import {
     clearStoredSessionAccess,
     hasStoredSessionCode,
@@ -80,8 +78,6 @@
   let screen = $state<PlayerLobbyScreenResponse | null>(null)
   let runtimeAccess = $state<StoredSessionAccess | null>(null)
   let pendingActionId = $state<PlayerLobbyActionId | null>(null)
-  let selectedPresetId = $state('')
-  let lastAppliedPresetLabel = $state<string | null>(null)
   let loadoutDraft = $state<SessionLoadoutDraft>(createEmptySessionLoadoutDraft())
   let savedLoadoutDraft = $state<SessionLoadoutDraft>(createEmptySessionLoadoutDraft())
   let editFlags = $state<SessionLoadoutDraftEditFlags>(createEmptySessionLoadoutDraftEditFlags())
@@ -102,12 +98,12 @@
   }
 
   function getInvalidAccessMessage(nextRouteCode: string | null, nextAccess: StoredSessionAccess | null) {
-    if (!nextRouteCode) return '현재 플레이어 로비 URL에 세션 코드가 없습니다.'
+    if (!nextRouteCode) return '?꾩옱 ?뚮젅?댁뼱 濡쒕퉬 URL???몄뀡 肄붾뱶媛 ?놁뒿?덈떎.'
     if (!isStoredPlayerSessionAccess(nextAccess)) {
-      return '플레이어 권한이 없습니다. 세션 입장에서 다시 들어가 주세요.'
+      return '?뚮젅?댁뼱 沅뚰븳???놁뒿?덈떎. ?몄뀡 ?낆옣?먯꽌 ?ㅼ떆 ?ㅼ뼱媛 二쇱꽭??'
     }
     if (!hasStoredSessionCode(nextAccess, nextRouteCode)) {
-      return '저장된 세션 권한이 요청 코드와 다릅니다.'
+      return '??λ맂 ?몄뀡 沅뚰븳???붿껌 肄붾뱶? ?ㅻ쫭?덈떎.'
     }
     return null
   }
@@ -118,6 +114,18 @@
 
   function formatIdentifierText(values: readonly string[]) {
     return values.join('\n')
+  }
+
+  function normalizeLoadoutIdentifier(value: string | null | undefined) {
+    return typeof value === 'string' ? value.trim() : ''
+  }
+
+  function addLoadoutIdentifier(values: readonly string[], value: string) {
+    const normalizedValue = normalizeLoadoutIdentifier(value)
+    if (!normalizedValue || values.includes(normalizedValue)) {
+      return [...values]
+    }
+    return [...values, normalizedValue]
   }
 
   function toNullablePositiveNumber(value: string) {
@@ -152,18 +160,6 @@
     if (nextAccess) runtimeAccess = nextAccess
   }
 
-  function syncSelectedPreset(nextScreen: PlayerLobbyScreenResponse, forceReset = false) {
-    const currentSelection = forceReset ? '' : normalizePresetIdentifier(selectedPresetId)
-    const hasCurrentSelection = nextScreen.presets.items.some(
-      (item) => String(item.presetId) === currentSelection,
-    )
-    selectedPresetId = hasCurrentSelection
-      ? currentSelection
-      : nextScreen.presets.selectedId == null
-        ? ''
-        : String(nextScreen.presets.selectedId)
-  }
-
   function applyScreen(nextScreen: PlayerLobbyScreenResponse, options: { forceDraftSync?: boolean } = {}) {
     const nextSavedDraft = createSessionLoadoutDraftFromScreen(nextScreen.me.draft)
     const currentLocalDirty = isSessionLoadoutDraftDirty(
@@ -174,7 +170,6 @@
     screen = nextScreen
     syncSessionSelectionHandoff(nextScreen.sessionCode)
     syncStoredCharacterId(nextScreen.me.loadout.characterId)
-    syncSelectedPreset(nextScreen, options.forceDraftSync)
 
     if (options.forceDraftSync || !currentLocalDirty) {
       loadoutDraft = cloneSessionLoadoutDraft(nextSavedDraft)
@@ -194,8 +189,6 @@
     invalidAccessMessage = null
     loadoutDraft = createEmptySessionLoadoutDraft()
     savedLoadoutDraft = createEmptySessionLoadoutDraft()
-    selectedPresetId = ''
-    lastAppliedPresetLabel = null
     deckPreviewResponse = null
     lastSuccessfulDeckPreviewResponse = null
     deckPreviewPending = false
@@ -216,7 +209,7 @@
         }
       },
       onError: (error) => {
-        errorMessage = getApiErrorMessage(error, '플레이어 로비를 새로고침하지 못했습니다.')
+        errorMessage = getApiErrorMessage(error, '?뚮젅?댁뼱 濡쒕퉬瑜??덈줈怨좎묠?섏? 紐삵뻽?듬땲??')
       },
     })
   }
@@ -228,8 +221,7 @@
       | 'route-change'
       | 'polling'
       | 'action-toggle-ready'
-      | 'action-save-loadout'
-      | 'action-apply-preset',
+      | 'action-save-loadout',
   ) {
     const plan = resolvePlayerLobbyScreenRefreshPlan(reason)
     const requestId = ++requestSequence
@@ -246,7 +238,6 @@
       notFound = false
       errorMessage = null
       clearActionFeedback()
-      if (!screen) lastAppliedPresetLabel = null
     }
 
     if (!nextRouteCode || nextInvalidAccessMessage) {
@@ -319,12 +310,12 @@
   }
 
   function addPassiveCandidate() {
-    const nextIdentifier = normalizePresetIdentifier(passiveCandidate)
+    const nextIdentifier = normalizeLoadoutIdentifier(passiveCandidate)
     if (!nextIdentifier) return
 
     loadoutDraft = {
       ...loadoutDraft,
-      passiveIds: addPresetIdentifier(loadoutDraft.passiveIds, nextIdentifier),
+      passiveIds: addLoadoutIdentifier(loadoutDraft.passiveIds, nextIdentifier),
     }
     editFlags = { ...editFlags, passiveIdsEdited: true }
     passiveCandidate = ''
@@ -335,7 +326,6 @@
       case 'playerLobby.toggleReady': return 'Updating ready state...'
       case 'playerLobby.leave': return 'Leaving session...'
       case 'playerLobby.saveLoadout': return 'Saving loadout...'
-      case 'playerLobby.applyPreset': return 'Applying preset...'
     }
   }
 
@@ -357,8 +347,8 @@
       await refreshPlayerLobbyScreen('action-toggle-ready')
       actionSuccessTitle = 'Ready updated'
       actionSuccessMessage = requestedReady
-        ? '준비 상태입니다.'
-        : '준비 상태를 해제했습니다.'
+        ? '以鍮??곹깭?낅땲??'
+        : '以鍮??곹깭瑜??댁젣?덉뒿?덈떎.'
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to update the current ready state.')
     } finally {
@@ -399,7 +389,7 @@
 
     if (normalizedDraft.characterId === null) {
       actionErrorTitle = 'Loadout save failed'
-      actionErrorMessage = '로드아웃 저장 전 캐릭터를 선택해 주세요.'
+      actionErrorMessage = '濡쒕뱶?꾩썐 ?????罹먮┃?곕? ?좏깮??二쇱꽭??'
       actionSuccessTitle = null
       actionSuccessMessage = null
       return
@@ -409,7 +399,7 @@
     const requiresExCard = 'exCardId' in savePayload && typeof savePayload.exCardId === 'string'
     if (requiresExCard && !normalizedDraft.exCardId) {
       actionErrorTitle = 'Loadout save failed'
-      actionErrorMessage = '로드아웃 저장 전 EX 카드를 선택해 주세요.'
+      actionErrorMessage = '濡쒕뱶?꾩썐 ?????EX 移대뱶瑜??좏깮??二쇱꽭??'
       actionSuccessTitle = null
       actionSuccessMessage = null
       return
@@ -429,41 +419,6 @@
       actionSuccessMessage = playerLobbyStateCopy.loadoutSavedFeedback.message
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to save the current loadout.')
-    } finally {
-      pendingActionId = null
-    }
-  }
-
-  async function runApplyPreset() {
-    if (!screen) return
-    const action = findPlayerLobbyAction(screen, 'playerLobby.applyPreset')
-    if (!action?.enabled || pendingActionId) return
-
-    const presetId = Number(selectedPresetId)
-    const presetItem = screen.presets.items.find((item) => String(item.presetId) === selectedPresetId) ?? null
-    if (!Number.isInteger(presetId) || presetId <= 0 || !presetItem) {
-      actionErrorTitle = 'Preset apply failed'
-      actionErrorMessage = '적용할 프리셋을 선택해 주세요.'
-      actionSuccessTitle = null
-      actionSuccessMessage = null
-      return
-    }
-
-    pendingActionId = action.id
-    actionErrorTitle = 'Preset apply failed'
-    clearActionFeedback()
-
-    try {
-      await invokeScreenAction<PlayerLobbyScreenResponse, PlayerLobbyActionResponseById['playerLobby.applyPreset']>(
-        action,
-        { body: buildScreenActionPayload(action, { presetId }) },
-      )
-      lastAppliedPresetLabel = presetItem.label
-      await refreshPlayerLobbyScreen('action-apply-preset')
-      actionSuccessTitle = playerLobbyStateCopy.presetAppliedFeedback.title
-      actionSuccessMessage = `${playerLobbyStateCopy.presetAppliedFeedback.message} (${presetItem.label})`
-    } catch (error) {
-      actionErrorMessage = getApiErrorMessage(error, '선택한 프리셋을 적용하지 못했습니다.')
     } finally {
       pendingActionId = null
     }
@@ -512,7 +467,7 @@
       ) {
         return
       }
-      deckPreviewErrorMessage = getApiErrorMessage(error, '덱 미리보기를 새로고침하지 못했습니다.')
+      deckPreviewErrorMessage = getApiErrorMessage(error, '??誘몃━蹂닿린瑜??덈줈怨좎묠?섏? 紐삵뻽?듬땲??')
     } finally {
       if (
         requestId === latestDeckPreviewRequestId &&
@@ -544,13 +499,12 @@
     window.removeEventListener('popstate', handlePopState)
   })
 
-  // server screen owns slot/reference/preset snapshots; localPresentation owns current draft UX only.
+  // server screen owns slot/reference snapshots; localPresentation owns current draft UX only.
   const localPresentation = $derived.by(() =>
     screen
       ? (createPlayerLobbyLocalPresentation(
           screen,
           normalizeSessionLoadoutDraft(loadoutDraft),
-          selectedPresetId,
         ) as PlayerLobbyLocalPresentationState)
       : null,
   )
@@ -566,9 +520,7 @@
   const toggleReadyAction = $derived.by(() => (screen ? findPlayerLobbyAction(screen, 'playerLobby.toggleReady') : null))
   const leaveAction = $derived.by(() => (screen ? findPlayerLobbyAction(screen, 'playerLobby.leave') : null))
   const saveLoadoutAction = $derived.by(() => (screen ? findPlayerLobbyAction(screen, 'playerLobby.saveLoadout') : null))
-  const applyPresetAction = $derived.by(() => (screen ? findPlayerLobbyAction(screen, 'playerLobby.applyPreset') : null))
   const loadoutEditGuardMessage = $derived.by(() => !saveLoadoutAction?.enabled ? saveLoadoutAction?.disabledReason?.userMessage ?? 'Current loadout editing is unavailable.' : null)
-  const presetApplyGuardMessage = $derived.by(() => !applyPresetAction?.enabled ? applyPresetAction?.disabledReason?.userMessage ?? 'Preset apply is unavailable.' : null)
   const deckPreviewState = $derived.by(() =>
     resolvePlayerLobbyPreviewState({
       previewResponse: deckPreviewResponse,
@@ -654,35 +606,35 @@
 
 <div class="player-lobby-page">
   {#if loading}
-    <SectionFrame eyebrow="Player Lobby" title="Loading player lobby" description="플레이어 로비를 불러오는 중입니다.">
+    <SectionFrame eyebrow="Player Lobby" title="Loading player lobby" description="?뚮젅?댁뼱 濡쒕퉬瑜?遺덈윭?ㅻ뒗 以묒엯?덈떎.">
       <ContentStatePanel title={sessionPageStateCopy.loading.title} message={sessionPageStateCopy.loading.message} />
     </SectionFrame>
   {:else if invalidAccessMessage}
-    <SectionFrame eyebrow="Player Access" title={sessionPageStateCopy.invalidPlayerAccess.title} description="플레이어 권한이 필요합니다.">
+    <SectionFrame eyebrow="Player Access" title={sessionPageStateCopy.invalidPlayerAccess.title} description="?뚮젅?댁뼱 沅뚰븳???꾩슂?⑸땲??">
       <ContentStatePanel title={sessionPageStateCopy.invalidPlayerAccess.title} message={invalidAccessMessage} tone="error" />
       <div class="player-lobby-page__actions">
         <a class="player-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Back to session entry</a>
       </div>
     </SectionFrame>
   {:else if notFound}
-    <SectionFrame eyebrow="Session Missing" title="Session not found" description="요청한 세션을 찾을 수 없습니다.">
+    <SectionFrame eyebrow="Session Missing" title="Session not found" description="?붿껌???몄뀡??李얠쓣 ???놁뒿?덈떎.">
       <ContentStatePanel title={sessionPageStateCopy.notFound.title} message={sessionPageStateCopy.notFound.message} tone="error">
         <p>Requested code: {requestedSessionCode ?? 'Unavailable'}</p>
-        <p>세션 코드를 확인하고 다시 시도해 주세요.</p>
+        <p>?몄뀡 肄붾뱶瑜??뺤씤?섍퀬 ?ㅼ떆 ?쒕룄??二쇱꽭??</p>
       </ContentStatePanel>
       <div class="player-lobby-page__actions">
         <a class="player-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Back to session entry</a>
       </div>
     </SectionFrame>
   {:else if errorMessage}
-    <SectionFrame eyebrow="Session Summary" title="Player lobby could not be loaded" description="플레이어 로비를 불러오지 못했습니다.">
+    <SectionFrame eyebrow="Session Summary" title="Player lobby could not be loaded" description="?뚮젅?댁뼱 濡쒕퉬瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??">
       <ContentStatePanel title="Unable to load player lobby" message={errorMessage} tone="error" actionLabel="Retry load" onAction={retryLoad} />
       <div class="player-lobby-page__actions">
         <a class="player-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Back to session entry</a>
       </div>
     </SectionFrame>
   {:else if screen && localPresentation}
-    <SectionFrame eyebrow="Session Summary" title={`Session ${screen.sessionCode}`} description="플레이어 로비 상태를 확인합니다.">
+    <SectionFrame eyebrow="Session Summary" title={`Session ${screen.sessionCode}`} description="?뚮젅?댁뼱 濡쒕퉬 ?곹깭瑜??뺤씤?⑸땲??">
       <div class="player-lobby-page__summary">
         <div class="player-lobby-page__summary-copy">
           <p>Player lobby</p>
@@ -694,12 +646,11 @@
           <TagChip label={`Ready: ${screen.me.summary.readyLabel}`} tone={screen.me.summary.readyTone} />
           <TagChip label={localPresentation.dirty ? 'Draft Changed' : 'Draft Synced'} tone={localPresentation.dirty ? 'warning' : 'success'} />
           <TagChip label={localPresentation.deckEditingLocked ? 'Deck Locked' : 'Deck Editable'} tone={localPresentation.deckEditingLocked ? 'warning' : 'success'} />
-          <TagChip label={localPresentation.preset.previewStale ? 'Preset Preview Stale' : 'Preset Preview Fresh'} tone={localPresentation.preset.previewStale ? 'warning' : 'success'} />
         </div>
       </div>
       <div class="player-lobby-page__stats">
-        <StatBlock value={participantCount} label="Joined" note="참가자 수" />
-        <StatBlock value={readyCount} label="Ready" note="준비 완료 인원" />
+        <StatBlock value={participantCount} label="Joined" note="Joined players" />
+        <StatBlock value={readyCount} label="Ready" note="Ready players" />
         <StatBlock value={screen.me.summary.readyLabel} label="My state" note={screen.me.playerId} />
       </div>
       {#if feedback}
@@ -713,7 +664,7 @@
     </SectionFrame>
 
     <div class="player-lobby-page__main">
-      <SectionFrame title="Participant slots" description="참가자 목록입니다.">
+      <SectionFrame title="Participant slots" description="李멸???紐⑸줉?낅땲??">
         {#if screen.participantSlots.length > 0}
           <div class="player-lobby-page__slots">
             {#each screen.participantSlots as participant}
@@ -721,11 +672,11 @@
             {/each}
           </div>
         {:else}
-          <ContentStatePanel title="No participants yet" message="아직 참가자가 없습니다." />
+          <ContentStatePanel title="No participants yet" message="?꾩쭅 李멸??먭? ?놁뒿?덈떎." />
         {/if}
       </SectionFrame>
 
-      <SectionFrame title="Current loadout" description="현재 로드아웃을 편집합니다.">
+      <SectionFrame title="Current loadout" description="?꾩옱 濡쒕뱶?꾩썐???몄쭛?⑸땲??">
         <div class="player-lobby-page__guide">
           <p>Current player id: {screen.me.playerId}</p>
           <p>Ready state: {screen.me.summary.readyLabel}</p>
@@ -751,35 +702,32 @@
           </div>
         </div>
         <div class="player-lobby-page__todo">
-          <p>{localPresentation.dirty ? '저장되지 않은 변경사항이 있습니다.' : '변경사항이 없습니다.'}</p>
+          <p>{localPresentation.dirty ? '??λ릺吏 ?딆? 蹂寃쎌궗??씠 ?덉뒿?덈떎.' : '蹂寃쎌궗??씠 ?놁뒿?덈떎.'}</p>
           <p>
             {#if localPresentation.characterChangePending}
-              덱을 수정하기 전에 캐릭터 선택을 저장해 주세요.
+              ?깆쓣 ?섏젙?섍린 ?꾩뿉 罹먮┃???좏깮????ν빐 二쇱꽭??
             {:else if deckPreviewErrorMessage && staleDeckPreviewVisible}
-              미리보기를 불러오지 못해 이전 결과를 표시합니다.
+              誘몃━蹂닿린瑜?遺덈윭?ㅼ? 紐삵빐 ?댁쟾 寃곌낵瑜??쒖떆?⑸땲??
             {:else if localPresentation.dirty && !currentDeckPreviewMatchesDraft}
-              미리보기를 불러오는 중입니다.
+              誘몃━蹂닿린瑜?遺덈윭?ㅻ뒗 以묒엯?덈떎.
             {:else}
-              현재 덱 편집 상태입니다.
+              ?꾩옱 ???몄쭛 ?곹깭?낅땲??
             {/if}
           </p>
           {#if localPresentation.deckEditingLocked}
             <p>{localPresentation.deckEditingLockReason}</p>
-          {/if}
-          {#if lastAppliedPresetLabel}
-            <p>마지막 적용 프리셋: {lastAppliedPresetLabel}</p>
           {/if}
         </div>
       </SectionFrame>
     </div>
 
     <div class="player-lobby-page__main">
-      <SectionFrame title="Direct loadout save" description="로드아웃을 저장합니다.">
+      <SectionFrame title="Direct loadout save" description="濡쒕뱶?꾩썐????ν빀?덈떎.">
         {#if loadoutEditGuardMessage}
           <ContentStatePanel title="Loadout editing unavailable" message={loadoutEditGuardMessage} tone="error" />
         {/if}
         {#if localPresentation.characterChangePending}
-          <ContentStatePanel title="Character change pending" message="캐릭터 선택을 먼저 저장해 주세요." />
+          <ContentStatePanel title="Character change pending" message="罹먮┃???좏깮??癒쇱? ??ν빐 二쇱꽭??" />
         {/if}
         {#if localPresentation.deckEditingLocked}
           <ContentStatePanel title="Deck editing locked" message={localPresentation.deckEditingLockReason} />
@@ -849,88 +797,29 @@
           <ContentStatePanel
             title="Draft passive summary"
             message={localPresentation.passiveItems.length
-              ? `${localPresentation.passiveItems.length}개 패시브 선택됨`
-              : '선택한 패시브가 없습니다.'}
+              ? String(localPresentation.passiveItems.length) + ' passives selected'
+              : 'No passives selected.'}
           >
             {#each localPresentation.passiveItems as passiveItem}
-              <p>{passiveItem.title}{passiveItem.subtitle ? ` · ${passiveItem.subtitle}` : ''}</p>
+              <p>{passiveItem.title}{passiveItem.subtitle ? ' - ' + passiveItem.subtitle : ''}</p>
             {/each}
           </ContentStatePanel>
           <ContentStatePanel
             title="Deck preview source"
             message={localPresentation.dirty
               ? deckPreviewErrorMessage && staleDeckPreviewVisible
-                ? '미리보기를 불러오지 못해 이전 결과를 표시합니다.'
+                ? '誘몃━蹂닿린瑜?遺덈윭?ㅼ? 紐삵빐 ?댁쟾 寃곌낵瑜??쒖떆?⑸땲??'
                 : currentDeckPreviewMatchesDraft
-                ? '최신 미리보기를 표시합니다.'
-                : '미리보기를 불러오는 중입니다.'
-              : '현재 로비 상태를 표시합니다.'}
+                ? '理쒖떊 誘몃━蹂닿린瑜??쒖떆?⑸땲??'
+                : '誘몃━蹂닿린瑜?遺덈윭?ㅻ뒗 以묒엯?덈떎.'
+              : '?꾩옱 濡쒕퉬 ?곹깭瑜??쒖떆?⑸땲??'}
           />
         </div>
       </SectionFrame>
 
-      <SectionFrame title="Apply saved preset" description="저장된 프리셋을 적용합니다.">
-        <div class="player-lobby-page__guide">
-          <p>{localPresentation.preset.summary}</p>
-          <p>
-            {localPresentation.preset.previewStale
-              ? '선택한 프리셋이 변경되었습니다.'
-              : '프리셋 미리보기가 최신입니다.'}
-          </p>
-          {#if lastAppliedPresetLabel}
-            <p>마지막 적용 프리셋: {lastAppliedPresetLabel}</p>
-          {/if}
-        </div>
-        {#if presetApplyGuardMessage}
-          <ContentStatePanel title="Preset apply unavailable" message={presetApplyGuardMessage} tone="error" />
-        {/if}
-        {#if localPresentation.dirty}
-          <ContentStatePanel title="Preset apply replaces the current draft" message="프리셋 적용 시 현재 변경사항이 대체됩니다." />
-        {/if}
-        <label class="player-lobby-page__field">
-          <span>Preset</span>
-          <select bind:value={selectedPresetId} disabled={loading || pendingActionId !== null || !screen.presets.items.length}>
-            <option value="">Select preset</option>
-            {#each screen.presets.items as preset}
-              <option value={String(preset.presetId)}>{preset.label}</option>
-            {/each}
-          </select>
-        </label>
-
-        {#if !screen.presets.items.length}
-          <ContentStatePanel title="No saved presets yet" message="표시할 프리셋이 없습니다." />
-        {:else if selectedPresetId}
-          <div class="player-lobby-page__guide">
-            <p>{localPresentation.preset.label}</p>
-            <p>{localPresentation.preset.subtitle}</p>
-            {#if localPresentation.preset.previewSynced}
-              <p>Character: {localPresentation.preset.characterLabel}</p>
-              <p>EX: {localPresentation.preset.exLabel}</p>
-            {:else}
-              <p>프리셋을 선택하면 미리보기가 갱신됩니다.</p>
-            {/if}
-          </div>
-          <div class="player-lobby-page__actions">
-            <button type="button" onclick={() => void runApplyPreset()} disabled={loading || pendingActionId !== null || !applyPresetAction?.enabled}>
-              {pendingActionId === 'playerLobby.applyPreset' ? getPendingActionLabel('playerLobby.applyPreset') : applyPresetAction?.label ?? 'Apply preset'}
-            </button>
-            <a class="player-lobby-page__link-action" data-nav href={pathBuilders.presetList()}>Open preset archive</a>
-          </div>
-          {#if localPresentation.preset.previewSynced}
-            <div class="player-lobby-page__grid">
-              <EntityListPane items={localPresentation.preset.deckItems} emptyMessage="표시할 덱 카드가 없습니다." />
-              <EntityListPane items={localPresentation.preset.passiveItems} emptyMessage="표시할 패시브가 없습니다." />
-            </div>
-          {:else}
-            <ContentStatePanel title="Preview pending refresh" message={localPresentation.preset.summary} />
-          {/if}
-        {:else}
-          <ContentStatePanel message="선택한 프리셋이 없습니다." />
-        {/if}
-      </SectionFrame>
     </div>
 
-    <SectionFrame title="Action zone" description="준비 상태와 퇴장을 처리합니다.">
+    <SectionFrame title="Action zone" description="以鍮??곹깭? ?댁옣??泥섎━?⑸땲??">
       <div class="player-lobby-page__guide">
         <p>Current ready state: {screen.me.summary.readyLabel}</p>
         <p>{screen.me.summary.membershipSummary}</p>

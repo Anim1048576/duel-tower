@@ -22,7 +22,7 @@ public class StarterLoadoutConfig {
 
     private final String defaultExCardId;
     private final List<OwnedCard> defaultOwnedCards;
-    private final List<String> defaultPresetDeckCardIds;
+    private final List<String> defaultDeckCardIds;
 
     @Autowired
     public StarterLoadoutConfig(GameRules gameRules,
@@ -42,9 +42,9 @@ public class StarterLoadoutConfig {
             throw new IllegalStateException("starter defaultOwnedCardIds size must be <= " + gameRules.maxOwnedCards());
         }
 
-        List<String> normalizedDeckCardIds = normalizeRequiredList(raw.defaultPresetDeckCardIds(), "defaultPresetDeckCardIds");
+        List<String> normalizedDeckCardIds = normalizeRequiredList(raw.defaultDeckCardIds(), "defaultDeckCardIds");
         if (normalizedDeckCardIds.size() != gameRules.deckSize()) {
-            throw new IllegalStateException("starter defaultPresetDeckCardIds size must be exactly " + gameRules.deckSize());
+            throw new IllegalStateException("starter defaultDeckCardIds size must be exactly " + gameRules.deckSize());
         }
 
         validateDeckCardCoverage(normalizedDeckCardIds, normalizedOwnedCardIds);
@@ -56,7 +56,7 @@ public class StarterLoadoutConfig {
 
         this.defaultExCardId = normalizedExCardId;
         this.defaultOwnedCards = List.copyOf(ownedCards);
-        this.defaultPresetDeckCardIds = List.copyOf(normalizedDeckCardIds);
+        this.defaultDeckCardIds = List.copyOf(normalizedDeckCardIds);
     }
 
     public static StarterLoadoutConfig defaults(GameRules gameRules) {
@@ -85,8 +85,8 @@ public class StarterLoadoutConfig {
         return defaultOwnedCards;
     }
 
-    public List<String> defaultPresetDeckCardIds() {
-        return defaultPresetDeckCardIds;
+    public List<String> defaultDeckCardIds() {
+        return defaultDeckCardIds;
     }
 
     static StarterLoadoutRaw load(Resource resource) {
@@ -132,7 +132,7 @@ public class StarterLoadoutConfig {
         for (Map.Entry<String, Integer> entry : deckCountByCardId.entrySet()) {
             int ownedCount = ownedCountByCardId.getOrDefault(entry.getKey(), 0);
             if (ownedCount < entry.getValue()) {
-                throw new IllegalStateException("starter defaultPresetDeckCardIds contains " + entry.getKey()
+                throw new IllegalStateException("starter defaultDeckCardIds contains " + entry.getKey()
                         + " x" + entry.getValue() + " but defaultOwnedCardIds has only x" + ownedCount);
             }
         }
@@ -141,6 +141,6 @@ public class StarterLoadoutConfig {
     record StarterLoadoutRaw(
             String defaultExCardId,
             List<String> defaultOwnedCardIds,
-            List<String> defaultPresetDeckCardIds
+            List<String> defaultDeckCardIds
     ) {}
 }

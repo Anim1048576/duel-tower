@@ -2,7 +2,6 @@ package com.example.dueltower.session.api;
 
 import com.example.dueltower.content.equip.service.EquipService;
 import com.example.dueltower.content.item.service.ItemService;
-import com.example.dueltower.session.dto.ApplyPresetToSessionRequest;
 import com.example.dueltower.session.dto.CommandRequest;
 import com.example.dueltower.session.dto.CreateSessionRequest;
 import com.example.dueltower.session.dto.CreateSessionResponse;
@@ -165,7 +164,7 @@ public class SessionController {
             throw new ResponseStatusException(FORBIDDEN, "playerId must match the authenticated user");
         }
         List<String> requestedPassiveIds = (req.passiveIds() == null) ? List.of() : req.passiveIds();
-        sessionLobbyService.join(code, requestedPlayerId, req.characterId(), requestedPassiveIds, req.requestedPresetDeckOwnedCardIds(), req.presetExCardId(), req.ownedCards());
+        sessionLobbyService.join(code, requestedPlayerId, req.characterId(), requestedPassiveIds, req.requestedDeckOwnedCardIds(), req.exCardId(), req.ownedCards());
 
         SessionStateDto state = sessionLifecycleService.withLockedSession(code, rt -> {
             log.info("session join code={} playerId={} requestedPassiveIds={} playersNow={}",
@@ -303,25 +302,6 @@ public class SessionController {
                         preview.deckEditAnalysis()
                 )
         );
-    }
-
-    @PostMapping("/{code}/players/{playerId}/loadout/from-preset")
-    public SessionStateDto applyPresetToLoadout(@PathVariable String code,
-                                                @PathVariable String playerId,
-                                                @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
-                                                @RequestBody(required = false) ApplyPresetToSessionRequest req) {
-        if (req == null || req.presetId() == null) {
-            throw new ResponseStatusException(BAD_REQUEST, "presetId is required");
-        }
-        SessionRuntime runtime = sessionLifecycleService.get(code);
-        String actorPlayerId = sessionAccessResolver.requirePlayerSelf(
-                runtime,
-                playerTokenHeader,
-                playerId,
-                "players may only edit their own loadout"
-        );
-        sessionLoadoutService.applyPresetToLoadout(code, actorPlayerId, playerId, req.presetId());
-        return sessionLifecycleService.withLockedSession(code, rt -> StateMapper.toDto(rt.code(), rt.state()));
     }
 
     @PutMapping("/{code}/players/{playerId}/ready")

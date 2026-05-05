@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * Screen model for PlayerLobby.
- * The server owns participant summary, reference option curation, preset preview resolution,
+ * The server owns participant summary, reference option curation,
  * and action availability so the frontend can stay in render + local draft mode.
  */
 public class PlayerLobbyScreenResponse extends ScreenResponseBase {
@@ -18,7 +18,6 @@ public class PlayerLobbyScreenResponse extends ScreenResponseBase {
     private final PlayerLobbyMeDto me;
     private final PlayerLobbyDeckEditorStateDto deckEditor;
     private final PlayerLobbyReferencesDto references;
-    private final PlayerLobbyPresetsDto presets;
 
     public PlayerLobbyScreenResponse(String screenKey,
                                      OffsetDateTime generatedAt,
@@ -32,8 +31,7 @@ public class PlayerLobbyScreenResponse extends ScreenResponseBase {
                                      List<PlayerLobbyParticipantSlotDto> participantSlots,
                                      PlayerLobbyMeDto me,
                                      PlayerLobbyDeckEditorStateDto deckEditor,
-                                     PlayerLobbyReferencesDto references,
-                                     PlayerLobbyPresetsDto presets) {
+                                     PlayerLobbyReferencesDto references) {
         super(screenKey, generatedAt, uiNotices, possibleActions);
         this.sessionCode = sessionCode;
         this.version = version;
@@ -44,7 +42,6 @@ public class PlayerLobbyScreenResponse extends ScreenResponseBase {
         this.me = me;
         this.deckEditor = deckEditor;
         this.references = references;
-        this.presets = presets;
     }
 
     public String getSessionCode() {
@@ -83,7 +80,4 @@ public class PlayerLobbyScreenResponse extends ScreenResponseBase {
         return references;
     }
 
-    public PlayerLobbyPresetsDto getPresets() {
-        return presets;
-    }
 }

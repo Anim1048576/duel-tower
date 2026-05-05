@@ -1,6 +1,5 @@
 import { apiGet, apiPost, apiPut } from './client'
 import type {
-  ApplyPresetToSessionRequest,
   CommandRequest,
   CreateSessionRequest,
   CreateSessionResponse,
@@ -150,19 +149,6 @@ export function previewSessionLoadout(
 ) {
   return apiPost<PreviewSessionLoadoutResponse, PreviewSessionLoadoutRequest>(
     `${getSessionPlayerResourcePath(code, playerId)}/loadout/preview`,
-    payload,
-    withPlayerToken(playerToken),
-  )
-}
-
-export function applyPresetToSession(
-  code: SessionCode,
-  playerId: SessionPlayerId,
-  payload: ApplyPresetToSessionRequest,
-  playerToken: SessionToken,
-) {
-  return apiPost<SessionStateDto, ApplyPresetToSessionRequest>(
-    `${getSessionPlayerResourcePath(code, playerId)}/loadout/from-preset`,
     payload,
     withPlayerToken(playerToken),
   )

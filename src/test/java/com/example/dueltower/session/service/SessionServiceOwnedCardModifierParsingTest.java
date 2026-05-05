@@ -159,7 +159,7 @@ class SessionServiceOwnedCardModifierParsingTest {
     private static SessionService newSessionService() {
         GameRules gameRules = GameRules.defaults();
         return new SessionService(
-                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null,
                 gameRules,
                 RewardTableConfig.defaults(),
                 StarterLoadoutConfig.defaults(gameRules),

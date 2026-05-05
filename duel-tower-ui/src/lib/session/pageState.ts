@@ -40,10 +40,6 @@ export const sessionEntryStateCopy = {
 } as const
 
 export const playerLobbyStateCopy = {
-  presetAppliedFeedback: {
-    title: 'Preset applied',
-    message: '선택한 프리셋을 적용했습니다.',
-  },
   loadoutSavedFeedback: {
     title: 'Loadout saved',
     message: '로드아웃을 저장했습니다.',

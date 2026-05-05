@@ -7,8 +7,6 @@ import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.PassiveDefinition;
-import com.example.dueltower.preset.dto.PresetResponse;
-import com.example.dueltower.preset.service.PresetService;
 import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
 import com.example.dueltower.session.service.SessionLoadoutSupport;
 import com.example.dueltower.session.dto.PlayerStateDto;
@@ -29,13 +27,13 @@ import static org.springframework.http.HttpStatus.FORBIDDEN;
 @Service
 /**
  * PlayerLobby Screen API assembler.
- * The backend owns participant slot summary, reference option curation, preset preview resolution,
+ * The backend owns participant slot summary, reference option curation,
  * and action metadata so the frontend can focus on local draft input and rendering.
  */
 public class PlayerLobbyScreenService {
 
     private static final List<String> PLAYER_LOBBY_NOTICE = List.of(
-            "Player lobby participant summary, loadout references, and preset preview are assembled on the server-side screen model."
+            "Player lobby participant summary and loadout references are assembled on the server-side screen model."
     );
 
     private final SessionLifecycleService sessionLifecycleService;
@@ -45,7 +43,6 @@ public class PlayerLobbyScreenService {
     private final CharacterProfileService characterProfileService;
     private final CardService cardService;
     private final PassiveService passiveService;
-    private final PresetService presetService;
 
     public PlayerLobbyScreenService(SessionLifecycleService sessionLifecycleService,
                                     SessionAccessResolver sessionAccessResolver,
@@ -53,8 +50,7 @@ public class PlayerLobbyScreenService {
                                     SessionLoadoutSupport sessionLoadoutSupport,
                                     CharacterProfileService characterProfileService,
                                     CardService cardService,
-                                    PassiveService passiveService,
-                                    PresetService presetService) {
+                                    PassiveService passiveService) {
         this.sessionLifecycleService = sessionLifecycleService;
         this.sessionAccessResolver = sessionAccessResolver;
         this.screenResponseFactory = screenResponseFactory;
@@ -62,7 +58,6 @@ public class PlayerLobbyScreenService {
         this.characterProfileService = characterProfileService;
         this.cardService = cardService;
         this.passiveService = passiveService;
-        this.presetService = presetService;
     }
 
     public PlayerLobbyScreenResponse getScreen(String code,
@@ -97,7 +92,6 @@ public class PlayerLobbyScreenService {
         List<CharacterProfileResponse> characters = characterProfileService.list();
         List<CardDefinition> exCards = cardService.list(CardType.EX);
         List<PassiveDefinition> passives = passiveService.list();
-        List<PresetResponse> presets = presetService.listMine(resolvePresetOwner(decision));
 
         return screenResponseFactory.playerLobby(
                 ScreenRouteSpec.PLAYER_LOBBY,
@@ -109,18 +103,7 @@ public class PlayerLobbyScreenService {
                 characters,
                 exCards,
                 passives,
-                presets,
                 PLAYER_LOBBY_NOTICE
         );
-    }
-
-    private String resolvePresetOwner(SessionAccessDecision decision) {
-        if (decision.username() != null && !decision.username().isBlank()) {
-            return decision.username();
-        }
-        if (decision.playerId() != null && !decision.playerId().isBlank()) {
-            return decision.playerId();
-        }
-        throw new ResponseStatusException(FORBIDDEN, "player preset access requires an owner id");
     }
 }

@@ -10,8 +10,6 @@ import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.character.service.CharacterCardCollectionService;
 import com.example.dueltower.character.service.CharacterLoadoutService;
 import com.example.dueltower.member.MemberRepository;
-import com.example.dueltower.preset.domain.Preset;
-import com.example.dueltower.preset.repository.PresetRepository;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -70,8 +68,6 @@ class SessionManagementIntegrationTest {
     @Autowired
     private CharacterLoadoutService characterLoadoutService;
 
-    @Autowired
-    private PresetRepository presetRepository;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -83,7 +79,6 @@ class SessionManagementIntegrationTest {
         characterOwnedCardRepository.deleteAll();
         memberRepository.deleteAll();
         characterProfileRepository.deleteAll();
-        presetRepository.deleteAll();
     }
 
     @Test
@@ -573,177 +568,6 @@ class SessionManagementIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
-    @Test
-    @DisplayName("로드아웃에 프리셋 적용은 플레이어 토큰으로 자신의 프리셋 적용만 허용한다")
-    void applyPresetToLoadoutAllowsSelfApplyWithPlayerToken() throws Exception {
-        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
-        SessionInfo info = createSession(gmSession, "gm");
-        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
-        String playerToken = joinAsPlayer(playerSession, info.code(), "player1");
-
-        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
-                .name("프리셋 캐릭터")
-                .gender(CharacterGender.OTHER)
-                .age(20)
-                .wish("테스트")
-                .disposition("중립")
-                .oneLiner("프리셋")
-                .story("preset apply")
-                .physical(10)
-                .technique(10)
-                .sense(10)
-                .willpower(10)
-                .trait1("P001")
-                .trait2("P002")
-                .build());
-        seedLoadout(
-                characterCardCollectionService,
-                characterLoadoutService,
-                profile.getId(),
-                "[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]",
-                List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"),
-                "EX901"
-        );
-        Preset preset = presetRepository.save(Preset.create(
-                "player1",
-                "세션 적용 프리셋",
-                profile.getId(),
-                List.of(
-                        "C001", "C001", "C001",
-                        "C002", "C002", "C002",
-                        "C003", "C003", "C003",
-                        "C004", "C004", "C004"
-                ),
-                "EX901",
-                List.of("P001", "P002")
-        ));
-
-        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/from-preset", info.code(), "player1")
-                        .header("X-Player-Token", playerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "presetId": %d
-                                }
-                                """.formatted(preset.getId())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.players.player1.passiveIds[0]").value("P001"))
-                .andExpect(jsonPath("$.players.player1.passiveIds[1]").value("P002"))
-                .andExpect(jsonPath("$.players.player1.deckOwnedCardIds.length()").value(12));
-    }
-
-    @Test
-    @DisplayName("로드아웃에 프리셋 적용은 다른 플레이어의 프리셋이면 거부한다")
-    void applyPresetToLoadoutRejectsOtherPlayersPreset() throws Exception {
-        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
-        SessionInfo info = createSession(gmSession, "gm");
-        MockHttpSession player1Session = signUpAndLogin("player1", "player1@example.com", "password123");
-        MockHttpSession player2Session = signUpAndLogin("player2", "player2@example.com", "password123");
-        String player1Token = joinAsPlayer(player1Session, info.code(), "player1");
-        joinAsPlayer(player2Session, info.code(), "player2");
-
-        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
-                .name("타인 프리셋")
-                .gender(CharacterGender.OTHER)
-                .age(20)
-                .wish("테스트")
-                .disposition("중립")
-                .oneLiner("타인")
-                .story("owner scope")
-                .physical(10)
-                .technique(10)
-                .sense(10)
-                .willpower(10)
-                .trait1("P001")
-                .trait2(null)
-                .build());
-        seedLoadout(
-                characterCardCollectionService,
-                characterLoadoutService,
-                profile.getId(),
-                "[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]",
-                List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"),
-                "EX901"
-        );
-        Preset foreignPreset = presetRepository.save(Preset.create(
-                "player2",
-                "player2 preset",
-                profile.getId(),
-                List.of(
-                        "C001", "C001", "C001",
-                        "C002", "C002", "C002",
-                        "C003", "C003", "C003",
-                        "C004", "C004", "C004"
-                ),
-                "EX901",
-                List.of("P001")
-        ));
-
-        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/from-preset", info.code(), "player1")
-                        .header("X-Player-Token", player1Token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "presetId": %d
-                                }
-                                """.formatted(foreignPreset.getId())))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    @DisplayName("로드아웃에 프리셋 적용은 경로의 player ID가 다르면 거부한다")
-    void applyPresetToLoadoutRejectsDifferentPathPlayerId() throws Exception {
-        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
-        SessionInfo info = createSession(gmSession, "gm");
-        MockHttpSession player1Session = signUpAndLogin("player1", "player1@example.com", "password123");
-        MockHttpSession player2Session = signUpAndLogin("player2", "player2@example.com", "password123");
-        String player1Token = joinAsPlayer(player1Session, info.code(), "player1");
-        joinAsPlayer(player2Session, info.code(), "player2");
-
-        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/from-preset", info.code(), "player2")
-                        .header("X-Player-Token", player1Token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "presetId": 1
-                                }
-                                """))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("로드아웃에 프리셋 적용은 플레이어 토큰이 필요하다")
-    void applyPresetToLoadoutRequiresPlayerToken() throws Exception {
-        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
-        SessionInfo info = createSession(gmSession, "gm");
-        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
-        joinAsPlayer(playerSession, info.code(), "player1");
-
-        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/from-preset", info.code(), "player1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "presetId": 1
-                                }
-                                """))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @DisplayName("로드아웃에 프리셋 적용은 preset ID가 필요하다")
-    void applyPresetToLoadoutRequiresPresetId() throws Exception {
-        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
-        SessionInfo info = createSession(gmSession, "gm");
-        MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
-        String playerToken = joinAsPlayer(playerSession, info.code(), "player1");
-
-        mockMvc.perform(post("/api/sessions/{code}/players/{playerId}/loadout/from-preset", info.code(), "player1")
-                        .header("X-Player-Token", playerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest());
-    }
-
     private SessionInfo createSession(MockHttpSession session, String gmId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/sessions")
                         .session(session)
@@ -767,7 +591,7 @@ class SessionManagementIntegrationTest {
                         .content("""
                                 {
                                   "playerId": "%s",
-                                  "presetDeckCardIds": [
+                                  "deckCardIds": [
                                     "C001", "C001", "C001",
                                     "C002", "C002", "C002",
                                     "C003", "C003", "C003",
@@ -786,7 +610,7 @@ class SessionManagementIntegrationTest {
                                               String code,
                                               String playerId,
                                               String ownedCardsJson,
-                                              String presetDeckOwnedCardIdsJson) throws Exception {
+                                              String deckOwnedCardIdsJson) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/sessions/{code}/join", code)
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -794,9 +618,9 @@ class SessionManagementIntegrationTest {
                                 {
                                   "playerId": "%s",
                                   "ownedCards": %s,
-                                  "presetDeckOwnedCardIds": %s
+                                  "deckOwnedCardIds": %s
                                 }
-                                """.formatted(playerId, ownedCardsJson, presetDeckOwnedCardIdsJson)))
+                                """.formatted(playerId, ownedCardsJson, deckOwnedCardIdsJson)))
                 .andExpect(status().isOk())
                 .andReturn();
 

@@ -23,7 +23,6 @@ public final class SecurityPaths {
     public static final String[] AUTH_REQUIRED = {
             "/api/auth/me",
             "/api/auth/logout",
-            "/api/me/presets/**"
     };
 
     /**
@@ -94,7 +93,6 @@ public final class SecurityPaths {
             "/api/sessions/*/players/*/deck",
             "/api/sessions/*/players/*/loadout",
             "/api/sessions/*/players/*/loadout/preview",
-            "/api/sessions/*/players/*/loadout/from-preset"
     };
 
     public static final String[] PLAYER_SELF_PUT = {

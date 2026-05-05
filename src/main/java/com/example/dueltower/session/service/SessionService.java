@@ -19,7 +19,6 @@ import com.example.dueltower.session.config.StarterLoadoutConfig;
 import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.dto.OwnedCardModifierDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
-import com.example.dueltower.preset.service.PresetService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -68,7 +67,6 @@ public class SessionService {
                    EquipService equipService,
                    PassiveService passiveService,
                    CardModifierService cardModifierService,
-                   PresetService presetService,
                    GameRules gameRules,
                    RewardTableConfig rewardTableConfig,
                    StarterLoadoutConfig starterLoadoutConfig,

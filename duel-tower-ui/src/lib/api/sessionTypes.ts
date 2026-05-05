@@ -229,9 +229,9 @@ export type JoinSessionRequest = {
   playerId: string
   characterId: number | null
   passiveIds: readonly string[]
-  presetDeckOwnedCardIds?: readonly string[] | null
-  presetDeckCardIds?: readonly string[] | null
-  presetExCardId?: string | null
+  deckOwnedCardIds?: readonly string[] | null
+  deckCardIds?: readonly string[] | null
+  exCardId?: string | null
   ownedCards?: readonly OwnedCardDto[] | null
 }
 
@@ -266,10 +266,6 @@ export type PreviewSessionLoadoutResponse = {
   draft: PreviewSessionLoadoutDraftDto
   clientRequestId: string | null
   deckEditor: PlayerLobbyDeckEditorStateDto
-}
-
-export type ApplyPresetToSessionRequest = {
-  presetId: number
 }
 
 export type UpdatePlayerReadyRequest = {

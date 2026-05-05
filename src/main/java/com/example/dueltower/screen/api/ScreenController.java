@@ -7,7 +7,6 @@ import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatActionRequest;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatActionResponse;
 import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
-import com.example.dueltower.screen.dto.PresetEditorScreenResponse;
 import com.example.dueltower.session.dto.CommandRequest;
 import com.example.dueltower.screen.service.ScreenQueryService;
 import org.springframework.security.core.Authentication;
@@ -86,14 +85,4 @@ public class ScreenController {
         return screenQueryService.getDeckEditor(id, authentication);
     }
 
-    @GetMapping("/presets/new/editor")
-    public PresetEditorScreenResponse newPresetEditor(Authentication authentication) {
-        return screenQueryService.getNewPresetEditor(authentication);
-    }
-
-    @GetMapping("/presets/{id}/editor")
-    public PresetEditorScreenResponse presetEditor(@PathVariable long id,
-                                                   Authentication authentication) {
-        return screenQueryService.getPresetEditor(id, authentication);
-    }
 }

@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class SessionRequestCompatibilityTest {
 
     @Test
-    void requestedDeckOwnedCardIdsPrefersCanonicalField() {
+    void joinRequestedDeckOwnedCardIdsPrefersCanonicalField() {
         UpdateSessionDeckRequest req = new UpdateSessionDeckRequest(
                 List.of("oc-1", "oc-2"),
                 List.of("C001", "C002")
@@ -19,7 +19,7 @@ class SessionRequestCompatibilityTest {
     }
 
     @Test
-    void requestedPresetDeckOwnedCardIdsPrefersCanonicalField() {
+    void requestedDeckOwnedCardIdsPrefersCanonicalField() {
         JoinSessionRequest req = new JoinSessionRequest(
                 "player",
                 null,
@@ -30,7 +30,7 @@ class SessionRequestCompatibilityTest {
                 List.of()
         );
 
-        assertEquals(List.of("oc-10", "oc-11"), req.requestedPresetDeckOwnedCardIds());
+        assertEquals(List.of("oc-10", "oc-11"), req.requestedDeckOwnedCardIds());
     }
 
     @Test
@@ -44,7 +44,7 @@ class SessionRequestCompatibilityTest {
     }
 
     @Test
-    void requestedPresetDeckOwnedCardIdsFallsBackToLegacyPresetDeckCardIds() {
+    void joinRequestedDeckOwnedCardIdsFallsBackToDeckCardIds() {
         JoinSessionRequest req = new JoinSessionRequest(
                 "player",
                 null,
@@ -55,6 +55,6 @@ class SessionRequestCompatibilityTest {
                 List.of()
         );
 
-        assertEquals(List.of("C001", "C002"), req.requestedPresetDeckOwnedCardIds());
+        assertEquals(List.of("C001", "C002"), req.requestedDeckOwnedCardIds());
     }
 }

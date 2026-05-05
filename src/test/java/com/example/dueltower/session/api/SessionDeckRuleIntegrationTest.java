@@ -88,7 +88,7 @@ class SessionDeckRuleIntegrationTest {
 
     @Test
     @DisplayName("참가 시 프리셋 덱의 owned card ID canonical 형식을 허용한다")
-    void joinAcceptsPresetDeckOwnedCardIdsCanonical() throws Exception {
+    void joinAcceptsDeckOwnedCardIdsCanonical() throws Exception {
         MockHttpSession session = signUpAndLogin("playerJoinOwned", "playerJoinOwned@example.com", "password123");
         String code = createSession(session);
 
@@ -109,7 +109,7 @@ class SessionDeckRuleIntegrationTest {
                     {"ownedCardId":"oc11","cardId":"C004"},
                     {"ownedCardId":"oc12","cardId":"C004"}
                   ],
-                  "presetDeckOwnedCardIds": [
+                  "deckOwnedCardIds": [
                     "oc2","oc1","oc3",
                     "oc4","oc5","oc6",
                     "oc7","oc8","oc9",
@@ -520,7 +520,7 @@ class SessionDeckRuleIntegrationTest {
                     {"cardId":"C006","weakened":false},
                     {"cardId":"C006","weakened":false}
                   ],
-                  "presetDeckCardIds": [
+                  "deckCardIds": [
                     "C001","C001",
                     "C002","C002",
                     "C003","C003",
@@ -577,7 +577,7 @@ class SessionDeckRuleIntegrationTest {
                 {"cardId":"C004","weakened":false},
                 {"cardId":"Tig001_Card","weakened":false}
               ],
-              "presetDeckCardIds": [
+              "deckCardIds": [
                 "C001","C001","C001",
                 "C002","C002","C002",
                 "C003","C003","C003",
@@ -956,7 +956,7 @@ class SessionDeckRuleIntegrationTest {
                     {"ownedCardId":"oc-c004-3","cardId":"C004"},
                     {"ownedCardId":"oc-c001-3","cardId":"C001"}
                   ],
-                  "presetDeckCardIds": [
+                  "deckCardIds": [
                     "C001","C001","C001",
                     "C002","C002","C002",
                     "C003","C003","C003",
@@ -1014,7 +1014,7 @@ class SessionDeckRuleIntegrationTest {
                                     {"cardId":"C003"},{"cardId":"C003"},{"cardId":"C003"},
                                     {"cardId":"C004"},{"cardId":"C004"},{"cardId":"C004"}
                                   ],
-                                  "presetDeckCardIds": [
+                                  "deckCardIds": [
                                     "C001","C001","C001",
                                     "C002","C002","C002",
                                     "C003","C003","C003",
@@ -1050,7 +1050,7 @@ class SessionDeckRuleIntegrationTest {
                   "ownedCards": [
                     %s
                   ],
-                  "presetDeckCardIds": [
+                  "deckCardIds": [
                     "C001","C001","C001",
                     "C002","C002","C002",
                     "C003","C003","C003",
@@ -1107,7 +1107,7 @@ class SessionDeckRuleIntegrationTest {
                   "ownedCards": [
                     %s
                   ],
-                  "presetDeckCardIds": [
+                  "deckCardIds": [
                     "C001","C001","C001",
                     "C002","C002","C002",
                     "C003","C003","C003",

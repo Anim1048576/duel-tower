@@ -12,8 +12,6 @@
   import HubPage from './pages/HubLandingPage.svelte'
   import InventoryPage from './pages/InventoryPage.svelte'
   import LoginPage from './pages/LoginPage.svelte'
-  import PresetEditorPage from './pages/PresetEditorPage.svelte'
-  import PresetListPage from './pages/PresetListPage.svelte'
   import PlayerLobbyPage from './pages/PlayerLobbyPage.svelte'
   import RulesReferencePage from './pages/RulesReferencePage.svelte'
   import SessionEntryPage from './pages/SessionEntryPage.svelte'
@@ -40,13 +38,11 @@
     'character-detail': CharacterDetailPage,
     cards: CardLibraryPage,
     decks: DeckListPage,
-    presets: PresetListPage,
     inventory: InventoryPage,
     shop: ShopPage,
     'card-detail': CardDetailPage,
     reference: RulesReferencePage,
     'deck-editor': DeckEditorPage,
-    'preset-editor': PresetEditorPage,
     lobby: SessionEntryPage,
     'player-lobby': PlayerLobbyPage,
     'gm-lobby': GmLobbyPage,

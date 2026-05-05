@@ -5,16 +5,20 @@ import type {
   SessionStateDto,
 } from '../api/sessionTypes'
 import type { PlayerLobbyLoadoutDto, PlayerLobbySaveLoadoutPayload } from '../api/screenTypes'
-import {
-  normalizePresetIdentifier,
-  normalizePresetIdentifierList,
-} from '../presets/editorModel'
 
 export type SessionLoadoutDraft = {
   characterId: number | null
   deckOwnedCardIds: string[]
   exCardId: string
   passiveIds: string[]
+}
+
+function normalizeLoadoutIdentifier(value: string | null | undefined) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeLoadoutIdentifierList(values: readonly string[] | null | undefined) {
+  return (values ?? []).map(normalizeLoadoutIdentifier).filter(Boolean)
 }
 
 type SessionLoadoutDraftLike = {
@@ -68,9 +72,9 @@ export function createSessionLoadoutDraftFromScreen(
       typeof loadout.characterId === 'number' && Number.isFinite(loadout.characterId) && loadout.characterId > 0
         ? loadout.characterId
         : null,
-    deckOwnedCardIds: normalizePresetIdentifierList(loadout.deckOwnedCardIds),
-    exCardId: normalizePresetIdentifier(loadout.exCardId),
-    passiveIds: normalizePresetIdentifierList(loadout.passiveIds),
+    deckOwnedCardIds: normalizeLoadoutIdentifierList(loadout.deckOwnedCardIds),
+    exCardId: normalizeLoadoutIdentifier(loadout.exCardId),
+    passiveIds: normalizeLoadoutIdentifierList(loadout.passiveIds),
   }
 }
 
@@ -88,9 +92,9 @@ export function createSessionLoadoutDraft(
       typeof fallbackCharacterId === 'number' && Number.isFinite(fallbackCharacterId) && fallbackCharacterId > 0
         ? fallbackCharacterId
         : null,
-    deckOwnedCardIds: normalizePresetIdentifierList(player.deckOwnedCardIds),
+    deckOwnedCardIds: normalizeLoadoutIdentifierList(player.deckOwnedCardIds),
     exCardId: resolveSessionLoadoutExCardId(player, session),
-    passiveIds: normalizePresetIdentifierList(player.passiveIds),
+    passiveIds: normalizeLoadoutIdentifierList(player.passiveIds),
   }
 }
 
@@ -105,7 +109,7 @@ export function resolveSessionLoadoutExCardId(
   }
 
   const resolvedExCardId = session?.cards[currentExCard]?.defId
-  return normalizePresetIdentifier(resolvedExCardId ?? currentExCard)
+  return normalizeLoadoutIdentifier(resolvedExCardId ?? currentExCard)
 }
 
 export function normalizeSessionLoadoutDraft(draft: SessionLoadoutDraft): SessionLoadoutDraft {
@@ -114,9 +118,9 @@ export function normalizeSessionLoadoutDraft(draft: SessionLoadoutDraft): Sessio
       typeof draft.characterId === 'number' && Number.isFinite(draft.characterId) && draft.characterId > 0
         ? draft.characterId
         : null,
-    deckOwnedCardIds: normalizePresetIdentifierList(draft.deckOwnedCardIds),
-    exCardId: normalizePresetIdentifier(draft.exCardId),
-    passiveIds: normalizePresetIdentifierList(draft.passiveIds),
+    deckOwnedCardIds: normalizeLoadoutIdentifierList(draft.deckOwnedCardIds),
+    exCardId: normalizeLoadoutIdentifier(draft.exCardId),
+    passiveIds: normalizeLoadoutIdentifierList(draft.passiveIds),
   }
 }
 
@@ -163,9 +167,9 @@ function normalizeSessionLoadoutDraftLike(draft: SessionLoadoutDraftLike): Sessi
       typeof draft.characterId === 'number' && Number.isFinite(draft.characterId) && draft.characterId > 0
         ? draft.characterId
         : null,
-    deckOwnedCardIds: normalizePresetIdentifierList(draft.deckOwnedCardIds ?? []),
-    exCardId: normalizePresetIdentifier(draft.exCardId),
-    passiveIds: normalizePresetIdentifierList(draft.passiveIds ?? []),
+    deckOwnedCardIds: normalizeLoadoutIdentifierList(draft.deckOwnedCardIds ?? []),
+    exCardId: normalizeLoadoutIdentifier(draft.exCardId),
+    passiveIds: normalizeLoadoutIdentifierList(draft.passiveIds ?? []),
   })
 }
 

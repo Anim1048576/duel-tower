@@ -7,7 +7,7 @@ import {
 } from './screenTypes'
 
 /**
- * Minimal editor-screen action orchestration shared by DeckEditor and PresetEditor.
+ * Minimal editor-screen action orchestration for server-backed editor screens.
  * It only handles action lookup, payload patch application, invoke, and optional refresh.
  * Editor-specific effects such as delete navigation or validate snapshot updates stay in each page.
  * Errors intentionally bubble to the page so each editor can surface its own message.

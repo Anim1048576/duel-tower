@@ -1,4 +1,4 @@
-export type PageArea = 'public' | 'app'
+﻿export type PageArea = 'public' | 'app'
 
 export type PageKey =
   | 'login'
@@ -10,7 +10,6 @@ export type PageKey =
   | 'shop'
   | 'cards'
   | 'decks'
-  | 'presets'
   | 'card-detail'
   | 'character'
   | 'character-create'
@@ -19,7 +18,6 @@ export type PageKey =
   | 'combat'
   | 'logs'
   | 'deck-editor'
-  | 'preset-editor'
   | 'player-lobby'
   | 'gm-lobby'
 
@@ -56,12 +54,10 @@ export const routePaths = {
   characterDetail: '/characters/detail',
   cardLibrary: '/cards',
   deckList: '/decks',
-  presetList: '/presets',
   inventory: '/inventory',
   shop: '/shop',
   reference: '/reference',
   deckEditor: '/decks/editor',
-  presetEditor: '/presets/editor',
   sessionEntry: '/lobby',
   sessionLobbyPlayer: '/lobby/player',
   sessionLobbyGm: '/lobby/gm',
@@ -72,7 +68,6 @@ export const routePatterns = {
   characterDetail: '/characters/:id',
   cardDetail: '/cards/:id',
   deckEditor: '/decks/:id/editor',
-  presetEditor: '/presets/:id/editor',
   sessionLobbyPlayer: '/sessions/:code/player',
   sessionLobbyGm: '/sessions/:code/gm',
   combat: '/sessions/:code/combat',
@@ -111,7 +106,6 @@ export const pathBuilders = {
       : routePaths.characterDetail,
   cardLibrary: () => routePaths.cardLibrary,
   deckList: () => routePaths.deckList,
-  presetList: () => routePaths.presetList,
   inventory: () => routePaths.inventory,
   shop: () => routePaths.shop,
   cardDetail: (id?: string) =>
@@ -123,10 +117,6 @@ export const pathBuilders = {
     hasRouteParam(id)
       ? buildPathFromPattern(routePatterns.deckEditor, { id })
       : routePaths.deckEditor,
-  presetEditor: (id?: string) =>
-    hasRouteParam(id)
-      ? buildPathFromPattern(routePatterns.presetEditor, { id })
-      : routePaths.presetEditor,
   sessionEntry: () => routePaths.sessionEntry,
   sessionLobbyPlayer: (code?: string) =>
     hasRouteParam(code)
@@ -148,70 +138,70 @@ export const PAGES: PageDefinition[] = [
     label: 'Home',
     path: routePaths.home,
     title: 'Home',
-    description: '시작 화면입니다.',
+    description: '?쒖옉 ?붾㈃?낅땲??',
   },
   {
     key: 'lobby',
     label: 'Lobby / Session',
     path: routePaths.sessionEntry,
     title: 'Lobby / Session',
-    description: '세션을 만들거나 참가합니다.',
+    description: '?몄뀡??留뚮뱾嫄곕굹 李멸??⑸땲??',
   },
   {
     key: 'inventory',
     label: 'Inventory',
     path: routePaths.inventory,
     title: 'Inventory',
-    description: '현재 보유 자원을 확인합니다.',
+    description: '?꾩옱 蹂댁쑀 ?먯썝???뺤씤?⑸땲??',
   },
   {
     key: 'shop',
     label: 'Shop',
     path: routePaths.shop,
     title: 'Shop',
-    description: '상점 상품을 확인하고 구매합니다.',
+    description: '?곸젏 ?곹뭹???뺤씤?섍퀬 援щℓ?⑸땲??',
   },
   {
     key: 'cards',
     label: 'Cards',
     path: routePaths.cardLibrary,
     title: 'Cards',
-    description: '카드 목록과 상세 정보를 확인합니다.',
+    description: '移대뱶 紐⑸줉怨??곸꽭 ?뺣낫瑜??뺤씤?⑸땲??',
   },
   {
     key: 'decks',
     label: 'Decks',
     path: routePaths.deckList,
     title: 'Decks',
-    description: '덱을 조회하고 편집합니다.',
+    description: '?깆쓣 議고쉶?섍퀬 ?몄쭛?⑸땲??',
   },
   {
     key: 'character',
     label: 'Character',
     path: '/character',
     title: 'Character',
-    description: '캐릭터 목록과 프로필을 확인합니다.',
+    description: '罹먮┃??紐⑸줉怨??꾨줈?꾩쓣 ?뺤씤?⑸땲??',
   },
   {
     key: 'reference',
     label: 'Reference',
     path: routePaths.reference,
     title: 'Reference',
-    description: '키워드, 상태, 패시브 규칙을 확인합니다.',
+    description: '?ㅼ썙?? ?곹깭, ?⑥떆釉?洹쒖튃???뺤씤?⑸땲??',
   },
   {
     key: 'combat',
     label: 'Combat',
     path: routePaths.combat,
     title: 'Combat',
-    description: '전투 상태와 명령을 확인합니다.',
+    description: '?꾪닾 ?곹깭? 紐낅졊???뺤씤?⑸땲??',
   },
   {
     key: 'logs',
     label: 'Logs / Results',
     path: '/logs',
     title: 'Logs / Results',
-    description: '전투 로그를 확인합니다.',
+    description: '?꾪닾 濡쒓렇瑜??뺤씤?⑸땲??',
   },
 ]
 
@@ -251,7 +241,7 @@ export const APP_NAV_ITEMS = [
     key: 'shop',
     label: 'Shop',
     path: routePaths.shop,
-    description: '현재 상점 목록',
+    description: '상점 목록',
     enabled: true,
   },
   {
@@ -266,13 +256,6 @@ export const APP_NAV_ITEMS = [
     label: 'Decks',
     path: routePaths.deckList,
     description: '덱 목록과 편집',
-    enabled: true,
-  },
-  {
-    key: 'presets',
-    label: 'Presets',
-    path: routePaths.presetList,
-    description: '프리셋 목록과 편집',
     enabled: true,
   },
   {
@@ -300,7 +283,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.login,
       area: 'public',
       title: 'Archive Access',
-      description: '로그인 화면입니다.',
+      description: '濡쒓렇???붾㈃?낅땲??',
       eyebrow: 'Public Entry',
     },
   ],
@@ -312,7 +295,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.signup,
       area: 'public',
       title: 'Create Archive Access',
-      description: '회원가입 화면입니다.',
+      description: '?뚯썝媛???붾㈃?낅땲??',
       eyebrow: 'Public Entry',
     },
   ],
@@ -324,7 +307,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.hub,
       area: 'app',
       title: 'Duel Tower Hub',
-      description: '주요 화면으로 이동합니다.',
+      description: '二쇱슂 ?붾㈃?쇰줈 ?대룞?⑸땲??',
       eyebrow: 'Grand Archive',
       tags: [
         { label: 'Overview', tone: 'accent' },
@@ -340,7 +323,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.characterList,
       area: 'app',
       title: 'Character Roster',
-      description: '캐릭터를 선택하고 상세로 이동합니다.',
+      description: '罹먮┃?곕? ?좏깮?섍퀬 ?곸꽭濡??대룞?⑸땲??',
       eyebrow: 'Roster Ledger',
       tags: [{ label: 'Roster', tone: 'accent' }],
     },
@@ -353,22 +336,9 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.deckList,
       area: 'app',
       title: 'Deck Archive',
-      description: '덱을 선택하고 편집합니다.',
+      description: '?깆쓣 ?좏깮?섍퀬 ?몄쭛?⑸땲??',
       eyebrow: 'Deck Ledger',
       tags: [{ label: 'Deck Archive', tone: 'accent' }],
-    },
-  ],
-  [
-    routePaths.presetList,
-    {
-      key: 'presets',
-      label: 'Presets',
-      path: routePaths.presetList,
-      area: 'app',
-      title: 'Preset Archive',
-      description: '프리셋을 선택하고 편집합니다.',
-      eyebrow: 'Preset Ledger',
-      tags: [{ label: 'Loadouts', tone: 'accent' }],
     },
   ],
   [
@@ -379,7 +349,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.inventory,
       area: 'app',
       title: 'Expedition Supply',
-      description: '현재 보유 자원을 확인합니다.',
+      description: '?꾩옱 蹂댁쑀 ?먯썝???뺤씤?⑸땲??',
       eyebrow: 'Supply Locker',
       tags: [{ label: 'Inventory', tone: 'accent' }],
     },
@@ -392,7 +362,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.shop,
       area: 'app',
       title: 'Expedition Shop',
-      description: '상품을 확인하고 구매합니다.',
+      description: '?곹뭹???뺤씤?섍퀬 援щℓ?⑸땲??',
       eyebrow: 'Field Merchant',
       tags: [{ label: 'Shop', tone: 'accent' }],
     },
@@ -405,7 +375,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.cardLibrary,
       area: 'app',
       title: 'Card Library',
-      description: '카드를 검색하고 상세를 확인합니다.',
+      description: '移대뱶瑜?寃?됲븯怨??곸꽭瑜??뺤씤?⑸땲??',
       eyebrow: 'Content Library',
       tags: [{ label: 'Card Archive', tone: 'accent' }],
     },
@@ -418,7 +388,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePatterns.cardDetail,
       area: 'app',
       title: 'Card Detail',
-      description: '선택한 카드 정보를 확인합니다.',
+      description: '?좏깮??移대뱶 ?뺣낫瑜??뺤씤?⑸땲??',
       eyebrow: 'Card Record',
       tags: [{ label: 'Card Archive', tone: 'accent' }],
     },
@@ -431,7 +401,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.reference,
       area: 'app',
       title: 'Tactical Reference',
-      description: '키워드, 상태, 패시브를 확인합니다.',
+      description: '?ㅼ썙?? ?곹깭, ?⑥떆釉뚮? ?뺤씤?⑸땲??',
       eyebrow: 'Rules Codex',
       tags: [{ label: 'Codex', tone: 'accent' }],
     },
@@ -444,7 +414,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.sessionEntry,
       area: 'app',
       title: 'Session Entry',
-      description: '세션을 만들거나 참가합니다.',
+      description: '?몄뀡??留뚮뱾嫄곕굹 李멸??⑸땲??',
       eyebrow: 'Session Gate',
       tags: [{ label: 'Session Flow', tone: 'accent' }],
     },
@@ -457,7 +427,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.characterDetail,
       area: 'app',
       title: 'Character Detail / Edit',
-      description: '선택한 캐릭터를 확인하고 수정합니다.',
+      description: '?좏깮??罹먮┃?곕? ?뺤씤?섍퀬 ?섏젙?⑸땲??',
       eyebrow: 'Record Detail',
       tags: [{ label: 'Character Record', tone: 'accent' }],
     },
@@ -470,7 +440,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.characterCreate,
       area: 'app',
       title: 'Character Create',
-      description: '새 캐릭터를 생성합니다.',
+      description: '??罹먮┃?곕? ?앹꽦?⑸땲??',
       eyebrow: 'Record Creation',
       tags: [{ label: 'Character Record', tone: 'accent' }],
     },
@@ -483,22 +453,9 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.deckEditor,
       area: 'app',
       title: 'Deck Editor',
-      description: '선택한 덱을 확인하고 수정합니다.',
+      description: '?좏깮???깆쓣 ?뺤씤?섍퀬 ?섏젙?⑸땲??',
       eyebrow: 'Tactical Editor',
       tags: [{ label: 'Deck Editor', tone: 'accent' }],
-    },
-  ],
-  [
-    routePaths.presetEditor,
-    {
-      key: 'preset-editor',
-      label: 'Preset Editor',
-      path: routePaths.presetEditor,
-      area: 'app',
-      title: 'Preset Editor',
-      description: '선택한 프리셋을 확인하고 수정합니다.',
-      eyebrow: 'Loadout Editor',
-      tags: [{ label: 'Preset Editor', tone: 'accent' }],
     },
   ],
   [
@@ -509,7 +466,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.sessionLobbyPlayer,
       area: 'app',
       title: 'Player Lobby',
-      description: '플레이어 로비 상태를 확인합니다.',
+      description: '?뚮젅?댁뼱 濡쒕퉬 ?곹깭瑜??뺤씤?⑸땲??',
       eyebrow: 'Session Lobby',
       tags: [{ label: 'Player View', tone: 'accent' }],
     },
@@ -522,7 +479,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.sessionLobbyGm,
       area: 'app',
       title: 'GM Lobby',
-      description: 'GM 로비 상태를 관리합니다.',
+      description: 'GM 濡쒕퉬 ?곹깭瑜?愿由ы빀?덈떎.',
       eyebrow: 'Session Control',
       tags: [{ label: 'GM View', tone: 'accent' }],
     },
@@ -535,7 +492,7 @@ const activePageMap = new Map<string, PageDefinition>([
       path: routePaths.combat,
       area: 'app',
       title: 'Combat Command',
-      description: '전투 상태와 명령을 확인합니다.',
+      description: '?꾪닾 ?곹깭? 紐낅졊???뺤씤?⑸땲??',
       eyebrow: 'Battlefield Control',
       tags: [{ label: 'Battle View', tone: 'accent' }],
     },
@@ -564,7 +521,6 @@ const dynamicRouteEntries = createDynamicRouteEntries([
   { pattern: routePatterns.characterDetail, page: activePageMap.get(routePaths.characterDetail) },
   { pattern: routePatterns.cardDetail, page: activePageMap.get(routePatterns.cardDetail) },
   { pattern: routePatterns.deckEditor, page: activePageMap.get(routePaths.deckEditor) },
-  { pattern: routePatterns.presetEditor, page: activePageMap.get(routePaths.presetEditor) },
   { pattern: routePatterns.sessionLobbyPlayer, page: activePageMap.get(routePaths.sessionLobbyPlayer) },
   { pattern: routePatterns.sessionLobbyGm, page: activePageMap.get(routePaths.sessionLobbyGm) },
   { pattern: routePatterns.combat, page: activePageMap.get(routePaths.combat) },

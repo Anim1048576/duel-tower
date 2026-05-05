@@ -434,7 +434,7 @@ class SessionAuthIntegrationTest {
                                     {"ownedCardId":"oc11","cardId":"C004"},
                                     {"ownedCardId":"oc12","cardId":"C004"}
                                   ],
-                                  "presetDeckOwnedCardIds": [
+                                  "deckOwnedCardIds": [
                                     "oc1","oc2","oc3",
                                     "oc4","oc5","oc6",
                                     "oc7","oc8","oc9",
@@ -465,7 +465,7 @@ class SessionAuthIntegrationTest {
                                     {"ownedCardId":"oc11","cardId":"C004"},
                                     {"ownedCardId":"oc12","cardId":"C004"}
                                   ],
-                                  "presetDeckOwnedCardIds": [
+                                  "deckOwnedCardIds": [
                                     "oc1","oc2","oc3",
                                     "oc4","oc5","oc6",
                                     "oc7","oc8","oc9",

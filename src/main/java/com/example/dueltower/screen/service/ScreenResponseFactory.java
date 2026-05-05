@@ -28,23 +28,12 @@ import com.example.dueltower.screen.dto.PlayerLobbyMeSummaryDto;
 import com.example.dueltower.screen.dto.PlayerLobbyOptionDto;
 import com.example.dueltower.screen.dto.PlayerLobbyOwnedCardOptionDto;
 import com.example.dueltower.screen.dto.PlayerLobbyParticipantSlotDto;
-import com.example.dueltower.screen.dto.PlayerLobbyPresetItemDto;
-import com.example.dueltower.screen.dto.PlayerLobbyPresetPreviewDto;
-import com.example.dueltower.screen.dto.PlayerLobbyPresetsDto;
-import com.example.dueltower.screen.dto.PlayerLobbyPreviewItemDto;
 import com.example.dueltower.screen.dto.PlayerLobbyReferencesDto;
 import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
 import com.example.dueltower.screen.dto.PlayerLobbyTagDto;
-import com.example.dueltower.screen.dto.PresetEditorDerivedDto;
-import com.example.dueltower.screen.dto.PresetEditorDraftDto;
-import com.example.dueltower.screen.dto.PresetEditorResolvedDto;
-import com.example.dueltower.screen.dto.PresetEditorResolvedItemDto;
-import com.example.dueltower.screen.dto.PresetEditorResolvedTagDto;
-import com.example.dueltower.screen.dto.PresetEditorScreenResponse;
 import com.example.dueltower.screen.dto.ScreenActionAuth;
 import com.example.dueltower.screen.dto.ScreenActionDto;
 import com.example.dueltower.screen.dto.SessionScreenSkeletonResponse;
-import com.example.dueltower.preset.dto.PresetResponse;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
 import com.example.dueltower.engine.model.Ids.CardDefId;
@@ -61,8 +50,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -76,9 +63,6 @@ import java.util.Objects;
 
 @Component
 public class ScreenResponseFactory {
-
-    private static final DateTimeFormatter PRESET_EDITOR_TIMESTAMP_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
 
     private final CharacterProfileRepository characterProfileRepository;
     private final CharacterLoadoutService characterLoadoutService;
@@ -146,29 +130,6 @@ public class ScreenResponseFactory {
         );
     }
 
-    public PresetEditorScreenResponse presetEditor(ScreenRouteSpec route,
-                                                   Long presetId,
-                                                   String mode,
-                                                   PresetEditorDraftDto draft,
-                                                   PresetEditorResolvedDto resolved,
-                                                   PresetEditorDerivedDto derived,
-                                                   List<String> uiNotices) {
-        return new PresetEditorScreenResponse(
-                route.screenKey(),
-                OffsetDateTime.now(),
-                uiNotices,
-                presetEditorActions(presetId, mode, draft),
-                presetId,
-                mode,
-                route.routeTemplate(),
-                route.readAuth().policyGroup(),
-                route.readAuth().requiredAuth().wireValue(),
-                draft,
-                resolved,
-                derived
-        );
-    }
-
     public PlayerLobbyScreenResponse playerLobby(ScreenRouteSpec route,
                                                  SessionStateDto state,
                                                  SessionRuntime runtime,
@@ -178,15 +139,13 @@ public class ScreenResponseFactory {
                                                  List<com.example.dueltower.character.dto.CharacterProfileResponse> characters,
                                                  List<CardDefinition> exCards,
                                                  List<PassiveDefinition> passives,
-                                                 List<PresetResponse> presets,
                                                  List<String> uiNotices) {
         PlayerLobbyLoadoutDto loadout = playerLobbyLoadout(runtime, me);
-        PlayerLobbyPresetsDto presetSection = playerLobbyPresets(presets);
         return new PlayerLobbyScreenResponse(
                 route.screenKey(),
                 OffsetDateTime.now(),
                 uiNotices,
-                playerLobbyActions(state.sessionCode(), me, presetSection.selectedId(), loadout, deckEditAnalysis),
+                playerLobbyActions(state.sessionCode(), me, loadout, deckEditAnalysis),
                 state.sessionCode(),
                 state.version(),
                 route.routeTemplate(),
@@ -202,8 +161,7 @@ public class ScreenResponseFactory {
                         playerLobbyDraftFlags(loadout)
                 ),
                 playerLobbyDeckEditor(me, deckEditAnalysis),
-                playerLobbyReferences(characters, exCards, passives, me),
-                presetSection
+                playerLobbyReferences(characters, exCards, passives, me)
         );
     }
 
@@ -248,26 +206,6 @@ public class ScreenResponseFactory {
         );
     }
 
-    public PresetEditorDraftDto presetEditorDraft(PresetResponse preset) {
-        return new PresetEditorDraftDto(
-                preset.name(),
-                preset.characterId(),
-                List.copyOf(preset.deckCardIds()),
-                preset.exCardId(),
-                List.copyOf(preset.passiveIds())
-        );
-    }
-
-    public PresetEditorDraftDto newPresetEditorDraft() {
-        return new PresetEditorDraftDto(
-                "",
-                null,
-                List.of(),
-                "",
-                List.of()
-        );
-    }
-
     public DeckEditorDerivedDto deckEditorDerived(String mode,
                                                   DeckResponse sourceDeck,
                                                   DeckEditorDraftDto draft) {
@@ -276,41 +214,6 @@ public class ScreenResponseFactory {
                 deckTypeLabel(draft.type()),
                 totalCards(draft.cards()),
                 isDraftDirty(sourceDeck, draft)
-        );
-    }
-
-    public PresetEditorResolvedDto presetEditorResolved(PresetEditorDraftDto draft) {
-        Optional<CharacterProfile> character = resolveCharacter(draft.characterId());
-        Optional<CardDefinition> exCard = resolveCard(draft.exCardId());
-
-        return new PresetEditorResolvedDto(
-                character.map(this::presetCharacterLabel).orElse(characterMissingLabel(draft.characterId())),
-                character.map(this::presetCharacterSubtitle).orElse(characterMissingSubtitle(draft.characterId())),
-                character.map(this::presetCharacterTags).orElse(List.of(new PresetEditorResolvedTagDto(
-                        draft.characterId() == null ? "Empty" : "Unresolved",
-                        draft.characterId() == null ? "muted" : "warning"
-                ))),
-                exCard.map(this::presetCardLabel).orElse(cardMissingLabel(draft.exCardId(), "No EX card selected")),
-                exCard.map(this::presetExSubtitle).orElse(cardMissingSubtitle(draft.exCardId(), "Select an EX card for the preset draft")),
-                exCard.map(card -> List.of(
-                        new PresetEditorResolvedTagDto("EX", "accent"),
-                        new PresetEditorResolvedTagDto("Resolved", "success")
-                )).orElse(List.of(new PresetEditorResolvedTagDto(
-                        safeTrim(draft.exCardId()).isBlank() ? "Empty" : "Unresolved",
-                        safeTrim(draft.exCardId()).isBlank() ? "muted" : "warning"
-                ))),
-                presetDeckItems(draft.deckCardIds()),
-                presetPassiveItems(draft.passiveIds())
-        );
-    }
-
-    public PresetEditorDerivedDto presetEditorDerived(String mode,
-                                                      PresetResponse sourcePreset,
-                                                      PresetEditorDraftDto draft) {
-        return new PresetEditorDerivedDto(
-                isPresetDraftDirty(sourcePreset, draft),
-                formatPresetTimestampLabel(sourcePreset == null ? null : sourcePreset.createdAt(), "Available after create"),
-                formatPresetTimestampLabel(sourcePreset == null ? null : sourcePreset.updatedAt(), "Available after create")
         );
     }
 
@@ -339,14 +242,12 @@ public class ScreenResponseFactory {
 
     private List<ScreenActionDto> playerLobbyActions(String sessionCode,
                                                      PlayerStateDto me,
-                                                     Long selectedPresetId,
                                                      PlayerLobbyLoadoutDto loadout,
                                                      PlayerLobbyDeckEditAnalysis deckEditAnalysis) {
         List<ScreenActionDto> actions = new ArrayList<>();
         actions.add(toggleReadyAction(sessionCode, me, loadout, deckEditAnalysis));
         actions.add(leavePlayerLobbyAction(sessionCode));
         actions.add(saveLoadoutAction(sessionCode, me.playerId(), loadout, deckEditAnalysis));
-        actions.add(applyPresetAction(sessionCode, me.playerId(), selectedPresetId));
         return List.copyOf(actions);
     }
 
@@ -373,20 +274,6 @@ public class ScreenResponseFactory {
         actions.add(validateDeckAction(deckId, draft));
         actions.add(saveDeckAction(deckId, draft));
         actions.add(deleteDeckAction(deckId));
-        return List.copyOf(actions);
-    }
-
-    private List<ScreenActionDto> presetEditorActions(Long presetId,
-                                                      String mode,
-                                                      PresetEditorDraftDto draft) {
-        if ("create".equals(mode)) {
-            return List.of(createPresetAction(draft));
-        }
-
-        List<ScreenActionDto> actions = new ArrayList<>();
-        actions.add(savePresetAction(presetId, draft));
-        actions.add(clonePresetAction(presetId));
-        actions.add(deletePresetAction(presetId));
         return List.copyOf(actions);
     }
 
@@ -438,58 +325,6 @@ public class ScreenResponseFactory {
                 "Delete deck",
                 "DELETE",
                 "/api/content/decks/" + deckId,
-                ScreenActionAuth.LOGIN_COOKIE,
-                true,
-                null,
-                null
-        );
-    }
-
-    private ScreenActionDto savePresetAction(Long presetId, PresetEditorDraftDto draft) {
-        return ScreenActionDto.of(
-                "presetEditor.save",
-                "Save preset",
-                "PUT",
-                "/api/me/presets/" + presetId,
-                ScreenActionAuth.LOGIN_COOKIE,
-                true,
-                null,
-                presetUpsertPayload(draft)
-        );
-    }
-
-    private ScreenActionDto createPresetAction(PresetEditorDraftDto draft) {
-        return ScreenActionDto.of(
-                "presetEditor.create",
-                "Create preset",
-                "POST",
-                "/api/me/presets",
-                ScreenActionAuth.LOGIN_COOKIE,
-                true,
-                null,
-                presetUpsertPayload(draft)
-        );
-    }
-
-    private ScreenActionDto clonePresetAction(Long presetId) {
-        return ScreenActionDto.of(
-                "presetEditor.clone",
-                "Clone preset",
-                "POST",
-                "/api/me/presets/" + presetId + "/clone",
-                ScreenActionAuth.LOGIN_COOKIE,
-                true,
-                null,
-                null
-        );
-    }
-
-    private ScreenActionDto deletePresetAction(Long presetId) {
-        return ScreenActionDto.of(
-                "presetEditor.delete",
-                "Delete preset",
-                "DELETE",
-                "/api/me/presets/" + presetId,
                 ScreenActionAuth.LOGIN_COOKIE,
                 true,
                 null,
@@ -601,30 +436,6 @@ public class ScreenResponseFactory {
         return reason + " You can save the loadout after it is valid.";
     }
 
-    private ScreenActionDto applyPresetAction(String sessionCode,
-                                              String playerId,
-                                              Long selectedPresetId) {
-        boolean enabled = selectedPresetId != null && selectedPresetId > 0;
-        return ScreenActionDto.of(
-                "playerLobby.applyPreset",
-                "Apply preset",
-                "POST",
-                "/api/sessions/" + sessionCode + "/players/" + playerId + "/loadout/from-preset",
-                ScreenActionAuth.PLAYER_TOKEN,
-                enabled,
-                enabled ? null : new DisabledReasonDto(
-                        "PRESET_REQUIRED",
-                        "VALIDATION",
-                        "Choose a saved preset before applying it to the current session.",
-                        "player lobby applyPreset requires at least one selectable preset",
-                        null,
-                        null,
-                        null
-                ),
-                Map.of("presetId", selectedPresetId == null ? 0L : selectedPresetId)
-        );
-    }
-
     private ScreenActionDto gmLobbyKickAction(SessionStateDto state,
                                               List<PlayerStateDto> sortedPlayers,
                                               boolean gmActionAllowed) {
@@ -712,16 +523,6 @@ public class ScreenResponseFactory {
                 "name", draft.name(),
                 "type", draft.type().name(),
                 "cards", actionCardPayload(draft.cards())
-        );
-    }
-
-    private Map<String, Object> presetUpsertPayload(PresetEditorDraftDto draft) {
-        return Map.of(
-                "name", safeTrim(draft.name()),
-                "characterId", draft.characterId() == null ? 0L : draft.characterId(),
-                "deckCardIds", List.copyOf(draft.deckCardIds()),
-                "exCardId", safeTrim(draft.exCardId()),
-                "passiveIds", List.copyOf(draft.passiveIds())
         );
     }
 
@@ -928,7 +729,7 @@ public class ScreenResponseFactory {
         return exCards.stream()
                 .map(card -> new PlayerLobbyOptionDto(
                         card.id().value(),
-                        presetCardLabel(card),
+                        cardDisplayLabel(card),
                         "EX card | Cost " + card.cost(),
                         List.of(new PlayerLobbyTagDto("EX", "accent"))
                 ))
@@ -969,71 +770,6 @@ public class ScreenResponseFactory {
                     );
                 })
                 .toList();
-    }
-
-    private PlayerLobbyPresetsDto playerLobbyPresets(List<PresetResponse> presets) {
-        Long selectedId = presets.isEmpty() ? null : presets.get(0).id();
-        PlayerLobbyPresetPreviewDto preview = presets.isEmpty() ? null : presetPreview(presets.get(0));
-        return new PlayerLobbyPresetsDto(
-                presets.stream()
-                        .map(preset -> new PlayerLobbyPresetItemDto(
-                                preset.id(),
-                                preset.name() + " | Character #" + preset.characterId() + " | " + preset.deckCardIds().size() + " cards | " + preset.passiveIds().size() + " passives",
-                                "EX " + safeTrim(preset.exCardId())
-                        ))
-                        .toList(),
-                selectedId,
-                preview
-        );
-    }
-
-    private PlayerLobbyPresetPreviewDto presetPreview(PresetResponse preset) {
-        return new PlayerLobbyPresetPreviewDto(
-                preset.name(),
-                "Deck " + preset.deckCardIds().size() + " cards | " + preset.passiveIds().size() + " passives",
-                resolveCharacterLabel(preset.characterId()),
-                resolveCardLabel(preset.exCardId(), "No EX card selected"),
-                preset.deckCardIds().stream()
-                        .map(this::presetPreviewDeckItem)
-                        .toList(),
-                preset.passiveIds().stream()
-                        .map(this::presetPreviewPassiveItem)
-                        .toList()
-        );
-    }
-
-    private PlayerLobbyPreviewItemDto presetPreviewDeckItem(String cardId) {
-        Optional<CardDefinition> resolved = resolveCard(cardId);
-        return resolved
-                .map(card -> new PlayerLobbyPreviewItemDto(
-                        card.id().value(),
-                        presetCardLabel(card),
-                        card.type().name() + " | Cost " + card.cost(),
-                        List.of(new PlayerLobbyTagDto(card.type().name(), cardTypeTone(card.type())))
-                ))
-                .orElseGet(() -> new PlayerLobbyPreviewItemDto(
-                        safeTrim(cardId),
-                        cardMissingLabel(cardId, "Unresolved card"),
-                        "Card reference could not be restored",
-                        List.of(new PlayerLobbyTagDto("Unresolved", "warning"))
-                ));
-    }
-
-    private PlayerLobbyPreviewItemDto presetPreviewPassiveItem(String passiveId) {
-        Optional<PassiveDefinition> resolved = resolvePassive(passiveId);
-        return resolved
-                .map(passive -> new PlayerLobbyPreviewItemDto(
-                        passive.id(),
-                        passive.name() + " (" + passive.id() + ")",
-                        "Passive definition | Priority " + passive.priority(),
-                        List.of(new PlayerLobbyTagDto("Passive", "success"))
-                ))
-                .orElseGet(() -> new PlayerLobbyPreviewItemDto(
-                        safeTrim(passiveId),
-                        safeTrim(passiveId),
-                        "Passive reference could not be restored",
-                        List.of(new PlayerLobbyTagDto("Unresolved", "warning"))
-                ));
     }
 
     private List<PlayerStateDto> gmLobbySortedPlayers(SessionStateDto state) {
@@ -1406,13 +1142,13 @@ public class ScreenResponseFactory {
 
     private String resolveCharacterLabel(Long characterId) {
         return resolveCharacter(characterId)
-                .map(this::presetCharacterLabel)
+                .map(this::characterDisplayLabel)
                 .orElse(characterMissingLabel(characterId));
     }
 
     private String resolveCardLabel(String rawCardId, String emptyLabel) {
         return resolveCard(rawCardId)
-                .map(this::presetCardLabel)
+                .map(this::cardDisplayLabel)
                 .orElse(cardMissingLabel(rawCardId, emptyLabel));
     }
 
@@ -1439,67 +1175,11 @@ public class ScreenResponseFactory {
         return Optional.ofNullable(passiveService.defsMap().get(normalized));
     }
 
-    private List<PresetEditorResolvedItemDto> presetDeckItems(List<String> deckCardIds) {
-        List<PresetEditorResolvedItemDto> items = new ArrayList<>();
-        for (int index = 0; index < deckCardIds.size(); index++) {
-            int position = index + 1;
-            String cardId = deckCardIds.get(index);
-            Optional<CardDefinition> resolved = resolveCard(cardId);
-            items.add(resolved
-                    .map(card -> new PresetEditorResolvedItemDto(
-                            "deck-" + position,
-                            presetCardLabel(card),
-                            card.type().name(),
-                            "Entry " + position + " | Cost " + card.cost(),
-                            List.of(
-                                    new PresetEditorResolvedTagDto(card.type().name(), cardTypeTone(card.type())),
-                                    new PresetEditorResolvedTagDto("Resolved", "success")
-                            )
-                    ))
-                    .orElseGet(() -> new PresetEditorResolvedItemDto(
-                            "deck-" + position,
-                            safeTrim(cardId),
-                            "Deck card id",
-                            "Entry " + position + " | Unresolved",
-                            List.of(new PresetEditorResolvedTagDto("Unresolved", "warning"))
-                    )));
-        }
-        return List.copyOf(items);
-    }
-
-    private List<PresetEditorResolvedItemDto> presetPassiveItems(List<String> passiveIds) {
-        List<PresetEditorResolvedItemDto> items = new ArrayList<>();
-        for (int index = 0; index < passiveIds.size(); index++) {
-            int position = index + 1;
-            String passiveId = passiveIds.get(index);
-            Optional<PassiveDefinition> resolved = resolvePassive(passiveId);
-            items.add(resolved
-                    .map(passive -> new PresetEditorResolvedItemDto(
-                            "passive-" + position,
-                            passive.name() + " (" + passive.id() + ")",
-                            "Passive definition",
-                            "Entry " + position + " | Priority " + passive.priority(),
-                            List.of(
-                                    new PresetEditorResolvedTagDto("Passive", "success"),
-                                    new PresetEditorResolvedTagDto("Resolved", "success")
-                            )
-                    ))
-                    .orElseGet(() -> new PresetEditorResolvedItemDto(
-                            "passive-" + position,
-                            safeTrim(passiveId),
-                            "Passive id",
-                            "Entry " + position + " | Unresolved",
-                            List.of(new PresetEditorResolvedTagDto("Unresolved", "warning"))
-                    )));
-        }
-        return List.copyOf(items);
-    }
-
-    private String presetCharacterLabel(CharacterProfile profile) {
+    private String characterDisplayLabel(CharacterProfile profile) {
         return profile.getName() + " #" + profile.getId();
     }
 
-    private String presetCharacterSubtitle(CharacterProfile profile) {
+    private String characterDisplaySubtitle(CharacterProfile profile) {
         if (profile.getDisposition() != null && !profile.getDisposition().isBlank()) {
             return profile.getDisposition();
         }
@@ -1507,17 +1187,6 @@ public class ScreenResponseFactory {
             return profile.getOneLiner();
         }
         return "Character reference";
-    }
-
-    private List<PresetEditorResolvedTagDto> presetCharacterTags(CharacterProfile profile) {
-        List<PresetEditorResolvedTagDto> tags = new ArrayList<>();
-        tags.add(new PresetEditorResolvedTagDto("Character", "accent"));
-        tags.add(new PresetEditorResolvedTagDto("Resolved", "success"));
-        int totalCards = characterLoadoutService.getCurrentSkillDeckPreviewCardIds(profile.getId()).size();
-        if (totalCards > 0) {
-            tags.add(new PresetEditorResolvedTagDto(totalCards + " applied cards", "muted"));
-        }
-        return List.copyOf(tags);
     }
 
     private String characterMissingLabel(Long characterId) {
@@ -1529,16 +1198,16 @@ public class ScreenResponseFactory {
 
     private String characterMissingSubtitle(Long characterId) {
         if (characterId == null) {
-            return "Choose a character for the preset draft";
+            return "Choose a character";
         }
         return "The referenced character could not be restored";
     }
 
-    private String presetCardLabel(CardDefinition card) {
+    private String cardDisplayLabel(CardDefinition card) {
         return card.name() + " (" + card.id().value() + ")";
     }
 
-    private String presetExSubtitle(CardDefinition card) {
+    private String exCardSubtitle(CardDefinition card) {
         return "EX card | Cost " + card.cost();
     }
 
@@ -1552,32 +1221,6 @@ public class ScreenResponseFactory {
 
     private String cardMissingSubtitle(String rawCardId, String emptySubtitle) {
         return safeTrim(rawCardId).isBlank() ? emptySubtitle : "The referenced card could not be restored";
-    }
-
-    private String formatPresetTimestampLabel(java.sql.Timestamp timestamp, String fallback) {
-        if (timestamp == null) {
-            return fallback;
-        }
-        return PRESET_EDITOR_TIMESTAMP_FORMATTER.format(timestamp.toInstant());
-    }
-
-    private boolean isPresetDraftDirty(PresetResponse sourcePreset, PresetEditorDraftDto draft) {
-        if (sourcePreset == null) {
-            return false;
-        }
-        if (!safeTrim(sourcePreset.name()).equals(safeTrim(draft.name()))) {
-            return true;
-        }
-        if (!sourcePreset.characterId().equals(draft.characterId())) {
-            return true;
-        }
-        if (!safeTrim(sourcePreset.exCardId()).equals(safeTrim(draft.exCardId()))) {
-            return true;
-        }
-        if (!sourcePreset.deckCardIds().equals(draft.deckCardIds())) {
-            return true;
-        }
-        return !sourcePreset.passiveIds().equals(draft.passiveIds());
     }
 
     private String deckTypeLabel(DeckType type) {

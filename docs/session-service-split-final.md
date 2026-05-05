@@ -21,10 +21,9 @@ Session 관련 책임은 역할별 서비스로 분리됐다.
 - `SessionLoadoutService`
   - `updateDeck`
   - `updateLoadout`
-  - `applyPresetToLoadout`
   - `forgetOwnedCard`
 - `SessionLoadoutSupport`
-  - lobby / loadout이 함께 쓰는 deck, owned card, preset, character loadout 보조 로직
+  - lobby / loadout이 함께 쓰는 deck, owned card, character loadout 보조 로직
   - parsing / validation / deck runtime 반영 / character deck persistence
 - `SessionQueryService`
   - `getPublicState`

@@ -2,7 +2,6 @@ export const selectionHandoffKeys = {
   characterId: 'duel-tower:selected-character-id',
   deckApplyCharacterId: 'duel-tower:deck-apply-character-id',
   deckId: 'duel-tower:selected-deck-id',
-  presetId: 'duel-tower:selected-preset-id',
   sessionId: 'duel-tower:selected-session-id',
   sessionCode: 'duel-tower:selected-session-code',
 } as const

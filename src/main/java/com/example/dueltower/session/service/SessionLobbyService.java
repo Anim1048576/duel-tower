@@ -49,8 +49,8 @@ public class SessionLobbyService {
                           String playerIdRaw,
                           Long characterIdRaw,
                           List<String> passiveIdsRaw,
-                          List<String> requestedPresetDeckOwnedCardIdsRaw,
-                          String presetExCardIdRaw,
+                          List<String> requestedDeckOwnedCardIdsRaw,
+                          String exCardIdRaw,
                           List<OwnedCardDto> ownedCardsRaw) {
         if (playerIdRaw == null || playerIdRaw.isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "playerId is required");
@@ -89,7 +89,7 @@ public class SessionLobbyService {
 
             List<String> deckOwnedCardIds = sessionLoadoutSupport.resolveJoinDeckOwnedCardIds(
                     characterTemplate,
-                    requestedPresetDeckOwnedCardIdsRaw,
+                    requestedDeckOwnedCardIdsRaw,
                     ps.ownedCards()
             );
             boolean allowEmptyCharacterDeck = characterTemplate != null && deckOwnedCardIds.isEmpty();
@@ -100,7 +100,7 @@ public class SessionLobbyService {
             state.players().put(pid, ps);
             ps.deckOwnedCardIds(deckOwnedCardIds);
             sessionLoadoutSupport.loadDeck(state, ps, deckOwnedCardIds);
-            String exCardId = (characterTemplate != null) ? characterTemplate.exCardId() : presetExCardIdRaw;
+            String exCardId = (characterTemplate != null) ? characterTemplate.exCardId() : exCardIdRaw;
             sessionLoadoutSupport.addCardToEx(state, ps, new CardDefId(sessionLoadoutSupport.normalizeExCardId(exCardId)));
             sessionLoadoutSupport.shuffleDeck(state, ps);
             return state;
@@ -256,7 +256,7 @@ public class SessionLobbyService {
             ps.passiveIds(List.of());
             ps.ownedCards(defaultOwnedCards);
             List<String> defaultDeckOwnedCardIds = sessionLoadoutSupport.resolveCardIdsToOwnedCardIds(
-                    starterLoadoutConfig.defaultPresetDeckCardIds(),
+                    starterLoadoutConfig.defaultDeckCardIds(),
                     defaultOwnedCards,
                     "deckCardIds must not contain blank values"
             );

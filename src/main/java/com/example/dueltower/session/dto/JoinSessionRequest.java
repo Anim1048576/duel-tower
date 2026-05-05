@@ -6,8 +6,8 @@ import java.util.List;
  * Join payload contract.
  * - playerId: required
  * - passiveIds: optional, 0..2 items
- * - presetDeckOwnedCardIds: optional, omitted 시 서버 기본 프리셋 덱 로드
- * - presetDeckCardIds: optional legacy compatibility field
+ * - deckOwnedCardIds: optional, omitted 시 서버 기본 덱 로드
+ * - deckCardIds: optional legacy compatibility field
  * - ownedCards: optional, omitted 시 서버 기본 보유 카드(20) 로드
  */
 public record JoinSessionRequest(
@@ -15,16 +15,16 @@ public record JoinSessionRequest(
         Long characterId,
         List<String> passiveIds,
         /** Canonical request field. */
-        List<String> presetDeckOwnedCardIds,
-        /** Legacy compatibility field; prefer presetDeckOwnedCardIds when both are provided. */
-        List<String> presetDeckCardIds,
-        String presetExCardId,
+        List<String> deckOwnedCardIds,
+        /** Legacy compatibility field; prefer deckOwnedCardIds when both are provided. */
+        List<String> deckCardIds,
+        String exCardId,
         List<OwnedCardDto> ownedCards
 ) {
-    public List<String> requestedPresetDeckOwnedCardIds() {
-        if (presetDeckOwnedCardIds != null) {
-            return presetDeckOwnedCardIds;
+    public List<String> requestedDeckOwnedCardIds() {
+        if (deckOwnedCardIds != null) {
+            return deckOwnedCardIds;
         }
-        return presetDeckCardIds;
+        return deckCardIds;
     }
 }

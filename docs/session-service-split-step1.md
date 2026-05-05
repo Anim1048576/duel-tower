@@ -28,7 +28,6 @@
 ### 3) 로드아웃 / 덱 / 프리셋
 - `updateDeck`
 - `updateLoadout`
-- `applyPresetToLoadout`
 - `forgetOwnedCard`
 - 관련 내부 헬퍼:
   `applyLoadoutToPlayer`, `applyLoadout`, `validateDeckBuild`, `validateDeckEditableState`,
@@ -68,7 +67,7 @@
 - `SessionLobbyService`
   - join, leave, ready, kick, reset, token 발급/해석
 - `SessionLoadoutService`
-  - deck, loadout, loadout/from-preset, forget
+  - deck, loadout, forget
 - `SessionQueryService`
   - run, inventory, results, recent-results, choices, state
 - `SessionCommandService`

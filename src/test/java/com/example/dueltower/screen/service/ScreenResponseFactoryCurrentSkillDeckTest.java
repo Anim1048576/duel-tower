@@ -13,8 +13,6 @@ import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.Ids.SessionId;
 import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
-import com.example.dueltower.screen.dto.PresetEditorDraftDto;
-import com.example.dueltower.screen.dto.PresetEditorResolvedDto;
 import com.example.dueltower.session.dto.OwnedCardDto;
 import com.example.dueltower.session.dto.PlayerStateDto;
 import com.example.dueltower.session.dto.SessionStateDto;
@@ -153,61 +151,6 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                 .isEqualTo("Likely Partially Stale #7");
         assertThat(response.getParticipantCards().get(0).characterSummary())
                 .doesNotContain("oc-stale");
-    }
-
-    @Test
-    void presetEditorResolvedUsesAppliedCardsTagFromCharacterLoadoutPreview() {
-        CharacterProfileRepository repository = mock(CharacterProfileRepository.class);
-        when(repository.findById(7L)).thenReturn(Optional.of(characterProfile(
-                7L,
-                "Preset Character",
-                "[]",
-                List.of()
-        )));
-        CharacterLoadoutService loadoutService = mock(CharacterLoadoutService.class);
-        when(loadoutService.getCurrentSkillDeckPreviewCardIds(7L)).thenReturn(List.of("C001", "C001", "C002"));
-        ScreenResponseFactory factory = factory(repository, loadoutService);
-
-        PresetEditorResolvedDto resolved = factory.presetEditorResolved(new PresetEditorDraftDto(
-                "preset",
-                7L,
-                List.of(),
-                null,
-                List.of()
-        ));
-
-        assertThat(resolved.characterTags())
-                .extracting(tag -> tag.label())
-                .contains("3 applied cards")
-                .doesNotContain("3 linked cards");
-    }
-
-    @Test
-    void presetEditorResolvedOmitsAppliedCardsTagWhenCharacterLoadoutPreviewIsEmpty() {
-        CharacterProfileRepository repository = mock(CharacterProfileRepository.class);
-        when(repository.findById(7L)).thenReturn(Optional.of(characterProfile(
-                7L,
-                "Empty Loadout Character",
-                "[]",
-                List.of()
-        )));
-        CharacterLoadoutService loadoutService = mock(CharacterLoadoutService.class);
-        when(loadoutService.getCurrentSkillDeckPreviewCardIds(7L)).thenReturn(List.of());
-        ScreenResponseFactory factory = factory(repository, loadoutService);
-
-        PresetEditorResolvedDto resolved = factory.presetEditorResolved(new PresetEditorDraftDto(
-                "preset",
-                7L,
-                List.of(),
-                null,
-                List.of()
-        ));
-
-        assertThat(resolved.characterTags())
-                .extracting(tag -> tag.label())
-                .doesNotContain("1 applied cards")
-                .doesNotContain("2 applied cards")
-                .doesNotContain("linked cards");
     }
 
     private static ScreenResponseFactory factory(CharacterProfileRepository repository) {

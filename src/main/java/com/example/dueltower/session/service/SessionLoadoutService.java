@@ -7,7 +7,6 @@ import com.example.dueltower.engine.model.GameState;
 import com.example.dueltower.engine.model.Ids.CardDefId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 import com.example.dueltower.engine.model.PlayerState;
-import com.example.dueltower.preset.service.PresetService;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,20 +24,17 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 /**
  * Player self loadout service.
  *
- * <p>deck/loadout/preset/forget self-action 구현과 관련 검증을 담당한다.</p>
+ * <p>deck/loadout/forget self-action 구현과 관련 검증을 담당한다.</p>
  */
 public class SessionLoadoutService {
 
     private final SessionLifecycleService sessionLifecycleService;
     private final SessionLoadoutSupport sessionLoadoutSupport;
-    private final PresetService presetService;
 
     public SessionLoadoutService(SessionLifecycleService sessionLifecycleService,
-                                 SessionLoadoutSupport sessionLoadoutSupport,
-                                 PresetService presetService) {
+                                 SessionLoadoutSupport sessionLoadoutSupport) {
         this.sessionLifecycleService = sessionLifecycleService;
         this.sessionLoadoutSupport = sessionLoadoutSupport;
-        this.presetService = presetService;
     }
 
     public GameState updateDeck(String code,
@@ -152,23 +148,6 @@ public class SessionLoadoutService {
                     deckEditAnalysis
             );
         });
-    }
-
-    public GameState applyPresetToLoadout(String code,
-                                          String actorPlayerIdRaw,
-                                          String targetPlayerIdRaw,
-                                          Long presetIdRaw) {
-        if (presetIdRaw == null || presetIdRaw <= 0) {
-            throw new ResponseStatusException(BAD_REQUEST, "presetId must be positive");
-        }
-        String ownerUsername = requirePlayerText(actorPlayerIdRaw, "actorPlayerId is required");
-        PresetService.PresetLoadout presetLoadout = presetService.getOwnedLoadout(ownerUsername, presetIdRaw);
-        return applyLoadoutToPlayer(
-                code,
-                actorPlayerIdRaw,
-                targetPlayerIdRaw,
-                LoadoutApplySpec.fromPreset(presetLoadout)
-        );
     }
 
     public GameState forgetOwnedCard(String code,
@@ -348,15 +327,6 @@ public class SessionLoadoutService {
                                                List<String> deckCardIds,
                                                String exCardId) {
             return new LoadoutApplySpec(characterId, passiveIds, deckCardIds, exCardId);
-        }
-
-        private static LoadoutApplySpec fromPreset(PresetService.PresetLoadout presetLoadout) {
-            return new LoadoutApplySpec(
-                    presetLoadout.characterId(),
-                    presetLoadout.passiveIds(),
-                    presetLoadout.deckCardIds(),
-                presetLoadout.exCardId()
-            );
         }
     }
 

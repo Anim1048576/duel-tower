@@ -16,8 +16,8 @@ class StarterLoadoutConfigTest {
 
         assertEquals("EX901", config.defaultExCardId());
         assertEquals(20, config.defaultOwnedCards().size());
-        assertEquals(12, config.defaultPresetDeckCardIds().size());
-        assertEquals(List.of("C001", "C001", "C001"), config.defaultPresetDeckCardIds().subList(0, 3));
+        assertEquals(12, config.defaultDeckCardIds().size());
+        assertEquals(List.of("C001", "C001", "C001"), config.defaultDeckCardIds().subList(0, 3));
     }
 
     @Test
@@ -35,7 +35,7 @@ class StarterLoadoutConfigTest {
     }
 
     @Test
-    void throws_when_default_preset_deck_size_does_not_match_game_rules() {
+    void throws_when_default_deck_size_does_not_match_game_rules() {
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new StarterLoadoutConfig(
                 new StarterLoadoutConfig.StarterLoadoutRaw(
                         "EX901",
@@ -45,6 +45,6 @@ class StarterLoadoutConfigTest {
                 GameRules.defaults()
         ));
 
-        assertEquals("starter defaultPresetDeckCardIds size must be exactly 12", exception.getMessage());
+        assertEquals("starter defaultDeckCardIds size must be exactly 12", exception.getMessage());
     }
 }

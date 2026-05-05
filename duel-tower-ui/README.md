@@ -37,20 +37,6 @@ npm run build
 
 Current frontend tests cover DeckEditor presentation state and validation freshness. Add new `*.test.js` files under `tests/` to include them automatically in `npm test`.
 
-## PresetEditor Verification
-
-After changing PresetEditor screen contracts, local presentation helpers, or editor screen actions, run:
-
-```bash
-npm test
-npm run check
-npm run build
-```
-
-Current frontend tests cover:
-- PresetEditor local presentation and dirty/preview reactions
-- Editor screen action orchestration and refresh flow
-
 ## PlayerLobby Verification
 
 After changing PlayerLobby screen contracts, local loadout presentation, or screen refresh policy, run:
@@ -62,7 +48,7 @@ npm run build
 ```
 
 Current frontend tests cover:
-- PlayerLobby local dirty, summary, deck lock, and preset preview freshness reactions
+- PlayerLobby local dirty, summary, and deck lock reactions
 - PlayerLobby screen refresh policy after polling and player actions
 
 ## GmLobby Verification

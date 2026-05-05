@@ -7,7 +7,6 @@ import com.example.dueltower.screen.dto.GmLobbyScreenResponse;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatActionRequest;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatActionResponse;
 import com.example.dueltower.screen.dto.PlayerLobbyScreenResponse;
-import com.example.dueltower.screen.dto.PresetEditorScreenResponse;
 import com.example.dueltower.session.dto.CommandRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -17,16 +16,13 @@ public class ScreenQueryService {
 
     private final SessionScreenService sessionScreenService;
     private final DeckEditorScreenService deckEditorScreenService;
-    private final PresetEditorScreenService presetEditorScreenService;
     private final GmLobbyStartCombatActionService gmLobbyStartCombatActionService;
 
     public ScreenQueryService(SessionScreenService sessionScreenService,
                               DeckEditorScreenService deckEditorScreenService,
-                              PresetEditorScreenService presetEditorScreenService,
                               GmLobbyStartCombatActionService gmLobbyStartCombatActionService) {
         this.sessionScreenService = sessionScreenService;
         this.deckEditorScreenService = deckEditorScreenService;
-        this.presetEditorScreenService = presetEditorScreenService;
         this.gmLobbyStartCombatActionService = gmLobbyStartCombatActionService;
     }
 
@@ -78,11 +74,4 @@ public class ScreenQueryService {
         return deckEditorScreenService.getNewEditor(authentication);
     }
 
-    public PresetEditorScreenResponse getPresetEditor(long presetId, Authentication authentication) {
-        return presetEditorScreenService.getEditor(presetId, authentication);
-    }
-
-    public PresetEditorScreenResponse getNewPresetEditor(Authentication authentication) {
-        return presetEditorScreenService.getNewEditor(authentication);
-    }
 }

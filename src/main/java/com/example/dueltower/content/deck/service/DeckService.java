@@ -259,7 +259,7 @@ public class DeckService {
 
     /**
      * add/replace/remove(validate candidate)에서 공통 재사용할 카드 입력 정규화.
-     * 다음 단계(remove endpoint, preset/session validation 재사용)의 공통 진입점으로 사용한다.
+     * 다음 단계(remove endpoint, session validation 재사용)의 공통 진입점으로 사용한다.
      */
     private Map<String, Integer> normalizeAndValidateSpecs(List<DeckCardSpec> specs, boolean requireCards) {
         if (requireCards && specs == null) {

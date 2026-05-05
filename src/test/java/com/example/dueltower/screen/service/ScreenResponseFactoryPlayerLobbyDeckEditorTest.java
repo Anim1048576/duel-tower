@@ -119,7 +119,6 @@ class ScreenResponseFactoryPlayerLobbyDeckEditorTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(),
                 List.of("notice")
         );
 

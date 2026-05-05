@@ -18,8 +18,6 @@ import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.PendingDecision;
 import com.example.dueltower.engine.model.Zone;
 import com.example.dueltower.member.MemberRepository;
-import com.example.dueltower.preset.domain.Preset;
-import com.example.dueltower.preset.repository.PresetRepository;
 import com.example.dueltower.screen.dto.GmLobbyStartCombatActionRequest;
 import com.example.dueltower.screen.support.ScreenApiContractTestSupport;
 import com.example.dueltower.session.service.SessionLifecycleService;
@@ -89,8 +87,6 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     @Autowired
     private DeckRepository deckRepository;
 
-    @Autowired
-    private PresetRepository presetRepository;
 
     @Autowired
     private SessionLifecycleService sessionLifecycleService;
@@ -101,7 +97,6 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         characterExLoadoutRepository.deleteAll();
         characterOwnedCardModifierRepository.deleteAll();
         characterOwnedCardRepository.deleteAll();
-        presetRepository.deleteAll();
         deckRepository.deleteAll();
         memberRepository.deleteAll();
         characterProfileRepository.deleteAll();
@@ -114,7 +109,6 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         MockHttpSession playerSession = signUpAndLogin("player1", "player1@example.com", "password123");
         long characterId = createCharacter();
         String playerToken = joinAsPlayer(playerSession, session.code(), "player1", characterId);
-        createPreset("player1", characterId);
 
         MvcResult unauthorized = mockMvc.perform(get("/api/screens/sessions/{code}/player-lobby", session.code()))
                 .andExpect(status().isUnauthorized())
@@ -170,33 +164,18 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("references").path("ownedCardOptions").get(0).path("label").asText()).isNotBlank();
         assertThat(body.path("references").path("ownedCardOptions").get(0).path("subtitle").asText()).isNotBlank();
         assertThat(body.path("references").path("ownedCardOptions").get(0).path("tags").isArray()).isTrue();
-        assertThat(body.path("presets").path("items")).hasSize(1);
-        assertThat(body.path("presets").path("selectedId").asLong()).isPositive();
-        assertThat(body.path("presets").path("items").get(0).path("label").asText()).isNotBlank();
-        assertThat(body.path("presets").path("items").get(0).path("subtitle").asText()).isNotBlank();
-        assertThat(body.path("presets").path("preview").path("characterLabel").asText()).contains("#" + characterId);
-        assertThat(body.path("presets").path("preview").path("exLabel").asText()).contains("EX901");
-        assertThat(body.path("presets").path("preview").path("deckItems")).hasSize(2);
-        assertThat(body.path("presets").path("preview").path("passiveItems")).hasSize(1);
-        assertThat(body.path("presets").path("preview").path("deckItems").get(0).path("label").asText()).contains("C001");
-        assertThat(body.path("presets").path("preview").path("deckItems").get(0).path("tags").isArray()).isTrue();
-        assertThat(body.path("presets").path("preview").path("passiveItems").get(0).path("label").asText()).contains("Tig001_Passive");
 
         JsonNode toggleReadyAction = findAction(body, "playerLobby.toggleReady");
         JsonNode leaveAction = findAction(body, "playerLobby.leave");
         JsonNode saveLoadoutAction = findAction(body, "playerLobby.saveLoadout");
-        JsonNode applyPresetAction = findAction(body, "playerLobby.applyPreset");
-        assertThat(body.path("possibleActions")).hasSize(4);
+        assertThat(body.path("possibleActions")).hasSize(3);
         assertActionContract(toggleReadyAction);
         assertActionContract(leaveAction);
         assertActionContract(saveLoadoutAction);
-        assertActionContract(applyPresetAction);
         assertThat(toggleReadyAction.path("label").asText()).isEqualTo("Mark ready");
         assertThat(toggleReadyAction.path("auth").asText()).isEqualTo("playerToken");
         assertThat(toggleReadyAction.path("payloadTemplate").path("ready").asBoolean()).isTrue();
         assertThat(saveLoadoutAction.path("payloadTemplate").path("characterId").asLong()).isEqualTo(characterId);
-        assertThat(applyPresetAction.path("enabled").asBoolean()).isTrue();
-        assertThat(applyPresetAction.path("payloadTemplate").path("presetId").asLong()).isPositive();
     }
 
     @Test
@@ -230,7 +209,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     @Test
-    void playerLobbyScreenExposesMissingCharacterStateAndDisablesPresetApplyWhenArchiveIsEmpty() throws Exception {
+    void playerLobbyScreenExposesMissingCharacterStateWhenArchiveIsEmpty() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm-missing", "gm-missing@example.com", "password123");
         SessionInfo session = createSession(gmSession, "gm-missing");
         MockHttpSession playerSession = signUpAndLogin("player-missing", "player-missing@example.com", "password123");
@@ -247,20 +226,13 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("me").path("draftFlags").path("deckEditingLocked").asBoolean()).isTrue();
         assertThat(body.path("me").path("draftFlags").path("requiredFieldsMissing").asBoolean()).isTrue();
         assertThat(body.path("references").path("ownedCardOptions")).isNotEmpty();
-        assertThat(body.path("presets").path("items")).hasSize(0);
-        assertThat(body.path("presets").path("selectedId").isNull()).isTrue();
-        assertThat(body.path("presets").path("preview").isNull()).isTrue();
 
         JsonNode toggleReadyAction = findAction(body, "playerLobby.toggleReady");
         JsonNode saveLoadoutAction = findAction(body, "playerLobby.saveLoadout");
-        JsonNode applyPresetAction = findAction(body, "playerLobby.applyPreset");
         assertDisabledActionContract(toggleReadyAction);
         assertDisabledActionContract(saveLoadoutAction);
-        assertDisabledActionContract(applyPresetAction);
         assertThat(toggleReadyAction.path("disabledReason").path("code").asText()).isEqualTo("CHARACTER_REQUIRED");
         assertThat(saveLoadoutAction.path("disabledReason").path("code").asText()).isEqualTo("CHARACTER_REQUIRED");
-        assertThat(applyPresetAction.path("disabledReason").path("code").asText()).isEqualTo("PRESET_REQUIRED");
-        assertThat(applyPresetAction.path("payloadTemplate").path("presetId").asLong()).isZero();
     }
 
     @Test
@@ -1351,95 +1323,6 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     @Test
-    void newPresetEditorScreenReturnsCreateModeDraftResolvedPreviewAndCreateAction() throws Exception {
-        MockHttpSession session = signUpAndLogin("preset-user", "preset-user@example.com", "password123");
-
-        MvcResult newEditor = mockMvc.perform(get("/api/screens/presets/new/editor")
-                        .session(session))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        JsonNode body = assertBaseScreenContract(newEditor, "PresetEditor");
-        assertThat(body.path("mode").asText()).isEqualTo("create");
-        assertThat(body.path("policyGroup").asText()).isEqualTo("AUTHENTICATED_WEB");
-        assertThat(body.path("auth").asText()).isEqualTo("loginCookie");
-        assertThat(body.path("presetId").isNull()).isTrue();
-        assertThat(body.path("draft").path("name").asText()).isEmpty();
-        assertThat(body.path("draft").path("characterId").isNull()).isTrue();
-        assertThat(body.path("draft").path("deckCardIds")).hasSize(0);
-        assertThat(body.path("draft").path("exCardId").asText()).isEmpty();
-        assertThat(body.path("draft").path("passiveIds")).hasSize(0);
-        assertThat(body.path("resolved").path("characterLabel").asText()).isEqualTo("No character selected");
-        assertThat(body.path("resolved").path("exLabel").asText()).isEqualTo("No EX card selected");
-        assertThat(body.path("resolved").path("deckItems")).hasSize(0);
-        assertThat(body.path("resolved").path("passiveItems")).hasSize(0);
-        assertThat(body.path("derived").path("dirty").asBoolean()).isFalse();
-        assertThat(body.path("derived").path("createdAtLabel").asText()).isEqualTo("Available after create");
-        assertThat(body.path("derived").path("updatedAtLabel").asText()).isEqualTo("Available after create");
-
-        assertThat(body.path("possibleActions")).hasSize(1);
-        JsonNode createAction = findAction(body, "presetEditor.create");
-        assertActionContract(createAction);
-        assertThat(createAction.path("href").asText()).isEqualTo("/api/me/presets");
-        assertThat(createAction.path("method").asText()).isEqualTo("POST");
-        assertThat(createAction.path("payloadTemplate").path("name").asText()).isEmpty();
-        assertThat(createAction.path("payloadTemplate").path("characterId").asLong()).isZero();
-        assertThat(createAction.path("payloadTemplate").path("deckCardIds")).hasSize(0);
-        assertThat(createAction.path("payloadTemplate").path("exCardId").asText()).isEmpty();
-        assertThat(createAction.path("payloadTemplate").path("passiveIds")).hasSize(0);
-    }
-
-    @Test
-    void existingPresetEditorScreenReturnsEditModeDraftResolvedPreviewAndModeSpecificActions() throws Exception {
-        long characterId = createCharacter();
-        MockHttpSession session = signUpAndLogin("preset-user-edit", "preset-user-edit@example.com", "password123");
-        Preset preset = createPreset("preset-user-edit", characterId);
-
-        MvcResult editor = mockMvc.perform(get("/api/screens/presets/{id}/editor", preset.getId())
-                        .session(session))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        JsonNode body = assertBaseScreenContract(editor, "PresetEditor");
-        assertThat(body.path("presetId").asLong()).isEqualTo(preset.getId());
-        assertThat(body.path("mode").asText()).isEqualTo("edit");
-        assertThat(body.path("draft").path("name").asText()).isEqualTo("screen-preset");
-        assertThat(body.path("draft").path("characterId").asLong()).isEqualTo(characterId);
-        assertThat(body.path("draft").path("deckCardIds")).hasSize(2);
-        assertThat(body.path("draft").path("deckCardIds").get(0).asText()).isEqualTo("C001");
-        assertThat(body.path("draft").path("exCardId").asText()).isEqualTo("EX901");
-        assertThat(body.path("draft").path("passiveIds")).hasSize(1);
-        assertThat(body.path("resolved").path("characterLabel").asText()).contains("#" + characterId);
-        assertThat(body.path("resolved").path("deckItems")).hasSize(2);
-        assertThat(body.path("resolved").path("deckItems").get(0).path("label").asText()).contains("C001");
-        assertThat(body.path("resolved").path("deckItems").get(0).path("tags").isArray()).isTrue();
-        assertThat(body.path("resolved").path("passiveItems")).hasSize(1);
-        assertThat(body.path("resolved").path("passiveItems").get(0).path("label").asText()).contains("Tig001_Passive");
-        assertThat(body.path("derived").path("dirty").asBoolean()).isFalse();
-        assertThat(body.path("derived").path("createdAtLabel").asText()).isNotBlank();
-        assertThat(body.path("derived").path("updatedAtLabel").asText()).isNotBlank();
-
-        assertThat(body.path("possibleActions")).hasSize(3);
-        JsonNode saveAction = findAction(body, "presetEditor.save");
-        JsonNode cloneAction = findAction(body, "presetEditor.clone");
-        JsonNode deleteAction = findAction(body, "presetEditor.delete");
-        assertActionContract(saveAction);
-        assertActionContract(cloneAction);
-        assertActionContract(deleteAction);
-        assertThat(saveAction.path("href").asText()).isEqualTo("/api/me/presets/" + preset.getId());
-        assertThat(saveAction.path("method").asText()).isEqualTo("PUT");
-        assertThat(saveAction.path("payloadTemplate").path("name").asText()).isEqualTo("screen-preset");
-        assertThat(saveAction.path("payloadTemplate").path("characterId").asLong()).isEqualTo(characterId);
-        assertThat(saveAction.path("payloadTemplate").path("deckCardIds")).hasSize(2);
-        assertThat(cloneAction.path("href").asText()).isEqualTo("/api/me/presets/" + preset.getId() + "/clone");
-        assertThat(cloneAction.path("method").asText()).isEqualTo("POST");
-        assertThat(cloneAction.path("payloadTemplate").isNull()).isTrue();
-        assertThat(deleteAction.path("href").asText()).isEqualTo("/api/me/presets/" + preset.getId());
-        assertThat(deleteAction.path("method").asText()).isEqualTo("DELETE");
-        assertThat(deleteAction.path("payloadTemplate").isNull()).isTrue();
-    }
-
-    @Test
     void combatScreenExposesBoardObjectRequirementMetadataForTig901Ex() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("gm-tig901", "gm-tig901@example.com", "password123");
         SessionInfo session = createSession(gmSession, "gm-tig901");
@@ -1712,18 +1595,6 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         Deck deck = Deck.create(name, type);
         deck.syncCards(cards);
         return deckRepository.save(deck);
-    }
-
-    private Preset createPreset(String ownerUsername, long characterId) {
-        Preset preset = Preset.create(
-                ownerUsername,
-                "screen-preset",
-                characterId,
-                List.of("C001", "C002"),
-                "EX901",
-                List.of("Tig001_Passive")
-        );
-        return presetRepository.save(preset);
     }
 
     private MockHttpSession signUpAndLogin(String username, String email, String password) throws Exception {

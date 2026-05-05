@@ -126,7 +126,7 @@ public class SessionLoadoutSupport {
     }
 
     public List<String> resolveJoinDeckOwnedCardIds(CharacterJoinTemplate characterTemplate,
-                                                    List<String> requestedPresetDeckOwnedCardIdsRaw,
+                                                    List<String> requestedDeckOwnedCardIdsRaw,
                                                     List<OwnedCard> ownedCards) {
         if (characterTemplate != null) {
             List<String> currentSkillDeckOwnedCardIds = characterTemplate.currentSkillDeckOwnedCardIds();
@@ -136,17 +136,17 @@ public class SessionLoadoutSupport {
             return List.copyOf(currentSkillDeckOwnedCardIds);
         }
 
-        if (requestedPresetDeckOwnedCardIdsRaw != null) {
+        if (requestedDeckOwnedCardIdsRaw != null) {
             return SessionNormalizationSupport.normalizeStoredOrRequestedDeckToOwnedCardIds(
-                    requestedPresetDeckOwnedCardIdsRaw,
+                    requestedDeckOwnedCardIdsRaw,
                     ownedCards
             );
         }
 
         return resolveCardIdsToOwnedCardIds(
-                starterLoadoutConfig.defaultPresetDeckCardIds(),
+                starterLoadoutConfig.defaultDeckCardIds(),
                 ownedCards,
-                "starter defaultPresetDeckCardIds must not contain blank values"
+                "starter defaultDeckCardIds must not contain blank values"
         );
     }
 

@@ -1,6 +1,5 @@
-/** @typedef {import('../api/screenTypes').PlayerLobbyScreenResponse} PlayerLobbyScreenResponse */
+﻿/** @typedef {import('../api/screenTypes').PlayerLobbyScreenResponse} PlayerLobbyScreenResponse */
 /** @typedef {import('../api/screenTypes').PlayerLobbyOptionDto} PlayerLobbyOptionDto */
-/** @typedef {import('../api/screenTypes').PlayerLobbyPreviewItemDto} PlayerLobbyPreviewItemDto */
 /** @typedef {import('../api/screenTypes').PlayerLobbyTagDto} PlayerLobbyTagDto */
 /** @typedef {import('./loadoutEditor').SessionLoadoutDraft} SessionLoadoutDraft */
 /** @typedef {import('../components/EntityListPane.svelte').EntityListItem} EntityListItem */
@@ -9,7 +8,7 @@
 /**
  * PlayerLobby local presentation helpers stay in the editor-UX layer.
  * They keep the current local draft visually aligned with the form while reusing
- * server-curated reference options and preset preview snapshots.
+ * server-curated reference options.
  * This is not game-rule resolution; it is editor-style presentation state.
  */
 
@@ -147,7 +146,7 @@ function buildReferencePreview(option, emptyLabel, missingKind) {
 
   return {
     label: `${missingKind} (unresolved)`,
-    subtitle: '현재 선택값을 사용할 수 없습니다.',
+    subtitle: '?꾩옱 ?좏깮媛믪쓣 ?ъ슜?????놁뒿?덈떎.',
     tags: /** @type {EntityListTag[]} */ ([{ label: 'Unresolved', tone: 'warning' }]),
   }
 }
@@ -167,7 +166,7 @@ function buildPassiveItems(identifiers, options) {
         title: passiveId,
         subtitle: 'Passive id in the current local draft',
         meta: `Entry ${index + 1}`,
-        note: '이 패시브 id를 사용할 수 없습니다.',
+        note: '???⑥떆釉?id瑜??ъ슜?????놁뒿?덈떎.',
         tags: /** @type {EntityListTag[]} */ ([{ label: 'Unresolved', tone: 'warning' }]),
       }
     }
@@ -183,26 +182,10 @@ function buildPassiveItems(identifiers, options) {
 }
 
 /**
- * @param {readonly PlayerLobbyPreviewItemDto[]} items
- * @param {string} kind
- * @returns {EntityListItem[]}
- */
-function mapPresetPreviewItems(items, kind) {
-  return (items ?? []).map((item, index) => ({
-    id: `${kind}:${item.id}:${index}`,
-    title: item.label,
-    subtitle: item.subtitle,
-    meta: `Entry ${index + 1}`,
-    tags: mapTags(item.tags),
-  }))
-}
-
-/**
  * @param {PlayerLobbyScreenResponse} screen
  * @param {SessionLoadoutDraft} loadoutDraft
- * @param {string} selectedPresetId
  */
-export function createPlayerLobbyLocalPresentation(screen, loadoutDraft, selectedPresetId) {
+export function createPlayerLobbyLocalPresentation(screen, loadoutDraft) {
   const characterId = normalizeCharacterId(loadoutDraft.characterId)
   const deckOwnedCardIds = normalizeIdentifierList(loadoutDraft.deckOwnedCardIds)
   const exCardId = normalizeText(loadoutDraft.exCardId)
@@ -216,18 +199,9 @@ export function createPlayerLobbyLocalPresentation(screen, loadoutDraft, selecte
 
   const characterOption = findCharacterOption(screen.references.characterOptions, characterId)
   const exCardOption = findOption(screen.references.exCardOptions, exCardId)
-  const selectedPreset =
-    screen.presets.items.find((item) => String(item.presetId) === normalizeText(selectedPresetId)) ?? null
-  const serverSelectedPresetId =
-    screen.presets.selectedId == null ? '' : String(screen.presets.selectedId)
   const characterChangePending = characterId !== normalizeCharacterId(screen.me.draft.characterId)
   const requiredFieldsMissing = characterId === null || exCardId === ''
   const deckEditingLocked = screen.me.draftFlags.deckEditingLocked || characterChangePending
-  const presetPreviewSynced =
-    normalizeText(selectedPresetId) !== '' &&
-    normalizeText(selectedPresetId) === normalizeText(serverSelectedPresetId) &&
-    screen.presets.preview !== null
-  const presetPreviewStale = normalizeText(selectedPresetId) !== '' && !presetPreviewSynced
   const localSummary = `Deck ${deckOwnedCardIds.length} cards | ${passiveIds.length} passives | EX ${exCardId || 'none'}`
   const syncedSummary = normalizeText(screen.me.summary.loadoutSummary) || screen.me.summary.draftSummary
 
@@ -256,26 +230,5 @@ export function createPlayerLobbyLocalPresentation(screen, loadoutDraft, selecte
       'EX card',
     ),
     passiveItems: buildPassiveItems(passiveIds, screen.references.passiveOptions),
-    preset: {
-      selectedId: normalizeText(selectedPresetId),
-      label: selectedPreset?.label ?? 'No preset selected',
-      subtitle: selectedPreset?.subtitle ?? '저장된 프리셋을 선택해 주세요.',
-      previewSynced: presetPreviewSynced,
-      previewStale: presetPreviewStale,
-      name: presetPreviewSynced ? screen.presets.preview?.name ?? '' : selectedPreset?.label ?? '',
-      summary: presetPreviewSynced
-        ? screen.presets.preview?.summary ?? ''
-        : selectedPreset
-          ? '최신 프리셋 미리보기만 표시됩니다.'
-          : '적용할 프리셋을 선택해 주세요.',
-      characterLabel: presetPreviewSynced ? screen.presets.preview?.characterLabel ?? '' : '',
-      exLabel: presetPreviewSynced ? screen.presets.preview?.exLabel ?? '' : '',
-      deckItems: presetPreviewSynced
-        ? mapPresetPreviewItems(screen.presets.preview?.deckItems ?? [], 'deck')
-        : [],
-      passiveItems: presetPreviewSynced
-        ? mapPresetPreviewItems(screen.presets.preview?.passiveItems ?? [], 'passive')
-        : [],
-    },
   }
 }

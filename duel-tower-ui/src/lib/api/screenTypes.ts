@@ -1,8 +1,7 @@
-import type { DeckIdentifier, DeckResponse, DeckType, DeckValidationIssue } from './deckTypes'
-import type { PresetIdentifier, PresetResponse } from './presetTypes'
+﻿import type { DeckIdentifier, DeckResponse, DeckType, DeckValidationIssue } from './deckTypes'
 import type { SessionCode, SessionStateDto } from './sessionTypes'
 
-export type ScreenKey = 'PlayerLobby' | 'GmLobby' | 'Combat' | 'DeckEditor' | 'PresetEditor'
+export type ScreenKey = 'PlayerLobby' | 'GmLobby' | 'Combat' | 'DeckEditor'
 
 export type ScreenActionAuth =
   | 'public'
@@ -25,9 +24,6 @@ export type ScreenRequestParamsByKey = {
   }
   DeckEditor: {
     deckId?: DeckIdentifier | null
-  }
-  PresetEditor: {
-    presetId?: PresetIdentifier | null
   }
 }
 
@@ -52,13 +48,6 @@ export type DeckEditorActionPayload = {
   }[] | null
 }
 
-export type PresetEditorActionPayload = {
-  name?: string | null
-  characterId?: number | null
-  deckCardIds?: string[] | null
-  exCardId?: string | null
-  passiveIds?: string[] | null
-}
 
 export type PlayerLobbyToggleReadyPayload = {
   ready?: boolean | null
@@ -71,14 +60,10 @@ export type PlayerLobbySaveLoadoutPayload = {
   exCardId?: string | null
 }
 
-export type PlayerLobbyApplyPresetPayload = {
-  presetId?: number | null
-}
 
 export type PlayerLobbyActionPayload =
   | PlayerLobbyToggleReadyPayload
   | PlayerLobbySaveLoadoutPayload
-  | PlayerLobbyApplyPresetPayload
 
 export type GmLobbyKickPayload = {
   playerId?: string | null
@@ -107,17 +92,10 @@ export type DeckEditorActionId =
   | 'deckEditor.create'
   | 'deckEditor.delete'
 
-export type PresetEditorActionId =
-  | 'presetEditor.save'
-  | 'presetEditor.create'
-  | 'presetEditor.clone'
-  | 'presetEditor.delete'
-
 export type PlayerLobbyActionId =
   | 'playerLobby.toggleReady'
   | 'playerLobby.leave'
   | 'playerLobby.saveLoadout'
-  | 'playerLobby.applyPreset'
 
 export type GmLobbyActionId =
   | 'gmLobby.kick'
@@ -152,51 +130,6 @@ export type DeckEditorDraftDto = {
   name: string
   type: DeckType
   cards: DeckEditorDraftCardDto[]
-}
-
-export type PresetEditorDraftDto = {
-  name: string
-  characterId: number | null
-  deckCardIds: string[]
-  exCardId: string
-  passiveIds: string[]
-}
-
-export type DeckEditorDerivedDto = {
-  title: string
-  deckTypeLabel: string
-  totalCards: number
-  dirty: boolean
-}
-
-export type PresetEditorResolvedTagDto = {
-  label: string
-  tone: 'accent' | 'muted' | 'success' | 'warning' | string
-}
-
-export type PresetEditorResolvedItemDto = {
-  id: string
-  label: string
-  subtitle: string
-  meta: string
-  tags: PresetEditorResolvedTagDto[]
-}
-
-export type PresetEditorResolvedDto = {
-  characterLabel: string
-  characterSubtitle: string
-  characterTags: PresetEditorResolvedTagDto[]
-  exLabel: string
-  exSubtitle: string
-  exTags: PresetEditorResolvedTagDto[]
-  deckItems: PresetEditorResolvedItemDto[]
-  passiveItems: PresetEditorResolvedItemDto[]
-}
-
-export type PresetEditorDerivedDto = {
-  dirty: boolean
-  createdAtLabel: string
-  updatedAtLabel: string
 }
 
 export type PlayerLobbyTagDto = {
@@ -328,19 +261,6 @@ export type PlayerLobbyReferencesDto = {
   ownedCardOptions: PlayerLobbyOwnedCardOptionDto[]
 }
 
-export type PlayerLobbyPresetItemDto = {
-  presetId: number
-  label: string
-  subtitle: string
-}
-
-export type PlayerLobbyPreviewItemDto = {
-  id: string
-  label: string
-  subtitle: string
-  tags: PlayerLobbyTagDto[]
-}
-
 export type GmLobbyTagDto = {
   label: string
   tone: 'accent' | 'muted' | 'success' | 'warning'
@@ -387,20 +307,6 @@ export type GmLobbyStartCombatDto = {
   selectableStartPlayers: GmLobbySelectableStartPlayerDto[]
 }
 
-export type PlayerLobbyPresetPreviewDto = {
-  name: string
-  summary: string
-  characterLabel: string
-  exLabel: string
-  deckItems: PlayerLobbyPreviewItemDto[]
-  passiveItems: PlayerLobbyPreviewItemDto[]
-}
-
-export type PlayerLobbyPresetsDto = {
-  items: PlayerLobbyPresetItemDto[]
-  selectedId: number | null
-  preview: PlayerLobbyPresetPreviewDto | null
-}
 
 /**
  * Server-side PlayerLobby me snapshot.
@@ -415,11 +321,6 @@ export type PlayerLobbyServerMe = PlayerLobbyMeDto
  */
 export type PlayerLobbyServerReferences = PlayerLobbyReferencesDto
 
-/**
- * Server-side preset archive snapshot for PlayerLobby.
- * preview belongs to the currently selected preset snapshot on the backend.
- */
-export type PlayerLobbyServerPresets = PlayerLobbyPresetsDto
 
 /**
  * Frontend-only PlayerLobby presentation state.
@@ -463,104 +364,8 @@ export type PlayerLobbyLocalPresentationState = {
       tone?: 'accent' | 'muted' | 'success' | 'warning'
     }[]
   }[]
-  preset: {
-    selectedId: string
-    label: string
-    subtitle: string
-    previewSynced: boolean
-    previewStale: boolean
-    name: string
-    summary: string
-    characterLabel: string
-    exLabel: string
-    deckItems: {
-      id: string
-      title: string
-      subtitle?: string
-      meta?: string
-      note?: string
-      tags?: {
-        label: string
-        tone?: 'accent' | 'muted' | 'success' | 'warning'
-      }[]
-    }[]
-    passiveItems: {
-      id: string
-      title: string
-      subtitle?: string
-      meta?: string
-      note?: string
-      tags?: {
-        label: string
-        tone?: 'accent' | 'muted' | 'success' | 'warning'
-      }[]
-    }[]
-  }
 }
 
-/**
- * Server-side PresetEditor draft snapshot.
- * The frontend copies this into local editor state and does not reinterpret preset semantics.
- */
-export type PresetEditorServerDraft = PresetEditorDraftDto
-
-/**
- * Server-side resolved preview snapshot.
- * Character / EX / deck / passive labels and tags are resolved on the backend.
- */
-export type PresetEditorServerResolved = PresetEditorResolvedDto
-
-/**
- * Frontend-only presentation state for PresetEditor.
- * This mirrors the current local draft for dirty/title/preview display without
- * re-implementing backend reference resolution or action-enable rules.
- */
-export type PresetEditorLocalPresentationState = {
-  title: string
-  summary: string
-  dirty: boolean
-  previewNeedsResolveRefresh: boolean
-  deckCount: number
-  passiveCount: number
-  character: {
-    label: string
-    subtitle: string
-    tags: {
-      label: string
-      tone?: 'accent' | 'muted' | 'success' | 'warning'
-    }[]
-  }
-  ex: {
-    label: string
-    subtitle: string
-    tags: {
-      label: string
-      tone?: 'accent' | 'muted' | 'success' | 'warning'
-    }[]
-  }
-  deckItems: {
-    id: string
-    title: string
-    subtitle?: string
-    meta?: string
-    note?: string
-    tags?: {
-      label: string
-      tone?: 'accent' | 'muted' | 'success' | 'warning'
-    }[]
-  }[]
-  passiveItems: {
-    id: string
-    title: string
-    subtitle?: string
-    meta?: string
-    note?: string
-    tags?: {
-      label: string
-      tone?: 'accent' | 'muted' | 'success' | 'warning'
-    }[]
-  }[]
-}
 
 /**
  * Server-side validation snapshot for the last validated deck draft.
@@ -918,9 +723,6 @@ export type DeckEditorScreenAction = ScreenActionDto<DeckEditorActionPayload> & 
   id: DeckEditorActionId
 }
 
-export type PresetEditorScreenAction = ScreenActionDto<PresetEditorActionPayload> & {
-  id: PresetEditorActionId
-}
 
 export type PlayerLobbyScreenAction = ScreenActionDto<PlayerLobbyActionPayload> & {
   id: PlayerLobbyActionId
@@ -1014,26 +816,11 @@ export type DeckEditorScreenResponse = ScreenResponseBase<DeckEditorScreenAction
   validation: DeckEditorServerValidationDto
 }
 
-/**
- * PresetEditor screen contract.
- * The backend owns draft serialization, resolved preview metadata, derived labels,
- * and mode-specific actions. The frontend adds only local presentation state on top.
- */
-export type PresetEditorScreenResponse = ScreenResponseBase<PresetEditorScreenAction> & {
-  presetId: number | null
-  mode: 'create' | 'edit'
-  routeTemplate: string
-  policyGroup: string
-  auth: string
-  draft: PresetEditorServerDraft
-  resolved: PresetEditorServerResolved
-  derived: PresetEditorDerivedDto
-}
 
 /**
  * PlayerLobby screen contract.
  * The backend owns participant slot summary, reference option curation,
- * preset preview resolution, and action metadata. The frontend keeps only
+ * action metadata. The frontend keeps only
  * local loadout input state and editor-style presentation helpers.
  */
 export type PlayerLobbyScreenResponse = ScreenResponseBase<PlayerLobbyScreenAction> & {
@@ -1046,7 +833,6 @@ export type PlayerLobbyScreenResponse = ScreenResponseBase<PlayerLobbyScreenActi
   me: PlayerLobbyServerMe
   deckEditor: PlayerLobbyDeckEditorStateDto
   references: PlayerLobbyServerReferences
-  presets: PlayerLobbyServerPresets
 }
 
 /**
@@ -1083,18 +869,11 @@ export type DeckEditorActionResponseById = {
   'deckEditor.delete': void
 }
 
-export type PresetEditorActionResponseById = {
-  'presetEditor.save': PresetResponse
-  'presetEditor.create': PresetResponse
-  'presetEditor.clone': PresetResponse
-  'presetEditor.delete': void
-}
 
 export type PlayerLobbyActionResponseById = {
   'playerLobby.toggleReady': SessionStateDto
   'playerLobby.leave': SessionStateDto
   'playerLobby.saveLoadout': SessionStateDto
-  'playerLobby.applyPreset': SessionStateDto
 }
 
 export type GmLobbyStartCombatActionResponse = {
@@ -1176,12 +955,6 @@ export function findDeckEditorAction(
   return screen.possibleActions.find((action) => action.id === actionId) ?? null
 }
 
-export function findPresetEditorAction(
-  screen: Pick<PresetEditorScreenResponse, 'possibleActions'>,
-  actionId: PresetEditorActionId,
-) {
-  return screen.possibleActions.find((action) => action.id === actionId) ?? null
-}
 
 export function findPlayerLobbyAction(
   screen: Pick<PlayerLobbyScreenResponse, 'possibleActions'>,
