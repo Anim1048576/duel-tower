@@ -6,6 +6,7 @@ import type {
   EngineResponseDto,
   JoinSessionRequest,
   JoinSessionResponse,
+  DebugSoloCombatResponse,
   KickPlayerRequest,
   PreviewSessionLoadoutRequest,
   PreviewSessionLoadoutResponse,
@@ -97,6 +98,14 @@ function buildSessionQueryPath(
 
 export function createSession(payload: CreateSessionRequest) {
   return apiPost<CreateSessionResponse, CreateSessionRequest>(SESSIONS_API_BASE, payload)
+}
+
+export function startDebugSoloCombat() {
+  return apiPost<DebugSoloCombatResponse, Record<string, never>>(
+    '/api/debug/sessions/solo-combat',
+    {},
+    { handleUnauthorized: false },
+  )
 }
 
 export function getSessionState(code: SessionCode) {

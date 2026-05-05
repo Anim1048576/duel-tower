@@ -1,6 +1,9 @@
 package com.example.dueltower.session.service;
 
 import com.example.dueltower.engine.model.Ids.PlayerId;
+import com.example.dueltower.engine.model.PlayerControlType;
+import com.example.dueltower.engine.model.PlayerState;
+import com.example.dueltower.session.dto.ControllableActorDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -12,6 +15,7 @@ import static com.example.dueltower.session.service.SessionAccessDecision.Sessio
 import static com.example.dueltower.session.service.SessionAccessDecision.SessionAccessSource.PLAYER_TOKEN;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
+import java.util.List;
 
 @Service
 /**
@@ -95,6 +99,54 @@ public class SessionAccessResolver {
             throw new ResponseStatusException(FORBIDDEN, mismatchMessage);
         }
         return actorPlayerId;
+    }
+
+    public String requirePlayerControl(SessionRuntime rt,
+                                       String playerTokenHeader,
+                                       String actorPlayerId,
+                                       String mismatchMessage) {
+        String requesterPlayerId = requirePlayerToken(rt, playerTokenHeader);
+        String normalizedActorPlayerId = normalizeRequiredPlayerId(actorPlayerId);
+        if (!canControl(rt, requesterPlayerId, normalizedActorPlayerId)) {
+            throw new ResponseStatusException(FORBIDDEN, mismatchMessage);
+        }
+        return requesterPlayerId;
+    }
+
+    public boolean canControl(SessionRuntime rt, String requesterPlayerIdRaw, String actorPlayerIdRaw) {
+        if (rt == null || requesterPlayerIdRaw == null || requesterPlayerIdRaw.isBlank()
+                || actorPlayerIdRaw == null || actorPlayerIdRaw.isBlank()) {
+            return false;
+        }
+        String requesterPlayerId = requesterPlayerIdRaw.trim();
+        String actorPlayerId = actorPlayerIdRaw.trim();
+        if (requesterPlayerId.equals(actorPlayerId)) {
+            return hasParticipant(rt, actorPlayerId);
+        }
+
+        return rt.withLock(() -> {
+            PlayerState actor = rt.state().players().get(new PlayerId(actorPlayerId));
+            if (actor == null || actor.controlType() != PlayerControlType.GM_CONTROLLED_NPC) {
+                return false;
+            }
+            String controllerPlayerId = actor.controllerPlayerId().value();
+            return requesterPlayerId.equals(controllerPlayerId) || requesterPlayerId.equals(rt.gmId());
+        });
+    }
+
+    public List<ControllableActorDto> controllableActors(SessionRuntime rt, String requesterPlayerIdRaw) {
+        if (rt == null || requesterPlayerIdRaw == null || requesterPlayerIdRaw.isBlank()) {
+            return List.of();
+        }
+        String requesterPlayerId = requesterPlayerIdRaw.trim();
+        return rt.withLock(() -> rt.state().players().values().stream()
+                .filter(player -> canControl(rt, requesterPlayerId, player.playerId().value()))
+                .map(player -> new ControllableActorDto(
+                        player.playerId().value(),
+                        player.playerId().value(),
+                        player.controlType().name()
+                ))
+                .toList());
     }
 
     public String authenticatedUsername(Authentication authentication) {

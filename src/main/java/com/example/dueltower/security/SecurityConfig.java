@@ -60,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.PLAYER_SELF_POST).permitAll()
                         .requestMatchers(SecurityPaths.SESSION_UPDATE_METHOD, SecurityPaths.PLAYER_SELF_PUT).permitAll()
                         .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.GM_ONLY_POST).permitAll()
+                        .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.DEBUG_POST).permitAll()
                         .requestMatchers(SecurityPaths.SESSION_DELETE_METHOD, SecurityPaths.GM_ONLY_DELETE).permitAll()
                         .requestMatchers(SecurityPaths.SESSION_WRITE_METHOD, SecurityPaths.SESSION_COMMAND).permitAll()
                         .requestMatchers(SecurityPaths.API_ALL).authenticated()

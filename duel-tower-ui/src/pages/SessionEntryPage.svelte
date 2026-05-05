@@ -6,7 +6,7 @@
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
   import { onMount } from 'svelte'
-  import { createSession, joinSession } from '../lib/api/sessions'
+  import { createSession, joinSession, startDebugSoloCombat } from '../lib/api/sessions'
   import { getApiErrorMessage } from '../lib/api/types'
   import { authState } from '../lib/auth/authState.svelte'
   import { pathBuilders } from '../lib/navigation'
@@ -76,7 +76,7 @@
   let query = $state('')
   let sessionCode = $state('')
   let selectedId = $state<EntryActionId>(entryActions[0].id)
-  let pendingAction = $state<'create' | 'join' | null>(null)
+  let pendingAction = $state<'create' | 'join' | 'debug' | null>(null)
   let formErrorMessage = $state<string | null>(null)
   let apiErrorMessage = $state<string | null>(null)
   let feedback = $state<SessionPageFeedback | null>(null)
@@ -101,6 +101,7 @@
 
   const joinPending = $derived.by(() => pendingAction === 'join')
   const createPending = $derived.by(() => pendingAction === 'create')
+  const debugPending = $derived.by(() => pendingAction === 'debug')
   const actionPending = $derived.by(() => pendingAction !== null)
   const currentUsername = $derived.by(() => authState.user?.username?.trim() ?? '')
   const filteredActionSummary = $derived.by(() =>
@@ -233,6 +234,33 @@
     }
   }
 
+  async function handleDebugSoloCombat() {
+    if (actionPending) {
+      return
+    }
+
+    clearErrors()
+    pendingAction = 'debug'
+
+    try {
+      const response = await startDebugSoloCombat()
+      const nextCode = normalizeSessionCode(response.sessionCode)
+
+      setStoredSessionAccess({
+        code: nextCode,
+        role: 'player',
+        playerToken: response.playerToken,
+        playerId: response.gmPlayerId,
+      })
+      persistSessionCode(nextCode)
+      navigateTo(response.redirectUrl || pathBuilders.combat(nextCode), true)
+    } catch (error) {
+      apiErrorMessage = getApiErrorMessage(error, '디버그 전투를 시작하지 못했습니다.')
+    } finally {
+      pendingAction = null
+    }
+  }
+
   function handleSubmit(event: SubmitEvent) {
     event.preventDefault()
     void handleJoinSession()
@@ -332,6 +360,29 @@
         <TagChip label="Live create API" tone="warning" />
       </div>
     </SectionFrame>
+
+    {#if import.meta.env.DEV}
+      <SectionFrame
+        title="디버그 전투"
+        description="GM 플레이어와 GM 조종 NPC를 포함한 테스트 전투를 바로 시작합니다."
+      >
+        <div class="session-entry-page__guide">
+          <p>개발 환경에서만 표시됩니다.</p>
+          <p>기존 세션 생성, 로드아웃, 전투 시작 흐름을 사용합니다.</p>
+        </div>
+
+        <div class="session-entry-page__actions">
+          <button
+            type="button"
+            onclick={() => void handleDebugSoloCombat()}
+            disabled={actionPending}
+          >
+            {debugPending ? '디버그 전투 시작 중...' : '디버그 전투 바로 시작'}
+          </button>
+          <TagChip label="Debug API" tone="warning" />
+        </div>
+      </SectionFrame>
+    {/if}
   </div>
 
   <SectionFrame

@@ -85,6 +85,8 @@ export type PlayerStateDto = {
   maxOwnedCardCount: number
   forgettingRequired: boolean
   equippedItems: PlayerEquippedItemDto[]
+  controlType: 'HUMAN' | 'GM_CONTROLLED_NPC'
+  controllerPlayerId: string
 }
 
 export type CombatSummonDto = {
@@ -238,6 +240,15 @@ export type JoinSessionRequest = {
 export type JoinSessionResponse = {
   state: SessionStateDto
   playerToken: SessionToken
+}
+
+export type DebugSoloCombatResponse = {
+  sessionCode: SessionCode
+  gmPlayerId: string
+  npcPlayerId: string
+  gmToken: SessionToken
+  playerToken: SessionToken
+  redirectUrl: string
 }
 
 export type UpdateSessionLoadoutRequest = {

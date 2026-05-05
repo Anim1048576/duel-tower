@@ -220,7 +220,9 @@ class CombatScreenServiceBoardObjectMetadataTest {
                 0,
                 99,
                 false,
-                List.of()
+                List.of(),
+                "HUMAN",
+                playerId
         );
     }
 

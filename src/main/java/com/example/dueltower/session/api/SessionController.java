@@ -3,6 +3,8 @@ package com.example.dueltower.session.api;
 import com.example.dueltower.content.equip.service.EquipService;
 import com.example.dueltower.content.item.service.ItemService;
 import com.example.dueltower.session.dto.CommandRequest;
+import com.example.dueltower.session.dto.AddGmNpcRequest;
+import com.example.dueltower.session.dto.AddGmNpcResponse;
 import com.example.dueltower.session.dto.CreateSessionRequest;
 import com.example.dueltower.session.dto.CreateSessionResponse;
 import com.example.dueltower.session.dto.EngineResponseDto;
@@ -28,6 +30,7 @@ import com.example.dueltower.session.runtime.StateMapper;
 import com.example.dueltower.session.service.SessionAccessResolver;
 import com.example.dueltower.session.service.SessionCommandService;
 import com.example.dueltower.session.service.SessionLifecycleService;
+import com.example.dueltower.session.service.SessionGmNpcService;
 import com.example.dueltower.session.service.SessionLoadoutService;
 import com.example.dueltower.session.service.SessionLobbyService;
 import com.example.dueltower.session.service.SessionQueryService;
@@ -61,6 +64,7 @@ public class SessionController {
     private final SessionLifecycleService sessionLifecycleService;
     private final SessionLoadoutService sessionLoadoutService;
     private final SessionLobbyService sessionLobbyService;
+    private final SessionGmNpcService sessionGmNpcService;
     private final SessionQueryService sessionQueryService;
     private final SessionCommandService sessionCommandService;
     private final SessionAccessResolver sessionAccessResolver;
@@ -69,6 +73,7 @@ public class SessionController {
     public SessionController(SessionLifecycleService sessionLifecycleService,
                              SessionLoadoutService sessionLoadoutService,
                              SessionLobbyService sessionLobbyService,
+                             SessionGmNpcService sessionGmNpcService,
                              SessionQueryService sessionQueryService,
                              SessionCommandService sessionCommandService,
                              SessionAccessResolver sessionAccessResolver,
@@ -78,6 +83,7 @@ public class SessionController {
         this.sessionLifecycleService = sessionLifecycleService;
         this.sessionLoadoutService = sessionLoadoutService;
         this.sessionLobbyService = sessionLobbyService;
+        this.sessionGmNpcService = sessionGmNpcService;
         this.sessionQueryService = sessionQueryService;
         this.sessionCommandService = sessionCommandService;
         this.sessionAccessResolver = sessionAccessResolver;
@@ -194,6 +200,15 @@ public class SessionController {
                 lockedRt -> StateMapper.toDto(lockedRt.code(), lockedRt.state())
         );
         return new RestoreGmAccessResponse(rt.code(), rt.gmToken(), state);
+    }
+
+    @PostMapping("/{code}/gm-npcs")
+    public AddGmNpcResponse addGmNpc(@PathVariable String code,
+                                     @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                     @RequestBody(required = false) AddGmNpcRequest req) {
+        SessionRuntime rt = sessionLifecycleService.get(code);
+        sessionAccessResolver.requireGm(rt, gmTokenHeader);
+        return sessionGmNpcService.addGmControlledNpc(rt.code(), rt.gmId(), req);
     }
 
     @PostMapping("/{code}/players/{playerId}/forget")

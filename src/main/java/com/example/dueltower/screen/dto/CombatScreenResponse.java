@@ -2,6 +2,7 @@ package com.example.dueltower.screen.dto;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import com.example.dueltower.session.dto.ControllableActorDto;
 
 /**
  * Combat screen read model curated for the frontend.
@@ -99,7 +100,8 @@ public class CombatScreenResponse extends ScreenResponseBase {
             String role,
             String runtimePlayerId,
             long expectedVersion,
-            GuardSummary guards
+            GuardSummary guards,
+            List<ControllableActorDto> controllableActors
     ) {}
 
     public record GuardSummary(

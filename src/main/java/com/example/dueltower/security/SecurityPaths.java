@@ -105,7 +105,12 @@ public final class SecurityPaths {
      */
     public static final String[] GM_ONLY_POST = {
             "/api/sessions/*/players/*/kick",
-            "/api/sessions/*/reset"
+            "/api/sessions/*/reset",
+            "/api/sessions/*/gm-npcs"
+    };
+
+    public static final String[] DEBUG_POST = {
+            "/api/debug/sessions/solo-combat"
     };
 
     public static final String[] GM_ONLY_DELETE = {

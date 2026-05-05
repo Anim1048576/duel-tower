@@ -33,7 +33,7 @@ public class SessionCommandAuthorization {
 
         if (commandType.requiresPlayerAuthorization()) {
             String requestPlayerId = requireText(req.trimmedPlayerId(), "playerId");
-            sessionAccessResolver.requirePlayerSelf(rt, playerTokenHeader, requestPlayerId, "playerId mismatch");
+            sessionAccessResolver.requirePlayerControl(rt, playerTokenHeader, requestPlayerId, "playerId mismatch");
         }
     }
 

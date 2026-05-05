@@ -220,7 +220,9 @@ class ScreenResponseFactoryCurrentSkillDeckTest {
                 ownedCards.size(),
                 20,
                 false,
-                List.of()
+                List.of(),
+                "HUMAN",
+                playerId
         );
     }
 

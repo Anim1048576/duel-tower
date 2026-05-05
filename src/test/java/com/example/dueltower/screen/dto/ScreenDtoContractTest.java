@@ -104,7 +104,8 @@ class ScreenDtoContractTest {
                         "player",
                         "p1",
                         27L,
-                        new CombatScreenResponse.GuardSummary(true, false, true, false, true, false, true, true)
+                        new CombatScreenResponse.GuardSummary(true, false, true, false, true, false, true, true),
+                        List.of()
                 ),
                 new CombatScreenResponse.Actors(
                         List.of(),

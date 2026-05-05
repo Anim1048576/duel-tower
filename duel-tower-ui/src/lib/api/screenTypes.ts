@@ -132,6 +132,13 @@ export type DeckEditorDraftDto = {
   cards: DeckEditorDraftCardDto[]
 }
 
+export type DeckEditorDerivedDto = {
+  title: string
+  deckTypeLabel: string
+  totalCards: number
+  dirty: boolean
+}
+
 export type PlayerLobbyTagDto = {
   label: string
   tone: 'accent' | 'muted' | 'success' | 'warning'
@@ -573,6 +580,11 @@ export type CombatAccessDto = {
   runtimePlayerId: string | null
   expectedVersion: number
   guards: CombatGuardSummaryDto
+  controllableActors: {
+    playerId: string
+    name: string
+    controlType: 'HUMAN' | 'GM_CONTROLLED_NPC'
+  }[]
 }
 
 export type CombatStatusDto = {

@@ -20,6 +20,7 @@ import com.example.dueltower.screen.dto.DisabledReasonDto;
 import com.example.dueltower.screen.dto.ScreenActionAuth;
 import com.example.dueltower.screen.dto.ScreenActionDto;
 import com.example.dueltower.session.dto.CombatStateDto;
+import com.example.dueltower.session.dto.ControllableActorDto;
 import com.example.dueltower.session.dto.PlayerStateDto;
 import com.example.dueltower.session.dto.SessionStateDto;
 import com.example.dueltower.session.runtime.SessionRuntime;
@@ -139,13 +140,14 @@ public class CombatScreenService {
         String role = role(decision);
         String runtimePlayerId = decision.playerId();
         String currentActorPlayerId = currentActorPlayerId(state);
-        PlayerStateDto runtimePlayer = runtimePlayerId == null ? null : state.players().get(runtimePlayerId);
+        String commandActorPlayerId = commandActorPlayerId(state, runtimePlayerId, currentActorPlayerId);
+        PlayerStateDto runtimePlayer = commandActorPlayerId == null ? null : state.players().get(commandActorPlayerId);
         boolean hasPlayerToken = decision.source() == SessionAccessDecision.SessionAccessSource.PLAYER_TOKEN;
         boolean hasGmToken = decision.source() == SessionAccessDecision.SessionAccessSource.GM_TOKEN;
         boolean canIssuePlayerCommand = hasPlayerToken
-                && runtimePlayerId != null
+                && commandActorPlayerId != null
                 && currentActorPlayerId != null
-                && runtimePlayerId.equals(currentActorPlayerId);
+                && commandActorPlayerId.equals(currentActorPlayerId);
         boolean hasPendingDecision = runtimePlayer != null && runtimePlayer.pendingDecision() != null;
         boolean exAvailable = runtimePlayer != null && runtimePlayer.exCard() != null && !runtimePlayer.exOnCooldown();
 
@@ -160,10 +162,23 @@ public class CombatScreenService {
                         "gm".equals(role) && hasGmToken,
                         exAvailable,
                         hasPendingDecision,
-                        runtimePlayerId != null && runtimePlayerId.equals(currentActorPlayerId),
+                        commandActorPlayerId != null && commandActorPlayerId.equals(currentActorPlayerId),
                         state.combat() != null
-                )
+                ),
+                controllableActors(state, runtimePlayerId)
         );
+    }
+
+    private List<ControllableActorDto> controllableActors(SessionStateDto state, String runtimePlayerId) {
+        if (runtimePlayerId == null || runtimePlayerId.isBlank()) {
+            return List.of();
+        }
+        return state.players().values().stream()
+                .filter(player -> runtimePlayerId.equals(player.playerId())
+                        || ("GM_CONTROLLED_NPC".equals(player.controlType())
+                        && runtimePlayerId.equals(player.controllerPlayerId())))
+                .map(player -> new ControllableActorDto(player.playerId(), player.playerId(), player.controlType()))
+                .toList();
     }
 
     private CombatScreenResponse.Actors actors(SessionStateDto state,
@@ -355,12 +370,13 @@ public class CombatScreenService {
                                                   Map<CardDefId, CardDefinition> cardDefinitions) {
         String runtimePlayerId = decision.playerId();
         String currentActorPlayerId = currentActorPlayerId(state);
-        PlayerStateDto runtimePlayer = runtimePlayerId == null ? null : state.players().get(runtimePlayerId);
+        String commandActorPlayerId = commandActorPlayerId(state, runtimePlayerId, currentActorPlayerId);
+        PlayerStateDto runtimePlayer = commandActorPlayerId == null ? null : state.players().get(commandActorPlayerId);
         boolean hasPlayerToken = decision.source() == SessionAccessDecision.SessionAccessSource.PLAYER_TOKEN;
         boolean canIssuePlayerCommand = hasPlayerToken
-                && runtimePlayerId != null
+                && commandActorPlayerId != null
                 && currentActorPlayerId != null
-                && runtimePlayerId.equals(currentActorPlayerId);
+                && commandActorPlayerId.equals(currentActorPlayerId);
         boolean canClearRecentResults = hasPlayerToken && runtimePlayerId != null;
         boolean hasPendingDecision = runtimePlayer != null && runtimePlayer.pendingDecision() != null;
         boolean exAvailable = runtimePlayer != null && runtimePlayer.exCard() != null && !runtimePlayer.exOnCooldown();
@@ -401,7 +417,7 @@ public class CombatScreenService {
                 Map.of(
                         "type", "DRAW",
                         "expectedVersion", state.version(),
-                        "playerId", runtimePlayerId == null ? "" : runtimePlayerId,
+                        "playerId", commandActorPlayerId == null ? "" : commandActorPlayerId,
                         "count", 1
                 )
         ));
@@ -420,7 +436,7 @@ public class CombatScreenService {
                 Map.of(
                         "type", "END_TURN",
                         "expectedVersion", state.version(),
-                        "playerId", runtimePlayerId == null ? "" : runtimePlayerId
+                        "playerId", commandActorPlayerId == null ? "" : commandActorPlayerId
                 )
         ));
         actions.add(playerCommandAction(
@@ -451,7 +467,7 @@ public class CombatScreenService {
                 new LinkedHashMap<>(Map.of(
                         "type", "PLAY_CARD",
                         "expectedVersion", state.version(),
-                        "playerId", runtimePlayerId == null ? "" : runtimePlayerId,
+                        "playerId", commandActorPlayerId == null ? "" : commandActorPlayerId,
                         "cardId", "",
                         "discardIds", List.of(),
                         "selectedIds", List.of(),
@@ -474,14 +490,37 @@ public class CombatScreenService {
                 new LinkedHashMap<>(Map.of(
                         "type", "USE_EX",
                         "expectedVersion", state.version(),
-                        "playerId", runtimePlayerId == null ? "" : runtimePlayerId,
+                        "playerId", commandActorPlayerId == null ? "" : commandActorPlayerId,
                         "targets", List.of()
                 ))
         ));
 
-        actions.add(resolvePendingAction(state, runtimePlayerId, runtimePlayer, hasPlayerToken, hasPendingDecision, cardDefinitions));
+        actions.add(resolvePendingAction(state, commandActorPlayerId, runtimePlayer, hasPlayerToken, hasPendingDecision, cardDefinitions));
 
         return List.copyOf(actions);
+    }
+
+    private String commandActorPlayerId(SessionStateDto state, String runtimePlayerId, String currentActorPlayerId) {
+        if (runtimePlayerId == null || runtimePlayerId.isBlank()) {
+            return null;
+        }
+        if (currentActorPlayerId != null && canControl(state, runtimePlayerId, currentActorPlayerId)) {
+            return currentActorPlayerId;
+        }
+        return runtimePlayerId;
+    }
+
+    private boolean canControl(SessionStateDto state, String requesterPlayerId, String actorPlayerId) {
+        if (requesterPlayerId == null || actorPlayerId == null) {
+            return false;
+        }
+        if (requesterPlayerId.equals(actorPlayerId)) {
+            return state.players().containsKey(actorPlayerId);
+        }
+        PlayerStateDto actor = state.players().get(actorPlayerId);
+        return actor != null
+                && "GM_CONTROLLED_NPC".equals(actor.controlType())
+                && requesterPlayerId.equals(actor.controllerPlayerId());
     }
 
     private ScreenActionDto resolvePendingAction(SessionStateDto state,

@@ -24,7 +24,9 @@ public record PlayerStateDto(
         int ownedCardCount,
         int maxOwnedCardCount,
         boolean forgettingRequired,
-        List<EquippedItemDto> equippedItems
+        List<EquippedItemDto> equippedItems,
+        String controlType,
+        String controllerPlayerId
 ) {
     public record EquippedItemDto(
             String slot,

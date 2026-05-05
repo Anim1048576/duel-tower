@@ -70,9 +70,12 @@ public final class PlayerState {
     private final List<OwnedCard> ownedCards = new ArrayList<>();
     private final List<String> deckOwnedCardIds = new ArrayList<>();
     private boolean ready;
+    private PlayerControlType controlType = PlayerControlType.HUMAN;
+    private PlayerId controllerPlayerId;
 
     public PlayerState(PlayerId playerId) {
         this.playerId = playerId;
+        this.controllerPlayerId = playerId;
         // 기본 스탯 0 기준으로도 maxHp>=20이므로 안전
         this.hp = maxHp();
         this.ap = maxAp();
@@ -252,6 +255,30 @@ public final class PlayerState {
 
     public boolean ready() { return ready; }
     public void ready(boolean value) { this.ready = value; }
+
+    public PlayerControlType controlType() { return controlType; }
+    public void controlType(PlayerControlType value) {
+        this.controlType = (value == null) ? PlayerControlType.HUMAN : value;
+        if (this.controlType == PlayerControlType.HUMAN) {
+            this.controllerPlayerId = playerId;
+        }
+    }
+
+    public PlayerId controllerPlayerId() {
+        return controllerPlayerId == null ? playerId : controllerPlayerId;
+    }
+
+    public void controllerPlayerId(PlayerId value) {
+        this.controllerPlayerId = value == null ? playerId : value;
+    }
+
+    public void markGmControlledNpc(PlayerId controllerPlayerId) {
+        if (controllerPlayerId == null) {
+            throw new IllegalArgumentException("controllerPlayerId is required");
+        }
+        this.controlType = PlayerControlType.GM_CONTROLLED_NPC;
+        this.controllerPlayerId = controllerPlayerId;
+    }
 
     public void deckOwnedCardIds(Collection<String> value) {
         Objects.requireNonNull(value, "deckOwnedCardIds is required");

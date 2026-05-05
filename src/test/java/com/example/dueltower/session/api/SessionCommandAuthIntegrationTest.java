@@ -166,6 +166,88 @@ class SessionCommandAuthIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void gmControlledNpcIsAddedAsSessionParticipant() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSessionInfo(gmSession, "gm");
+
+        mockMvc.perform(post("/api/sessions/{code}/gm-npcs", info.code())
+                        .header("X-GM-Token", info.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionCode").value(info.code()))
+                .andExpect(jsonPath("$.npcPlayerId").value("gm-npc-1"));
+
+        mockMvc.perform(post("/api/sessions/{code}/command", info.code())
+                        .header("X-GM-Token", info.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "START_COMBAT",
+                                  "playerId": "gm-npc-1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accepted").value(true))
+                .andExpect(jsonPath("$.state.players.gm-npc-1.controlType").value("GM_CONTROLLED_NPC"))
+                .andExpect(jsonPath("$.state.players.gm-npc-1.controllerPlayerId").value("gm"))
+                .andExpect(jsonPath("$.state.combat.turnOrder").isArray());
+    }
+
+    @Test
+    void gmControllerCanIssueNpcPlayerCommand() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSessionInfo(gmSession, "gm");
+        String gmPlayerToken = joinAsPlayer(gmSession, info.code(), "gm");
+
+        mockMvc.perform(post("/api/sessions/{code}/gm-npcs", info.code())
+                        .header("X-GM-Token", info.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/sessions/{code}/command", info.code())
+                        .header("X-Player-Token", gmPlayerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "CLEAR_RECENT_RESULTS",
+                                  "playerId": "gm-npc-1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accepted").value(true));
+    }
+
+    @Test
+    void otherPlayerCannotIssueNpcPlayerCommand() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm", "gm@example.com", "password123");
+        SessionInfo info = createSessionInfo(gmSession, "gm");
+        MockHttpSession playerSession = signUpAndLogin("player2", "player2@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, info.code(), "player2");
+
+        mockMvc.perform(post("/api/sessions/{code}/gm-npcs", info.code())
+                        .header("X-GM-Token", info.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/sessions/{code}/command", info.code())
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "CLEAR_RECENT_RESULTS",
+                                  "playerId": "gm-npc-1",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
 
     @Test
     @DisplayName("아이템 사용은 플레이어 토큰이 없으면 401을 반환한다")

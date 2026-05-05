@@ -177,7 +177,9 @@ public final class StateMapper {
                                     def != null && def.action() != null
                             );
                         })
-                        .toList()
+                        .toList(),
+                ps.controlType().name(),
+                ps.controllerPlayerId().value()
         );
     }
 
