@@ -98,12 +98,12 @@
   }
 
   function getInvalidAccessMessage(nextRouteCode: string | null, nextAccess: StoredSessionAccess | null) {
-    if (!nextRouteCode) return '?꾩옱 ?뚮젅?댁뼱 濡쒕퉬 URL???몄뀡 肄붾뱶媛 ?놁뒿?덈떎.'
+    if (!nextRouteCode) return '현재 플레이어 로비 URL에 세션 코드가 없습니다.'
     if (!isStoredPlayerSessionAccess(nextAccess)) {
-      return '?뚮젅?댁뼱 沅뚰븳???놁뒿?덈떎. ?몄뀡 ?낆옣?먯꽌 ?ㅼ떆 ?ㅼ뼱媛 二쇱꽭??'
+      return '플레이어 권한이 없습니다. 세션 입장에서 다시 들어가 주세요.'
     }
     if (!hasStoredSessionCode(nextAccess, nextRouteCode)) {
-      return '??λ맂 ?몄뀡 沅뚰븳???붿껌 肄붾뱶? ?ㅻ쫭?덈떎.'
+      return '저장된 세션 권한이 요청 코드와 다릅니다.'
     }
     return null
   }
@@ -209,7 +209,7 @@
         }
       },
       onError: (error) => {
-        errorMessage = getApiErrorMessage(error, '?뚮젅?댁뼱 濡쒕퉬瑜??덈줈怨좎묠?섏? 紐삵뻽?듬땲??')
+        errorMessage = getApiErrorMessage(error, '플레이어 로비를 새로고침하지 못했습니다.')
       },
     })
   }
@@ -347,8 +347,8 @@
       await refreshPlayerLobbyScreen('action-toggle-ready')
       actionSuccessTitle = 'Ready updated'
       actionSuccessMessage = requestedReady
-        ? '以鍮??곹깭?낅땲??'
-        : '以鍮??곹깭瑜??댁젣?덉뒿?덈떎.'
+        ? '준비 상태입니다.'
+        : '준비 상태를 해제했습니다.'
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, 'Unable to update the current ready state.')
     } finally {
@@ -389,7 +389,7 @@
 
     if (normalizedDraft.characterId === null) {
       actionErrorTitle = 'Loadout save failed'
-      actionErrorMessage = '濡쒕뱶?꾩썐 ?????罹먮┃?곕? ?좏깮??二쇱꽭??'
+      actionErrorMessage = '로드아웃 저장을 위해 캐릭터를 선택해 주세요.'
       actionSuccessTitle = null
       actionSuccessMessage = null
       return
@@ -399,7 +399,7 @@
     const requiresExCard = 'exCardId' in savePayload && typeof savePayload.exCardId === 'string'
     if (requiresExCard && !normalizedDraft.exCardId) {
       actionErrorTitle = 'Loadout save failed'
-      actionErrorMessage = '濡쒕뱶?꾩썐 ?????EX 移대뱶瑜??좏깮??二쇱꽭??'
+      actionErrorMessage = '로드아웃 저장을 위해 EX 카드를 선택해 주세요.'
       actionSuccessTitle = null
       actionSuccessMessage = null
       return
@@ -467,7 +467,7 @@
       ) {
         return
       }
-      deckPreviewErrorMessage = getApiErrorMessage(error, '??誘몃━蹂닿린瑜??덈줈怨좎묠?섏? 紐삵뻽?듬땲??')
+      deckPreviewErrorMessage = getApiErrorMessage(error, '덱 미리보기를 새로고침하지 못했습니다.')
     } finally {
       if (
         requestId === latestDeckPreviewRequestId &&
@@ -606,35 +606,35 @@
 
 <div class="player-lobby-page">
   {#if loading}
-    <SectionFrame eyebrow="Player Lobby" title="Loading player lobby" description="?뚮젅?댁뼱 濡쒕퉬瑜?遺덈윭?ㅻ뒗 以묒엯?덈떎.">
+    <SectionFrame eyebrow="Player Lobby" title="Loading player lobby" description="플레이어 로비를 불러오는 중입니다.">
       <ContentStatePanel title={sessionPageStateCopy.loading.title} message={sessionPageStateCopy.loading.message} />
     </SectionFrame>
   {:else if invalidAccessMessage}
-    <SectionFrame eyebrow="Player Access" title={sessionPageStateCopy.invalidPlayerAccess.title} description="?뚮젅?댁뼱 沅뚰븳???꾩슂?⑸땲??">
+    <SectionFrame eyebrow="Player Access" title={sessionPageStateCopy.invalidPlayerAccess.title} description="플레이어 권한이 필요합니다.">
       <ContentStatePanel title={sessionPageStateCopy.invalidPlayerAccess.title} message={invalidAccessMessage} tone="error" />
       <div class="player-lobby-page__actions">
         <a class="player-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Back to session entry</a>
       </div>
     </SectionFrame>
   {:else if notFound}
-    <SectionFrame eyebrow="Session Missing" title="Session not found" description="?붿껌???몄뀡??李얠쓣 ???놁뒿?덈떎.">
+    <SectionFrame eyebrow="Session Missing" title="Session not found" description="요청한 세션을 찾을 수 없습니다.">
       <ContentStatePanel title={sessionPageStateCopy.notFound.title} message={sessionPageStateCopy.notFound.message} tone="error">
         <p>Requested code: {requestedSessionCode ?? 'Unavailable'}</p>
-        <p>?몄뀡 肄붾뱶瑜??뺤씤?섍퀬 ?ㅼ떆 ?쒕룄??二쇱꽭??</p>
+        <p>세션 코드를 확인하고 다시 시도해 주세요.</p>
       </ContentStatePanel>
       <div class="player-lobby-page__actions">
         <a class="player-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Back to session entry</a>
       </div>
     </SectionFrame>
   {:else if errorMessage}
-    <SectionFrame eyebrow="Session Summary" title="Player lobby could not be loaded" description="?뚮젅?댁뼱 濡쒕퉬瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??">
+    <SectionFrame eyebrow="Session Summary" title="Player lobby could not be loaded" description="플레이어 로비를 불러오지 못했습니다.">
       <ContentStatePanel title="Unable to load player lobby" message={errorMessage} tone="error" actionLabel="Retry load" onAction={retryLoad} />
       <div class="player-lobby-page__actions">
         <a class="player-lobby-page__link-action" data-nav href={pathBuilders.sessionEntry()}>Back to session entry</a>
       </div>
     </SectionFrame>
   {:else if screen && localPresentation}
-    <SectionFrame eyebrow="Session Summary" title={`Session ${screen.sessionCode}`} description="?뚮젅?댁뼱 濡쒕퉬 ?곹깭瑜??뺤씤?⑸땲??">
+    <SectionFrame eyebrow="Session Summary" title={`Session ${screen.sessionCode}`} description="플레이어 로비 상태를 확인합니다.">
       <div class="player-lobby-page__summary">
         <div class="player-lobby-page__summary-copy">
           <p>Player lobby</p>
@@ -664,7 +664,7 @@
     </SectionFrame>
 
     <div class="player-lobby-page__main">
-      <SectionFrame title="Participant slots" description="李멸???紐⑸줉?낅땲??">
+      <SectionFrame title="Participant slots" description="참가자 목록입니다.">
         {#if screen.participantSlots.length > 0}
           <div class="player-lobby-page__slots">
             {#each screen.participantSlots as participant}
@@ -672,11 +672,11 @@
             {/each}
           </div>
         {:else}
-          <ContentStatePanel title="No participants yet" message="?꾩쭅 李멸??먭? ?놁뒿?덈떎." />
+          <ContentStatePanel title="No participants yet" message="아직 참가자가 없습니다." />
         {/if}
       </SectionFrame>
 
-      <SectionFrame title="Current loadout" description="?꾩옱 濡쒕뱶?꾩썐???몄쭛?⑸땲??">
+      <SectionFrame title="Current loadout" description="현재 로드아웃을 편집합니다.">
         <div class="player-lobby-page__guide">
           <p>Current player id: {screen.me.playerId}</p>
           <p>Ready state: {screen.me.summary.readyLabel}</p>
@@ -702,16 +702,16 @@
           </div>
         </div>
         <div class="player-lobby-page__todo">
-          <p>{localPresentation.dirty ? '??λ릺吏 ?딆? 蹂寃쎌궗??씠 ?덉뒿?덈떎.' : '蹂寃쎌궗??씠 ?놁뒿?덈떎.'}</p>
+          <p>{localPresentation.dirty ? '저장되지 않은 변경사항이 있습니다.' : '변경사항이 없습니다.'}</p>
           <p>
             {#if localPresentation.characterChangePending}
-              ?깆쓣 ?섏젙?섍린 ?꾩뿉 罹먮┃???좏깮????ν빐 二쇱꽭??
+              덱을 수정하기 전에 캐릭터 선택을 저장해 주세요.
             {:else if deckPreviewErrorMessage && staleDeckPreviewVisible}
-              誘몃━蹂닿린瑜?遺덈윭?ㅼ? 紐삵빐 ?댁쟾 寃곌낵瑜??쒖떆?⑸땲??
+              미리보기를 불러오지 못해 이전 결과를 표시합니다.
             {:else if localPresentation.dirty && !currentDeckPreviewMatchesDraft}
-              誘몃━蹂닿린瑜?遺덈윭?ㅻ뒗 以묒엯?덈떎.
+              미리보기를 불러오는 중입니다.
             {:else}
-              ?꾩옱 ???몄쭛 ?곹깭?낅땲??
+              현재 편집 상태입니다.
             {/if}
           </p>
           {#if localPresentation.deckEditingLocked}
@@ -722,12 +722,12 @@
     </div>
 
     <div class="player-lobby-page__main">
-      <SectionFrame title="Direct loadout save" description="濡쒕뱶?꾩썐????ν빀?덈떎.">
+      <SectionFrame title="Direct loadout save" description="로드아웃을 저장합니다.">
         {#if loadoutEditGuardMessage}
           <ContentStatePanel title="Loadout editing unavailable" message={loadoutEditGuardMessage} tone="error" />
         {/if}
         {#if localPresentation.characterChangePending}
-          <ContentStatePanel title="Character change pending" message="罹먮┃???좏깮??癒쇱? ??ν빐 二쇱꽭??" />
+          <ContentStatePanel title="Character change pending" message="캐릭터 선택을 먼저 저장해 주세요." />
         {/if}
         {#if localPresentation.deckEditingLocked}
           <ContentStatePanel title="Deck editing locked" message={localPresentation.deckEditingLockReason} />
@@ -808,18 +808,18 @@
             title="Deck preview source"
             message={localPresentation.dirty
               ? deckPreviewErrorMessage && staleDeckPreviewVisible
-                ? '誘몃━蹂닿린瑜?遺덈윭?ㅼ? 紐삵빐 ?댁쟾 寃곌낵瑜??쒖떆?⑸땲??'
+                ? '미리보기를 불러오지 못해 이전 결과를 표시합니다.'
                 : currentDeckPreviewMatchesDraft
-                ? '理쒖떊 誘몃━蹂닿린瑜??쒖떆?⑸땲??'
-                : '誘몃━蹂닿린瑜?遺덈윭?ㅻ뒗 以묒엯?덈떎.'
-              : '?꾩옱 濡쒕퉬 ?곹깭瑜??쒖떆?⑸땲??'}
+                ? '최신 미리보기를 표시합니다.'
+                : '미리보기를 불러오는 중입니다.'
+              : '현재 로비 상태를 표시합니다.'}
           />
         </div>
       </SectionFrame>
 
     </div>
 
-    <SectionFrame title="Action zone" description="以鍮??곹깭? ?댁옣??泥섎━?⑸땲??">
+    <SectionFrame title="Action zone" description="준비 상태와 퇴장을 처리합니다.">
       <div class="player-lobby-page__guide">
         <p>Current ready state: {screen.me.summary.readyLabel}</p>
         <p>{screen.me.summary.membershipSummary}</p>

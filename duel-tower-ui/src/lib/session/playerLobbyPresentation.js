@@ -146,7 +146,7 @@ function buildReferencePreview(option, emptyLabel, missingKind) {
 
   return {
     label: `${missingKind} (unresolved)`,
-    subtitle: '?꾩옱 ?좏깮媛믪쓣 ?ъ슜?????놁뒿?덈떎.',
+    subtitle: '현재 선택값을 사용할 수 없습니다.',
     tags: /** @type {EntityListTag[]} */ ([{ label: 'Unresolved', tone: 'warning' }]),
   }
 }
@@ -166,7 +166,7 @@ function buildPassiveItems(identifiers, options) {
         title: passiveId,
         subtitle: 'Passive id in the current local draft',
         meta: `Entry ${index + 1}`,
-        note: '???⑥떆釉?id瑜??ъ슜?????놁뒿?덈떎.',
+        note: '이 패시브 id를 사용할 수 없습니다.',
         tags: /** @type {EntityListTag[]} */ ([{ label: 'Unresolved', tone: 'warning' }]),
       }
     }
