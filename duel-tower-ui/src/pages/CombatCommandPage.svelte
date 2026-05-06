@@ -755,6 +755,8 @@
       return requirement.unsupportedReason
     }
 
+    const hasBoardObjectRequirement = Boolean(requirement.boardObjectRequirement)
+
     if (requirement.boardObjectRequirement) {
       const selectedBoardKeys = filterBoardSelectionKeysForRequirement(
         buildSelectedBoardObjectKeys(selectedTargetKeys, selectedFieldIds),
@@ -780,7 +782,8 @@
       }
     }
 
-    if (requirement.targetRule?.requiredSelection && selectedTargetKeys.length === 0) {
+    // boardObjectRequirement is the unified selection path, so legacy target/selectedIds checks must not double-block it.
+    if (!hasBoardObjectRequirement && requirement.targetRule?.requiredSelection && selectedTargetKeys.length === 0) {
       return requirement.targetSummary
     }
 
@@ -794,7 +797,7 @@
       }
     }
 
-    if (requirement.selectedIdsRequirement) {
+    if (!hasBoardObjectRequirement && requirement.selectedIdsRequirement) {
       const { minSelections, maxSelections } = requirement.selectedIdsRequirement
       if (selectedFieldIds.length < minSelections) {
         return requirement.selectedIdsSummary
