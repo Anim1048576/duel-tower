@@ -153,6 +153,15 @@ function getPendingDecisionSignature(screen) {
 }
 
 /**
+ * @param {import('../api/screenTypes').CombatScreenResponse | null | undefined} screen
+ */
+export function getPlayCardSourceOptions(screen) {
+  const action = (screen?.possibleActions ?? []).find((candidate) => candidate.id === 'combat.playCard') ?? null
+  const metadata = action?.metadata
+  return metadata?.kind === 'playCard' ? (metadata.sourceOptions ?? []) : []
+}
+
+/**
  * @template T
  * @param {T[]} values
  * @returns {T[]}
@@ -178,6 +187,7 @@ export function reconcileCombatLocalSelectionState(nextScreen, currentState, { r
   const nextPendingSignature = getPendingDecisionSignature(nextScreen)
   const pendingChanged = previousPendingSignature !== nextPendingSignature
   const validHandIds = new Set((nextScreen?.zones?.hand ?? []).map((/** @type {import('../api/screenTypes').CombatCardDto} */ card) => card.instanceId))
+  const playableHandIds = new Set(getPlayCardSourceOptions(nextScreen).map((source) => source.instanceId))
   const validFieldIds = new Set((nextScreen?.zones?.field ?? []).map((/** @type {import('../api/screenTypes').CombatCardDto} */ card) => card.instanceId))
   const validTargetKeys = new Set()
   const validCandidateIds = new Set(nextPendingSchema?.candidateIds ?? [])
@@ -223,7 +233,7 @@ export function reconcileCombatLocalSelectionState(nextScreen, currentState, { r
       : null
 
   const nextSelectedCardId =
-    nextState.selectedCardId && validHandIds.has(nextState.selectedCardId) ? nextState.selectedCardId : null
+    nextState.selectedCardId && playableHandIds.has(nextState.selectedCardId) ? nextState.selectedCardId : null
   const selectedCardLost = nextState.selectedCardId !== null && nextSelectedCardId === null
   nextState.selectedCardId = nextSelectedCardId
 

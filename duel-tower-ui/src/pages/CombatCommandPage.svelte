@@ -62,6 +62,7 @@
   } from '../lib/session/combatBoardSelection.js'
   import { readStoredSessionAccess, type StoredSessionAccess } from '../lib/session/access'
   import {
+    getPlayCardSourceOptions,
     reconcileCombatLocalSelectionState,
     resolveCombatScreenRefreshPlan,
   } from '../lib/session/combatScreenRefresh.js'
@@ -532,17 +533,15 @@
   }
 
   function findSelectedPlayCardSource(screenModel: CombatScreenResponse | null, instanceId: string | null) {
-    if (!screenModel || !instanceId) {
+    if (!instanceId) {
       return null
     }
 
-    const action = findCombatAction(screenModel, 'combat.playCard')
-    const metadata = action?.metadata
-    if (!metadata || metadata.kind !== 'playCard') {
-      return null
-    }
+    return getPlayCardSourceOptions(screenModel).find((option) => option.instanceId === instanceId) ?? null
+  }
 
-    return metadata.sourceOptions.find((option) => option.instanceId === instanceId) ?? null
+  function hasPlayableCardSource(screenModel: CombatScreenResponse | null, instanceId: string | null) {
+    return Boolean(findSelectedPlayCardSource(screenModel, instanceId))
   }
 
   function getPendingMetadata(screenModel: CombatScreenResponse | null) {
@@ -1051,6 +1050,16 @@
   }
 
   function handleSelectHandCard(instanceId: string) {
+    if (!hasPlayableCardSource(screen, instanceId)) {
+      if (selectedCardId === instanceId) {
+        selectedCardId = null
+      }
+      selectedActionId = selectedActionId === 'combat.playCard' ? null : selectedActionId
+      actionErrorMessage = 'That hand card is not currently playable.'
+      return
+    }
+
+    actionErrorMessage = null
     const nextSelectedCardId = selectedCardId === instanceId ? null : instanceId
     selectedCardId = nextSelectedCardId
     selectedActionId = 'combat.playCard'
@@ -1152,10 +1161,14 @@
       null
     )
   })
-  const selectedCardView = $derived.by(() =>
-    selectedCardId ? (visiblePlayerView?.handCards.find((card) => card.instanceId === selectedCardId) ?? null) : null,
-  )
   const selectedPlayCardSource = $derived.by(() => findSelectedPlayCardSource(screen, selectedCardId))
+  const selectedCardView = $derived.by(() =>
+    selectedCardId
+      ? (toCardView(selectedPlayCardSource?.sourceCard) ??
+        visiblePlayerView?.handCards.find((card) => card.instanceId === selectedCardId) ??
+        null)
+      : null,
+  )
   const pendingActionMetadata = $derived.by(() => getPendingMetadata(screen))
   const pendingDecision = $derived.by(() => createCombatPendingDecisionView(pendingActionMetadata))
   const pendingLocalBlock = $derived.by(() => getPendingLocalBlock(pendingActionMetadata))

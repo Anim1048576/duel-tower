@@ -18,6 +18,7 @@ function runTest(name, fn) {
 function createScreen({
   version = 7,
   handIds = ['card-1', 'card-2'],
+  sourceOptionIds = handIds,
   fieldIds = ['field-1', 'field-2'],
   candidateIds = ['candidate-1', 'candidate-2'],
   actorKeys = ['P:p1', 'E:e1'],
@@ -37,7 +38,13 @@ function createScreen({
       summons: [{ owner: 'p1', summonId: 's1' }],
     },
     possibleActions: [
-      { id: 'combat.playCard' },
+      {
+        id: 'combat.playCard',
+        metadata: {
+          kind: 'playCard',
+          sourceOptions: sourceOptionIds.map((instanceId) => ({ instanceId })),
+        },
+      },
       {
         id: 'combat.resolvePending',
         metadata: {
@@ -115,6 +122,38 @@ runTest('selected card loss clears play-card-specific helper input while preserv
       reason: 'polling',
       previousScreen: createScreen(),
     }),
+    {
+      ...createEmptyCombatLocalSelectionState(),
+      selectedActionId: 'combat.playCard',
+      selectedPlayerId: 'p2',
+      selectedCardId: null,
+    },
+  )
+})
+
+runTest('polling clears selected card when it is visible in hand but no longer a playable source option', () => {
+  const currentState = {
+    ...createEmptyCombatLocalSelectionState(),
+    selectedActionId: 'combat.playCard',
+    selectedPlayerId: 'p2',
+    selectedCardId: 'card-2',
+    selectedTargetKeys: ['enemy:e1'],
+    selectedDiscardIds: ['card-1'],
+    selectedFieldIds: ['field-1'],
+  }
+
+  assert.deepEqual(
+    reconcileCombatLocalSelectionState(
+      createScreen({
+        handIds: ['card-1', 'card-2'],
+        sourceOptionIds: ['card-1'],
+      }),
+      currentState,
+      {
+        reason: 'polling',
+        previousScreen: createScreen(),
+      },
+    ),
     {
       ...createEmptyCombatLocalSelectionState(),
       selectedActionId: 'combat.playCard',
