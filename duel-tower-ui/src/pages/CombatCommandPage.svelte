@@ -210,6 +210,7 @@
   function clearActionFeedback() {
     actionErrorMessage = null
     actionSuccessMessage = null
+    pendingActionId = null
   }
 
   function setActiveSidebarTab(nextTab: CombatSidebarTab) {
@@ -609,19 +610,24 @@
   }
 
   function debugCombatSelectionReconcile(
+    reason: CombatRefreshReason,
     previousState: Pick<CombatLocalSelectionState, 'selectedActionId' | 'selectedCardId'>,
     nextState: Pick<CombatLocalSelectionState, 'selectedActionId' | 'selectedCardId'>,
     screenModel: CombatScreenResponse | null,
+    previousActionErrorMessage: string | null,
   ) {
     if (!import.meta.env.DEV) {
       return
     }
 
-    console.debug('Combat selection reconciled', {
+    console.debug('Combat screen applied', {
+      reason,
       previousSelectedActionId: previousState.selectedActionId,
       previousSelectedCardId: previousState.selectedCardId,
       nextSelectedActionId: nextState.selectedActionId,
       nextSelectedCardId: nextState.selectedCardId,
+      previousActionErrorMessage,
+      nextActionErrorMessage: actionErrorMessage,
       possibleActionIds: screenModel?.possibleActions.map((action) => action.id) ?? [],
       playCardSourceOptionIds: getPlayCardSourceOptions(screenModel).map((option) => option.instanceId),
     })
@@ -650,10 +656,15 @@
   }
 
   function applyScreen(nextScreen: CombatScreenResponse, reason: CombatRefreshReason) {
+    const plan = resolveCombatScreenRefreshPlan(reason)
     const previousScreen = screen
     const previousSelection = {
       selectedActionId,
       selectedCardId,
+    }
+    const previousActionErrorMessage = actionErrorMessage
+    if (plan.clearActionFeedback) {
+      clearActionFeedback()
     }
     screen = nextScreen
     syncSessionSelectionHandoff(nextScreen.sessionCode)
@@ -664,10 +675,10 @@
     writeLocalSelectionState(nextSelectionState)
     reconcileSelectedActionIdWithScreen(nextScreen)
     reconcileSelectedCardIdWithPlayCardSources(nextScreen)
-    debugCombatSelectionReconcile(previousSelection, {
+    debugCombatSelectionReconcile(reason, previousSelection, {
       selectedActionId,
       selectedCardId,
-    }, nextScreen)
+    }, nextScreen, previousActionErrorMessage)
     reconcilePresentationState(nextScreen)
 
     if (!getRouteSessionCode() && nextScreen.sessionCode) {
@@ -952,7 +963,7 @@
 
   function getActionPresentationBlock(action: CombatScreenAction | null) {
     if (!action) {
-      return 'Combat action is unavailable.'
+      return null
     }
 
     if (!action.enabled) {
@@ -993,6 +1004,21 @@
     }
 
     return null
+  }
+
+  function getActionExecutionBlock(action: CombatScreenAction | null) {
+    return action ? getActionPresentationBlock(action) : 'Combat action is unavailable.'
+  }
+
+  function getCommandGuardMessage(action: CombatScreenAction | null) {
+    if (!screen) {
+      return 'Combat access is unavailable.'
+    }
+
+    const actionMessage = action ? getActionPresentationBlock(action) : 'Select a command.'
+    const statusMessage = `Expected version ${screen.access.expectedVersion} | Runtime role ${screen.access.role} | Current actor ${screen.status.currentActor?.label ?? 'Unavailable'}`
+
+    return actionMessage ? `${actionMessage} ${statusMessage}` : statusMessage
   }
 
   function buildActionBody(action: CombatScreenAction) {
@@ -1104,7 +1130,7 @@
     selectedActionId = action.id
     reconcileSelectedCardIdWithPlayCardSources(screen)
 
-    const blockedMessage = getActionPresentationBlock(action)
+    const blockedMessage = getActionExecutionBlock(action)
 
     if (blockedMessage) {
       actionErrorMessage = blockedMessage
@@ -1162,8 +1188,7 @@
 
     const normalizedActionId = normalizeCombatActionId(actionId)
     if (!normalizedActionId) {
-      actionErrorMessage = '현재 화면에서 사용할 수 없는 액션입니다. 화면을 새로고침했습니다.'
-      actionSuccessMessage = null
+      void executeAction(actionId)
       return
     }
 
@@ -1172,9 +1197,7 @@
       if (selectedActionId === normalizedActionId) {
         selectedActionId = null
       }
-      actionErrorMessage = '현재 화면에서 사용할 수 없는 액션입니다. 화면을 새로고침했습니다.'
-      actionSuccessMessage = null
-      void refreshCombatScreen('action-failure')
+      void executeAction(actionId)
       return
     }
 
@@ -1192,7 +1215,7 @@
       return
     }
 
-    if (action.id === 'combat.useEx' && !getActionPresentationBlock(action)) {
+    if (action.id === 'combat.useEx' && !getActionExecutionBlock(action)) {
       void executeAction(action.id)
     }
   }
@@ -1229,7 +1252,6 @@
         selectedCardId = null
       }
       selectedActionId = selectedActionId === 'combat.playCard' ? null : selectedActionId
-      actionErrorMessage = '현재 사용할 수 없는 손패 카드입니다.'
       return
     }
 
@@ -1349,7 +1371,6 @@
     screen && selectedActionId ? findCombatAction(screen, selectedActionId) : null,
   )
   const selectedActionRequirement = $derived.by(() => getSelectedActionRequirementView(selectedAction))
-  const selectedActionLocalBlock = $derived.by(() => getActionPresentationBlock(selectedAction))
   const selectedRequirementView = $derived.by(() => {
     if (!selectedAction?.metadata) {
       return null
@@ -1500,11 +1521,7 @@
     }) satisfies CommandOptionViewModel[]
   })
   const commandGuardMessage = $derived.by(() => {
-    if (!screen) {
-      return 'Combat access is unavailable.'
-    }
-
-    return `Expected version ${screen.access.expectedVersion} | Runtime role ${screen.access.role} | Current actor ${screen.status.currentActor?.label ?? 'Unavailable'}`
+    return getCommandGuardMessage(selectedAction)
   })
   const eventFeedEntries = $derived.by(() => (screen?.sidebar.events ?? []) satisfies CombatFeedEntry[])
   const logFeedEntries = $derived.by(() => (screen?.sidebar.logs ?? []) satisfies CombatFeedEntry[])
@@ -1616,7 +1633,7 @@
           {latestRecentResult}
           {accessNoticeMessage}
           catalogErrorMessage={null}
-          commandErrorMessage={actionErrorMessage ?? refreshErrorMessage ?? selectedActionLocalBlock}
+          commandErrorMessage={actionErrorMessage}
           commandRejectedMessage={null}
           commandSuccessMessage={actionSuccessMessage}
           onToggleExpanded={toggleHeaderExpanded}
