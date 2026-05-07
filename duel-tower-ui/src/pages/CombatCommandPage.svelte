@@ -2,15 +2,16 @@
   import { onDestroy, onMount } from 'svelte'
   import { getScreen, invokeScreenAction } from '../lib/api/screens'
   import {
-    buildScreenActionPayload,
     findCombatAction,
     type CombatActionId,
     type CombatCardDto,
     type CombatPendingActionMetadataDto,
+    type CombatPlayCardSourceOptionDto,
     type CombatRequirementViewDto,
     type CombatScreenAction,
     type CombatScreenActionResponse,
     type CombatScreenResponse,
+    type ScreenActionPayloadTemplate,
   } from '../lib/api/screenTypes'
   import type { RunRecentResultDto, TargetRefDto } from '../lib/api/sessionTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
@@ -103,6 +104,9 @@
     | 'polling'
     | 'action-success'
     | 'action-failure'
+  type LocalActionValidationResult =
+    | { ok: true }
+    | { ok: false; message: string; clearSelectedCard?: boolean; selectedSource?: CombatPlayCardSourceOptionDto | null }
 
   /**
    * Combat page boundary:
@@ -1021,10 +1025,141 @@
     return actionMessage ? `${actionMessage} ${statusMessage}` : statusMessage
   }
 
+  function debugCombatCommandClick(actionId: string) {
+    if (!import.meta.env.DEV) {
+      return
+    }
+
+    console.debug('[combat] command button clicked', {
+      actionId,
+      selectedActionId,
+      selectedPlayerId,
+      selectedCardId,
+      selectedTargetKeys,
+      selectedFieldIds,
+      selectedDiscardIds,
+      selectedCount,
+      possibleActions: screen?.possibleActions.map((action) => ({
+        id: action.id,
+        label: action.label,
+        enabled: action.enabled,
+        disabledReason: action.disabledReason?.userMessage ?? null,
+      })) ?? [],
+      playCardSourceOptions: getPlayCardSourceOptions(screen).map((source) => ({
+        instanceId: source.instanceId,
+        title: source.title,
+        supported: source.supported,
+        unsupportedReason: source.unsupportedReason,
+      })),
+    })
+  }
+
+  function debugPlayCardBlockedLocally(
+    reason: string,
+    selectedSource: CombatPlayCardSourceOptionDto | null = null,
+  ) {
+    if (!import.meta.env.DEV) {
+      return
+    }
+
+    console.debug('[combat] playCard blocked locally', {
+      reason,
+      selectedCardId,
+      selectedSource,
+    })
+  }
+
+  function debugCombatActionInvoke(action: CombatScreenAction, payload: ScreenActionPayloadTemplate) {
+    if (!import.meta.env.DEV) {
+      return
+    }
+
+    console.debug('[combat] invoking action', {
+      actionId: action.id,
+      href: action.href,
+      method: action.method,
+      payload,
+    })
+  }
+
+  function debugCombatActionResponse(action: CombatScreenAction, response: CombatScreenActionResponse) {
+    if (!import.meta.env.DEV) {
+      return
+    }
+
+    console.debug('[combat] action response received', {
+      actionId: action.id,
+      success: response.success,
+      outcome: response.outcome,
+      message: response.message,
+      disabledReason: response.disabledReason?.userMessage ?? null,
+      latestVersion: response.latestVersion,
+      hasLatestScreen: Boolean(response.latestScreen),
+    })
+  }
+
+  function setLocalActionBlock(
+    message: string,
+    options: { clearSelectedCard?: boolean; selectedSource?: CombatPlayCardSourceOptionDto | null } = {},
+  ) {
+    if (options.clearSelectedCard) {
+      selectedCardId = null
+    }
+    activeSidebarTab = 'command'
+    actionErrorMessage = message
+    actionSuccessMessage = null
+  }
+
+  function buildPayloadWithCurrentVersion(
+    action: CombatScreenAction,
+    patch: ScreenActionPayloadTemplate | null | undefined = undefined,
+  ) {
+    return {
+      ...(action.payloadTemplate ?? {}),
+      expectedVersion: screen?.access.expectedVersion ?? screen?.version,
+      ...(patch ?? {}),
+    } as ScreenActionPayloadTemplate
+  }
+
+  function validatePlayCardAction(action: CombatScreenAction | null): LocalActionValidationResult {
+    if (!screen || !action || action.id !== 'combat.playCard' || action.metadata?.kind !== 'playCard') {
+      return { ok: false, message: 'Combat action is unavailable.' }
+    }
+
+    if (!selectedCardId) {
+      return { ok: false, message: '먼저 사용할 손패 카드를 선택하세요.' }
+    }
+
+    const selectedSource = findSelectedPlayCardSource(screen, selectedCardId)
+    if (!selectedSource) {
+      return {
+        ok: false,
+        message: '선택한 카드를 현재 전투 액션으로 사용할 수 없습니다. 손패 상태를 다시 확인하세요.',
+        clearSelectedCard: true,
+        selectedSource: null,
+      }
+    }
+
+    if (!selectedSource.supported) {
+      return {
+        ok: false,
+        message: selectedSource.unsupportedReason ?? '이 카드는 현재 전투 단계에서 지원되지 않습니다.',
+        selectedSource,
+      }
+    }
+
+    const requirementBlock = getRequirementLocalBlock(selectedSource.requirementView)
+    if (requirementBlock) {
+      return { ok: false, message: requirementBlock, selectedSource }
+    }
+
+    return { ok: true }
+  }
+
   function buildActionBody(action: CombatScreenAction) {
     switch (action.id) {
       case 'combat.draw': {
-        const basePayload = buildScreenActionPayload(action, {})
+        const basePayload = buildPayloadWithCurrentVersion(action)
         return {
           ...basePayload,
           count: selectedCount ?? 1,
@@ -1032,30 +1167,34 @@
         }
       }
       case 'combat.endTurn': {
-        const basePayload = buildScreenActionPayload(action, {})
+        const basePayload = buildPayloadWithCurrentVersion(action)
         return {
           ...basePayload,
           reason: normalizeOptionalText(selectedReason),
         }
       }
       case 'combat.clearRecentResults': {
-        const basePayload = buildScreenActionPayload(action, {})
+        const basePayload = buildPayloadWithCurrentVersion(action)
         return {
           ...basePayload,
           reason: normalizeOptionalText(selectedReason),
         }
       }
       case 'combat.playCard': {
-        const basePayload = buildScreenActionPayload(action, {})
+        const basePayload = buildPayloadWithCurrentVersion(action)
         const requirement = getSelectedActionRequirementView(action)
         const boardSelectionPayload = buildBoardSelectionPayload(requirement)
         return {
           ...basePayload,
+          playerId:
+            typeof basePayload.playerId === 'string' && basePayload.playerId.trim()
+              ? basePayload.playerId
+              : selectedPlayerId ?? screen?.zones.visiblePlayerId ?? '',
           cardId: selectedCardId ?? '',
-          discardIds: selectedDiscardIds,
+          discardIds: [...selectedDiscardIds],
           selectedIds: requirement?.boardObjectRequirement
             ? boardSelectionPayload.selectedIds
-            : selectedFieldIds,
+            : [...selectedFieldIds],
           targets: requirement?.boardObjectRequirement
             ? boardSelectionPayload.targets
             : buildTargetRefs(selectedTargetKeys),
@@ -1063,7 +1202,7 @@
         }
       }
       case 'combat.useEx': {
-        const basePayload = buildScreenActionPayload(action, {})
+        const basePayload = buildPayloadWithCurrentVersion(action)
         const requirement = getSelectedActionRequirementView(action)
         const boardSelectionPayload = buildBoardSelectionPayload(requirement)
         return {
@@ -1075,7 +1214,7 @@
         }
       }
       case 'combat.resolvePending': {
-        const basePayload = buildScreenActionPayload(action, {})
+        const basePayload = buildPayloadWithCurrentVersion(action)
         const metadata = action.metadata
         const schema = metadata && metadata.kind === 'pendingDecision' ? metadata.schema : null
         const selectedIdsField = schema?.selectedIdsField
@@ -1128,13 +1267,25 @@
     }
 
     selectedActionId = action.id
-    reconcileSelectedCardIdWithPlayCardSources(screen)
 
-    const blockedMessage = getActionExecutionBlock(action)
+    if (action.id !== 'combat.playCard') {
+      reconcileSelectedCardIdWithPlayCardSources(screen)
+    }
+
+    const playCardValidation = action.id === 'combat.playCard' ? validatePlayCardAction(action) : null
+    if (playCardValidation && !playCardValidation.ok) {
+      debugPlayCardBlockedLocally(playCardValidation.message, playCardValidation.selectedSource ?? null)
+      setLocalActionBlock(playCardValidation.message, {
+        clearSelectedCard: playCardValidation.clearSelectedCard,
+        selectedSource: playCardValidation.selectedSource,
+      })
+      return
+    }
+
+    const blockedMessage = action.id === 'combat.playCard' ? null : getActionExecutionBlock(action)
 
     if (blockedMessage) {
-      actionErrorMessage = blockedMessage
-      actionSuccessMessage = null
+      setLocalActionBlock(blockedMessage)
       return
     }
 
@@ -1143,9 +1294,12 @@
     actionSuccessMessage = null
 
     try {
+      const payload = buildActionBody(action)
+      debugCombatActionInvoke(action, payload)
       const response = await invokeScreenAction<CombatScreenResponse, CombatScreenActionResponse>(action, {
-        body: buildActionBody(action),
+        body: payload,
       })
+      debugCombatActionResponse(action, response)
 
       if (response.latestScreen) {
         applyScreen(response.latestScreen, response.success ? 'action-success' : 'action-failure')
@@ -1182,6 +1336,8 @@
   }
 
   function handleCommandButtonClick(actionId: string) {
+    debugCombatCommandClick(actionId)
+
     if (!screen) {
       return
     }
@@ -1211,6 +1367,11 @@
       action.id === 'combat.endTurn' ||
       action.id === 'combat.clearRecentResults'
     ) {
+      void executeAction(action.id)
+      return
+    }
+
+    if (action.id === 'combat.playCard') {
       void executeAction(action.id)
       return
     }
@@ -1512,11 +1673,12 @@
     return screen.possibleActions.map((action) => {
       const presentationBlock = getActionPresentationBlock(action)
       const metadataNote = action.metadata && 'note' in action.metadata ? action.metadata.note : null
+      const disabled = action.id === 'combat.playCard' ? !action.enabled : Boolean(presentationBlock)
       return {
         id: action.id,
         title: action.label,
         note: presentationBlock ?? metadataNote ?? action.disabledReason?.userMessage ?? action.label,
-        disabled: Boolean(presentationBlock),
+        disabled,
       }
     }) satisfies CommandOptionViewModel[]
   })
