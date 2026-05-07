@@ -967,9 +967,29 @@
     }
 
     const action = findCombatAction(screen, actionId)
+
+    if (import.meta.env.DEV) {
+      console.debug('Combat executeAction', {
+        actionId,
+        possibleActionIds: screen.possibleActions.map((candidate) => candidate.id),
+        selectedActionId,
+        selectedCardId,
+      })
+    }
+
+    if (!action) {
+      if (selectedActionId === actionId) {
+        selectedActionId = null
+      }
+      actionErrorMessage = '현재 화면에서 사용할 수 없는 액션입니다. 화면을 새로고침했습니다.'
+      actionSuccessMessage = null
+      await refreshCombatScreen('action-failure')
+      return
+    }
+
     const blockedMessage = getActionPresentationBlock(action)
 
-    if (!action || blockedMessage) {
+    if (blockedMessage) {
       actionErrorMessage = blockedMessage
       actionSuccessMessage = null
       return
@@ -1008,28 +1028,38 @@
     }
   }
 
-  function handleCommandButtonClick(actionId: string) {
+  function handleCommandButtonClick(actionId: CombatActionId) {
     if (!screen) {
       return
     }
 
-    const normalizedActionId = actionId as CombatActionId
-    selectedActionId = normalizedActionId
-    prepareBoardSelectionState(getSelectedActionRequirementView(findCombatAction(screen, normalizedActionId)), {
-      resetCountChoice: normalizedActionId === 'combat.useEx',
-    })
-
-    if (
-      normalizedActionId === 'combat.draw' ||
-      normalizedActionId === 'combat.endTurn' ||
-      normalizedActionId === 'combat.clearRecentResults'
-    ) {
-      void executeAction(normalizedActionId)
+    const action = findCombatAction(screen, actionId)
+    if (!action) {
+      if (selectedActionId === actionId) {
+        selectedActionId = null
+      }
+      actionErrorMessage = '현재 화면에서 사용할 수 없는 액션입니다. 화면을 새로고침했습니다.'
+      actionSuccessMessage = null
+      void refreshCombatScreen('action-failure')
       return
     }
 
-    if (normalizedActionId === 'combat.useEx' && !getActionPresentationBlock(findCombatAction(screen, normalizedActionId))) {
-      void executeAction(normalizedActionId)
+    selectedActionId = action.id
+    prepareBoardSelectionState(getSelectedActionRequirementView(action), {
+      resetCountChoice: action.id === 'combat.useEx',
+    })
+
+    if (
+      action.id === 'combat.draw' ||
+      action.id === 'combat.endTurn' ||
+      action.id === 'combat.clearRecentResults'
+    ) {
+      void executeAction(action.id)
+      return
+    }
+
+    if (action.id === 'combat.useEx' && !getActionPresentationBlock(action)) {
+      void executeAction(action.id)
     }
   }
 

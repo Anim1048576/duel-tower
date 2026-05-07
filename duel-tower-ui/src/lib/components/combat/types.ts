@@ -1,4 +1,4 @@
-import type { CombatCardDto } from '../../api/screenTypes'
+import type { CombatActionId, CombatCardDto } from '../../api/screenTypes'
 import type { PendingDecisionDto } from '../../api/sessionTypes'
 
 export type CombatTone = 'accent' | 'muted' | 'success' | 'warning'
@@ -184,7 +184,7 @@ export type CombatSummonViewModel = {
 }
 
 export type CommandOptionViewModel = {
-  id: string
+  id: CombatActionId
   title: string
   note: string
   disabled: boolean

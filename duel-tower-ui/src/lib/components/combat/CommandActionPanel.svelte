@@ -6,11 +6,12 @@
     CombatPendingDecisionViewModel,
     CommandOptionViewModel,
   } from './types'
+  import type { CombatActionId } from '../../api/screenTypes'
 
   type Props = {
     commandOptions: readonly CommandOptionViewModel[]
-    commandPending: string | null
-    selectedCommandType: string | null
+    commandPending: CombatActionId | null
+    selectedCommandType: CombatActionId | null
     commandGuardMessage: string
     isCurrentTurnPlayer: boolean
     hasPendingDecision: boolean
@@ -32,7 +33,7 @@
     selectedReason: string
     boardCountChoiceOptions: readonly number[]
     boardCountChoiceRequired: boolean
-    onCommandButtonClick: (commandType: string) => void
+    onCommandButtonClick: (actionId: CombatActionId) => void
     onClearTargets: () => void
     onClearSelectionInputs: () => void
     onSelectedCountChange: (value: string) => void

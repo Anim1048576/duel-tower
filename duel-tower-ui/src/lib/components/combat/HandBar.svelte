@@ -2,15 +2,16 @@
   import ContentStatePanel from '../ContentStatePanel.svelte'
   import SectionFrame from '../SectionFrame.svelte'
   import CombatHandCard from './CombatHandCard.svelte'
+  import type { CombatActionId } from '../../api/screenTypes'
   import type { CommandOptionViewModel, ResolvedCombatCardViewModel } from './types'
 
   type Props = {
     handCards: readonly ResolvedCombatCardViewModel[]
     commandOptions: readonly CommandOptionViewModel[]
-    commandPending: string | null
+    commandPending: CombatActionId | null
     selectedCardId: string | null
     selectedDiscardIds: readonly string[]
-    selectedCommandType: string | null
+    selectedCommandType: CombatActionId | null
     currentActorLabel: string
     visibleHandOwner: string | null
     selectedCardView: ResolvedCombatCardViewModel | null
@@ -18,7 +19,7 @@
     handExpanded: boolean
     catalogLoading: boolean
     emptyMessage: string
-    onCommandButtonClick: (commandType: string) => void
+    onCommandButtonClick: (actionId: CombatActionId) => void
     onToggleExpanded: () => void
     onSelectHandCard: (instanceId: string) => void
     onToggleDiscard: (instanceId: string) => void

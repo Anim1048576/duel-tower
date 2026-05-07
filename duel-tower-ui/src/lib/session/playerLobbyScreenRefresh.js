@@ -6,7 +6,7 @@
  */
 
 /**
- * @typedef {'initial-load' | 'retry-load' | 'route-change' | 'polling' | 'action-toggle-ready' | 'action-save-loadout'} PlayerLobbyScreenRefreshReason
+ * @typedef {'initial-load' | 'retry-load' | 'route-change' | 'polling' | 'action-toggle-ready' | 'action-save-loadout' | 'action-apply-preset'} PlayerLobbyScreenRefreshReason
  */
 
 /**
@@ -28,6 +28,7 @@ export function resolvePlayerLobbyScreenRefreshPlan(reason) {
         forceDraftSync: false,
       }
     case 'action-save-loadout':
+    case 'action-apply-preset':
       return {
         showLoading: false,
         forceDraftSync: true,

@@ -281,6 +281,50 @@
     window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
+  function isSameStringArray(left: string[], right: string[]) {
+    return left.length === right.length && left.every((value, index) => value === right[index])
+  }
+
+  function isSameFormState(left: CharacterFormState, right: CharacterFormState) {
+    return (
+      left.name === right.name &&
+      left.quote === right.quote &&
+      left.wish === right.wish &&
+      left.backstory === right.backstory &&
+      String(left.age ?? '') === String(right.age ?? '') &&
+      left.gender === right.gender &&
+      left.alignmentOrderChaos === right.alignmentOrderChaos &&
+      left.alignmentGoodEvil === right.alignmentGoodEvil &&
+      String(left.lifeStats.body ?? '') === String(right.lifeStats.body ?? '') &&
+      String(left.lifeStats.technique ?? '') === String(right.lifeStats.technique ?? '') &&
+      String(left.lifeStats.sense ?? '') === String(right.lifeStats.sense ?? '') &&
+      String(left.lifeStats.will ?? '') === String(right.lifeStats.will ?? '') &&
+      isSameStringArray(left.selectedTraitIds, right.selectedTraitIds) &&
+      isSameStringArray(left.selectedHiddenTraitIds, right.selectedHiddenTraitIds) &&
+      isSameStringArray(left.ownedSkillCardIds, right.ownedSkillCardIds) &&
+      left.selectedExCardId === right.selectedExCardId
+    )
+  }
+
+  function handleApplySavedDeck() {
+    if (applySavedDeckBlocked) {
+      saveMessage = null
+      if (formDirty) {
+        saveErrorMessage = '덱 적용 전 변경사항을 저장하거나 취소해 주세요.'
+      } else {
+        saveErrorMessage = '덱 적용 전 캐릭터를 저장해 주세요.'
+      }
+      return
+    }
+
+    if (!requestedCharacterId) {
+      return
+    }
+
+    setSelectionHandoff(selectionHandoffKeys.deckApplyCharacterId, requestedCharacterId)
+    navigateTo(pathBuilders.deckList())
+  }
+
   const routeState = getCharacterRouteState()
   const isCreateMode = routeState.mode === 'create'
   const characterSelection = !isCreateMode
@@ -336,6 +380,13 @@
   const selectedOwnedCardCount = $derived.by(() => form.ownedSkillCardIds.length)
   const selectedExCard = $derived.by(() => exCards.find((card) => card.id === form.selectedExCardId) ?? null)
   const selectedExCardLabel = $derived.by(() => selectedExCard?.name ?? form.selectedExCardId ?? '-')
+  const formDirty = $derived.by(() =>
+    character === null ? false : !isSameFormState(form, createFormStateFromResponse(character)),
+  )
+  const applySavedDeckBlocked = $derived.by(() =>
+    isCreateMode || !requestedCharacterId || saving || deleting || loading || formDirty,
+  )
+  const currentDeckPreviewCardIds = $derived.by(() => character?.currentSkillDeckPreviewCardIds ?? [])
   const filteredTraitOptions = $derived.by(() => {
     const query = traitSearch.trim().toLowerCase()
     if (!query) return traitOptions
@@ -828,6 +879,28 @@
           </div>
         </SectionFrame>
       </div>
+
+      <SectionFrame title="적용된 덱" description="현재 캐릭터에 적용된 저장 덱을 확인합니다.">
+        <div class="detail-page__deck-handoff">
+          <strong>{currentDeckPreviewCardIds.length > 0 ? 'Deck Applied' : 'No Applied Deck'}</strong>
+          <p>{currentDeckPreviewCardIds.length > 0 ? `적용된 덱 카드 ${currentDeckPreviewCardIds.length}장: ${currentDeckPreviewCardIds.join(', ')}` : '적용된 덱이 없습니다.'}</p>
+          {#if !isCreateMode}
+            <button
+              type="button"
+              class="detail-page__link-action"
+              disabled={applySavedDeckBlocked}
+              onclick={() => handleApplySavedDeck()}
+            >
+              Apply saved deck
+            </button>
+            {#if formDirty}
+              <p class="detail-page__muted">덱 적용 전 변경사항을 저장하거나 취소해 주세요.</p>
+            {:else if applySavedDeckBlocked}
+              <p class="detail-page__muted">덱 적용 전 캐릭터를 저장해 주세요.</p>
+            {/if}
+          {/if}
+        </div>
+      </SectionFrame>
 
       <SectionFrame title="생성 확인" description="입력 요약을 확인한 뒤 저장합니다.">
         <div class="detail-page__summary">

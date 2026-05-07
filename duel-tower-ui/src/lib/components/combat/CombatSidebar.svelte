@@ -6,6 +6,7 @@
   import CommandActionPanel from './CommandActionPanel.svelte'
   import CombatZoneSummary from './CombatZoneSummary.svelte'
   import { COMBAT_SIDEBAR_TABS } from './types'
+  import type { CombatActionId } from '../../api/screenTypes'
   import type {
     CombatCommandRequirementViewModel,
     CombatFeedEntry,
@@ -20,8 +21,8 @@
   type Props = {
     activeTab: CombatSidebarTab
     commandOptions: readonly CommandOptionViewModel[]
-    commandPending: string | null
-    selectedCommandType: string | null
+    commandPending: CombatActionId | null
+    selectedCommandType: CombatActionId | null
     commandGuardMessage: string
     isCurrentTurnPlayer: boolean
     hasPendingDecision: boolean
@@ -55,7 +56,7 @@
     recentResultsErrorMessage: string | null
     inspectorView: CombatInspectorViewModel | null
     onTabChange: (tab: CombatSidebarTab) => void
-    onCommandButtonClick: (commandType: string) => void
+    onCommandButtonClick: (actionId: CombatActionId) => void
     onClearTargets: () => void
     onClearSelectionInputs: () => void
     onSelectedCountChange: (value: string) => void

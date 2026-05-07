@@ -184,12 +184,18 @@ function buildPassiveItems(identifiers, options) {
 /**
  * @param {PlayerLobbyScreenResponse} screen
  * @param {SessionLoadoutDraft} loadoutDraft
+ * @param {string | null | undefined} selectedPresetId
  */
-export function createPlayerLobbyLocalPresentation(screen, loadoutDraft) {
+export function createPlayerLobbyLocalPresentation(screen, loadoutDraft, selectedPresetId = null) {
   const characterId = normalizeCharacterId(loadoutDraft.characterId)
   const deckOwnedCardIds = normalizeIdentifierList(loadoutDraft.deckOwnedCardIds)
   const exCardId = normalizeText(loadoutDraft.exCardId)
   const passiveIds = normalizeIdentifierList(loadoutDraft.passiveIds)
+  const screenWithPresets = /** @type {PlayerLobbyScreenResponse & { presets?: any }} */ (screen)
+  const localPresetId = normalizeText(selectedPresetId)
+  const serverPresetId = screenWithPresets.presets?.selectedId == null ? '' : String(screenWithPresets.presets.selectedId)
+  const presetPreview = screenWithPresets.presets?.preview ?? null
+  const presetPreviewSynced = localPresetId === '' || localPresetId === serverPresetId
   const localDirty = isPlayerLobbyDraftLocallyDirty(screen.me.draft, {
     characterId,
     deckOwnedCardIds,
@@ -230,5 +236,19 @@ export function createPlayerLobbyLocalPresentation(screen, loadoutDraft) {
       'EX card',
     ),
     passiveItems: buildPassiveItems(passiveIds, screen.references.passiveOptions),
+    preset: presetPreview
+      ? {
+          previewSynced: presetPreviewSynced,
+          previewStale: !presetPreviewSynced,
+          name: presetPreview.name,
+          summary: presetPreviewSynced
+            ? presetPreview.summary
+            : '최신 프리셋 미리보기만 표시됩니다.',
+          characterLabel: presetPreview.characterLabel,
+          exLabel: presetPreview.exLabel,
+          deckItems: presetPreview.deckItems,
+          passiveItems: presetPreview.passiveItems,
+        }
+      : null,
   }
 }
