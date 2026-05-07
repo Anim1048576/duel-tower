@@ -10,6 +10,7 @@ import com.example.dueltower.engine.model.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 public final class HealOps {
     private HealOps() {}
@@ -66,7 +67,33 @@ public final class HealOps {
         if (remaining <= 0) return;
 
         // 2) HP 적용
+        int hpBefore = CombatEntityOps.hp(state, target);
         CombatEntityOps.adjustHp(state, ctx, out, target, remaining);
+        int hpAfter = CombatEntityOps.hp(state, target);
+        String targetLabel = CombatEntityOps.targetLabel(target);
+        out.add(new GameEvent.CombatLogAppended(
+                "combat.heal",
+                "PLAYER",
+                targetLabel + "이 " + remaining + " 회복했다. HP: " + hpBefore + " -> " + hpAfter,
+                sourceRef == null ? null : CombatEntityOps.targetLabel(sourceRef),
+                source,
+                targetLabel,
+                targetLabel,
+                sourceCardId == null ? null : sourceCardId.value().toString(),
+                source,
+                List.of(
+                        "회복: " + remaining,
+                        "HP: " + hpBefore + " -> " + hpAfter,
+                        "출처: " + source
+                ),
+                Map.of(
+                        "amount", remaining,
+                        "hpBefore", hpBefore,
+                        "hpAfter", hpAfter,
+                        "target", targetLabel,
+                        "source", source
+                )
+        ));
         out.add(new GameEvent.LogAppended(
                 source + " heals " + remaining + " to " + CombatEntityOps.targetLabel(target)
                         + " (hp=" + CombatEntityOps.hpText(state, target) + ")"

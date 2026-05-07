@@ -219,6 +219,34 @@ public final class ZoneOps {
         ps.hand().remove(id);
         CardInstance ci = state.card(id);
         ci.zone(Zone.GRAVE);
+        events.add(new GameEvent.CombatLogAppended(
+                "combat.cardMove",
+                "PLAYER",
+                (ci == null ? id.value().toString() : ci.defId().value()) + " 이동: HAND -> GRAVE",
+                ps.playerId().value(),
+                ps.playerId().value(),
+                null,
+                null,
+                ci == null ? null : ci.defId().value(),
+                null,
+                List.of(
+                        "카드: " + (ci == null ? id.value().toString() : ci.defId().value()),
+                        "카드 ID: " + (ci == null ? "" : ci.defId().value()),
+                        "인스턴스: " + id.value(),
+                        "소유자: " + ps.playerId().value(),
+                        "이동: HAND -> GRAVE",
+                        "사유: DISCARD"
+                ),
+                Map.of(
+                        "cardInstanceId", id.value().toString(),
+                        "cardDefId", ci == null ? "" : ci.defId().value(),
+                        "cardName", "",
+                        "ownerId", ps.playerId().value(),
+                        "from", "HAND",
+                        "to", "GRAVE",
+                        "reason", "DISCARD"
+                )
+        ));
         events.add(new GameEvent.CardsMoved(ps.playerId().value(), "HAND", "GRAVE", 1));
 
         ps.grave().add(id);
@@ -328,6 +356,34 @@ public final class ZoneOps {
         removeFromZone(ps, id, from);
         addToZone(ps, id, finalTo);
         ci.zone(finalTo);
+        events.add(new GameEvent.CombatLogAppended(
+                "combat.cardMove",
+                "PLAYER",
+                def.name() + " 이동: " + from.name() + " -> " + finalTo.name(),
+                ps.playerId().value(),
+                ps.playerId().value(),
+                null,
+                null,
+                ci.defId().value(),
+                def.name(),
+                List.of(
+                        "카드: " + def.name(),
+                        "카드 ID: " + ci.defId().value(),
+                        "인스턴스: " + id.value(),
+                        "소유자: " + ps.playerId().value(),
+                        "이동: " + from.name() + " -> " + finalTo.name(),
+                        "사유: " + reason.name()
+                ),
+                Map.of(
+                        "cardInstanceId", id.value().toString(),
+                        "cardDefId", ci.defId().value(),
+                        "cardName", def.name(),
+                        "ownerId", ps.playerId().value(),
+                        "from", from.name(),
+                        "to", finalTo.name(),
+                        "reason", reason.name()
+                )
+        ));
         events.add(new GameEvent.CardsMoved(ps.playerId().value(), from.name(), finalTo.name(), 1));
 
         boolean enteringField = from != Zone.FIELD && finalTo == Zone.FIELD;

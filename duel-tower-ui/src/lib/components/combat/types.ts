@@ -200,6 +200,21 @@ export type CombatActionButtonViewModel = {
 export type CombatFeedEntry = {
   title: string
   lines: string[]
+  type?: string | null
+  visibility?: string | null
+  message?: string | null
+  actorId?: string | null
+  actorName?: string | null
+  targetId?: string | null
+  targetName?: string | null
+  cardDefId?: string | null
+  cardName?: string | null
+  details?: string[] | null
+  data?: unknown
+  version?: number | null
+  cursor?: number | null
+  createdAt?: string | null
+  rawPayload?: unknown
 }
 
 export type CombatRecentResultEntry = {

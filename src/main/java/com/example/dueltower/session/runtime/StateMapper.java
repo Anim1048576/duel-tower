@@ -377,6 +377,21 @@ public final class StateMapper {
         if (ev instanceof GameEvent.LogAppended e) {
             return new EventDto("LOG_APPENDED", Map.of("line", e.line()));
         }
+        if (ev instanceof GameEvent.CombatLogAppended e) {
+            return new EventDto("COMBAT_LOG_APPENDED", mapOfNonNull(
+                    "type", e.type(),
+                    "visibility", e.visibility(),
+                    "message", e.message(),
+                    "actorId", e.actorId(),
+                    "actorName", e.actorName(),
+                    "targetId", e.targetId(),
+                    "targetName", e.targetName(),
+                    "cardDefId", e.cardDefId(),
+                    "cardName", e.cardName(),
+                    "details", e.details(),
+                    "data", e.data()
+            ));
+        }
         if (ev instanceof GameEvent.CardsMoved e) {
             return new EventDto("CARDS_MOVED", Map.of(
                     "playerId", e.playerId(),
@@ -413,5 +428,16 @@ public final class StateMapper {
             ));
         }
         return new EventDto("UNKNOWN", Map.of("raw", ev.toString()));
+    }
+
+    private static Map<String, Object> mapOfNonNull(Object... pairs) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            Object value = pairs[i + 1];
+            if (value != null) {
+                out.put(String.valueOf(pairs[i]), value);
+            }
+        }
+        return out;
     }
 }

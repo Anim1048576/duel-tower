@@ -1061,6 +1061,47 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
     }
 
     @Test
+    void combatPlayCardActionAddsPlayerReadableCombatLogs() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-log-gm", "combat-log-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-log-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-log-p1", "combat-log-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-log-p1", characterId);
+        markPlayerReady(session.code(), "combat-log-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-log-p1");
+
+        JsonNode screen = getCombatScreen(session.code(), playerToken);
+        JsonNode playCardAction = findAction(screen, "combat.playCard");
+        JsonNode source = StreamSupport.stream(playCardAction.path("metadata").path("sourceOptions").spliterator(), false)
+                .filter(option -> option.path("requirementView").path("boardObjectRequirement").isNull())
+                .findFirst()
+                .orElse(playCardAction.path("metadata").path("sourceOptions").get(0));
+
+        JsonNode body = executeCombatAction(
+                session.code(),
+                "combat.playCard",
+                playerToken,
+                """
+                {
+                  "cardId": "%s"
+                }
+                """.formatted(source.path("instanceId").asText())
+        );
+
+        assertCombatActionResponseContract(body);
+        assertThat(body.path("success").asBoolean()).isTrue();
+        JsonNode logs = body.path("latestScreen").path("sidebar").path("logs");
+        assertThat(logs).isNotEmpty();
+        assertThat(hasCombatLog(logs, "combat.playCard")).isTrue();
+        assertThat(hasCombatLog(logs, "combat.cardMove")).isTrue();
+        JsonNode playLog = findCombatLog(logs, "combat.playCard");
+        assertThat(playLog.path("message").asText()).contains("combat-log-p1");
+        assertThat(playLog.path("cardName").asText()).isNotBlank();
+        assertThat(playLog.path("details").toString()).contains("비용");
+        assertThat(playLog.path("details").toString()).contains("카드 이동");
+    }
+
+    @Test
     void combatResolvePendingActionSucceedsForSupportedDecision() throws Exception {
         MockHttpSession gmSession = signUpAndLogin("combat-pending-ok-gm", "combat-pending-ok-gm@example.com", "password123");
         SessionInfo session = createSession(gmSession, "combat-pending-ok-gm");
@@ -1478,6 +1519,18 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andExpect(status().isOk())
                 .andReturn();
         return readJson(result);
+    }
+
+    private boolean hasCombatLog(JsonNode logs, String type) {
+        return StreamSupport.stream(logs.spliterator(), false)
+                .anyMatch(log -> type.equals(log.path("type").asText()));
+    }
+
+    private JsonNode findCombatLog(JsonNode logs, String type) {
+        return StreamSupport.stream(logs.spliterator(), false)
+                .filter(log -> type.equals(log.path("type").asText()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Missing combat log: " + type));
     }
 
     private String injectLastWordsPendingDecision(String sessionCode,

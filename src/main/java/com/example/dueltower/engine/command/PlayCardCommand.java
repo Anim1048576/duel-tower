@@ -19,7 +19,9 @@ import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.PlayerId;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class PlayCardCommand implements GameCommand {
@@ -191,7 +193,65 @@ public final class PlayCardCommand implements GameCommand {
         // 이번 턴 카드 사용 횟수 트래킹
         ps.incCardsPlayedThisTurn();
 
+        events.add(new GameEvent.CombatLogAppended(
+                "combat.playCard",
+                "PLAYER",
+                ps.playerId().value() + "이 [" + def.name() + "]을 사용했다.",
+                ps.playerId().value(),
+                ps.playerId().value(),
+                targetSummary(),
+                targetSummary(),
+                def.id().value(),
+                def.name(),
+                List.of(
+                        "대상: " + nullSafeTargetSummary(),
+                        "비용: 행동력 " + cost + (debt > 0 ? " (부채 " + debt + ")" : ""),
+                        "카드 이동: HAND -> " + to.name(),
+                        "카드 ID: " + def.id().value(),
+                        "인스턴스: " + cardId.value()
+                ),
+                playCardLogData(def, cost, debt, to)
+        ));
         events.add(new GameEvent.LogAppended(ps.playerId().value() + " plays " + def.id().value()));
         return events;
+    }
+
+    private String targetSummary() {
+        if (selection == null || selection.targets() == null || selection.targets().isEmpty()) {
+            return null;
+        }
+        return selection.targets().stream()
+                .map(PlayCardCommand::targetLabel)
+                .reduce((left, right) -> left + ", " + right)
+                .orElse(null);
+    }
+
+    private String nullSafeTargetSummary() {
+        String summary = targetSummary();
+        return summary == null || summary.isBlank() ? "없음" : summary;
+    }
+
+    private Map<String, Object> playCardLogData(CardDefinition def, int cost, int debt, Zone to) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("actorId", playerId.value());
+        data.put("cardInstanceId", cardId.value().toString());
+        data.put("cardDefId", def.id().value());
+        data.put("cardName", def.name());
+        data.put("cost", cost);
+        data.put("apDebt", debt);
+        data.put("targets", selection == null || selection.targets() == null
+                ? List.of()
+                : selection.targets().stream().map(PlayCardCommand::targetLabel).toList());
+        data.put("from", "HAND");
+        data.put("to", to.name());
+        data.put("reason", "PLAY");
+        return data;
+    }
+
+    private static String targetLabel(TargetRef target) {
+        if (target instanceof TargetRef.Player p) return "PLAYER:" + p.id().value();
+        if (target instanceof TargetRef.Enemy e) return "ENEMY:" + e.id().value();
+        if (target instanceof TargetRef.Summon s) return "SUMMON:" + s.ownerId().value() + ":" + s.summonId().value();
+        return String.valueOf(target);
     }
 }

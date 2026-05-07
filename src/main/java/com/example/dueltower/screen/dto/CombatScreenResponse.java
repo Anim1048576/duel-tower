@@ -193,8 +193,28 @@ public class CombatScreenResponse extends ScreenResponseBase {
 
     public record FeedEntry(
             String title,
-            List<String> lines
-    ) {}
+            List<String> lines,
+            String type,
+            String visibility,
+            String message,
+            String actorId,
+            String actorName,
+            String targetId,
+            String targetName,
+            String cardDefId,
+            String cardName,
+            List<String> details,
+            Object data,
+            Long version,
+            Long cursor,
+            String createdAt,
+            Object rawPayload
+    ) {
+        public FeedEntry(String title, List<String> lines) {
+            this(title, lines, null, null, null, null, null, null, null, null, null,
+                    List.of(), null, null, null, null, null);
+        }
+    }
 
     public record RecentResultEntry(
             String title,

@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.core.effect.status;
 
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.combat.CombatEntityOps;
 import com.example.dueltower.engine.core.combat.DamageOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
@@ -68,8 +69,10 @@ public final class StatusRuntime {
 
     public void stacksSet(StatusOwnerRef owner, String statusId, int value) {
         Map<String,Integer> m = statusMap(owner);
+        int before = m.getOrDefault(statusId, 0);
         if (value == 0) m.remove(statusId);
         else m.put(statusId, value);
+        appendStatusLog(owner, statusId, before, value);
     }
 
     public void stacksAdd(StatusOwnerRef owner, String statusId, int delta) {
@@ -104,5 +107,52 @@ public final class StatusRuntime {
         } catch (UnsupportedOperationException ignored) {
             // validate 단계에서 out이 List.of()처럼 불변일 수 있다.
         }
+    }
+    private void appendStatusLog(StatusOwnerRef owner, String statusId, int before, int after) {
+        if (before == after || out == null) return;
+        String statusName = ctx.hasStatusDef(statusId) ? ctx.statusDef(statusId).name() : statusId;
+        String ownerLabel = statusOwnerLabel(owner);
+        String action = after <= 0 ? "제거" : before <= 0 ? "부여" : "변경";
+        try {
+            out.add(new GameEvent.CombatLogAppended(
+                    "combat.status",
+                    "PLAYER",
+                    ownerLabel + "에게 [" + statusName + "] " + action + ". " + before + " -> " + after,
+                    null,
+                    source,
+                    ownerLabel,
+                    ownerLabel,
+                    null,
+                    null,
+                    List.of(
+                            "상태: " + statusName + " (" + statusId + ")",
+                            "스택: " + before + " -> " + after,
+                            "출처: " + source
+                    ),
+                    Map.of(
+                            "statusId", statusId,
+                            "statusName", statusName,
+                            "before", before,
+                            "after", after,
+                            "owner", ownerLabel,
+                            "source", source
+                    )
+            ));
+        } catch (UnsupportedOperationException ignored) {
+            // validate paths may use immutable event lists.
+        }
+    }
+
+    private static String statusOwnerLabel(StatusOwnerRef owner) {
+        if (owner instanceof StatusOwnerRef.Character c) {
+            return CombatEntityOps.targetLabel(c.who());
+        }
+        if (owner instanceof StatusOwnerRef.Faction f) {
+            return "FACTION:" + f.id().name();
+        }
+        if (owner instanceof StatusOwnerRef.Card c) {
+            return "CARD:" + c.id().value();
+        }
+        return String.valueOf(owner);
     }
 }

@@ -317,22 +317,75 @@ public class CombatScreenService {
 
             if (events.size() < limit) {
                 events.add(new CombatScreenResponse.FeedEntry(
-                        eventDto.type(),
+                        eventDisplayTitle(eventDto.type()),
                         List.of(
                                 "Version " + stored.version() + " | Cursor " + stored.cursor(),
                                 formatInstant(stored.occurredAt())
-                        )
+                        ),
+                        eventDto.type(),
+                        "DEBUG",
+                        eventDisplayTitle(eventDto.type()),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        eventDetails(eventDto.payload()),
+                        eventDto.payload(),
+                        stored.version(),
+                        stored.cursor(),
+                        formatInstant(stored.occurredAt()),
+                        eventDto.payload()
                 ));
             }
 
-            if ("LOG_APPENDED".equals(eventDto.type()) && logs.size() < limit) {
+            if ("COMBAT_LOG_APPENDED".equals(eventDto.type()) && logs.size() < limit) {
+                Map<String, Object> payload = eventDto.payload();
+                String message = stringValue(payload.get("message"), "Combat log");
+                List<String> details = stringList(payload.get("details"));
+                logs.add(new CombatScreenResponse.FeedEntry(
+                        combatLogTitle(payload),
+                        details.isEmpty() ? List.of(message) : prepend(message, details),
+                        stringValue(payload.get("type"), "combat.log"),
+                        stringValue(payload.get("visibility"), "PLAYER"),
+                        message,
+                        stringValue(payload.get("actorId"), null),
+                        stringValue(payload.get("actorName"), null),
+                        stringValue(payload.get("targetId"), null),
+                        stringValue(payload.get("targetName"), null),
+                        stringValue(payload.get("cardDefId"), null),
+                        stringValue(payload.get("cardName"), null),
+                        details,
+                        payload.get("data"),
+                        stored.version(),
+                        stored.cursor(),
+                        formatInstant(stored.occurredAt()),
+                        payload
+                ));
+            } else if ("LOG_APPENDED".equals(eventDto.type()) && logs.size() < limit) {
                 Object line = eventDto.payload().get("line");
                 logs.add(new CombatScreenResponse.FeedEntry(
-                        "LOG_APPENDED",
+                        "Legacy log",
                         List.of(
                                 line == null ? "" : line.toString(),
                                 "Version " + stored.version() + " | " + formatInstant(stored.occurredAt())
-                        )
+                        ),
+                        "legacy.log",
+                        "DEBUG",
+                        line == null ? "" : line.toString(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        List.of("Legacy engine log line"),
+                        eventDto.payload(),
+                        stored.version(),
+                        stored.cursor(),
+                        formatInstant(stored.occurredAt()),
+                        eventDto.payload()
                 ));
             }
         }
@@ -347,6 +400,64 @@ public class CombatScreenService {
                 .toList();
 
         return new CombatScreenResponse.Sidebar(List.copyOf(events), List.copyOf(logs), recentResults);
+    }
+
+    private String eventDisplayTitle(String type) {
+        return switch (type == null ? "" : type) {
+            case "COMBAT_LOG_APPENDED" -> "Combat log updated";
+            case "LOG_APPENDED" -> "Legacy log appended";
+            case "CARDS_MOVED" -> "Cards moved";
+            case "TURN_ADVANCED" -> "Turn advanced";
+            case "DECK_SHUFFLED" -> "Deck shuffled";
+            case "DECK_REFILLED" -> "Deck refilled";
+            case "PENDING_DECISION_SET" -> "Pending decision opened";
+            case "PENDING_DECISION_CLEARED" -> "Pending decision cleared";
+            default -> nullSafe(type, "Unknown event");
+        };
+    }
+
+    private String combatLogTitle(Map<String, Object> payload) {
+        String type = stringValue(payload.get("type"), "combat.log");
+        return switch (type) {
+            case "combat.playCard" -> "Card played";
+            case "combat.damage" -> "Damage";
+            case "combat.heal" -> "Heal";
+            case "combat.status" -> "Status changed";
+            case "combat.cardMove" -> "Card moved";
+            case "combat.lastWordsSkipped" -> "Last words skipped";
+            default -> "Combat log";
+        };
+    }
+
+    private List<String> eventDetails(Map<String, Object> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return List.of();
+        }
+        return payload.entrySet().stream()
+                .map(entry -> entry.getKey() + ": " + entry.getValue())
+                .toList();
+    }
+
+    private List<String> prepend(String first, List<String> rest) {
+        List<String> out = new ArrayList<>();
+        out.add(first);
+        out.addAll(rest);
+        return List.copyOf(out);
+    }
+
+    private String stringValue(Object value, String fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        String normalized = value.toString();
+        return normalized.isBlank() ? fallback : normalized;
+    }
+
+    private List<String> stringList(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+        return list.stream().map(String::valueOf).toList();
     }
 
     private List<String> notices(SessionAccessDecision decision,
