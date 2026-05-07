@@ -1164,7 +1164,7 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertThat(body.path("outcome").asText()).isEqualTo("SUCCEEDED");
         assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("LAST_WORDS");
         assertThat(body.path("latestScreen").path("access").path("guards").path("hasPendingDecision").asBoolean()).isFalse();
-        assertThat(body.path("latestScreen").path("sidebar").path("logs").toString()).contains("skipped last words");
+        assertThat(body.path("latestScreen").path("sidebar").path("logs").toString()).contains("[유언] 처리를 생략했다.");
         assertThat(candidateId).isNotBlank();
     }
 

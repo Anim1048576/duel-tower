@@ -342,8 +342,8 @@ public class CombatScreenService {
 
             if ("COMBAT_LOG_APPENDED".equals(eventDto.type()) && logs.size() < limit) {
                 Map<String, Object> payload = eventDto.payload();
-                String message = stringValue(payload.get("message"), "Combat log");
-                List<String> details = stringList(payload.get("details"));
+                String message = localizedCombatLogMessage(payload);
+                List<String> details = localizedCombatLogDetails(payload);
                 logs.add(new CombatScreenResponse.FeedEntry(
                         combatLogTitle(payload),
                         details.isEmpty() ? List.of(message) : prepend(message, details),
@@ -362,30 +362,6 @@ public class CombatScreenService {
                         stored.cursor(),
                         formatInstant(stored.occurredAt()),
                         payload
-                ));
-            } else if ("LOG_APPENDED".equals(eventDto.type()) && logs.size() < limit) {
-                Object line = eventDto.payload().get("line");
-                logs.add(new CombatScreenResponse.FeedEntry(
-                        "Legacy log",
-                        List.of(
-                                line == null ? "" : line.toString(),
-                                "Version " + stored.version() + " | " + formatInstant(stored.occurredAt())
-                        ),
-                        "legacy.log",
-                        "DEBUG",
-                        line == null ? "" : line.toString(),
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        List.of("Legacy engine log line"),
-                        eventDto.payload(),
-                        stored.version(),
-                        stored.cursor(),
-                        formatInstant(stored.occurredAt()),
-                        eventDto.payload()
                 ));
             }
         }
@@ -419,14 +395,247 @@ public class CombatScreenService {
     private String combatLogTitle(Map<String, Object> payload) {
         String type = stringValue(payload.get("type"), "combat.log");
         return switch (type) {
-            case "combat.playCard" -> "Card played";
-            case "combat.damage" -> "Damage";
-            case "combat.heal" -> "Heal";
-            case "combat.status" -> "Status changed";
-            case "combat.cardMove" -> "Card moved";
-            case "combat.lastWordsSkipped" -> "Last words skipped";
-            default -> "Combat log";
+            case "combat.start" -> "전투 시작";
+            case "combat.initiative" -> "행동 순서 판정";
+            case "combat.draw" -> "드로우";
+            case "combat.playCard" -> "카드 사용";
+            case "combat.damage" -> "피해";
+            case "combat.heal" -> "회복";
+            case "combat.status" -> "상태 변화";
+            case "combat.cardMove" -> "카드 이동";
+            case "combat.lastWordsSkipped" -> "유언 생략";
+            case "combat.encounter" -> "인카운터";
+            default -> "전투 로그";
         };
+    }
+
+    private String localizedCombatLogMessage(Map<String, Object> payload) {
+        String type = stringValue(payload.get("type"), "combat.log");
+        Map<String, Object> data = objectMap(payload.get("data"));
+        return switch (type) {
+            case "combat.start" -> "전투가 시작되었다.";
+            case "combat.initiative" -> "행동 순서 판정: " + stringList(data.get("summaries")).stream()
+                    .findFirst()
+                    .orElse(stringValue(payload.get("message"), "행동 순서 판정이 완료되었다."));
+            case "combat.draw" -> stringValue(data.get("actorId"), stringValue(payload.get("actorId"), "플레이어"))
+                    + "이 카드 " + stringValue(data.get("count"), "0") + "장을 드로우했다.";
+            case "combat.playCard" -> stringValue(payload.get("actorName"), stringValue(payload.get("actorId"), "플레이어"))
+                    + "이 [" + cardLogName(payload, data) + "]을 사용했다.";
+            case "combat.damage" -> stringValue(data.get("target"), stringValue(payload.get("targetName"), "대상"))
+                    + "이 " + stringValue(data.get("amount"), "0") + " 피해를 받았다. HP: "
+                    + stringValue(data.get("hpBefore"), "?") + " -> " + stringValue(data.get("hpAfter"), "?");
+            case "combat.heal" -> stringValue(data.get("target"), stringValue(payload.get("targetName"), "대상"))
+                    + "이 " + stringValue(data.get("amount"), "0") + " 회복했다. HP: "
+                    + stringValue(data.get("hpBefore"), "?") + " -> " + stringValue(data.get("hpAfter"), "?");
+            case "combat.status" -> stringValue(data.get("owner"), stringValue(payload.get("targetName"), "대상"))
+                    + "에게 [" + stringValue(data.get("statusName"), stringValue(data.get("statusId"), "상태")) + "] "
+                    + statusChangeLabel(data) + ". " + stringValue(data.get("before"), "?") + " -> "
+                    + stringValue(data.get("after"), "?");
+            case "combat.cardMove" -> "[" + cardLogName(payload, data) + "] 이동: "
+                    + zoneLabel(stringValue(data.get("from"), "")) + " -> " + zoneLabel(stringValue(data.get("to"), ""));
+            case "combat.lastWordsSkipped" -> "[유언] 처리를 생략했다.";
+            default -> stringValue(payload.get("message"), "전투 로그");
+        };
+    }
+
+    private List<String> localizedCombatLogDetails(Map<String, Object> payload) {
+        String type = stringValue(payload.get("type"), "combat.log");
+        Map<String, Object> data = objectMap(payload.get("data"));
+        return switch (type) {
+            case "combat.start" -> combatStartDetails(data);
+            case "combat.initiative" -> initiativeDetails(data);
+            case "combat.draw" -> List.of("사유: " + reasonLabel(stringValue(data.get("reason"), "")));
+            case "combat.playCard" -> playCardDetails(payload, data);
+            case "combat.damage" -> List.of(
+                    "피해: " + stringValue(data.get("amount"), "0"),
+                    "HP: " + stringValue(data.get("hpBefore"), "?") + " -> " + stringValue(data.get("hpAfter"), "?"),
+                    "출처: " + stringValue(data.get("source"), "알 수 없음")
+            );
+            case "combat.heal" -> List.of(
+                    "회복: " + stringValue(data.get("amount"), "0"),
+                    "HP: " + stringValue(data.get("hpBefore"), "?") + " -> " + stringValue(data.get("hpAfter"), "?"),
+                    "출처: " + stringValue(data.get("source"), "알 수 없음")
+            );
+            case "combat.status" -> List.of(
+                    "상태: " + stringValue(data.get("statusName"), stringValue(data.get("statusId"), "상태")),
+                    "스택: " + stringValue(data.get("before"), "?") + " -> " + stringValue(data.get("after"), "?"),
+                    "출처: " + stringValue(data.get("source"), "알 수 없음")
+            );
+            case "combat.cardMove" -> List.of(
+                    "카드: " + cardLogName(payload, data),
+                    "카드 ID: " + stringValue(data.get("cardDefId"), stringValue(payload.get("cardDefId"), "알 수 없음")),
+                    "인스턴스: " + stringValue(data.get("cardInstanceId"), "알 수 없음"),
+                    "소유자: " + stringValue(data.get("ownerId"), stringValue(payload.get("actorId"), "알 수 없음")),
+                    "이동: " + zoneLabel(stringValue(data.get("from"), "")) + " -> " + zoneLabel(stringValue(data.get("to"), "")),
+                    "사유: " + reasonLabel(stringValue(data.get("reason"), ""))
+            );
+            case "combat.lastWordsSkipped" -> lastWordsSkippedDetails(data);
+            default -> stringList(payload.get("details"));
+        };
+    }
+
+    private List<String> combatStartDetails(Map<String, Object> data) {
+        List<String> details = new ArrayList<>();
+        List<String> order = stringList(data.get("order"));
+        if (!order.isEmpty()) {
+            details.add("행동 순서: " + order.stream().map(this::actorLabel).reduce((a, b) -> a + " -> " + b).orElse(""));
+        }
+        String encounterId = stringValue(data.get("encounterId"), null);
+        if (encounterId != null) {
+            details.add("인카운터: " + encounterId);
+        }
+        List<String> enemies = stringList(data.get("enemies"));
+        if (!enemies.isEmpty()) {
+            details.add("적 배치: " + String.join(", ", enemies));
+        }
+        return List.copyOf(details);
+    }
+
+    private List<String> initiativeDetails(Map<String, Object> data) {
+        List<String> summaries = stringList(data.get("summaries"));
+        if (!summaries.isEmpty()) {
+            return List.of("판정 결과: " + String.join(", ", summaries));
+        }
+        Map<String, Object> rolls = objectMap(data.get("rolls"));
+        if (rolls.isEmpty()) {
+            return List.of();
+        }
+        return List.of("판정 결과: " + rolls.entrySet().stream()
+                .map(entry -> actorLabel(entry.getKey()) + " " + entry.getValue())
+                .reduce((a, b) -> a + ", " + b)
+                .orElse(""));
+    }
+
+    private List<String> playCardDetails(Map<String, Object> payload, Map<String, Object> data) {
+        List<String> details = new ArrayList<>();
+        List<String> targets = stringList(data.get("targets")).stream().map(this::actorLabel).toList();
+        details.add("대상: " + (targets.isEmpty() ? "없음" : String.join(", ", targets)));
+        details.add("비용: 행동력 " + stringValue(data.get("cost"), "0")
+                + ("0".equals(stringValue(data.get("apDebt"), "0")) ? "" : " (부채 " + stringValue(data.get("apDebt"), "0") + ")"));
+        details.add("카드 이동: " + zoneLabel(stringValue(data.get("from"), ""))
+                + " -> " + zoneLabel(stringValue(data.get("to"), "")));
+        details.add("카드 ID: " + stringValue(data.get("cardDefId"), stringValue(payload.get("cardDefId"), "알 수 없음")));
+        details.add("인스턴스: " + stringValue(data.get("cardInstanceId"), "알 수 없음"));
+        return List.copyOf(details);
+    }
+
+    private List<String> lastWordsSkippedDetails(Map<String, Object> data) {
+        String reason = stringValue(data.get("reason"), "");
+        List<String> details = new ArrayList<>();
+        details.add("사유: " + switch (reason) {
+            case "NO_CANDIDATES" -> "발동 가능한 유언 효과가 없습니다.";
+            case "NO_PAYABLE_CANDIDATES" -> "지불 가능한 유언 효과가 없습니다.";
+            case "PENDING_DECISION_EXISTS" -> "먼저 처리해야 할 선택지가 있습니다.";
+            default -> stringValue(data.get("reasonLabel"), "유언 처리를 진행할 수 없습니다.");
+        });
+        List<String> checkedZones = stringList(data.get("checkedZones"));
+        if (!checkedZones.isEmpty()) {
+            details.add("검사 영역: " + checkedZones.stream().map(this::zoneLabel).reduce((a, b) -> a + ", " + b).orElse(""));
+        }
+        String candidateCount = stringValue(data.get("candidateCount"), null);
+        if (candidateCount != null) {
+            details.add("후보 수: " + candidateCount);
+        }
+        return List.copyOf(details);
+    }
+
+    private String cardLogName(Map<String, Object> payload, Map<String, Object> data) {
+        String cardName = stringValue(data.get("cardName"), stringValue(payload.get("cardName"), null));
+        if (cardName != null) {
+            return cardName;
+        }
+        String cardDefId = stringValue(data.get("cardDefId"), stringValue(payload.get("cardDefId"), null));
+        return cardDefId == null ? "알 수 없는 카드" : cardDefId;
+    }
+
+    private String statusChangeLabel(Map<String, Object> data) {
+        int before = intValue(data.get("before"));
+        int after = intValue(data.get("after"));
+        if (after <= 0) {
+            return "제거";
+        }
+        if (before <= 0) {
+            return after + " 부여";
+        }
+        return "변경";
+    }
+
+    private String actorLabel(String value) {
+        if (value == null || value.isBlank()) {
+            return "알 수 없음";
+        }
+        if (value.startsWith("P:") || value.startsWith("E:")) {
+            return value.substring(2);
+        }
+        if (value.startsWith("PLAYER:")) {
+            return value.substring("PLAYER:".length());
+        }
+        if (value.startsWith("ENEMY:")) {
+            return value.substring("ENEMY:".length());
+        }
+        return value;
+    }
+
+    private String zoneLabel(String value) {
+        if (value == null || value.isBlank()) {
+            return "알 수 없음";
+        }
+        return switch (value) {
+            case "HAND" -> "패";
+            case "DECK" -> "덱";
+            case "GRAVE", "GRAVEYARD" -> "묘지";
+            case "FIELD" -> "필드";
+            case "EXCLUDED", "BANISHED" -> "제외";
+            case "EX" -> "EX";
+            case "PLAYER_FIELD" -> "플레이어 필드";
+            case "PLAYER_GRAVEYARD" -> "플레이어 묘지";
+            default -> value;
+        };
+    }
+
+    private String reasonLabel(String value) {
+        if (value == null || value.isBlank()) {
+            return "알 수 없음";
+        }
+        return switch (value) {
+            case "PLAY", "PLAY_CARD" -> "카드 사용";
+            case "COMBAT_START" -> "전투 시작";
+            case "TURN_START" -> "턴 시작";
+            case "TURN_END" -> "턴 종료";
+            case "DAMAGE" -> "피해";
+            case "HEAL" -> "회복";
+            case "DRAW" -> "드로우";
+            case "DISCARD" -> "버림";
+            case "OTHER" -> "기타";
+            default -> value;
+        };
+    }
+
+    private Map<String, Object> objectMap(Object value) {
+        if (!(value instanceof Map<?, ?> map)) {
+            return Map.of();
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            if (entry.getKey() != null) {
+                out.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+        }
+        return out;
+    }
+
+    private int intValue(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private List<String> eventDetails(Map<String, Object> payload) {

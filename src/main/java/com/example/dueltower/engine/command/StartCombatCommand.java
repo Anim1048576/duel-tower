@@ -129,6 +129,23 @@ public final class StartCombatCommand implements GameCommand {
 
             HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, events, "hand limit exceeded");
 
+            events.add(new GameEvent.CombatLogAppended(
+                    "combat.draw",
+                    "PLAYER",
+                    ps.playerId().value() + "이 카드 " + openingDrawCount + "장을 드로우했다.",
+                    ps.playerId().value(),
+                    ps.playerId().value(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of("사유: 전투 시작"),
+                    Map.of(
+                            "actorId", ps.playerId().value(),
+                            "count", openingDrawCount,
+                            "reason", "COMBAT_START"
+                    )
+            ));
             events.add(new GameEvent.LogAppended(ps.playerId().value() + " draws " + openingDrawCount + " (combat start)"));
         }
 
@@ -145,6 +162,19 @@ public final class StartCombatCommand implements GameCommand {
             String key = CombatState.actorKey(ref);
             events.add(new GameEvent.LogAppended("initiative " + key + " = " + cs.initiatives().get(key)));
         }
+        events.add(new GameEvent.CombatLogAppended(
+                "combat.initiative",
+                "PLAYER",
+                "행동 순서 판정: " + initiativeSummary(cs),
+                actorId.value(),
+                actorId.value(),
+                null,
+                null,
+                null,
+                null,
+                List.of("판정 결과: " + initiativeSummary(cs)),
+                initiativeLogData(cs)
+        ));
 
         if (!cs.initiativeTieGroups().isEmpty()) {
             events.add(new GameEvent.LogAppended("initiative tie among players: " + cs.initiativeTieGroups()));
@@ -154,6 +184,19 @@ public final class StartCombatCommand implements GameCommand {
                 .collect(java.util.stream.Collectors.joining(","));
 
         events.add(new GameEvent.LogAppended(actorId.value() + " starts combat. order=" + orderStr));
+        events.add(new GameEvent.CombatLogAppended(
+                "combat.start",
+                "PLAYER",
+                "전투가 시작되었다.",
+                actorId.value(),
+                actorId.value(),
+                null,
+                null,
+                null,
+                null,
+                List.of("행동 순서: " + order.stream().map(StartCombatCommand::actorDisplay).collect(java.util.stream.Collectors.joining(" -> "))),
+                combatStartLogData(state, order)
+        ));
         if (cs.phase() == CombatPhase.MAIN) {
             events.add(new GameEvent.TurnAdvanced(CombatState.actorKey(cs.currentTurnActor()), cs.round()));
         }
@@ -248,5 +291,48 @@ public final class StartCombatCommand implements GameCommand {
         state.combat(null);
         state.enemies().clear();
         events.add(new GameEvent.LogAppended("combat state reset"));
+    }
+
+    private static String initiativeSummary(CombatState cs) {
+        return cs.initiatives().entrySet().stream()
+                .map(entry -> actorDisplay(entry.getKey()) + " " + entry.getValue())
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    private static Map<String, Object> initiativeLogData(CombatState cs) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("rolls", Map.copyOf(cs.initiatives()));
+        data.put("summaries", cs.initiatives().entrySet().stream()
+                .map(entry -> actorDisplay(entry.getKey()) + " " + entry.getValue())
+                .toList());
+        if (!cs.initiativeTieGroups().isEmpty()) {
+            data.put("tieGroups", List.copyOf(cs.initiativeTieGroups()));
+        }
+        return Map.copyOf(data);
+    }
+
+    private static Map<String, Object> combatStartLogData(GameState state, List<TargetRef> order) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("order", order.stream().map(CombatState::actorKey).toList());
+        data.put("enemies", state.enemies().keySet().stream().map(Ids.EnemyId::value).toList());
+        if (state.runState() != null && state.runState().currentNode() != null) {
+            data.put("encounterId", state.runState().currentNode().id());
+            data.put("encounterName", state.runState().currentNode().name());
+        }
+        return Map.copyOf(data);
+    }
+
+    private static String actorDisplay(TargetRef ref) {
+        return actorDisplay(CombatState.actorKey(ref));
+    }
+
+    private static String actorDisplay(String actorKey) {
+        if (actorKey == null || actorKey.isBlank()) {
+            return "알 수 없음";
+        }
+        if (actorKey.startsWith("P:") || actorKey.startsWith("E:")) {
+            return actorKey.substring(2);
+        }
+        return actorKey;
     }
 }

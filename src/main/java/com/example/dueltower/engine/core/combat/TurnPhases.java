@@ -14,6 +14,7 @@ import com.example.dueltower.engine.model.SummonState;
 import com.example.dueltower.engine.model.TargetRef;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 턴 시작/턴 종료에서 공통으로 실행할 처리들을 한 군데로 모아둔다.
@@ -73,6 +74,23 @@ public final class TurnPhases {
             ZoneOps.drawWithRefill(state, ctx, ps, draw, out, false);
 
             HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, out, "hand limit exceeded");
+            out.add(new GameEvent.CombatLogAppended(
+                    "combat.draw",
+                    "PLAYER",
+                    ps.playerId().value() + "이 카드 " + draw + "장을 드로우했다.",
+                    ps.playerId().value(),
+                    ps.playerId().value(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of("사유: 턴 시작"),
+                    Map.of(
+                            "actorId", ps.playerId().value(),
+                            "count", draw,
+                            "reason", "TURN_START"
+                    )
+            ));
             out.add(new GameEvent.LogAppended(ps.playerId().value() + " draws " + draw + " (turn start)"));
         }
     }

@@ -10,6 +10,7 @@ import com.example.dueltower.engine.model.PlayerState;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class DrawCommand implements GameCommand {
@@ -49,6 +50,23 @@ public final class DrawCommand implements GameCommand {
 
         HandLimitOps.ensureHandLimitOrPending(state, ctx, ps, events, "hand limit exceeded");
 
+        events.add(new GameEvent.CombatLogAppended(
+                "combat.draw",
+                "PLAYER",
+                ps.playerId().value() + "이 카드 " + count + "장을 드로우했다.",
+                ps.playerId().value(),
+                ps.playerId().value(),
+                null,
+                null,
+                null,
+                null,
+                List.of("사유: 드로우"),
+                Map.of(
+                        "actorId", ps.playerId().value(),
+                        "count", count,
+                        "reason", "DRAW"
+                )
+        ));
         events.add(new GameEvent.LogAppended(ps.playerId().value() + " draws " + count));
         return events;
     }

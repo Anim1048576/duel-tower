@@ -17,6 +17,7 @@ import com.example.dueltower.engine.model.PlayerState;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -126,6 +127,27 @@ public final class ResolveLastWordsCommand implements GameCommand {
         if (selectedIds.isEmpty()) {
             ps.pendingDecision(null);
             events.add(new GameEvent.PendingDecisionCleared(ps.playerId().value(), "LAST_WORDS"));
+            events.add(new GameEvent.CombatLogAppended(
+                    "combat.lastWordsSkipped",
+                    "PLAYER",
+                    "[유언] 처리를 생략했다.",
+                    ps.playerId().value(),
+                    ps.playerId().value(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of(
+                            "사유: 사용자가 유언 처리를 건너뛰었습니다.",
+                            "후보 수: " + decision.candidateIds().size()
+                    ),
+                    Map.of(
+                            "reason", "USER_SKIPPED",
+                            "reasonLabel", "사용자가 유언 처리를 건너뛰었습니다.",
+                            "candidateCount", decision.candidateIds().size(),
+                            "candidateIds", decision.candidateIds().stream().map(id -> id.value().toString()).toList()
+                    )
+            ));
             events.add(new GameEvent.LogAppended(ps.playerId().value() + " skipped last words"));
             return events;
         }
