@@ -245,7 +245,7 @@ export type JoinSessionResponse = {
 export type DebugSoloCombatResponse = {
   sessionCode: SessionCode
   gmPlayerId: string
-  npcPlayerId: string
+  npcPlayerId: string | null
   gmToken: SessionToken
   playerToken: SessionToken
   redirectUrl: string

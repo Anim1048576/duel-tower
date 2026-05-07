@@ -1,7 +1,5 @@
 package com.example.dueltower.session.service;
 
-import com.example.dueltower.session.dto.AddGmNpcRequest;
-import com.example.dueltower.session.dto.AddGmNpcResponse;
 import com.example.dueltower.session.dto.CommandRequest;
 import com.example.dueltower.session.dto.DebugSoloCombatRequest;
 import com.example.dueltower.session.dto.DebugSoloCombatResponse;
@@ -17,46 +15,34 @@ public class DebugSoloCombatService {
 
     private final SessionLifecycleService sessionLifecycleService;
     private final SessionLobbyService sessionLobbyService;
-    private final SessionGmNpcService sessionGmNpcService;
     private final SessionCommandService sessionCommandService;
 
     public DebugSoloCombatService(SessionLifecycleService sessionLifecycleService,
                                   SessionLobbyService sessionLobbyService,
-                                  SessionGmNpcService sessionGmNpcService,
                                   SessionCommandService sessionCommandService) {
         this.sessionLifecycleService = sessionLifecycleService;
         this.sessionLobbyService = sessionLobbyService;
-        this.sessionGmNpcService = sessionGmNpcService;
         this.sessionCommandService = sessionCommandService;
     }
 
     public DebugSoloCombatResponse startSoloCombat(DebugSoloCombatRequest req) {
-        String gmPlayerId = normalizeOrDefault(req == null ? null : req.gmPlayerId(), DEFAULT_GM_PLAYER_ID);
-        SessionRuntime rt = sessionLifecycleService.createSession(gmPlayerId);
+        // Quick solo combat creates exactly one real combat actor. GM-NPC control scenarios
+        // stay in the dedicated GM-NPC feature/tests so visible player, command actor, and
+        // token owner all resolve to the same player id in this debug path.
+        String debugPlayerId = normalizeOrDefault(req == null ? null : req.gmPlayerId(), DEFAULT_GM_PLAYER_ID);
+        SessionRuntime rt = sessionLifecycleService.createSession(debugPlayerId);
 
         sessionLobbyService.join(
                 rt.code(),
-                gmPlayerId,
+                debugPlayerId,
                 req == null ? null : req.playerCharacterId(),
                 List.of(),
                 null,
                 null,
                 null
         );
-        String playerToken = sessionLobbyService.issuePlayerToken(rt.code(), gmPlayerId);
-        sessionLobbyService.setPlayerReady(rt.code(), gmPlayerId, gmPlayerId, true);
-
-        AddGmNpcResponse npc = sessionGmNpcService.addGmControlledNpc(
-                rt.code(),
-                gmPlayerId,
-                new AddGmNpcRequest(
-                        req == null ? null : req.npcName(),
-                        req == null ? null : req.npcCharacterId(),
-                        null,
-                        null,
-                        null
-                )
-        );
+        String playerToken = sessionLobbyService.issuePlayerToken(rt.code(), debugPlayerId);
+        sessionLobbyService.setPlayerReady(rt.code(), debugPlayerId, debugPlayerId, true);
 
         long expectedVersion = sessionLifecycleService.withLockedSession(rt.code(), lockedRt -> lockedRt.state().version());
         sessionCommandService.handleCommand(
@@ -67,7 +53,7 @@ public class DebugSoloCombatService {
                         "START_COMBAT",
                         null,
                         expectedVersion,
-                        gmPlayerId,
+                        debugPlayerId,
                         null,
                         null,
                         null,
@@ -92,8 +78,8 @@ public class DebugSoloCombatService {
 
         return new DebugSoloCombatResponse(
                 rt.code(),
-                gmPlayerId,
-                npc.npcPlayerId(),
+                debugPlayerId,
+                null,
                 rt.gmToken(),
                 playerToken,
                 "/sessions/" + rt.code() + "/combat"
