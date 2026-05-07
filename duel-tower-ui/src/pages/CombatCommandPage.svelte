@@ -62,7 +62,7 @@
   } from '../lib/session/combatBoardSelection.js'
   import { readStoredSessionAccess, type StoredSessionAccess } from '../lib/session/access'
   import {
-    getPlayCardSourceOptions,
+    getPlayCardSourceOptions as getRefreshPlayCardSourceOptions,
     reconcileCombatLocalSelectionState,
     resolveCombatScreenRefreshPlan,
   } from '../lib/session/combatScreenRefresh.js'
@@ -76,6 +76,26 @@
 
   const POLLING_INTERVAL_MS = 4000
   const COMBAT_SIDEBAR_EVENT_LIMIT = 12
+  const COMBAT_ACTION_ID_BY_COMMAND_TYPE: Record<string, CombatActionId> = {
+    DRAW: 'combat.draw',
+    END_TURN: 'combat.endTurn',
+    CLEAR_RECENT_RESULTS: 'combat.clearRecentResults',
+    PLAY_CARD: 'combat.playCard',
+    USE_EX: 'combat.useEx',
+    DISCARD_TO_HAND_LIMIT: 'combat.resolvePending',
+    SEARCH_PICK: 'combat.resolvePending',
+    LAST_WORDS: 'combat.resolvePending',
+    INITIATIVE_TIE_ORDER: 'combat.resolvePending',
+    RESOLVE_INITIATIVE_TIE: 'combat.resolvePending',
+  }
+  const COMBAT_ACTION_ID_BY_CAMEL_CASE: Record<string, CombatActionId> = {
+    draw: 'combat.draw',
+    endTurn: 'combat.endTurn',
+    clearRecentResults: 'combat.clearRecentResults',
+    playCard: 'combat.playCard',
+    useEx: 'combat.useEx',
+    resolvePending: 'combat.resolvePending',
+  }
   type CombatRefreshReason =
     | 'initial-load'
     | 'retry-load'
@@ -532,6 +552,81 @@
     return values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value]
   }
 
+  function normalizeCombatActionId(value: string | null | undefined): CombatActionId | null {
+    const rawValue = String(value ?? '').trim()
+    if (!rawValue) {
+      return null
+    }
+
+    if (COMBAT_ACTION_ID_BY_CAMEL_CASE[rawValue]) {
+      return COMBAT_ACTION_ID_BY_CAMEL_CASE[rawValue]
+    }
+
+    if (rawValue.startsWith('combat.') && COMBAT_ACTION_ID_BY_CAMEL_CASE[rawValue.slice('combat.'.length)]) {
+      return COMBAT_ACTION_ID_BY_CAMEL_CASE[rawValue.slice('combat.'.length)]
+    }
+
+    return COMBAT_ACTION_ID_BY_COMMAND_TYPE[rawValue.toUpperCase()] ?? null
+  }
+
+  function getPlayCardAction(screenModel: CombatScreenResponse | null) {
+    const action = screenModel ? findCombatAction(screenModel, 'combat.playCard') : null
+    return action?.metadata?.kind === 'playCard' ? action : null
+  }
+
+  function getPlayCardSourceOptions(screenModel: CombatScreenResponse | null) {
+    return getRefreshPlayCardSourceOptions(screenModel)
+  }
+
+  function hasPlayCardSource(screenModel: CombatScreenResponse | null, cardId: string | null) {
+    return Boolean(cardId && getPlayCardSourceOptions(screenModel).some((option) => option.instanceId === cardId))
+  }
+
+  function reconcileSelectedActionIdWithScreen(screenModel: CombatScreenResponse | null) {
+    if (!screenModel || !selectedActionId) {
+      selectedActionId = null
+      return
+    }
+
+    const normalizedActionId = normalizeCombatActionId(selectedActionId)
+    selectedActionId =
+      normalizedActionId && findCombatAction(screenModel, normalizedActionId)
+        ? normalizedActionId
+        : null
+  }
+
+  function reconcileSelectedCardIdWithPlayCardSources(screenModel: CombatScreenResponse | null) {
+    if (!selectedCardId) {
+      return
+    }
+
+    if (!getPlayCardAction(screenModel) || !hasPlayCardSource(screenModel, selectedCardId)) {
+      selectedCardId = null
+      if (selectedActionId === 'combat.playCard') {
+        selectedActionId = null
+      }
+    }
+  }
+
+  function debugCombatSelectionReconcile(
+    previousState: Pick<CombatLocalSelectionState, 'selectedActionId' | 'selectedCardId'>,
+    nextState: Pick<CombatLocalSelectionState, 'selectedActionId' | 'selectedCardId'>,
+    screenModel: CombatScreenResponse | null,
+  ) {
+    if (!import.meta.env.DEV) {
+      return
+    }
+
+    console.debug('Combat selection reconciled', {
+      previousSelectedActionId: previousState.selectedActionId,
+      previousSelectedCardId: previousState.selectedCardId,
+      nextSelectedActionId: nextState.selectedActionId,
+      nextSelectedCardId: nextState.selectedCardId,
+      possibleActionIds: screenModel?.possibleActions.map((action) => action.id) ?? [],
+      playCardSourceOptionIds: getPlayCardSourceOptions(screenModel).map((option) => option.instanceId),
+    })
+  }
+
   function findSelectedPlayCardSource(screenModel: CombatScreenResponse | null, instanceId: string | null) {
     if (!instanceId) {
       return null
@@ -556,14 +651,23 @@
 
   function applyScreen(nextScreen: CombatScreenResponse, reason: CombatRefreshReason) {
     const previousScreen = screen
+    const previousSelection = {
+      selectedActionId,
+      selectedCardId,
+    }
     screen = nextScreen
     syncSessionSelectionHandoff(nextScreen.sessionCode)
-    writeLocalSelectionState(
-      reconcileCombatLocalSelectionState(nextScreen, readLocalSelectionState(), {
-        reason,
-        previousScreen,
-      }) as CombatLocalSelectionState,
-    )
+    const nextSelectionState = reconcileCombatLocalSelectionState(nextScreen, readLocalSelectionState(), {
+      reason,
+      previousScreen,
+    }) as CombatLocalSelectionState
+    writeLocalSelectionState(nextSelectionState)
+    reconcileSelectedActionIdWithScreen(nextScreen)
+    reconcileSelectedCardIdWithPlayCardSources(nextScreen)
+    debugCombatSelectionReconcile(previousSelection, {
+      selectedActionId,
+      selectedCardId,
+    }, nextScreen)
     reconcilePresentationState(nextScreen)
 
     if (!getRouteSessionCode() && nextScreen.sessionCode) {
@@ -961,24 +1065,34 @@
     }
   }
 
-  async function executeAction(actionId: CombatActionId) {
+  async function executeAction(actionId: string) {
     if (!screen) {
       return
     }
 
-    const action = findCombatAction(screen, actionId)
+    const normalizedActionId = normalizeCombatActionId(actionId)
 
     if (import.meta.env.DEV) {
-      console.debug('Combat executeAction', {
-        actionId,
+      console.debug('Combat executeAction before', {
+        rawActionId: actionId,
+        normalizedActionId,
         possibleActionIds: screen.possibleActions.map((candidate) => candidate.id),
         selectedActionId,
         selectedCardId,
+        playCardSourceOptionIds: getPlayCardSourceOptions(screen).map((option) => option.instanceId),
       })
     }
 
+    if (!normalizedActionId) {
+      actionErrorMessage = '현재 화면에서 사용할 수 없는 액션입니다. 화면을 새로고침했습니다.'
+      actionSuccessMessage = null
+      return
+    }
+
+    const action = findCombatAction(screen, normalizedActionId)
+
     if (!action) {
-      if (selectedActionId === actionId) {
+      if (selectedActionId === normalizedActionId) {
         selectedActionId = null
       }
       actionErrorMessage = '현재 화면에서 사용할 수 없는 액션입니다. 화면을 새로고침했습니다.'
@@ -986,6 +1100,9 @@
       await refreshCombatScreen('action-failure')
       return
     }
+
+    selectedActionId = action.id
+    reconcileSelectedCardIdWithPlayCardSources(screen)
 
     const blockedMessage = getActionPresentationBlock(action)
 
@@ -1024,18 +1141,35 @@
       actionErrorMessage = getApiErrorMessage(error, `Unable to execute ${action.label}.`)
       actionSuccessMessage = null
     } finally {
+      if (import.meta.env.DEV) {
+        console.debug('Combat executeAction after', {
+          rawActionId: actionId,
+          normalizedActionId: action.id,
+          possibleActionIds: screen?.possibleActions.map((candidate) => candidate.id) ?? [],
+          selectedActionId,
+          selectedCardId,
+          playCardSourceOptionIds: getPlayCardSourceOptions(screen).map((option) => option.instanceId),
+        })
+      }
       pendingActionId = null
     }
   }
 
-  function handleCommandButtonClick(actionId: CombatActionId) {
+  function handleCommandButtonClick(actionId: string) {
     if (!screen) {
       return
     }
 
-    const action = findCombatAction(screen, actionId)
+    const normalizedActionId = normalizeCombatActionId(actionId)
+    if (!normalizedActionId) {
+      actionErrorMessage = '현재 화면에서 사용할 수 없는 액션입니다. 화면을 새로고침했습니다.'
+      actionSuccessMessage = null
+      return
+    }
+
+    const action = findCombatAction(screen, normalizedActionId)
     if (!action) {
-      if (selectedActionId === actionId) {
+      if (selectedActionId === normalizedActionId) {
         selectedActionId = null
       }
       actionErrorMessage = '현재 화면에서 사용할 수 없는 액션입니다. 화면을 새로고침했습니다.'
@@ -1080,22 +1214,31 @@
   }
 
   function handleSelectHandCard(instanceId: string) {
-    if (!hasPlayableCardSource(screen, instanceId)) {
+    const sourceAvailable = hasPlayCardSource(screen, instanceId)
+
+    if (import.meta.env.DEV) {
+      console.debug('Combat hand card clicked', {
+        instanceId,
+        sourceAvailable,
+        playCardSourceOptionIds: getPlayCardSourceOptions(screen).map((option) => option.instanceId),
+      })
+    }
+
+    if (!sourceAvailable) {
       if (selectedCardId === instanceId) {
         selectedCardId = null
       }
       selectedActionId = selectedActionId === 'combat.playCard' ? null : selectedActionId
-      actionErrorMessage = 'That hand card is not currently playable.'
+      actionErrorMessage = '현재 사용할 수 없는 손패 카드입니다.'
       return
     }
 
     actionErrorMessage = null
-    const nextSelectedCardId = selectedCardId === instanceId ? null : instanceId
-    selectedCardId = nextSelectedCardId
+    selectedCardId = instanceId
     selectedActionId = 'combat.playCard'
-    const nextAction = screen ? findCombatAction(screen, 'combat.playCard') : null
+    const nextAction = getPlayCardAction(screen)
     prepareBoardSelectionState(getSelectedActionRequirementView(nextAction), {
-      resetCountChoice: nextSelectedCardId !== null,
+      resetCountChoice: true,
     })
   }
 

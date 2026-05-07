@@ -17,6 +17,50 @@
 /**
  * @typedef {import('../api/screenTypes').CombatActionId | null} CombatSelectedActionId
  */
+/** @type {Record<string, import('../api/screenTypes').CombatActionId>} */
+const COMBAT_ACTION_ID_BY_COMMAND_TYPE = {
+  DRAW: 'combat.draw',
+  END_TURN: 'combat.endTurn',
+  CLEAR_RECENT_RESULTS: 'combat.clearRecentResults',
+  PLAY_CARD: 'combat.playCard',
+  USE_EX: 'combat.useEx',
+  DISCARD_TO_HAND_LIMIT: 'combat.resolvePending',
+  SEARCH_PICK: 'combat.resolvePending',
+  LAST_WORDS: 'combat.resolvePending',
+  INITIATIVE_TIE_ORDER: 'combat.resolvePending',
+  RESOLVE_INITIATIVE_TIE: 'combat.resolvePending',
+}
+
+/** @type {Record<string, import('../api/screenTypes').CombatActionId>} */
+const COMBAT_ACTION_ID_BY_CAMEL_CASE = {
+  draw: 'combat.draw',
+  endTurn: 'combat.endTurn',
+  clearRecentResults: 'combat.clearRecentResults',
+  playCard: 'combat.playCard',
+  useEx: 'combat.useEx',
+  resolvePending: 'combat.resolvePending',
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {import('../api/screenTypes').CombatActionId | null}
+ */
+function normalizeCombatActionId(value) {
+  const rawValue = String(value ?? '').trim()
+  if (!rawValue) {
+    return null
+  }
+
+  if (COMBAT_ACTION_ID_BY_CAMEL_CASE[rawValue]) {
+    return COMBAT_ACTION_ID_BY_CAMEL_CASE[rawValue]
+  }
+
+  if (rawValue.startsWith('combat.') && COMBAT_ACTION_ID_BY_CAMEL_CASE[rawValue.slice('combat.'.length)]) {
+    return COMBAT_ACTION_ID_BY_CAMEL_CASE[rawValue.slice('combat.'.length)]
+  }
+
+  return COMBAT_ACTION_ID_BY_COMMAND_TYPE[rawValue.toUpperCase()] ?? null
+}
 
 /**
  * @typedef {{
@@ -226,10 +270,11 @@ export function reconcileCombatLocalSelectionState(nextScreen, currentState, { r
       ? nextState.selectedPlayerId
       : nextScreen?.zones?.visiblePlayerId ?? null
 
+  const normalizedSelectedActionId = normalizeCombatActionId(nextState.selectedActionId)
   nextState.selectedActionId =
-    nextState.selectedActionId &&
-    (nextScreen?.possibleActions ?? []).some((/** @type {import('../api/screenTypes').CombatScreenAction} */ action) => action.id === nextState.selectedActionId)
-      ? nextState.selectedActionId
+    normalizedSelectedActionId &&
+    (nextScreen?.possibleActions ?? []).some((/** @type {import('../api/screenTypes').CombatScreenAction} */ action) => action.id === normalizedSelectedActionId)
+      ? normalizedSelectedActionId
       : null
 
   const nextSelectedCardId =
