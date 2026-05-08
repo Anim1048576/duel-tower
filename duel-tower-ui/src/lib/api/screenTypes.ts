@@ -108,6 +108,7 @@ export type CombatActionId =
   | 'combat.clearRecentResults'
   | 'combat.playCard'
   | 'combat.useEx'
+  | 'combat.handSwap'
   | 'combat.resolvePending'
 
 export type GmLobbyStartCombatOutcome =
@@ -704,6 +705,14 @@ export type CombatUseExActionPayload = {
   reason?: string | null
 }
 
+export type CombatHandSwapActionPayload = {
+  type: 'HAND_SWAP'
+  expectedVersion: number
+  playerId: string
+  discardIds: string[]
+  reason?: string | null
+}
+
 export type CombatResolvePendingActionPayload = {
   type: string
   expectedVersion: number
@@ -795,6 +804,13 @@ export type CombatUseExScreenAction = ScreenActionDto<
   id: 'combat.useEx'
 }
 
+export type CombatHandSwapScreenAction = ScreenActionDto<
+  CombatHandSwapActionPayload,
+  CombatSimpleActionMetadataDto
+> & {
+  id: 'combat.handSwap'
+}
+
 export type CombatResolvePendingScreenAction = ScreenActionDto<
   CombatResolvePendingActionPayload,
   CombatPendingActionMetadataDto
@@ -808,6 +824,7 @@ export type CombatScreenAction =
   | CombatClearRecentResultsScreenAction
   | CombatPlayCardScreenAction
   | CombatUseExScreenAction
+  | CombatHandSwapScreenAction
   | CombatResolvePendingScreenAction
 
 export type ScreenResponseBase<TAction extends ScreenActionDto = ScreenActionDto> = {

@@ -57,6 +57,13 @@ function createScreen({
           },
         },
       },
+      {
+        id: 'combat.handSwap',
+        metadata: {
+          kind: 'simple',
+          note: '패 교환',
+        },
+      },
     ],
   }
 }
@@ -159,6 +166,35 @@ runTest('polling clears selected card when it is visible in hand but no longer a
       selectedActionId: 'combat.playCard',
       selectedPlayerId: 'p2',
       selectedCardId: null,
+    },
+  )
+})
+
+runTest('hand swap selection keeps one visible discard without play-card source checks', () => {
+  const currentState = {
+    ...createEmptyCombatLocalSelectionState(),
+    selectedActionId: 'HAND_SWAP',
+    selectedCardId: 'card-2',
+    selectedDiscardIds: ['card-2', 'missing-card', 'card-1'],
+  }
+
+  assert.deepEqual(
+    reconcileCombatLocalSelectionState(
+      createScreen({
+        handIds: ['card-1', 'card-2'],
+        sourceOptionIds: ['card-1'],
+      }),
+      currentState,
+      {
+        reason: 'polling',
+        previousScreen: createScreen(),
+      },
+    ),
+    {
+      ...createEmptyCombatLocalSelectionState(),
+      selectedActionId: 'combat.handSwap',
+      selectedPlayerId: 'p1',
+      selectedDiscardIds: ['card-2'],
     },
   )
 })

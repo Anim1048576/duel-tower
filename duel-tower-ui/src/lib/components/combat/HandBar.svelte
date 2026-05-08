@@ -66,6 +66,7 @@
   }
 
   const previewCard = $derived.by(() => resolvePreviewCard())
+  const handSwapMode = $derived(selectedCommandType === 'combat.handSwap')
 </script>
 
 <SectionFrame
@@ -105,9 +106,15 @@
         </button>
 
         <div class="hand-bar__selected-card">
-          <strong>Selected</strong>
+          <strong>{handSwapMode ? '패 교환' : 'Selected'}</strong>
           <p>{selectedCardView?.title ?? 'No card'}</p>
-          <span>{selectedCardView?.subtitle ?? visibleHandOwner ?? currentActorLabel}</span>
+          <span>
+            {handSwapMode
+              ? selectedDiscardIds.length === 1
+                ? '버릴 손패 선택됨'
+                : '버릴 손패 1장 선택'
+              : selectedCardView?.subtitle ?? visibleHandOwner ?? currentActorLabel}
+          </span>
           {#if pendingDecisionType}
             <small>{pendingDecisionType}</small>
           {/if}
@@ -140,6 +147,12 @@
               {card}
               selected={selectedCardId === card.instanceId}
               discardSelected={selectedDiscardIds.includes(card.instanceId)}
+              discardActionLabel={handSwapMode ? '교환' : 'D'}
+              discardActionAriaLabel={handSwapMode
+                ? selectedDiscardIds.includes(card.instanceId)
+                  ? '패 교환 선택 해제'
+                  : '패 교환으로 버릴 카드 선택'
+                : undefined}
               inspectState={resolveInspectState(card.instanceId)}
               onInspectHoverStart={() => onHoverHandCard(card.instanceId)}
               onInspectHoverEnd={() => onHoverHandCard(null)}

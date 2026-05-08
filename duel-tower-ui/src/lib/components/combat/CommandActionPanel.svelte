@@ -93,6 +93,10 @@
   function isPendingCandidateSelected(candidateId: string) {
     return pendingCandidateIds.includes(candidateId)
   }
+
+  function isSelectedCommandDisabled() {
+    return commandOptions.find((option) => option.id === selectedCommandType)?.disabled ?? true
+  }
 </script>
 
 <div
@@ -128,6 +132,23 @@
     <p>EX available: {exAvailable ? 'Yes' : 'No'}</p>
     <p>Recent command events buffered: {recentCommandEventCount}</p>
   </ContentStatePanel>
+
+  {#if selectedCommandType === 'combat.handSwap'}
+    <div class="command-action-panel__zone-panel command-action-panel__zone-panel--hand-swap">
+      <strong>패 교환</strong>
+      <p>패 교환으로 버릴 손패 1장을 선택하세요.</p>
+      <p>선택한 손패: {selectedDiscardIds.length === 1 ? selectedDiscardIds[0] : '없음'}</p>
+      <div class="command-action-panel__actions">
+        <button
+          type="button"
+          disabled={commandPending !== null || isSelectedCommandDisabled()}
+          onclick={() => onCommandButtonClick('combat.handSwap')}
+        >
+          {commandPending === 'combat.handSwap' ? '패 교환 실행 중...' : '패 교환 실행'}
+        </button>
+      </div>
+    </div>
+  {/if}
 
   <div class="command-action-panel__zone-panel">
     <TargetSelectionPanel
@@ -471,6 +492,13 @@
       linear-gradient(160deg, rgba(107, 24, 26, 0.46), rgba(21, 19, 17, 0.88)),
       rgba(12, 11, 10, 0.28);
     box-shadow: 0 0 0 1px rgba(255, 179, 175, 0.12), 0 18px 60px rgba(107, 24, 26, 0.18);
+  }
+
+  .command-action-panel__zone-panel--hand-swap {
+    border-color: rgba(199, 167, 125, 0.5);
+    background:
+      linear-gradient(160deg, rgba(72, 58, 42, 0.52), rgba(21, 19, 17, 0.84)),
+      rgba(12, 11, 10, 0.28);
   }
 
   .command-action-panel__tag-row,

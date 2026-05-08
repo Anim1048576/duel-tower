@@ -83,6 +83,7 @@
     CLEAR_RECENT_RESULTS: 'combat.clearRecentResults',
     PLAY_CARD: 'combat.playCard',
     USE_EX: 'combat.useEx',
+    HAND_SWAP: 'combat.handSwap',
     DISCARD_TO_HAND_LIMIT: 'combat.resolvePending',
     SEARCH_PICK: 'combat.resolvePending',
     LAST_WORDS: 'combat.resolvePending',
@@ -95,6 +96,7 @@
     clearRecentResults: 'combat.clearRecentResults',
     playCard: 'combat.playCard',
     useEx: 'combat.useEx',
+    handSwap: 'combat.handSwap',
     resolvePending: 'combat.resolvePending',
   }
   type CombatRefreshReason =
@@ -974,6 +976,10 @@
       return action.disabledReason?.userMessage ?? `${action.label} is currently disabled.`
     }
 
+    if (action.id === 'combat.handSwap' && selectedDiscardIds.length !== 1) {
+      return '패 교환으로 버릴 손패 1장을 선택하세요.'
+    }
+
     if (!action.metadata) {
       return null
     }
@@ -1121,6 +1127,20 @@
     } as ScreenActionPayloadTemplate
   }
 
+  function normalizePayloadString(value: unknown) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null
+  }
+
+  function resolveCombatCommandPlayerId(basePayload: ScreenActionPayloadTemplate) {
+    return (
+      normalizePayloadString(basePayload.playerId) ??
+      selectedPlayerId ??
+      screen?.access.runtimePlayerId ??
+      screen?.zones.visiblePlayerId ??
+      ''
+    )
+  }
+
   function validatePlayCardAction(action: CombatScreenAction | null): LocalActionValidationResult {
     if (!screen || !action || action.id !== 'combat.playCard' || action.metadata?.kind !== 'playCard') {
       return { ok: false, message: 'Combat action is unavailable.' }
@@ -1151,6 +1171,25 @@
     const requirementBlock = getRequirementLocalBlock(selectedSource.requirementView)
     if (requirementBlock) {
       return { ok: false, message: requirementBlock, selectedSource }
+    }
+
+    return { ok: true }
+  }
+
+  function validateHandSwapAction(action: CombatScreenAction | null): LocalActionValidationResult {
+    if (!screen || !action || action.id !== 'combat.handSwap') {
+      return { ok: false, message: 'Combat action is unavailable.' }
+    }
+
+    if (!action.enabled) {
+      return {
+        ok: false,
+        message: action.disabledReason?.userMessage ?? `${action.label} is currently disabled.`,
+      }
+    }
+
+    if (selectedDiscardIds.length !== 1) {
+      return { ok: false, message: '패 교환으로 버릴 카드 1장을 선택하세요.' }
     }
 
     return { ok: true }
@@ -1210,6 +1249,17 @@
           targets: requirement?.boardObjectRequirement
             ? boardSelectionPayload.targets
             : buildTargetRefs(selectedTargetKeys),
+          reason: normalizeOptionalText(selectedReason),
+        }
+      }
+      case 'combat.handSwap': {
+        const basePayload = buildPayloadWithCurrentVersion(action)
+        return {
+          ...basePayload,
+          type: 'HAND_SWAP',
+          expectedVersion: screen?.access.expectedVersion ?? screen?.version ?? basePayload.expectedVersion,
+          playerId: resolveCombatCommandPlayerId(basePayload),
+          discardIds: [...selectedDiscardIds],
           reason: normalizeOptionalText(selectedReason),
         }
       }
@@ -1282,7 +1332,16 @@
       return
     }
 
-    const blockedMessage = action.id === 'combat.playCard' ? null : getActionExecutionBlock(action)
+    const handSwapValidation = action.id === 'combat.handSwap' ? validateHandSwapAction(action) : null
+    if (handSwapValidation && !handSwapValidation.ok) {
+      setLocalActionBlock(handSwapValidation.message)
+      return
+    }
+
+    const blockedMessage =
+      action.id === 'combat.playCard' || action.id === 'combat.handSwap'
+        ? null
+        : getActionExecutionBlock(action)
 
     if (blockedMessage) {
       setLocalActionBlock(blockedMessage)
@@ -1308,13 +1367,17 @@
       }
 
       if (response.success) {
-        actionSuccessMessage = response.message ?? `${action.label} completed.`
+        actionSuccessMessage =
+          response.message ??
+          (action.id === 'combat.handSwap' ? '패 교환을 완료했습니다.' : `${action.label} completed.`)
         actionErrorMessage = null
       } else {
         actionErrorMessage =
           response.message ??
           response.disabledReason?.userMessage ??
-          `${action.label} could not be completed.`
+          (action.id === 'combat.handSwap'
+            ? '패 교환을 완료하지 못했습니다.'
+            : `${action.label} could not be completed.`)
         actionSuccessMessage = null
       }
     } catch (error) {
@@ -1357,10 +1420,24 @@
       return
     }
 
+    const previousActionId = selectedActionId
+    const actionWasSelected = previousActionId === action.id
     selectedActionId = action.id
+    if (!actionWasSelected && (previousActionId === 'combat.handSwap' || action.id === 'combat.handSwap')) {
+      selectedDiscardIds = []
+    }
     prepareBoardSelectionState(getSelectedActionRequirementView(action), {
       resetCountChoice: action.id === 'combat.useEx',
     })
+
+    if (action.id === 'combat.handSwap') {
+      selectedCardId = null
+      activeSidebarTab = 'command'
+      if (actionWasSelected) {
+        void executeAction(action.id)
+      }
+      return
+    }
 
     if (
       action.id === 'combat.draw' ||
@@ -1397,7 +1474,19 @@
     toggleBoardSelectionKey(targetKeyForSummon(owner, summonId))
   }
 
+  function selectHandSwapDiscard(instanceId: string) {
+    selectedActionId = 'combat.handSwap'
+    selectedCardId = null
+    selectedDiscardIds = selectedDiscardIds[0] === instanceId ? [] : [instanceId]
+    actionErrorMessage = null
+  }
+
   function handleSelectHandCard(instanceId: string) {
+    if (selectedActionId === 'combat.handSwap') {
+      selectHandSwapDiscard(instanceId)
+      return
+    }
+
     const sourceAvailable = hasPlayCardSource(screen, instanceId)
 
     if (import.meta.env.DEV) {
@@ -1426,6 +1515,11 @@
   }
 
   function handleToggleDiscard(instanceId: string) {
+    if (selectedActionId === 'combat.handSwap') {
+      selectHandSwapDiscard(instanceId)
+      return
+    }
+
     selectedDiscardIds = toggleIdentifier(selectedDiscardIds, instanceId)
   }
 
@@ -1519,11 +1613,13 @@
   })
   const selectedPlayCardSource = $derived.by(() => findSelectedPlayCardSource(screen, selectedCardId))
   const selectedCardView = $derived.by(() =>
-    selectedCardId
-      ? (toCardView(selectedPlayCardSource?.sourceCard) ??
-        visiblePlayerView?.handCards.find((card) => card.instanceId === selectedCardId) ??
-        null)
-      : null,
+    selectedActionId === 'combat.handSwap' && selectedDiscardIds.length === 1
+      ? visiblePlayerView?.handCards.find((card) => card.instanceId === selectedDiscardIds[0]) ?? null
+      : selectedCardId
+        ? (toCardView(selectedPlayCardSource?.sourceCard) ??
+          visiblePlayerView?.handCards.find((card) => card.instanceId === selectedCardId) ??
+          null)
+        : null,
   )
   const pendingActionMetadata = $derived.by(() => getPendingMetadata(screen))
   const pendingDecision = $derived.by(() => createCombatPendingDecisionView(pendingActionMetadata))
@@ -1673,7 +1769,8 @@
     return screen.possibleActions.map((action) => {
       const presentationBlock = getActionPresentationBlock(action)
       const metadataNote = action.metadata && 'note' in action.metadata ? action.metadata.note : null
-      const disabled = action.id === 'combat.playCard' ? !action.enabled : Boolean(presentationBlock)
+      const keepsLocalSelectionOpen = action.id === 'combat.playCard' || action.id === 'combat.handSwap'
+      const disabled = keepsLocalSelectionOpen ? !action.enabled : Boolean(presentationBlock)
       return {
         id: action.id,
         title: action.label,

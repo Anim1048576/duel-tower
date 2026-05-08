@@ -5,6 +5,8 @@
     card: ResolvedCombatCardViewModel
     selected: boolean
     discardSelected: boolean
+    discardActionLabel?: string
+    discardActionAriaLabel?: string
     inspectState?: 'idle' | 'hovered' | 'pinned'
     onSelect: (instanceId: string) => void
     onToggleDiscard: (instanceId: string) => void
@@ -17,6 +19,8 @@
     card,
     selected,
     discardSelected,
+    discardActionLabel = 'D',
+    discardActionAriaLabel,
     inspectState = 'idle',
     onSelect,
     onToggleDiscard,
@@ -79,7 +83,7 @@
   class:combat-hand-card--pinned={inspectState === 'pinned'}
   role="button"
   tabindex="0"
-  aria-pressed={selected}
+  aria-pressed={selected || discardSelected}
   onclick={handleCardClick}
   onkeydown={(event) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -112,13 +116,13 @@
     <button
       type="button"
       class:selected={discardSelected}
-      aria-label={discardSelected ? 'Unmark discard' : 'Mark discard'}
+      aria-label={discardActionAriaLabel ?? (discardSelected ? 'Unmark discard' : 'Mark discard')}
       onclick={(event) => {
         event.stopPropagation()
         onToggleDiscard(card.instanceId)
       }}
     >
-      D
+      {discardActionLabel}
     </button>
     <button
       type="button"
@@ -240,7 +244,7 @@
   }
 
   .combat-hand-card__actions button {
-    min-width: 1.55rem;
+    min-width: 1.85rem;
     min-height: 1.45rem;
     padding: 0.15rem;
     border: 1px solid var(--combat-border, var(--color-border));

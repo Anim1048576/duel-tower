@@ -24,6 +24,7 @@ const COMBAT_ACTION_ID_BY_COMMAND_TYPE = {
   CLEAR_RECENT_RESULTS: 'combat.clearRecentResults',
   PLAY_CARD: 'combat.playCard',
   USE_EX: 'combat.useEx',
+  HAND_SWAP: 'combat.handSwap',
   DISCARD_TO_HAND_LIMIT: 'combat.resolvePending',
   SEARCH_PICK: 'combat.resolvePending',
   LAST_WORDS: 'combat.resolvePending',
@@ -38,6 +39,7 @@ const COMBAT_ACTION_ID_BY_CAMEL_CASE = {
   clearRecentResults: 'combat.clearRecentResults',
   playCard: 'combat.playCard',
   useEx: 'combat.useEx',
+  handSwap: 'combat.handSwap',
   resolvePending: 'combat.resolvePending',
 }
 
@@ -285,6 +287,11 @@ export function reconcileCombatLocalSelectionState(nextScreen, currentState, { r
   nextState.selectedTargetKeys = uniqueValues(nextState.selectedTargetKeys.filter((key) => validTargetKeys.has(key)))
   nextState.selectedDiscardIds = uniqueValues(nextState.selectedDiscardIds.filter((id) => validHandIds.has(id)))
   nextState.selectedFieldIds = uniqueValues(nextState.selectedFieldIds.filter((id) => validFieldIds.has(id)))
+
+  if (nextState.selectedActionId === 'combat.handSwap') {
+    nextState.selectedCardId = null
+    nextState.selectedDiscardIds = nextState.selectedDiscardIds.slice(0, 1)
+  }
 
   if (selectedCardLost && nextState.selectedActionId === 'combat.playCard') {
     nextState.selectedTargetKeys = []
