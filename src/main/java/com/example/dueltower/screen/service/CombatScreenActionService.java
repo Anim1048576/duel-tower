@@ -253,6 +253,7 @@ public class CombatScreenActionService {
             case "combat.endTurn" -> "Turn ended.";
             case "combat.playCard" -> "Card command completed.";
             case "combat.useEx" -> "EX command completed.";
+            case "combat.handSwap" -> "패 교환을 완료했습니다.";
             case "combat.resolvePending" -> "Pending decision resolved.";
             case "combat.clearRecentResults" -> "Recent results cleared.";
             default -> action.label() + " completed.";

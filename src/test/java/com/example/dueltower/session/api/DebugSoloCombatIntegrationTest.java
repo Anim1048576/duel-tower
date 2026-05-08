@@ -107,6 +107,7 @@ class DebugSoloCombatIntegrationTest {
         }
         assertThat(findAction(screen, "combat.draw").path("id").asText()).isEqualTo("combat.draw");
         assertThat(findAction(screen, "combat.endTurn").path("id").asText()).isEqualTo("combat.endTurn");
+        assertThat(findAction(screen, "combat.handSwap").path("payloadTemplate").path("type").asText()).isEqualTo("HAND_SWAP");
         assertThat(findAction(screen, "combat.useEx").path("id").asText()).isEqualTo("combat.useEx");
         assertThat(findAction(screen, "combat.resolvePending").path("id").asText()).isEqualTo("combat.resolvePending");
     }

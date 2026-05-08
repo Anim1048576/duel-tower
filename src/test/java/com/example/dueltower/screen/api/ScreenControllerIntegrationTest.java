@@ -755,6 +755,108 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         assertActionContract(drawAction);
         assertThat(drawAction.path("enabled").asBoolean()).isTrue();
         assertThat(drawAction.path("metadata").path("kind").asText()).isEqualTo("simple");
+
+        JsonNode handSwapAction = findAction(body, "combat.handSwap");
+        assertActionContract(handSwapAction);
+        assertThat(handSwapAction.path("label").asText()).isEqualTo("패 교환");
+        assertThat(handSwapAction.path("method").asText()).isEqualTo("POST");
+        assertThat(handSwapAction.path("auth").asText()).isEqualTo("playerToken");
+        assertThat(handSwapAction.path("href").asText())
+                .isEqualTo("/api/screens/sessions/" + session.code() + "/combat/actions/combat.handSwap");
+        assertThat(handSwapAction.path("enabled").asBoolean()).isTrue();
+        assertThat(handSwapAction.path("payloadTemplate").path("type").asText()).isEqualTo("HAND_SWAP");
+        assertThat(handSwapAction.path("payloadTemplate").path("expectedVersion").asLong())
+                .isEqualTo(body.path("version").asLong());
+        assertThat(handSwapAction.path("payloadTemplate").path("playerId").asText()).isEqualTo("combat-p1");
+        assertThat(handSwapAction.path("payloadTemplate").path("discardIds").isArray()).isTrue();
+        assertThat(handSwapAction.path("payloadTemplate").path("discardIds")).hasSize(0);
+        assertThat(handSwapAction.path("metadata").path("kind").asText()).isEqualTo("simple");
+        assertThat(handSwapAction.path("metadata").path("note").asText())
+                .isEqualTo("패 1장을 버리고 1장 드로우합니다.");
+    }
+
+    @Test
+    void combatScreenDisablesHandSwapForCoarseServerOwnedReasons() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-hand-swap-disabled-gm", "combat-hand-swap-disabled-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-hand-swap-disabled-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-hand-swap-disabled-p1", "combat-hand-swap-disabled-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-hand-swap-disabled-p1", characterId);
+        markPlayerReady(session.code(), "combat-hand-swap-disabled-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-hand-swap-disabled-p1");
+
+        sessionLifecycleService.withLockedSession(session.code(), rt -> {
+            rt.state().player(new Ids.PlayerId("combat-hand-swap-disabled-p1")).swappedThisTurn(true);
+            return null;
+        });
+        assertHandSwapDisabled(
+                getCombatScreen(session.code(), playerToken),
+                "HAND_SWAP_ALREADY_USED",
+                "이번 턴에는 이미 패 교환을 사용했습니다."
+        );
+
+        sessionLifecycleService.withLockedSession(session.code(), rt -> {
+            var player = rt.state().player(new Ids.PlayerId("combat-hand-swap-disabled-p1"));
+            player.swappedThisTurn(false);
+            player.pendingDecision(new PendingDecision.DiscardToHandLimit("manual test", 1));
+            return null;
+        });
+        assertHandSwapDisabled(
+                getCombatScreen(session.code(), playerToken),
+                "PENDING_DECISION_PRESENT",
+                "먼저 처리해야 할 선택지가 있습니다."
+        );
+
+        sessionLifecycleService.withLockedSession(session.code(), rt -> {
+            var player = rt.state().player(new Ids.PlayerId("combat-hand-swap-disabled-p1"));
+            player.pendingDecision(null);
+            player.hand().clear();
+            return null;
+        });
+        assertHandSwapDisabled(
+                getCombatScreen(session.code(), playerToken),
+                "HAND_SWAP_EMPTY_HAND",
+                "패 교환으로 버릴 손패가 없습니다."
+        );
+    }
+
+    @Test
+    void combatHandSwapActionSucceedsAndReturnsLatestScreen() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-hand-swap-gm", "combat-hand-swap-gm@example.com", "password123");
+        SessionInfo session = createSession(gmSession, "combat-hand-swap-gm");
+        MockHttpSession playerSession = signUpAndLogin("combat-hand-swap-p1", "combat-hand-swap-p1@example.com", "password123");
+        long characterId = createCharacter();
+        String playerToken = joinAsPlayer(playerSession, session.code(), "combat-hand-swap-p1", characterId);
+        markPlayerReady(session.code(), "combat-hand-swap-p1", playerToken);
+        startCombat(session.code(), session.gmToken(), "combat-hand-swap-p1");
+
+        JsonNode currentScreen = getCombatScreen(session.code(), playerToken);
+        JsonNode handSwapAction = findAction(currentScreen, "combat.handSwap");
+        String discardId = currentScreen.path("zones").path("hand").get(0).path("instanceId").asText();
+        long beforeVersion = currentScreen.path("version").asLong();
+
+        assertActionContract(handSwapAction);
+        assertThat(handSwapAction.path("payloadTemplate").path("discardIds")).hasSize(0);
+
+        JsonNode body = executeCombatAction(
+                session.code(),
+                "combat.handSwap",
+                playerToken,
+                """
+                {
+                  "discardIds": ["%s"]
+                }
+                """.formatted(discardId)
+        );
+
+        assertCombatActionResponseContract(body);
+        assertThat(body.path("success").asBoolean()).isTrue();
+        assertThat(body.path("outcome").asText()).isEqualTo("SUCCEEDED");
+        assertThat(body.path("message").asText()).isEqualTo("패 교환을 완료했습니다.");
+        assertThat(body.path("resultSummary").path("actionId").asText()).isEqualTo("combat.handSwap");
+        assertThat(body.path("resultSummary").path("commandType").asText()).isEqualTo("HAND_SWAP");
+        assertThat(body.path("latestVersion").asLong()).isGreaterThan(beforeVersion);
+        assertThat(findAction(body.path("latestScreen"), "combat.handSwap").path("enabled").asBoolean()).isFalse();
     }
 
     @Test
@@ -1519,6 +1621,18 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andExpect(status().isOk())
                 .andReturn();
         return readJson(result);
+    }
+
+    private void assertHandSwapDisabled(JsonNode screen,
+                                        String expectedCode,
+                                        String expectedUserMessage) {
+        JsonNode handSwapAction = findAction(screen, "combat.handSwap");
+        assertDisabledActionContract(handSwapAction);
+        assertThat(handSwapAction.path("payloadTemplate").path("type").asText()).isEqualTo("HAND_SWAP");
+        assertThat(handSwapAction.path("payloadTemplate").path("discardIds").isArray()).isTrue();
+        assertThat(handSwapAction.path("payloadTemplate").path("discardIds")).hasSize(0);
+        assertThat(handSwapAction.path("disabledReason").path("code").asText()).isEqualTo(expectedCode);
+        assertThat(handSwapAction.path("disabledReason").path("userMessage").asText()).isEqualTo(expectedUserMessage);
     }
 
     private boolean hasCombatLog(JsonNode logs, String type) {

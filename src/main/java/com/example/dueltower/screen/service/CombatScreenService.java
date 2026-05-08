@@ -700,6 +700,12 @@ public class CombatScreenService {
         boolean canClearRecentResults = hasPlayerToken && runtimePlayerId != null;
         boolean hasPendingDecision = runtimePlayer != null && runtimePlayer.pendingDecision() != null;
         boolean exAvailable = runtimePlayer != null && runtimePlayer.exCard() != null && !runtimePlayer.exOnCooldown();
+        boolean canHandSwap = state.combat() != null
+                && canIssuePlayerCommand
+                && runtimePlayer != null
+                && !hasPendingDecision
+                && !runtimePlayer.swappedThisTurn()
+                && !runtimePlayer.hand().isEmpty();
         List<Map<String, Object>> playCardSourceOptions = runtimePlayer == null
                 ? List.of()
                 : runtimePlayer.hand().stream()
@@ -775,6 +781,23 @@ public class CombatScreenService {
                         "type", "CLEAR_RECENT_RESULTS",
                         "expectedVersion", state.version(),
                         "playerId", runtimePlayerId == null ? "" : runtimePlayerId
+                )
+        ));
+        actions.add(playerCommandAction(
+                state.sessionCode(),
+                "combat.handSwap",
+                "패 교환",
+                canHandSwap,
+                handSwapDisabledReason(state, canIssuePlayerCommand, runtimePlayer),
+                Map.of(
+                        "kind", "simple",
+                        "note", "패 1장을 버리고 1장 드로우합니다."
+                ),
+                Map.of(
+                        "type", "HAND_SWAP",
+                        "expectedVersion", state.version(),
+                        "playerId", commandActorPlayerId == null ? "" : commandActorPlayerId,
+                        "discardIds", List.of()
                 )
         ));
         actions.add(playerCommandAction(
@@ -931,6 +954,61 @@ public class CombatScreenService {
             return playerTokenRequiredReason("use this action");
         }
         return playerTurnRequiredReason();
+    }
+
+    private DisabledReasonDto handSwapDisabledReason(SessionStateDto state,
+                                                     boolean canIssuePlayerCommand,
+                                                     PlayerStateDto runtimePlayer) {
+        if (state.combat() == null) {
+            return handSwapUnavailableReason(
+                    "COMBAT_REQUIRED",
+                    "전투 중에만 패 교환할 수 있습니다.",
+                    "combat state is missing"
+            );
+        }
+        if (!canIssuePlayerCommand || runtimePlayer == null) {
+            return handSwapUnavailableReason(
+                    "PLAYER_TURN_REQUIRED",
+                    "현재 턴의 플레이어만 패 교환할 수 있습니다.",
+                    "runtime player is not allowed to issue the current player command"
+            );
+        }
+        if (runtimePlayer.pendingDecision() != null) {
+            return handSwapUnavailableReason(
+                    "PENDING_DECISION_PRESENT",
+                    "먼저 처리해야 할 선택지가 있습니다.",
+                    "runtime player has a pending decision"
+            );
+        }
+        if (runtimePlayer.swappedThisTurn()) {
+            return handSwapUnavailableReason(
+                    "HAND_SWAP_ALREADY_USED",
+                    "이번 턴에는 이미 패 교환을 사용했습니다.",
+                    "runtime player already used hand swap this turn"
+            );
+        }
+        if (runtimePlayer.hand().isEmpty()) {
+            return handSwapUnavailableReason(
+                    "HAND_SWAP_EMPTY_HAND",
+                    "패 교환으로 버릴 손패가 없습니다.",
+                    "runtime player hand is empty"
+            );
+        }
+        return null;
+    }
+
+    private DisabledReasonDto handSwapUnavailableReason(String code,
+                                                        String userMessage,
+                                                        String debugMessage) {
+        return new DisabledReasonDto(
+                code,
+                "RULE",
+                userMessage,
+                debugMessage,
+                null,
+                null,
+                null
+        );
     }
 
     private Map<String, Object> playCardSourceOption(String instanceId,
