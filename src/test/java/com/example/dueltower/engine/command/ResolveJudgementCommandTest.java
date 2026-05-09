@@ -74,7 +74,7 @@ class ResolveJudgementCommandTest {
         assertTrue(state.runState().resultPending());
         assertEquals(beforeGold + 99, state.runState().inventory().gold());
         assertFalse(state.runState().recentResults().get(0).detail().isBlank());
-        assertEquals(1, player.will());
+        assertEquals(2, player.will());
         assertTrue(player.ownedCards().get(0).hasModifier("WEAKENED_COST_PLUS_ONE"));
         assertTrue(result.events().stream().anyMatch(ev -> ev instanceof com.example.dueltower.engine.event.GameEvent.LogAppended log
                 && log.line().contains("memoryAccepted=true")

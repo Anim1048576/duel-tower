@@ -79,6 +79,7 @@ public class SessionLobbyService {
             }
 
             PlayerState ps = new PlayerState(pid);
+            sessionLoadoutSupport.applyCharacterStats(ps, characterTemplate);
             ps.passiveIds(passiveIds);
             if (characterIdRaw != null) {
                 rt.bindCharacterId(pid.value(), characterIdRaw);

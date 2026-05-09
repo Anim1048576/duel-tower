@@ -88,6 +88,18 @@ public class SessionLoadoutSupport {
         return toCharacterJoinTemplate(loadCharacterProfile(characterIdRaw));
     }
 
+    public void applyCharacterStats(PlayerState ps, CharacterJoinTemplate template) {
+        if (ps == null || template == null) {
+            return;
+        }
+
+        ps.body(template.physical());
+        ps.skill(template.technique());
+        ps.sense(template.sense());
+        ps.will(template.willpower());
+        ps.refillToMax();
+    }
+
     public List<String> parsePassiveIds(List<String> passiveIdsRaw) {
         if (passiveIdsRaw == null) return List.of();
         if (passiveIdsRaw.size() > gameRules.maxPassives()) {
@@ -536,6 +548,10 @@ public class SessionLoadoutSupport {
         String exCardId = loadoutService.getExCardId(profile.getId());
 
         return new CharacterJoinTemplate(
+                profile.getPhysical(),
+                profile.getTechnique(),
+                profile.getSense(),
+                profile.getWillpower(),
                 List.copyOf(passiveIds),
                 currentSkillDeckOwnedCardIds == null ? null : List.copyOf(currentSkillDeckOwnedCardIds),
                 exCardId,
@@ -624,6 +640,10 @@ public class SessionLoadoutSupport {
     }
 
     public record CharacterJoinTemplate(
+            int physical,
+            int technique,
+            int sense,
+            int willpower,
             List<String> passiveIds,
             List<String> currentSkillDeckOwnedCardIds,
             String exCardId,

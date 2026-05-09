@@ -58,6 +58,7 @@ public class SessionGmNpcService {
             }
 
             PlayerState npc = new PlayerState(npcId);
+            sessionLoadoutSupport.applyCharacterStats(npc, characterTemplate);
             npc.markGmControlledNpc(new PlayerId(controllerPlayerId));
             npc.ready(true);
 

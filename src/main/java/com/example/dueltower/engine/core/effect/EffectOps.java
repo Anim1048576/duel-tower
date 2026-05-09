@@ -59,7 +59,10 @@ public final class EffectOps {
     }
 
     public void damage(Target t, int amount) {
-        if (amount <= 0) return;
+        if (amount <= 0) {
+            ec.out().add(new GameEvent.LogAppended(ec.sourceLabel() + " deals no damage because amount=" + amount));
+            return;
+        }
         for (TargetRef ref : resolveTargets(t)) {
             applyDamage(ref, amount);
         }
@@ -92,7 +95,10 @@ public final class EffectOps {
     }
 
     public void heal(Target t, int amount) {
-        if (amount <= 0) return;
+        if (amount <= 0) {
+            ec.out().add(new GameEvent.LogAppended(ec.sourceLabel() + " heals nothing because amount=" + amount));
+            return;
+        }
         for (TargetRef ref : resolveTargets(t)) {
             applyHeal(ref, amount);
         }

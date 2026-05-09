@@ -9,7 +9,10 @@ import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.character.service.CharacterCardCollectionService;
 import com.example.dueltower.character.service.CharacterLoadoutService;
+import com.example.dueltower.engine.model.Ids.PlayerId;
+import com.example.dueltower.engine.model.PlayerState;
 import com.example.dueltower.member.MemberRepository;
+import com.example.dueltower.session.service.SessionLifecycleService;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -67,6 +70,9 @@ class SessionManagementIntegrationTest {
 
     @Autowired
     private CharacterLoadoutService characterLoadoutService;
+
+    @Autowired
+    private SessionLifecycleService sessionLifecycleService;
 
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -245,6 +251,62 @@ class SessionManagementIntegrationTest {
                 .andExpect(jsonPath("$.players.player1.passiveIds").isEmpty())
                 .andExpect(jsonPath("$.players.player1.deckOwnedCardIds.length()").value(12))
                 .andExpect(jsonPath("$.players.player1.exCard").exists());
+    }
+
+    @Test
+    @DisplayName("characterId 참가 시 캐릭터 생활 스탯을 PlayerState에 복사하고 기본 참가자는 1을 사용한다")
+    void joinWithCharacterCopiesLifeStatsAndStarterJoinUsesDefaults() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("stats-gm", "stats-gm@example.com", "password123");
+        SessionInfo info = createSession(gmSession, "stats-gm");
+
+        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
+                .name("Stats Character")
+                .gender(CharacterGender.OTHER)
+                .age(20)
+                .wish("test")
+                .disposition("neutral")
+                .oneLiner("stats")
+                .story("stats")
+                .physical(3)
+                .technique(4)
+                .sense(5)
+                .willpower(6)
+                .trait1("P001")
+                .trait2("P002")
+                .build());
+        seedLoadout(
+                characterCardCollectionService,
+                characterLoadoutService,
+                profile.getId(),
+                "[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]",
+                List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"),
+                "EX901"
+        );
+
+        MockHttpSession characterSession = signUpAndLogin("stats-player", "stats-player@example.com", "password123");
+        joinAsPlayerWithCharacter(characterSession, info.code(), "stats-player", profile.getId());
+
+        MockHttpSession starterSession = signUpAndLogin("starter-player", "starter-player@example.com", "password123");
+        joinAsPlayer(starterSession, info.code(), "starter-player");
+
+        sessionLifecycleService.withLockedSession(info.code(), rt -> {
+            PlayerState characterPlayer = rt.state().player(new PlayerId("stats-player"));
+            assertThat(characterPlayer).isNotNull();
+            assertThat(characterPlayer.body()).isEqualTo(3);
+            assertThat(characterPlayer.skill()).isEqualTo(4);
+            assertThat(characterPlayer.sense()).isEqualTo(5);
+            assertThat(characterPlayer.will()).isEqualTo(6);
+            assertThat(characterPlayer.hp()).isEqualTo(characterPlayer.maxHp());
+            assertThat(characterPlayer.ap()).isEqualTo(characterPlayer.maxAp());
+
+            PlayerState starterPlayer = rt.state().player(new PlayerId("starter-player"));
+            assertThat(starterPlayer).isNotNull();
+            assertThat(starterPlayer.body()).isEqualTo(1);
+            assertThat(starterPlayer.skill()).isEqualTo(1);
+            assertThat(starterPlayer.sense()).isEqualTo(1);
+            assertThat(starterPlayer.will()).isEqualTo(1);
+            return null;
+        });
     }
 
     @Test
@@ -621,6 +683,23 @@ class SessionManagementIntegrationTest {
                                   "deckOwnedCardIds": %s
                                 }
                                 """.formatted(playerId, ownedCardsJson, deckOwnedCardIdsJson)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode node = JSON.readTree(result.getResponse().getContentAsString());
+        return node.path("playerToken").asText();
+    }
+
+    private String joinAsPlayerWithCharacter(MockHttpSession session, String code, String playerId, long characterId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/sessions/{code}/join", code)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "playerId": "%s",
+                                  "characterId": %d
+                                }
+                                """.formatted(playerId, characterId)))
                 .andExpect(status().isOk())
                 .andReturn();
 

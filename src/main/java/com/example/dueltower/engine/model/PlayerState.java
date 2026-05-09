@@ -11,6 +11,7 @@ import java.util.*;
 
 public final class PlayerState {
     private static final GameRules DEFAULT_GAME_RULES = GameRules.defaults();
+    private static final int MIN_LIFE_STAT = 1;
 
     private final PlayerId playerId;
 
@@ -54,10 +55,10 @@ public final class PlayerState {
     private final Map<EquipSlot, EquippedItem> equippedItems = new EnumMap<>(EquipSlot.class);
 
     // ===== 생활 스탯(기본) =====
-    private int body;   // 신체
-    private int skill;  // 기술
-    private int sense;  // 감각
-    private int will;   // 의지
+    private int body = MIN_LIFE_STAT;   // 신체
+    private int skill = MIN_LIFE_STAT;  // 기술
+    private int sense = MIN_LIFE_STAT;  // 감각
+    private int will = MIN_LIFE_STAT;   // 의지
 
     // ===== 전투 스탯(현재값) =====
     private int hp;     // 현재 체력
@@ -76,7 +77,7 @@ public final class PlayerState {
     public PlayerState(PlayerId playerId) {
         this.playerId = playerId;
         this.controllerPlayerId = playerId;
-        // 기본 스탯 0 기준으로도 maxHp>=20이므로 안전
+        // 기본 생활 스탯은 최소 1로 시작하고, 생성 시 현재 HP/AP를 최대치로 채운다.
         this.hp = maxHp();
         this.ap = maxAp();
     }
@@ -146,16 +147,16 @@ public final class PlayerState {
 
     // ===== 생활 스탯 =====
     public int body() { return body; }
-    public void body(int v) { this.body = clampNonNegative(v); clampVitals(); }
+    public void body(int v) { this.body = clampLifeStat(v); clampVitals(); }
 
     public int skill() { return skill; }
-    public void skill(int v) { this.skill = clampNonNegative(v); clampVitals(); }
+    public void skill(int v) { this.skill = clampLifeStat(v); clampVitals(); }
 
     public int sense() { return sense; }
-    public void sense(int v) { this.sense = clampNonNegative(v); clampVitals(); }
+    public void sense(int v) { this.sense = clampLifeStat(v); clampVitals(); }
 
     public int will() { return will; }
-    public void will(int v) { this.will = clampNonNegative(v); clampVitals(); }
+    public void will(int v) { this.will = clampLifeStat(v); clampVitals(); }
 
     // ===== 전투 현재값 =====
     public int hp() { return hp; }
@@ -364,6 +365,10 @@ public final class PlayerState {
 
     private static int clampNonNegative(int v) {
         return Math.max(0, v);
+    }
+
+    private static int clampLifeStat(int v) {
+        return Math.max(MIN_LIFE_STAT, v);
     }
 
     private static int clamp(int v, int min, int max) {

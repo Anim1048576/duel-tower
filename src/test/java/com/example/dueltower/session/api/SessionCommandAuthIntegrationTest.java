@@ -9,7 +9,17 @@ import com.example.dueltower.character.repository.CharacterOwnedCardRepository;
 import com.example.dueltower.character.repository.CharacterProfileRepository;
 import com.example.dueltower.character.service.CharacterCardCollectionService;
 import com.example.dueltower.character.service.CharacterLoadoutService;
+import com.example.dueltower.engine.core.ZoneOps;
+import com.example.dueltower.engine.model.CardInstance;
+import com.example.dueltower.engine.model.CombatPhase;
+import com.example.dueltower.engine.model.Ids.CardInstId;
+import com.example.dueltower.engine.model.Ids.PlayerId;
+import com.example.dueltower.engine.model.PlayerControlType;
+import com.example.dueltower.engine.model.PlayerState;
+import com.example.dueltower.engine.model.TargetRef;
+import com.example.dueltower.engine.model.Zone;
 import com.example.dueltower.member.MemberRepository;
+import com.example.dueltower.session.service.SessionLifecycleService;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,10 +35,12 @@ import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import static com.example.dueltower.support.CharacterLoadoutTestFixtures.seedLoadout;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.hamcrest.Matchers.containsString;
@@ -68,6 +80,9 @@ class SessionCommandAuthIntegrationTest {
 
     @Autowired
     private CharacterLoadoutService characterLoadoutService;
+
+    @Autowired
+    private SessionLifecycleService sessionLifecycleService;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -194,6 +209,100 @@ class SessionCommandAuthIntegrationTest {
                 .andExpect(jsonPath("$.state.players.gm-npc-1.controlType").value("GM_CONTROLLED_NPC"))
                 .andExpect(jsonPath("$.state.players.gm-npc-1.controllerPlayerId").value("gm"))
                 .andExpect(jsonPath("$.state.combat.turnOrder").isArray());
+    }
+
+    @Test
+    void gmControlledNpcWithCharacterCopiesLifeStats() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("gm-npc-stats", "gm-npc-stats@example.com", "password123");
+        SessionInfo info = createSessionInfo(gmSession, "gm-npc-stats");
+        long characterId = createCharacterWithStatsAndLoadout("GM NPC Stats", 3, 4, 5, 6);
+
+        mockMvc.perform(post("/api/sessions/{code}/gm-npcs", info.code())
+                        .header("X-GM-Token", info.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "characterId": %d
+                                }
+                                """.formatted(characterId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.npcPlayerId").value("gm-npc-1"));
+
+        sessionLifecycleService.withLockedSession(info.code(), rt -> {
+            PlayerState npc = rt.state().player(new PlayerId("gm-npc-1"));
+            assertNotNull(npc);
+            assertEquals(3, npc.body());
+            assertEquals(4, npc.skill());
+            assertEquals(5, npc.sense());
+            assertEquals(6, npc.will());
+            assertEquals(npc.maxHp(), npc.hp());
+            assertEquals(npc.maxAp(), npc.ap());
+            assertTrue(npc.ready());
+            assertEquals(PlayerControlType.GM_CONTROLLED_NPC, npc.controlType());
+            assertEquals("gm-npc-stats", npc.controllerPlayerId().value());
+            return null;
+        });
+    }
+
+    @Test
+    void characterBasedPlayerAttackUsesCopiedStatsAndDamagesEnemy() throws Exception {
+        MockHttpSession gmSession = signUpAndLogin("combat-gm", "combat-gm@example.com", "password123");
+        SessionInfo info = createSessionInfo(gmSession, "combat-gm");
+        long characterId = createCharacterWithStatsAndLoadout("Combat Stats", 3, 4, 5, 6);
+        MockHttpSession playerSession = signUpAndLogin("combat-player", "combat-player@example.com", "password123");
+        String playerToken = joinAsPlayer(playerSession, info.code(), "combat-player", characterId);
+        markReady(info.code(), "combat-player", playerToken);
+
+        mockMvc.perform(post("/api/sessions/{code}/command", info.code())
+                        .header("X-GM-Token", info.gmToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "START_COMBAT",
+                                  "playerId": "combat-player",
+                                  "expectedVersion": 0
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accepted").value(true));
+
+        CombatPlaySetup setup = prepareAttackCardInHand(info.code(), "combat-player");
+
+        MvcResult playResult = mockMvc.perform(post("/api/sessions/{code}/command", info.code())
+                        .header("X-Player-Token", playerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "PLAY_CARD",
+                                  "playerId": "combat-player",
+                                  "cardId": "%s",
+                                  "targets": [
+                                    {"enemyId": "%s"}
+                                  ],
+                                  "expectedVersion": %d
+                                }
+                                """.formatted(setup.cardId(), setup.enemyId(), setup.expectedVersion())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accepted").value(true))
+                .andReturn();
+
+        JsonNode playBody = JSON.readTree(playResult.getResponse().getContentAsString());
+        assertTrue(hasDamageLog(playBody));
+
+        sessionLifecycleService.withLockedSession(info.code(), rt -> {
+            PlayerState player = rt.state().player(new PlayerId("combat-player"));
+            assertNotNull(player);
+            assertEquals(3, player.body());
+            assertEquals(4, player.skill());
+            assertEquals(5, player.sense());
+            assertEquals(6, player.will());
+            assertEquals(setup.apBefore() - 1, player.ap());
+            assertTrue(player.hand().stream().noneMatch(id -> id.value().toString().equals(setup.cardId())));
+            assertTrue(player.grave().stream().anyMatch(id -> id.value().toString().equals(setup.cardId())));
+            assertEquals(setup.enemyHpBefore() - setup.attackPower(),
+                    rt.state().enemy(new com.example.dueltower.engine.model.Ids.EnemyId(setup.enemyId())).hp());
+            return null;
+        });
     }
 
     @Test
@@ -668,6 +777,96 @@ class SessionCommandAuthIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    private CombatPlaySetup prepareAttackCardInHand(String code, String playerId) {
+        return sessionLifecycleService.withLockedSession(code, rt -> {
+            PlayerId pid = new PlayerId(playerId);
+            PlayerState player = rt.state().player(pid);
+            assertNotNull(player);
+            assertNotNull(rt.state().combat());
+
+            rt.state().combat().turnOrder().clear();
+            rt.state().combat().turnOrder().add(TargetRef.ofPlayer(pid));
+            rt.state().combat().currentTurnIndex(0);
+            rt.state().combat().phase(CombatPhase.MAIN);
+
+            CardInstId attackCard = player.hand().stream()
+                    .filter(id -> isCardDef(rt.state().card(id), "C001"))
+                    .findFirst()
+                    .orElse(null);
+            if (attackCard == null) {
+                attackCard = player.deck().stream()
+                        .filter(id -> isCardDef(rt.state().card(id), "C001"))
+                        .findFirst()
+                        .orElseThrow();
+                ZoneOps.moveToZoneOrVanishIfToken(rt.state(), rt.ctx(), player, attackCard, Zone.HAND, new ArrayList<>());
+            }
+
+            var enemy = rt.state().enemies().entrySet().stream().findFirst().orElseThrow();
+            return new CombatPlaySetup(
+                    attackCard.value().toString(),
+                    enemy.getKey().value(),
+                    enemy.getValue().hp(),
+                    player.attackPower(),
+                    player.ap(),
+                    rt.state().version()
+            );
+        });
+    }
+
+    private boolean isCardDef(CardInstance card, String cardDefId) {
+        return card != null && card.defId() != null && cardDefId.equals(card.defId().value());
+    }
+
+    private boolean hasDamageLog(JsonNode body) {
+        JsonNode events = body.path("events");
+        if (!events.isArray()) {
+            return false;
+        }
+        for (JsonNode event : events) {
+            JsonNode payload = event.path("payload");
+            if ("COMBAT_LOG_APPENDED".equals(event.path("type").asText())
+                    && "combat.damage".equals(payload.path("type").asText())) {
+                return true;
+            }
+            if ("LOG_APPENDED".equals(event.path("type").asText())
+                    && payload.path("line").asText("").contains("deals")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private long createCharacterWithStatsAndLoadout(String name,
+                                                    int physical,
+                                                    int technique,
+                                                    int sense,
+                                                    int willpower) {
+        CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
+                .name(name)
+                .gender(CharacterGender.OTHER)
+                .age(20)
+                .wish("test")
+                .disposition("neutral")
+                .oneLiner("stats")
+                .story("stats")
+                .physical(physical)
+                .technique(technique)
+                .sense(sense)
+                .willpower(willpower)
+                .trait1("P001")
+                .trait2("P002")
+                .build());
+        seedLoadout(
+                characterCardCollectionService,
+                characterLoadoutService,
+                profile.getId(),
+                "[\"C001\",\"C001\",\"C001\",\"C002\",\"C002\",\"C002\",\"C003\",\"C003\",\"C003\",\"C004\",\"C004\",\"C004\"]",
+                List.of("C001", "C001", "C001", "C002", "C002", "C002", "C003", "C003", "C003", "C004", "C004", "C004"),
+                "EX901"
+        );
+        return profile.getId();
+    }
+
     private long createCharacterWithEmptySkillDeck() {
         CharacterProfile profile = characterProfileRepository.save(CharacterProfile.builder()
                 .name("Raw Command Empty Deck Character")
@@ -694,6 +893,15 @@ class SessionCommandAuthIntegrationTest {
         );
         return profile.getId();
     }
+
+    private record CombatPlaySetup(
+            String cardId,
+            String enemyId,
+            int enemyHpBefore,
+            int attackPower,
+            int apBefore,
+            long expectedVersion
+    ) {}
 
     private record SessionInfo(String code, String gmToken) {}
 }

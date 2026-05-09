@@ -1451,6 +1451,53 @@ class RuleEngineRegressionTest {
         assertTrue(draw.events().stream().anyMatch(e -> e instanceof GameEvent.LogAppended l && l.line().contains("cannot draw: deck+grave empty")));
     }
 
+    @Test
+    @DisplayName("0 이하 피해는 HP를 바꾸지 않고 디버그 로그를 남긴다")
+    void zeroOrNegativeDamageLogsWithoutChangingHp() {
+        TestFixture fx = TestFixture.basic();
+        List<GameEvent> events = new ArrayList<>();
+        int hpBefore = fx.enemy.hp();
+
+        EffectContext ec = new EffectContext(
+                fx.state,
+                fx.ctx,
+                fx.playerId,
+                null,
+                new TargetSelection(List.of(TargetRef.ofEnemy(fx.enemyId))),
+                events
+        );
+        new EffectOps(ec).damage(Target.ENEMY_ONE, 0);
+
+        assertEquals(hpBefore, fx.enemy.hp());
+        assertTrue(events.stream().anyMatch(e -> e instanceof GameEvent.LogAppended l
+                && l.line().contains("deals no damage")
+                && l.line().contains("amount=0")));
+    }
+
+    @Test
+    @DisplayName("0 이하 회복은 HP를 바꾸지 않고 디버그 로그를 남긴다")
+    void zeroOrNegativeHealLogsWithoutChangingHp() {
+        TestFixture fx = TestFixture.basic();
+        List<GameEvent> events = new ArrayList<>();
+        fx.player.hp(fx.player.hp() - 5);
+        int hpBefore = fx.player.hp();
+
+        EffectContext ec = new EffectContext(
+                fx.state,
+                fx.ctx,
+                fx.playerId,
+                null,
+                TargetSelection.empty(),
+                events
+        );
+        new EffectOps(ec).heal(Target.SELF, 0);
+
+        assertEquals(hpBefore, fx.player.hp());
+        assertTrue(events.stream().anyMatch(e -> e instanceof GameEvent.LogAppended l
+                && l.line().contains("heals nothing")
+                && l.line().contains("amount=0")));
+    }
+
 
     private static int invokeMultiplyAndRound(int amount, Rational multiplier) {
         return TestCardEffect.multiplyAndRound(amount, multiplier);
