@@ -3,7 +3,7 @@ package com.example.dueltower.engine.model;
 import java.util.Objects;
 import java.util.UUID;
 
-public sealed interface PendingDecision permits PendingDecision.DiscardToHandLimit, PendingDecision.SearchPick, PendingDecision.InitiativeTieOrder, PendingDecision.JudgementChoice, PendingDecision.LastWordsChoice {
+public sealed interface PendingDecision permits PendingDecision.DiscardToHandLimit, PendingDecision.SearchPick, PendingDecision.InitiativeTieOrder, PendingDecision.JudgementChoice, PendingDecision.LastWordsChoice, PendingDecision.ReactionCard {
     record DiscardToHandLimit(String reason, int limit) implements PendingDecision {
         public DiscardToHandLimit {
             Objects.requireNonNull(reason);
@@ -89,6 +89,51 @@ public sealed interface PendingDecision permits PendingDecision.DiscardToHandLim
                 throw new IllegalArgumentException("candidateIds must not be empty");
             }
             Objects.requireNonNull(correlationId);
+        }
+    }
+
+    record ReactionCard(
+            String reason,
+            java.util.List<Ids.CardInstId> candidateIds,
+            boolean skippable,
+            ReactionContext context
+    ) implements PendingDecision {
+        public ReactionCard {
+            Objects.requireNonNull(reason);
+            Objects.requireNonNull(candidateIds);
+            candidateIds = java.util.List.copyOf(candidateIds);
+            if (candidateIds.stream().anyMatch(Objects::isNull)) {
+                throw new IllegalArgumentException("candidateIds must not contain null");
+            }
+            if (candidateIds.size() != new java.util.LinkedHashSet<>(candidateIds).size()) {
+                throw new IllegalArgumentException("candidateIds must be unique");
+            }
+            if (candidateIds.isEmpty()) {
+                throw new IllegalArgumentException("candidateIds must not be empty");
+            }
+            Objects.requireNonNull(context);
+        }
+    }
+
+    record ReactionContext(
+            UUID reactionId,
+            Ids.PlayerId ownerPlayerId,
+            ReactionTrigger trigger,
+            TargetRef source,
+            TargetRef subject,
+            int damageAmount,
+            String sourceAction
+    ) {
+        public ReactionContext {
+            Objects.requireNonNull(reactionId);
+            Objects.requireNonNull(ownerPlayerId);
+            Objects.requireNonNull(trigger);
+            Objects.requireNonNull(source);
+            Objects.requireNonNull(subject);
+            Objects.requireNonNull(sourceAction);
+            if (damageAmount < 0) {
+                throw new IllegalArgumentException("damageAmount must not be negative");
+            }
         }
     }
 

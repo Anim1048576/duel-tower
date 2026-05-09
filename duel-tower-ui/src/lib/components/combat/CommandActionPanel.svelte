@@ -41,6 +41,7 @@
     onTogglePendingSelectedId: (value: string) => void
     onToggleOrderedActorKey: (actorKey: string) => void
     onResolvePendingDecision: () => void
+    onResolveReactionCard: (cardId: string) => void
     onSkipPendingDecision: () => void
   }
 
@@ -77,6 +78,7 @@
     onTogglePendingSelectedId,
     onToggleOrderedActorKey,
     onResolvePendingDecision,
+    onResolveReactionCard,
     onSkipPendingDecision,
   }: Props = $props()
 
@@ -313,6 +315,81 @@
               {commandPending === 'combat.resolvePending' ? '유언 처리 중...' : '선택한 유언 발동'}
             </button>
           </div>
+        </div>
+      {:else if pendingDecision.type === 'REACTION_CARD'}
+        <div class="command-action-panel__last-words">
+          <div class="command-action-panel__last-words-heading">
+            <strong>반응 카드</strong>
+            {#if pendingDecision.reason}
+              <p class="command-action-panel__pending-note">{pendingDecision.reason}</p>
+            {/if}
+          </div>
+
+          {#if pendingDecision.candidateCards?.length}
+            <div class="command-action-panel__last-words-card-list">
+              {#each pendingDecision.candidateCards as candidateCard (candidateCard.instanceId)}
+                <article class="command-action-panel__last-words-card">
+                  <div class="command-action-panel__last-words-card-main">
+                    <span class="command-action-panel__last-words-card-title">
+                      {candidateCard.title || 'Reaction card'}
+                    </span>
+                    <span class="command-action-panel__last-words-card-subtitle">
+                      {candidateCard.subtitle || 'Available reaction'}
+                    </span>
+                  </div>
+
+                  {#if candidateCard.tags.length > 0}
+                    <div class="command-action-panel__card-tag-row" aria-label="card tags">
+                      {#each candidateCard.tags as tag}
+                        <span class="command-action-panel__card-tag">{tag.label}</span>
+                      {/each}
+                    </div>
+                  {/if}
+
+                  {#if candidateCard.meta}
+                    <p class="command-action-panel__card-meta">{candidateCard.meta}</p>
+                  {/if}
+
+                  <button
+                    type="button"
+                    class="command-action-panel__inline-button command-action-panel__card-select-button"
+                    disabled={!canResolvePendingCommand || commandPending !== null}
+                    onclick={() => onResolveReactionCard(candidateCard.instanceId)}
+                  >
+                    {commandPending === 'combat.resolvePending' ? '반응 처리 중...' : '반응 사용'}
+                  </button>
+                </article>
+              {/each}
+            </div>
+          {:else if pendingDecision.candidateIds.length > 0}
+            <div class="command-action-panel__tag-row">
+              {#each pendingDecision.candidateIds as candidateId (candidateId)}
+                <button
+                  type="button"
+                  class="command-action-panel__inline-button"
+                  disabled={!canResolvePendingCommand || commandPending !== null}
+                  onclick={() => onResolveReactionCard(candidateId)}
+                >
+                  반응 사용 {candidateId}
+                </button>
+              {/each}
+            </div>
+          {:else}
+            <p class="command-action-panel__pending-note">사용 가능한 반응 카드가 없습니다.</p>
+          {/if}
+
+          {#if pendingDecision.canSkip}
+            <div class="command-action-panel__actions">
+              <button
+                type="button"
+                class="command-action-panel__skip-button"
+                disabled={!canResolvePendingCommand || commandPending !== null}
+                onclick={() => onSkipPendingDecision()}
+              >
+                넘기기
+              </button>
+            </div>
+          {/if}
         </div>
       {:else}
         {#if pendingDecision.candidateIds.length > 0}

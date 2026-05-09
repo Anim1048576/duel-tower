@@ -6,13 +6,17 @@ import com.example.dueltower.engine.core.effect.card.CardEffect;
 import com.example.dueltower.engine.core.effect.card.CardEffectOps;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
+import com.example.dueltower.engine.core.reaction.ReactionOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 import com.example.dueltower.engine.model.Ids.CardInstId;
 import com.example.dueltower.engine.model.Ids.EnemyId;
+import com.example.dueltower.engine.model.Ids.PlayerId;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class EnemyPlayCardCommand implements GameCommand {
@@ -79,6 +83,7 @@ public final class EnemyPlayCardCommand implements GameCommand {
 
         CardDefinition def = ctx.def(ci.defId());
         List<GameEvent> events = new ArrayList<>();
+        Map<PlayerId, Integer> hpBeforeByPlayer = playerHpSnapshot(state);
 
         int costBase = def.cost();
         int costPassive = PassiveOps.modifiedCost(state, ctx, TargetRef.ofEnemy(enemyId), ci, def, costBase, events, "PLAY_COST");
@@ -100,6 +105,25 @@ public final class EnemyPlayCardCommand implements GameCommand {
         ci.zone(to);
 
         events.add(new GameEvent.LogAppended(enemyId.value() + " played " + def.id().value()));
+        ReactionOps.openAfterEnemyAttackDamagedSelf(
+                state,
+                ctx,
+                events,
+                enemyId,
+                hpBeforeByPlayer,
+                ReactionOps.SOURCE_ACTION_ENEMY_PLAY_CARD
+        );
         return events;
+    }
+
+    private static Map<PlayerId, Integer> playerHpSnapshot(GameState state) {
+        Map<PlayerId, Integer> out = new LinkedHashMap<>();
+        for (Map.Entry<PlayerId, PlayerState> entry : state.players().entrySet()) {
+            PlayerState ps = entry.getValue();
+            if (ps != null) {
+                out.put(entry.getKey(), ps.hp());
+            }
+        }
+        return out;
     }
 }

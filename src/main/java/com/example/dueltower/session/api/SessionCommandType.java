@@ -209,6 +209,14 @@ public enum SessionCommandType {
             return new ResolveLastWordsCommand(commandId, expectedVersion, commandPlayerId(req), parseCardInstIds(req.selectedIds(), "selectedIds"));
         }
     },
+    RESOLVE_REACTION("RESOLVE_REACTION", SessionCommandAuth.PLAYER, false) {
+        @Override
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+            String rawCardId = req.trimmedCardId();
+            CardInstId id = rawCardId == null ? null : parseCardInstId(rawCardId, "cardId");
+            return new ResolveReactionCommand(commandId, expectedVersion, commandPlayerId(req), id);
+        }
+    },
     RESOLVE_SEARCH_PICK("RESOLVE_SEARCH_PICK", SessionCommandAuth.PLAYER, false) {
         @Override
         public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {

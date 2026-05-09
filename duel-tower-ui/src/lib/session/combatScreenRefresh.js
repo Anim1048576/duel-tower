@@ -28,6 +28,8 @@ const COMBAT_ACTION_ID_BY_COMMAND_TYPE = {
   DISCARD_TO_HAND_LIMIT: 'combat.resolvePending',
   SEARCH_PICK: 'combat.resolvePending',
   LAST_WORDS: 'combat.resolvePending',
+  REACTION_CARD: 'combat.resolvePending',
+  RESOLVE_REACTION: 'combat.resolvePending',
   INITIATIVE_TIE_ORDER: 'combat.resolvePending',
   RESOLVE_INITIATIVE_TIE: 'combat.resolvePending',
 }

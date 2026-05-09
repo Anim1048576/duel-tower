@@ -57,3 +57,20 @@ export function getLastWordsPendingLocalBlock(selectedPendingIds, canSkip) {
 
   return null
 }
+
+/**
+ * @param {readonly string[]} selectedPendingIds
+ * @param {boolean | null | undefined} canSkip
+ * @returns {string | null}
+ */
+export function getReactionPendingLocalBlock(selectedPendingIds, canSkip) {
+  if (selectedPendingIds.length > 1) {
+    return 'Select only one reaction card.'
+  }
+
+  if (selectedPendingIds.length === 0 && !canSkip) {
+    return 'Select a reaction card.'
+  }
+
+  return null
+}

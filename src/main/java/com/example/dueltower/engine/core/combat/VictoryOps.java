@@ -114,6 +114,9 @@ public final class VictoryOps {
         if (pd instanceof PendingDecision.DiscardToHandLimit) return "DISCARD_TO_HAND_LIMIT";
         if (pd instanceof PendingDecision.SearchPick) return "SEARCH_PICK";
         if (pd instanceof PendingDecision.InitiativeTieOrder) return "INITIATIVE_TIE_ORDER";
+        if (pd instanceof PendingDecision.JudgementChoice) return "JUDGEMENT";
+        if (pd instanceof PendingDecision.LastWordsChoice) return "LAST_WORDS";
+        if (pd instanceof PendingDecision.ReactionCard) return "REACTION_CARD";
         return "UNKNOWN";
     }
 }

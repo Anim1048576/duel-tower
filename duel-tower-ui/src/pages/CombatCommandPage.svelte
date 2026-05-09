@@ -70,6 +70,7 @@
   import {
     createCombatPendingDecisionView,
     getLastWordsPendingLocalBlock,
+    getReactionPendingLocalBlock,
   } from '../lib/session/combatPendingDecision.js'
   import { startTimedPolling, type TimedPollingHandle } from '../lib/session/liveSessionPolling'
   import { readRequestedSessionCodeFromAccessOrHandoff, readSessionCodeFromRoute } from '../lib/session/sessionRoute'
@@ -87,6 +88,8 @@
     DISCARD_TO_HAND_LIMIT: 'combat.resolvePending',
     SEARCH_PICK: 'combat.resolvePending',
     LAST_WORDS: 'combat.resolvePending',
+    REACTION_CARD: 'combat.resolvePending',
+    RESOLVE_REACTION: 'combat.resolvePending',
     INITIATIVE_TIE_ORDER: 'combat.resolvePending',
     RESOLVE_INITIATIVE_TIE: 'combat.resolvePending',
   }
@@ -957,6 +960,8 @@
         return null
       case 'LAST_WORDS':
         return getLastWordsPendingLocalBlock(selectedPendingIds, schema.canSkip)
+      case 'REACTION_CARD':
+        return getReactionPendingLocalBlock(selectedPendingIds, schema.canSkip)
       case 'INITIATIVE_TIE_ORDER':
         if ((schema.actorKeys?.length ?? 0) !== orderedActorKeys.length) {
           return '동률 대상 순서를 먼저 정해 주세요.'
@@ -1272,6 +1277,7 @@
           ...basePayload,
           discardIds: selectedIdsField === 'discardIds' ? selectedDiscardIds : [],
           selectedIds: selectedIdsField === 'selectedIds' ? selectedPendingIds : [],
+          cardId: selectedIdsField === 'cardId' ? (selectedPendingIds[0] ?? null) : null,
           orderedActorKeys: selectedIdsField === 'orderedActorKeys' ? orderedActorKeys : [],
           tieGroupIndex: schema?.groupIndex ?? null,
           reason: normalizeOptionalText(selectedReason),
@@ -1573,6 +1579,11 @@
   function handleResolvePendingDecision() {
     selectedActionId = 'combat.resolvePending'
     void executeAction('combat.resolvePending')
+  }
+
+  function handleResolveReactionCard(cardId: string) {
+    selectedPendingIds = [cardId]
+    handleResolvePendingDecision()
   }
 
   function handleSkipPendingDecision() {
@@ -1970,6 +1981,7 @@
           onTogglePendingSelectedId={handleTogglePendingSelectedId}
           onToggleOrderedActorKey={handleToggleOrderedActorKey}
           onResolvePendingDecision={handleResolvePendingDecision}
+          onResolveReactionCard={handleResolveReactionCard}
           onSkipPendingDecision={handleSkipPendingDecision}
           onToggleSelectedId={handleToggleFieldId}
           canToggleSelectedId={(instanceId) => canToggleBoardSelectionKey(fieldSelectionKey(instanceId))}

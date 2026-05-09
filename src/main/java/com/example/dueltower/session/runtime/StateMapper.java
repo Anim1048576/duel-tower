@@ -140,6 +140,19 @@ public final class StateMapper {
                     List.of(),
                     lw.skippable()
             );
+        } else if (ps.pendingDecision() instanceof PendingDecision.ReactionCard rc) {
+            pending = new PendingDecisionDto(
+                    "REACTION_CARD",
+                    rc.reason(),
+                    null,
+                    null,
+                    rc.candidateIds().stream().map(id -> id.value().toString()).toList(),
+                    null,
+                    null,
+                    null,
+                    List.of(),
+                    rc.skippable()
+            );
         }
 
         return new PlayerStateDto(

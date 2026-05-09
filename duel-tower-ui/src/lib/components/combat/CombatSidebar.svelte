@@ -64,6 +64,7 @@
     onTogglePendingSelectedId: (value: string) => void
     onToggleOrderedActorKey: (actorKey: string) => void
     onResolvePendingDecision: () => void
+    onResolveReactionCard: (cardId: string) => void
     onSkipPendingDecision: () => void
     onToggleSelectedId: (instanceId: string) => void
     canToggleSelectedId: (instanceId: string) => boolean
@@ -118,6 +119,7 @@
     onTogglePendingSelectedId,
     onToggleOrderedActorKey,
     onResolvePendingDecision,
+    onResolveReactionCard,
     onSkipPendingDecision,
     onToggleSelectedId,
     canToggleSelectedId,
@@ -190,6 +192,7 @@
             onTogglePendingSelectedId={onTogglePendingSelectedId}
             onToggleOrderedActorKey={onToggleOrderedActorKey}
             onResolvePendingDecision={onResolvePendingDecision}
+            onResolveReactionCard={onResolveReactionCard}
             onSkipPendingDecision={onSkipPendingDecision}
           />
 

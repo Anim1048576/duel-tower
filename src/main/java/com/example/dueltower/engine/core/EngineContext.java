@@ -46,6 +46,7 @@ public final class EngineContext {
     private final RewardTableConfig rewardTableConfig;
     private final EncounterTableConfig encounterTableConfig;
     private final RunConfig runConfig;
+    private final boolean resolvingReaction;
 
     public EngineContext(Map<CardDefId, CardDefinition> definitions, Map<CardDefId, CardEffect> effects) {
         this(definitions, effects, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), GameRules.defaults(), RewardTableConfig.defaults(), EncounterTableConfig.defaults());
@@ -198,6 +199,31 @@ public final class EngineContext {
             EncounterTableConfig encounterTableConfig,
             RunConfig runConfig
     ) {
+        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, passiveDefs, passiveEffects,
+                cardModifierDefs, cardModifierEffects, itemDefs, itemEffects, equipDefs, gameRules, rewardTableConfig,
+                encounterTableConfig, runConfig, false);
+    }
+
+    private EngineContext(
+            Map<CardDefId, CardDefinition> definitions,
+            Map<CardDefId, CardEffect> effects,
+            Map<String, StatusDefinition> statusDefs,
+            Map<String, StatusEffect> statusEffects,
+            Map<String, KeywordDefinition> keywordDefs,
+            Map<String, KeywordEffect> keywordEffects,
+            Map<String, PassiveDefinition> passiveDefs,
+            Map<String, PassiveEffect> passiveEffects,
+            Map<String, CardModifierDefinition> cardModifierDefs,
+            Map<String, CardModifierEffect> cardModifierEffects,
+            Map<String, ItemDefinition> itemDefs,
+            Map<String, ItemEffect> itemEffects,
+            Map<String, EquipDefinition> equipDefs,
+            GameRules gameRules,
+            RewardTableConfig rewardTableConfig,
+            EncounterTableConfig encounterTableConfig,
+            RunConfig runConfig,
+            boolean resolvingReaction
+    ) {
         this.definitions = Map.copyOf(definitions);
         this.effects = Map.copyOf(effects);
         this.statusDefs = Map.copyOf(statusDefs);
@@ -215,6 +241,7 @@ public final class EngineContext {
         this.rewardTableConfig = Objects.requireNonNull(rewardTableConfig, "rewardTableConfig");
         this.encounterTableConfig = Objects.requireNonNull(encounterTableConfig, "encounterTableConfig");
         this.runConfig = Objects.requireNonNull(runConfig, "runConfig");
+        this.resolvingReaction = resolvingReaction;
     }
 
     public EngineContext(
@@ -333,4 +360,12 @@ public final class EngineContext {
     public RewardTableConfig rewardTable() { return rewardTableConfig; }
     public EncounterTableConfig encounterTable() { return encounterTableConfig; }
     public RunConfig runConfig() { return runConfig; }
+    public boolean resolvingReaction() { return resolvingReaction; }
+
+    public EngineContext withResolvingReaction(boolean value) {
+        if (resolvingReaction == value) return this;
+        return new EngineContext(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects,
+                passiveDefs, passiveEffects, cardModifierDefs, cardModifierEffects, itemDefs, itemEffects,
+                equipDefs, gameRules, rewardTableConfig, encounterTableConfig, runConfig, value);
+    }
 }

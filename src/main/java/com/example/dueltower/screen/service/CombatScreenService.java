@@ -882,6 +882,7 @@ public class CombatScreenService {
                 case "DISCARD_TO_HAND_LIMIT" -> "DISCARD_TO_HAND_LIMIT";
                 case "SEARCH_PICK" -> "SEARCH_PICK";
                 case "LAST_WORDS" -> "LAST_WORDS";
+                case "REACTION_CARD" -> "RESOLVE_REACTION";
                 case "INITIATIVE_TIE_ORDER" -> "RESOLVE_INITIATIVE_TIE";
                 default -> null;
             };
@@ -896,6 +897,7 @@ public class CombatScreenService {
         payload.put("selectedIds", List.of());
         payload.put("orderedActorKeys", List.of());
         payload.put("choiceId", "");
+        payload.put("cardId", null);
         if (pendingDecision != null && pendingDecision.groupIndex() != null) {
             payload.put("tieGroupIndex", pendingDecision.groupIndex());
         }
@@ -1369,6 +1371,12 @@ public class CombatScreenService {
                 schema.put("canSkip", pendingDecision.canSkip());
                 schema.put("selectedIdsField", "selectedIds");
             }
+            case "REACTION_CARD" -> {
+                schema.put("candidateIds", pendingDecision.candidateIds());
+                schema.put("candidateCards", cardViews(pendingDecision.candidateIds(), state, cardDefinitions));
+                schema.put("canSkip", pendingDecision.canSkip());
+                schema.put("selectedIdsField", "cardId");
+            }
             case "INITIATIVE_TIE_ORDER" -> {
                 schema.put("groupIndex", pendingDecision.groupIndex());
                 schema.put("actorKeys", pendingDecision.actorKeys());
@@ -1624,7 +1632,7 @@ public class CombatScreenService {
             return "Pending decision type is missing.";
         }
         return switch (pendingType) {
-            case "DISCARD_TO_HAND_LIMIT", "SEARCH_PICK", "LAST_WORDS", "INITIATIVE_TIE_ORDER" -> null;
+            case "DISCARD_TO_HAND_LIMIT", "SEARCH_PICK", "LAST_WORDS", "REACTION_CARD", "INITIATIVE_TIE_ORDER" -> null;
             default -> pendingType + " is not supported in this combat step yet.";
         };
     }

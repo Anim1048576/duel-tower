@@ -95,6 +95,43 @@ class StateMapperRunStateTest {
     }
 
     @Test
+    void toDtoMapsReactionPendingDecision() {
+        GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 1001L);
+        Ids.PlayerId playerId = new Ids.PlayerId("P1");
+        Ids.EnemyId enemyId = new Ids.EnemyId("E1");
+        PlayerState player = new PlayerState(playerId);
+        state.players().put(playerId, player);
+        state.enemies().put(enemyId, new EnemyState(enemyId, 20));
+
+        Ids.CardInstId cardId = Ids.newCardInstId();
+        state.cardInstances().put(cardId, new CardInstance(cardId, new Ids.CardDefId("C005"), playerId, Zone.HAND));
+        player.hand().add(cardId);
+        player.pendingDecision(new PendingDecision.ReactionCard(
+                ReactionTrigger.AFTER_ENEMY_ATTACK_DAMAGED_SELF.name(),
+                List.of(cardId),
+                true,
+                new PendingDecision.ReactionContext(
+                        UUID.randomUUID(),
+                        playerId,
+                        ReactionTrigger.AFTER_ENEMY_ATTACK_DAMAGED_SELF,
+                        TargetRef.ofEnemy(enemyId),
+                        TargetRef.ofPlayer(playerId),
+                        3,
+                        "ENEMY_PLAY_CARD"
+                )
+        ));
+
+        SessionStateDto dto = StateMapper.toDto("ABCD1234", state);
+
+        var pending = dto.players().get(playerId.value()).pendingDecision();
+        assertNotNull(pending);
+        assertEquals("REACTION_CARD", pending.type());
+        assertEquals(ReactionTrigger.AFTER_ENEMY_ATTACK_DAMAGED_SELF.name(), pending.reason());
+        assertEquals(List.of(cardId.value().toString()), pending.candidateIds());
+        assertEquals(Boolean.TRUE, pending.canSkip());
+    }
+
+    @Test
     void toDtoComposesInventoryRuntimeWithItemDefinitions() {
         GameState state = new GameState(new Ids.SessionId(UUID.randomUUID()), 123L);
 
