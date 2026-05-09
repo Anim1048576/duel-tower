@@ -5,6 +5,7 @@ import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.DiscardFilter;
 import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
+import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
 import com.example.dueltower.engine.core.effect.card.CardCostCtx;
@@ -18,6 +19,11 @@ import java.util.Map;
 @Component
 public class Tig005_Card implements CardBlueprint {
     @Override public String id() { return "Tig005_Card"; }
+
+    @Override
+    public String contentOwner() {
+        return ContentOwnerIds.TIG;
+    }
 
     @Override
     public CardDefinition definition() {

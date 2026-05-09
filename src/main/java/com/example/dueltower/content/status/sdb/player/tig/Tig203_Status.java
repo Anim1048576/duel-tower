@@ -1,6 +1,7 @@
 package com.example.dueltower.content.status.sdb.player.tig;
 
 import com.example.dueltower.content.status.model.StatusBlueprint;
+import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.content.status.sdb.S004_Evasion;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.model.*;
@@ -12,6 +13,11 @@ public class Tig203_Status implements StatusBlueprint {
     public static final String ID = "Tig203_Status";
 
     @Override public String id() { return ID; }
+
+    @Override
+    public String contentOwner() {
+        return ContentOwnerIds.TIG;
+    }
 
     @Override
     public StatusDefinition definition() {

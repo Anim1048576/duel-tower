@@ -24,6 +24,7 @@ type RawCardDefinition = {
   resolveTo: CardDefinition['resolveTo']
   token: boolean | string | null
   description: string
+  contentOwner?: string | null
 }
 
 type RawCardDetailResponse = RawCardDefinition & {
@@ -126,6 +127,7 @@ function normalizeCardDefinition(raw: RawCardDefinition): CardDefinition {
     resolveTo: raw.resolveTo ?? null,
     token: Boolean(raw.token),
     description: raw.description ?? '',
+    contentOwner: raw.contentOwner ?? '공용',
   }
 }
 

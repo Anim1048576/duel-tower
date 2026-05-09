@@ -1,6 +1,5 @@
 package com.example.dueltower.content.card.dto;
 
-import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
@@ -9,7 +8,7 @@ import com.example.dueltower.engine.model.Zone;
 
 import java.util.Map;
 
-public record CardDetailResponse(
+public record CardSummaryResponse(
         Ids.CardDefId id,
         String name,
         CardType type,
@@ -18,11 +17,10 @@ public record CardDetailResponse(
         Zone resolveTo,
         boolean token,
         String description,
-        String contentOwner,
-        CardPlaySpec playSpec
+        String contentOwner
 ) {
-    public static CardDetailResponse of(CardDefinition definition, String contentOwner, CardPlaySpec playSpec) {
-        return new CardDetailResponse(
+    public static CardSummaryResponse of(CardDefinition definition, String contentOwner) {
+        return new CardSummaryResponse(
                 definition.id(),
                 definition.name(),
                 definition.type(),
@@ -31,12 +29,7 @@ public record CardDetailResponse(
                 definition.resolveTo(),
                 definition.token(),
                 definition.description(),
-                contentOwner == null || contentOwner.isBlank() ? ContentOwnerIds.COMMON : contentOwner,
-                playSpec == null ? CardPlaySpec.none() : playSpec
+                contentOwner == null || contentOwner.isBlank() ? ContentOwnerIds.COMMON : contentOwner
         );
-    }
-
-    public static CardDetailResponse of(CardDefinition definition, CardPlaySpec playSpec) {
-        return of(definition, ContentOwnerIds.COMMON, playSpec);
     }
 }

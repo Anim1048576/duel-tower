@@ -1,6 +1,7 @@
 package com.example.dueltower.content.passive.pdb.player.tig;
 
 import com.example.dueltower.content.passive.model.PassiveBlueprint;
+import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.content.status.sdb.player.tig.Tig201_Status;
 import com.example.dueltower.engine.core.effect.passive.PassiveRuntime;
 import com.example.dueltower.engine.model.*;
@@ -24,6 +25,11 @@ public class Tig001_Passive implements PassiveBlueprint {
     private static final String KEY_USED_EX = "TIG_PASSIVE_USED_EX";
 
     @Override public String id() { return ID; }
+
+    @Override
+    public String contentOwner() {
+        return ContentOwnerIds.TIG;
+    }
 
     @Override
     public PassiveDefinition definition() {

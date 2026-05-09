@@ -1,7 +1,7 @@
 package com.example.dueltower.content.status.api;
 
+import com.example.dueltower.content.status.dto.StatusResponse;
 import com.example.dueltower.content.status.service.StatusService;
-import com.example.dueltower.engine.model.StatusDefinition;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,17 +19,17 @@ public class StatusController {
     }
 
     @GetMapping
-    public List<StatusDefinition> list() {
-        return service.list();
+    public List<StatusResponse> list() {
+        return service.listForApi();
     }
 
     @GetMapping("/all")
-    public List<StatusDefinition> listAll() {
-        return service.listAll();
+    public List<StatusResponse> listAll() {
+        return service.listAllForApi();
     }
 
     @GetMapping("/{id}")
-    public StatusDefinition get(@PathVariable String id) {
-        return service.get(id);
+    public StatusResponse get(@PathVariable String id) {
+        return service.getForApi(id);
     }
 }

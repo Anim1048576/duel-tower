@@ -1,5 +1,6 @@
 package com.example.dueltower.content;
 
+import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.content.status.sdb.S901_InstalledFieldBuff;
 import com.example.dueltower.content.status.sdb.S902_SummonFieldAura;
 import com.example.dueltower.content.status.sdb.player.tig.Tig202_Status;
@@ -36,7 +37,8 @@ class StatusContentApiIntegrationTest {
                         Tig203_Status.ID,
                         S901_InstalledFieldBuff.ID,
                         S902_SummonFieldAura.ID
-                ))));
+                ))))
+                .andExpect(jsonPath("$[0].contentOwner").exists());
     }
 
     @Test
@@ -49,7 +51,8 @@ class StatusContentApiIntegrationTest {
                         Tig203_Status.ID,
                         S901_InstalledFieldBuff.ID,
                         S902_SummonFieldAura.ID
-                )));
+                )))
+                .andExpect(jsonPath("$[0].contentOwner").exists());
     }
 
     @Test
@@ -58,11 +61,13 @@ class StatusContentApiIntegrationTest {
         mockMvc.perform(get("/api/content/statuses/{id}", Tig202_Status.ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(Tig202_Status.ID))
-                .andExpect(jsonPath("$.visibility").value("IMPLEMENTATION"));
+                .andExpect(jsonPath("$.visibility").value("IMPLEMENTATION"))
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.TIG));
 
         mockMvc.perform(get("/api/content/statuses/{id}", S901_InstalledFieldBuff.ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(S901_InstalledFieldBuff.ID))
-                .andExpect(jsonPath("$.visibility").value("TEST"));
+                .andExpect(jsonPath("$.visibility").value("TEST"))
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.COMMON));
     }
 }

@@ -9,6 +9,7 @@ import com.example.dueltower.content.card.model.playspec.DiscardFromHandRequirem
 import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
 import com.example.dueltower.content.keyword.kdb.K003_Installed;
+import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.content.status.sdb.player.tig.Tig202_Status;
 import com.example.dueltower.engine.core.effect.EffectContext;
 import com.example.dueltower.engine.core.effect.EffectOps;
@@ -21,6 +22,11 @@ import java.util.Map;
 @Component
 public class Tig008_Card implements CardBlueprint {
     @Override public String id() { return "Tig008_Card"; }
+
+    @Override
+    public String contentOwner() {
+        return ContentOwnerIds.TIG;
+    }
 
     @Override
     public CardDefinition definition() {

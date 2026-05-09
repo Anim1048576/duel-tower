@@ -2,9 +2,12 @@ package com.example.dueltower.content;
 
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.item.service.ItemService;
+import com.example.dueltower.content.keyword.kdb.K003_Installed;
 import com.example.dueltower.content.keyword.service.KeywordService;
+import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.content.passive.service.PassiveService;
 import com.example.dueltower.content.status.service.StatusService;
+import com.example.dueltower.content.status.sdb.player.tig.Tig202_Status;
 import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.ItemDefinition;
 import com.example.dueltower.engine.model.KeywordDefinition;
@@ -65,6 +68,7 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(jsonPath("$.resolveTo").isString())
                 .andExpect(jsonPath("$.token").isBoolean())
                 .andExpect(jsonPath("$.description", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.contentOwner", not(emptyOrNullString())))
                 .andExpect(jsonPath("$.playSpec").exists())
                 .andExpect(jsonPath("$.playSpec.target").exists())
                 .andExpect(jsonPath("$.playSpec.extraRequirements").isArray());
@@ -124,6 +128,7 @@ class ContentDetailApiIntegrationTest {
 
         mockMvc.perform(get("/api/content/cards/{id}", "Tig008_Card"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.TIG))
                 .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
                 .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
                 .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(2))
@@ -208,6 +213,7 @@ class ContentDetailApiIntegrationTest {
     void cardDetailShouldExposeEnemyTargetPlaySpecForBasicAttackCard() throws Exception {
         mockMvc.perform(get("/api/content/cards/{id}", "C001"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.COMMON))
                 .andExpect(jsonPath("$.playSpec.target.target").value("NONE"))
                 .andExpect(jsonPath("$.playSpec.target.requiredSelection").value(false))
                 .andExpect(jsonPath("$.playSpec.extraRequirements.length()").value(1))
@@ -256,7 +262,8 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(knownPassive.id()))
                 .andExpect(jsonPath("$.name", not(emptyOrNullString())))
-                .andExpect(jsonPath("$.description", not(emptyOrNullString())));
+                .andExpect(jsonPath("$.description", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.contentOwner", not(emptyOrNullString())));
     }
 
     @Test
@@ -285,7 +292,8 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(knownStatus.id()))
                 .andExpect(jsonPath("$.name", not(emptyOrNullString())))
-                .andExpect(jsonPath("$.description", not(emptyOrNullString())));
+                .andExpect(jsonPath("$.description", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.contentOwner", not(emptyOrNullString())));
     }
 
     @Test
@@ -314,7 +322,8 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(knownKeyword.id()))
                 .andExpect(jsonPath("$.name", not(emptyOrNullString())))
-                .andExpect(jsonPath("$.description", not(emptyOrNullString())));
+                .andExpect(jsonPath("$.description", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.contentOwner", not(emptyOrNullString())));
     }
 
     @Test
@@ -374,6 +383,38 @@ class ContentDetailApiIntegrationTest {
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(greaterThanOrEqualTo(5)))
                 .andExpect(jsonPath("$[*].id", hasItems("I-1", "I-2", "I-3", "I-4", "I-5")));
+    }
+
+    @Test
+    @DisplayName("content detail APIs expose common and Tig contentOwner metadata")
+    void contentDetailEndpointsShouldExposeContentOwnerMetadata() throws Exception {
+        mockMvc.perform(get("/api/content/cards/{id}", "C001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.COMMON));
+
+        mockMvc.perform(get("/api/content/cards/{id}", "Tig008_Card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.TIG));
+
+        mockMvc.perform(get("/api/content/keywords/{id}", K003_Installed.ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.COMMON));
+
+        mockMvc.perform(get("/api/content/statuses/{id}", "SHIELD"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.COMMON));
+
+        mockMvc.perform(get("/api/content/statuses/{id}", Tig202_Status.ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.TIG));
+
+        mockMvc.perform(get("/api/content/passives/{id}", "P001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.COMMON));
+
+        mockMvc.perform(get("/api/content/passives/{id}", "Tig001_Passive"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.TIG));
     }
 
     @Test

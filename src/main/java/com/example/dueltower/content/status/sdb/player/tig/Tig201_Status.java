@@ -1,6 +1,7 @@
 package com.example.dueltower.content.status.sdb.player.tig;
 
 import com.example.dueltower.content.status.model.StatusBlueprint;
+import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.engine.model.StatusDefinition;
 import com.example.dueltower.engine.model.StatusKind;
 import com.example.dueltower.engine.model.StatusScope;
@@ -11,6 +12,11 @@ import org.springframework.stereotype.Component;
 public class Tig201_Status implements StatusBlueprint {
     public static final String ID = "Tig201_Status";
     @Override public String id() { return ID; }
+
+    @Override
+    public String contentOwner() {
+        return ContentOwnerIds.TIG;
+    }
 
     @Override
     public StatusDefinition definition() {

@@ -1,5 +1,8 @@
 package com.example.dueltower.content;
 
+import com.example.dueltower.content.keyword.kdb.K003_Installed;
+import com.example.dueltower.content.meta.ContentOwnerIds;
+import com.example.dueltower.content.status.sdb.player.tig.Tig202_Status;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +29,8 @@ class ContentApiSmokeIntegrationTest {
     void cardsEndpointShouldReturnOkAndNonEmptyPayload() throws Exception {
         mockMvc.perform(get("/api/content/cards"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(greaterThan(0)));
+                .andExpect(jsonPath("$.length()").value(greaterThan(0)))
+                .andExpect(jsonPath("$[0].contentOwner").exists());
     }
 
     @Test
@@ -34,7 +38,8 @@ class ContentApiSmokeIntegrationTest {
     void cardDetailEndpointShouldReturnOkForKnownId() throws Exception {
         mockMvc.perform(get("/api/content/cards/C001"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id.value").value("C001"));
+                .andExpect(jsonPath("$.id.value").value("C001"))
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.COMMON));
     }
 
     @Test
@@ -57,6 +62,12 @@ class ContentApiSmokeIntegrationTest {
                         .param("keywordId", "__NO_SUCH_KEYWORD__"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(get("/api/content/cards")
+                        .param("q", "Tig008_Card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(greaterThan(0)))
+                .andExpect(jsonPath("$[0].contentOwner").value(ContentOwnerIds.TIG));
     }
 
     @Test
@@ -64,15 +75,17 @@ class ContentApiSmokeIntegrationTest {
     void keywordsEndpointShouldReturnOkAndNonEmptyPayload() throws Exception {
         mockMvc.perform(get("/api/content/keywords"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(greaterThan(0)));
+                .andExpect(jsonPath("$.length()").value(greaterThan(0)))
+                .andExpect(jsonPath("$[0].contentOwner").exists());
     }
 
     @Test
     @DisplayName("키워드 상세 엔드포인트는 알려진 ID에 대해 정상 응답을 반환한다")
     void keywordDetailEndpointShouldReturnOkForKnownId() throws Exception {
-        mockMvc.perform(get("/api/content/keywords/설치"))
+        mockMvc.perform(get("/api/content/keywords/{id}", K003_Installed.ID))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("설치"));
+                .andExpect(jsonPath("$.id").value(K003_Installed.ID))
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.COMMON));
     }
 
     @Test
@@ -87,7 +100,8 @@ class ContentApiSmokeIntegrationTest {
     void passivesEndpointShouldReturnOkAndNonEmptyPayload() throws Exception {
         mockMvc.perform(get("/api/content/passives"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(greaterThan(0)));
+                .andExpect(jsonPath("$.length()").value(greaterThan(0)))
+                .andExpect(jsonPath("$[0].contentOwner").exists());
     }
 
     @Test
@@ -95,7 +109,8 @@ class ContentApiSmokeIntegrationTest {
     void passiveDetailEndpointShouldReturnOkForKnownId() throws Exception {
         mockMvc.perform(get("/api/content/passives/P001"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("P001"));
+                .andExpect(jsonPath("$.id").value("P001"))
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.COMMON));
     }
 
     @Test
@@ -110,7 +125,8 @@ class ContentApiSmokeIntegrationTest {
     void statusesEndpointShouldReturnOkAndNonEmptyPayload() throws Exception {
         mockMvc.perform(get("/api/content/statuses"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(greaterThan(0)));
+                .andExpect(jsonPath("$.length()").value(greaterThan(0)))
+                .andExpect(jsonPath("$[0].contentOwner").exists());
     }
 
     @Test
@@ -118,7 +134,17 @@ class ContentApiSmokeIntegrationTest {
     void statusDetailEndpointShouldReturnOkForKnownId() throws Exception {
         mockMvc.perform(get("/api/content/statuses/SHIELD"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("SHIELD"));
+                .andExpect(jsonPath("$.id").value("SHIELD"))
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.COMMON));
+    }
+
+    @Test
+    @DisplayName("content API exposes contentOwner metadata for Tig-only status detail")
+    void statusDetailEndpointShouldReturnContentOwnerForTigStatus() throws Exception {
+        mockMvc.perform(get("/api/content/statuses/{id}", Tig202_Status.ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(Tig202_Status.ID))
+                .andExpect(jsonPath("$.contentOwner").value(ContentOwnerIds.TIG));
     }
 
     @Test

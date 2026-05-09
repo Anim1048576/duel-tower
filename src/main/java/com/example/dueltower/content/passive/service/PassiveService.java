@@ -1,5 +1,6 @@
 package com.example.dueltower.content.passive.service;
 
+import com.example.dueltower.content.passive.dto.PassiveResponse;
 import com.example.dueltower.content.passive.model.PassiveBlueprint;
 import com.example.dueltower.content.support.ContentLookupSupport;
 import com.example.dueltower.engine.core.effect.passive.PassiveEffect;
@@ -14,6 +15,7 @@ public class PassiveService {
     private final List<PassiveDefinition> all;
     private final Map<String, PassiveDefinition> defsById;
     private final Map<String, PassiveEffect> effectsById;
+    private final Map<String, String> ownersById;
 
     public PassiveService(List<PassiveBlueprint> blueprints) {
         List<PassiveBlueprint> sorted = blueprints.stream()
@@ -22,6 +24,7 @@ public class PassiveService {
 
         Map<String, PassiveDefinition> d = new HashMap<>();
         Map<String, PassiveEffect> e = new HashMap<>();
+        Map<String, String> owners = new HashMap<>();
         List<PassiveDefinition> list = new ArrayList<>();
 
         for (PassiveBlueprint bp : sorted) {
@@ -36,12 +39,14 @@ public class PassiveService {
             if (e.put(def.id(), bp) != null) {
                 throw new IllegalStateException("duplicate passive effect id: " + def.id());
             }
+            owners.put(def.id(), bp.contentOwner());
             list.add(def);
         }
 
         this.all = List.copyOf(list);
         this.defsById = Map.copyOf(d);
         this.effectsById = Map.copyOf(e);
+        this.ownersById = Map.copyOf(owners);
     }
 
     public List<PassiveDefinition> list() { return all; }
@@ -49,6 +54,21 @@ public class PassiveService {
     public PassiveDefinition get(String id) {
         return ContentLookupSupport.requireById(defsById, id, value -> value, "passive");
     }
+
+    public List<PassiveResponse> listForApi() {
+        return list().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public PassiveResponse getForApi(String id) {
+        return toResponse(get(id));
+    }
+
+    private PassiveResponse toResponse(PassiveDefinition definition) {
+        return PassiveResponse.of(definition, ownersById.get(definition.id()));
+    }
+
     public Map<String, PassiveDefinition> defsMap() { return defsById; }
     public Map<String, PassiveEffect> effectsMap() { return effectsById; }
 }

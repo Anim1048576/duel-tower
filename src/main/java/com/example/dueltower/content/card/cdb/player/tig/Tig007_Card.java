@@ -3,6 +3,7 @@ package com.example.dueltower.content.card.cdb.player.tig;
 import com.example.dueltower.content.card.model.CardBlueprint;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
+import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.content.status.sdb.S004_Evasion;
 import com.example.dueltower.content.status.sdb.player.tig.Tig203_Status;
 import com.example.dueltower.engine.core.effect.EffectContext;
@@ -16,6 +17,11 @@ import java.util.Map;
 @Component
 public class Tig007_Card implements CardBlueprint {
     @Override public String id() { return "Tig007_Card"; }
+
+    @Override
+    public String contentOwner() {
+        return ContentOwnerIds.TIG;
+    }
 
     @Override
     public CardDefinition definition() {

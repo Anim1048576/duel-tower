@@ -6,6 +6,7 @@ import com.example.dueltower.content.card.model.playspec.BoardObjectRelation;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.card.model.playspec.SelectBoardObjectsRequirement;
 import com.example.dueltower.content.card.model.playspec.TargetSpec;
+import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.effect.EffectOps;
 import com.example.dueltower.engine.core.effect.EffectContext;
@@ -20,6 +21,11 @@ import java.util.Map;
 public class Tig901_EX implements CardBlueprint {
 
     @Override public String id() { return "Tig901_EX"; }
+
+    @Override
+    public String contentOwner() {
+        return ContentOwnerIds.TIG;
+    }
 
     @Override
     public CardDefinition definition() {

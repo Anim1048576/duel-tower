@@ -1,5 +1,6 @@
 package com.example.dueltower.content.status.sdb.npc.iris;
 
+import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.content.status.model.StatusBlueprint;
 import com.example.dueltower.engine.model.*;
 import org.springframework.stereotype.Component;
@@ -12,6 +13,11 @@ import org.springframework.stereotype.Component;
 public class Iris201_Status implements StatusBlueprint {
     public static final String ID = "Iris201_Status";
     @Override public String id() { return ID; }
+
+    @Override
+    public String contentOwner() {
+        return ContentOwnerIds.IRIS;
+    }
 
     @Override
     public StatusDefinition definition() {

@@ -1,7 +1,7 @@
 package com.example.dueltower.content.keyword.api;
 
+import com.example.dueltower.content.keyword.dto.KeywordResponse;
 import com.example.dueltower.content.keyword.service.KeywordService;
-import com.example.dueltower.engine.model.KeywordDefinition;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,22 +19,22 @@ public class KeywordController {
     }
 
     @GetMapping
-    public List<KeywordDefinition> list() {
-        return service.list();
+    public List<KeywordResponse> list() {
+        return service.listForApi();
     }
 
     @GetMapping("/all")
-    public List<KeywordDefinition> listAll() {
-        return service.listAll();
+    public List<KeywordResponse> listAll() {
+        return service.listAllForApi();
     }
 
     @GetMapping("/{id}/attached")
-    public List<KeywordDefinition> listAttached(@PathVariable String id) {
-        return service.listAttachedTo(id);
+    public List<KeywordResponse> listAttached(@PathVariable String id) {
+        return service.listAttachedToForApi(id);
     }
 
     @GetMapping("/{id}")
-    public KeywordDefinition get(@PathVariable String id) {
-        return service.get(id);
+    public KeywordResponse get(@PathVariable String id) {
+        return service.getForApi(id);
     }
 }

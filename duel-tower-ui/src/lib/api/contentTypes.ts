@@ -40,6 +40,7 @@ export type CardDefinition = {
   resolveTo: Zone | null
   token: boolean
   description: string
+  contentOwner: string
 }
 
 export type CardPlaySpec = Record<string, unknown> | string | null
@@ -55,6 +56,7 @@ export type KeywordDefinition = {
   description: string
   role: KeywordRole
   parentKeywordId: string | null
+  contentOwner: string
 }
 
 export type PassiveDefinition = {
@@ -62,6 +64,7 @@ export type PassiveDefinition = {
   name: string
   priority: number | null
   description: string
+  contentOwner: string
 }
 
 export type StatusDefinition = {
@@ -74,6 +77,7 @@ export type StatusDefinition = {
   persistsAfterCombat: boolean
   description: string
   visibility: StatusVisibility
+  contentOwner: string
 }
 
 export type ItemDefinition = {

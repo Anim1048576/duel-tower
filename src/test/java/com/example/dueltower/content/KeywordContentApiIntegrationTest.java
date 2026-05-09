@@ -37,7 +37,8 @@ class KeywordContentApiIntegrationTest {
                         K902_SummonAttackPower.ID,
                         K903_SummonHealingPower.ID,
                         K904_Action.ID
-                ))));
+                ))))
+                .andExpect(jsonPath("$[0].contentOwner").exists());
     }
 
     @Test
@@ -50,7 +51,8 @@ class KeywordContentApiIntegrationTest {
                         K902_SummonAttackPower.ID,
                         K903_SummonHealingPower.ID,
                         K904_Action.ID
-                )));
+                )))
+                .andExpect(jsonPath("$[0].contentOwner").exists());
     }
 
     @Test
@@ -65,7 +67,8 @@ class KeywordContentApiIntegrationTest {
                         K904_Action.ID
                 )))
                 .andExpect(jsonPath("$[0].role").value("ATTACHED"))
-                .andExpect(jsonPath("$[0].parentKeywordId").value(K004_Summon.ID));
+                .andExpect(jsonPath("$[0].parentKeywordId").value(K004_Summon.ID))
+                .andExpect(jsonPath("$[0].contentOwner").exists());
     }
 
     @Test
@@ -75,6 +78,7 @@ class KeywordContentApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(K901_SummonHp.ID))
                 .andExpect(jsonPath("$.role").value("ATTACHED"))
-                .andExpect(jsonPath("$.parentKeywordId").value(K004_Summon.ID));
+                .andExpect(jsonPath("$.parentKeywordId").value(K004_Summon.ID))
+                .andExpect(jsonPath("$.contentOwner").exists());
     }
 }

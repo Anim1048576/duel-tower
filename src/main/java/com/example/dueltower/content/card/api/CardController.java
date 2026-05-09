@@ -1,8 +1,8 @@
 package com.example.dueltower.content.card.api;
 
 import com.example.dueltower.content.card.dto.CardDetailResponse;
+import com.example.dueltower.content.card.dto.CardSummaryResponse;
 import com.example.dueltower.content.card.service.CardService;
-import com.example.dueltower.engine.model.CardDefinition;
 import com.example.dueltower.engine.model.CardType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,10 +22,10 @@ public class CardController {
     }
 
     @GetMapping
-    public List<CardDefinition> list(@RequestParam(required = false) CardType type,
-                                     @RequestParam(required = false) String q,
-                                     @RequestParam(required = false) String keywordId) {
-        return service.listFiltered(type, q, keywordId);
+    public List<CardSummaryResponse> list(@RequestParam(required = false) CardType type,
+                                          @RequestParam(required = false) String q,
+                                          @RequestParam(required = false) String keywordId) {
+        return service.listFilteredForApi(type, q, keywordId);
     }
 
     @GetMapping("/{id}")

@@ -1,6 +1,7 @@
 package com.example.dueltower.content.card.service;
 
 import com.example.dueltower.content.card.dto.CardDetailResponse;
+import com.example.dueltower.content.card.dto.CardSummaryResponse;
 import com.example.dueltower.content.card.model.CardBlueprint;
 import com.example.dueltower.content.card.model.playspec.CardPlaySpec;
 import com.example.dueltower.content.support.ContentLookupSupport;
@@ -85,7 +86,7 @@ public class CardService {
     public CardDetailResponse get(String id) {
         CardBlueprint blueprint = requireBlueprint(id);
         CardDefinition definition = blueprint.definition();
-        return CardDetailResponse.of(definition, blueprint.playSpec());
+        return CardDetailResponse.of(definition, blueprint.contentOwner(), blueprint.playSpec());
     }
 
     /**
@@ -97,11 +98,17 @@ public class CardService {
 
         return allBlueprints.stream()
                 .map(CardBlueprint::definition)
-                .filter(card -> type == null || card.type() == type)
-                .filter(card -> query.isEmpty() || card.name().toLowerCase(Locale.ROOT).contains(query)
-                        || card.description().toLowerCase(Locale.ROOT).contains(query)
-                        || card.id().value().toLowerCase(Locale.ROOT).contains(query))
-                .filter(card -> normalizedKeywordId.isEmpty() || card.keywords().containsKey(normalizedKeywordId))
+                .filter(card -> matchesFilter(card, type, query, normalizedKeywordId))
+                .toList();
+    }
+
+    public List<CardSummaryResponse> listFilteredForApi(CardType type, String q, String keywordId) {
+        String query = ContentLookupSupport.normalizeId(q).toLowerCase(Locale.ROOT);
+        String normalizedKeywordId = ContentLookupSupport.normalizeId(keywordId);
+
+        return allBlueprints.stream()
+                .filter(bp -> matchesFilter(bp.definition(), type, query, normalizedKeywordId))
+                .map(bp -> CardSummaryResponse.of(bp.definition(), bp.contentOwner()))
                 .toList();
     }
 
@@ -148,6 +155,14 @@ public class CardService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "card not found: " + normalized);
         }
         return blueprint;
+    }
+
+    private boolean matchesFilter(CardDefinition card, CardType type, String query, String normalizedKeywordId) {
+        return (type == null || card.type() == type)
+                && (query.isEmpty() || card.name().toLowerCase(Locale.ROOT).contains(query)
+                || card.description().toLowerCase(Locale.ROOT).contains(query)
+                || card.id().value().toLowerCase(Locale.ROOT).contains(query))
+                && (normalizedKeywordId.isEmpty() || card.keywords().containsKey(normalizedKeywordId));
     }
 
     private void validateDefinitionBlueprintConsistency(
