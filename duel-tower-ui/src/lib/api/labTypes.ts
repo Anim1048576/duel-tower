@@ -124,6 +124,7 @@ export type LabEffectProbeResponse = {
   valid: boolean
   validationErrors: string[]
   resolved: boolean
+  probeError?: string | null
   before: LabProbeSnapshotDto
   after: LabProbeSnapshotDto
   changes: LabProbeChangesDto
