@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DiceUtilityTest {
 
@@ -92,6 +94,47 @@ class DiceUtilityTest {
     }
 
     @Test
+    @DisplayName("minDice/maxDice: multiple dice terms and constants")
+    void minMaxDiceSupportMultipleTerms() {
+        assertEquals(6, DiceUtility.minDice("1D6+2D4+3"));
+        assertEquals(17, DiceUtility.maxDice("1D6+2D4+3"));
+    }
+
+    @Test
+    @DisplayName("minDice/maxDice: keep and drop selectors")
+    void minMaxDiceSupportSelectors() {
+        assertEquals(2, DiceUtility.minDice("4D6KH2"));
+        assertEquals(12, DiceUtility.maxDice("4D6KH2"));
+
+        assertEquals(2, DiceUtility.minDice("4D6KL2"));
+        assertEquals(12, DiceUtility.maxDice("4D6KL2"));
+
+        assertEquals(2, DiceUtility.minDice("4D6DH2"));
+        assertEquals(12, DiceUtility.maxDice("4D6DH2"));
+
+        assertEquals(2, DiceUtility.minDice("4D6DL2"));
+        assertEquals(12, DiceUtility.maxDice("4D6DL2"));
+
+        assertEquals(1, DiceUtility.minDice("4D6MAX"));
+        assertEquals(6, DiceUtility.maxDice("4D6MAX"));
+
+        assertEquals(1, DiceUtility.minDice("4D6MIN"));
+        assertEquals(6, DiceUtility.maxDice("4D6MIN"));
+    }
+
+    @Test
+    @DisplayName("expectedDice: multiple sum terms and constants")
+    void expectedDiceSupportsMultipleSumTerms() {
+        assertEquals(Rational.of(23, 2), DiceUtility.expectedDice("1D6+2D4+3"));
+    }
+
+    @Test
+    @DisplayName("expectedDice: selectors are not supported yet")
+    void expectedDiceRejectsSelectors() {
+        assertThrows(UnsupportedOperationException.class, () -> DiceUtility.expectedDice("4D6KH2"));
+    }
+
+    @Test
     @DisplayName("rollDice(count, sides, rng): count/sides 양수 제약을 강제한다")
     void rollDiceWithCountAndSidesEnforcesPositiveInputs() {
         Random rng = new Random(7L);
@@ -112,6 +155,66 @@ class DiceUtilityTest {
         int secondRoll = DiceUtility.rollDice("3d6+2", second);
 
         assertEquals(firstRoll, secondRoll);
+    }
+
+    @Test
+    @DisplayName("rollDice(notation, rng): composite expressions are deterministic")
+    void rollDiceCompositeExpressionIsDeterministicWithSeededRandom() {
+        Random first = new Random(98765L);
+        Random second = new Random(98765L);
+
+        int firstRoll = DiceUtility.rollDice("1D6+2D4+3", first);
+        int secondRoll = DiceUtility.rollDice("1D6+2D4+3", second);
+
+        assertEquals(firstRoll, secondRoll);
+    }
+
+    @Test
+    @DisplayName("parseDiceExpression: mixed selector expression")
+    void parseDiceExpressionSupportsMixedSelectorExpression() {
+        DiceUtility.DiceExpression expression = DiceUtility.parseDiceExpression("3D6KH2+2D4MAX+1");
+
+        assertEquals(3, expression.terms().size());
+
+        DiceUtility.DiceRollTerm first =
+                assertInstanceOf(DiceUtility.DiceRollTerm.class, expression.terms().get(0).term());
+        assertEquals(3, first.count());
+        assertEquals(6, first.sides());
+        assertEquals(DiceUtility.DiceSelectorKind.KH, first.selector().kind());
+        assertEquals(2, first.selector().amount());
+
+        DiceUtility.DiceRollTerm second =
+                assertInstanceOf(DiceUtility.DiceRollTerm.class, expression.terms().get(1).term());
+        assertEquals(2, second.count());
+        assertEquals(4, second.sides());
+        assertEquals(DiceUtility.DiceSelectorKind.KH, second.selector().kind());
+        assertEquals(1, second.selector().amount());
+
+        DiceUtility.ConstantTerm third =
+                assertInstanceOf(DiceUtility.ConstantTerm.class, expression.terms().get(2).term());
+        assertEquals(1, third.value());
+
+        Random firstRandom = new Random(13579L);
+        Random secondRandom = new Random(13579L);
+        int firstRoll = DiceUtility.rollDice("3D6KH2+2D4MAX+1", firstRandom);
+        int secondRoll = DiceUtility.rollDice("3D6KH2+2D4MAX+1", secondRandom);
+
+        assertEquals(firstRoll, secondRoll);
+        assertTrue(firstRoll >= DiceUtility.minDice("3D6KH2+2D4MAX+1"));
+        assertTrue(firstRoll <= DiceUtility.maxDice("3D6KH2+2D4MAX+1"));
+    }
+
+    @Test
+    @DisplayName("parseDiceExpression: invalid selector amounts")
+    void parseDiceExpressionRejectsInvalidSelectorAmounts() {
+        assertThrows(IllegalArgumentException.class, () -> DiceUtility.parseDiceExpression("4D6KH0"));
+        assertThrows(IllegalArgumentException.class, () -> DiceUtility.parseDiceExpression("4D6KH5"));
+        assertThrows(IllegalArgumentException.class, () -> DiceUtility.parseDiceExpression("4D6KL0"));
+        assertThrows(IllegalArgumentException.class, () -> DiceUtility.parseDiceExpression("4D6KL5"));
+        assertThrows(IllegalArgumentException.class, () -> DiceUtility.parseDiceExpression("4D6DH0"));
+        assertThrows(IllegalArgumentException.class, () -> DiceUtility.parseDiceExpression("4D6DH4"));
+        assertThrows(IllegalArgumentException.class, () -> DiceUtility.parseDiceExpression("4D6DL0"));
+        assertThrows(IllegalArgumentException.class, () -> DiceUtility.parseDiceExpression("4D6DL4"));
     }
 
     @Test
