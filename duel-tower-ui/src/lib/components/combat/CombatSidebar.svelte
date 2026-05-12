@@ -42,6 +42,8 @@
     canResolvePendingCommand: boolean
     selectedCount: number | null
     selectedReason: string
+    selectedExChoiceId: string | null
+    exChoiceOptions: readonly { id: string; label: string; description: string }[]
     boardCountChoiceOptions: readonly number[]
     boardCountChoiceRequired: boolean
     visiblePlayerView: CombatPlayerViewModel | null
@@ -64,8 +66,11 @@
     onTogglePendingSelectedId: (value: string) => void
     onToggleOrderedActorKey: (actorKey: string) => void
     onResolvePendingDecision: () => void
+    onResolvePendingChoice: (choiceId: string) => void
     onResolveReactionCard: (cardId: string) => void
     onSkipPendingDecision: () => void
+    onSelectExChoice: (choiceId: string) => void
+    onUseEx: () => void
     onToggleSelectedId: (instanceId: string) => void
     canToggleSelectedId: (instanceId: string) => boolean
     onRetryEvents: () => void
@@ -97,6 +102,8 @@
     canResolvePendingCommand,
     selectedCount,
     selectedReason,
+    selectedExChoiceId,
+    exChoiceOptions,
     boardCountChoiceOptions,
     boardCountChoiceRequired,
     visiblePlayerView,
@@ -119,8 +126,11 @@
     onTogglePendingSelectedId,
     onToggleOrderedActorKey,
     onResolvePendingDecision,
+    onResolvePendingChoice,
     onResolveReactionCard,
     onSkipPendingDecision,
+    onSelectExChoice,
+    onUseEx,
     onToggleSelectedId,
     canToggleSelectedId,
     onRetryEvents,
@@ -182,6 +192,8 @@
             canResolvePendingCommand={canResolvePendingCommand}
             {selectedCount}
             {selectedReason}
+            {selectedExChoiceId}
+            {exChoiceOptions}
             {boardCountChoiceOptions}
             {boardCountChoiceRequired}
             onCommandButtonClick={onCommandButtonClick}
@@ -192,8 +204,11 @@
             onTogglePendingSelectedId={onTogglePendingSelectedId}
             onToggleOrderedActorKey={onToggleOrderedActorKey}
             onResolvePendingDecision={onResolvePendingDecision}
+            onResolvePendingChoice={onResolvePendingChoice}
             onResolveReactionCard={onResolveReactionCard}
             onSkipPendingDecision={onSkipPendingDecision}
+            onSelectExChoice={onSelectExChoice}
+            onUseEx={onUseEx}
           />
 
           <CombatZoneSummary

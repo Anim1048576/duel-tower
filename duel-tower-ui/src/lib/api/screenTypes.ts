@@ -513,9 +513,12 @@ export type CombatPlayCardSourceOptionDto = {
 export type CombatPendingDecisionSchemaDto = {
   type: string
   reason?: string | null
+  playerId?: string | null
+  statusId?: string | null
   discardCount?: number | null
   pickCount?: number | null
   candidateIds?: string[] | null
+  choiceIds?: string[] | null
   candidateCards?: CombatCardDto[] | null
   canSkip?: boolean | null
   destination?: string | null
@@ -702,6 +705,7 @@ export type CombatUseExActionPayload = {
   expectedVersion: number
   playerId: string
   targets: Record<string, unknown>[]
+  choiceId?: string | null
   reason?: string | null
 }
 

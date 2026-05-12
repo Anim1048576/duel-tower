@@ -78,6 +78,12 @@
 
   const POLLING_INTERVAL_MS = 4000
   const COMBAT_SIDEBAR_EVENT_LIMIT = 12
+  const GRAVITY_SINGULARITY_EX_ID = 'Nameless901_EX'
+  const GRAVITY_SINGULARITY_CHOICES = [
+    { id: 'AUGMENT_1', label: '도발 토글', description: '[도발]이 없으면 7 부여, 있으면 해제' },
+    { id: 'AUGMENT_2', label: '엔트로피 토글', description: '[엔트로피]가 없으면 4 부여, 있으면 해제' },
+    { id: 'AUGMENT_3', label: '사건의 지평선', description: '자신 대상에게 [사건의 지평선] 1 부여' },
+  ] as const
   const COMBAT_ACTION_ID_BY_COMMAND_TYPE: Record<string, CombatActionId> = {
     DRAW: 'combat.draw',
     END_TURN: 'combat.endTurn',
@@ -137,6 +143,7 @@
   let selectedDiscardIds = $state<string[]>([])
   let selectedFieldIds = $state<string[]>([])
   let selectedPendingIds = $state<string[]>([])
+  let selectedExChoiceId = $state<string | null>(null)
   let orderedActorKeys = $state<string[]>([])
   let selectedCount = $state<number | null>(1)
   let selectedReason = $state('')
@@ -324,6 +331,7 @@
       selectedDiscardIds: [...selectedDiscardIds],
       selectedFieldIds: [...selectedFieldIds],
       selectedPendingIds: [...selectedPendingIds],
+      selectedExChoiceId,
       orderedActorKeys: [...orderedActorKeys],
       selectedCount,
       selectedReason,
@@ -338,6 +346,7 @@
     selectedDiscardIds = [...nextState.selectedDiscardIds]
     selectedFieldIds = [...nextState.selectedFieldIds]
     selectedPendingIds = [...nextState.selectedPendingIds]
+    selectedExChoiceId = nextState.selectedExChoiceId
     orderedActorKeys = [...nextState.orderedActorKeys]
     selectedCount = nextState.selectedCount
     selectedReason = nextState.selectedReason
@@ -473,6 +482,17 @@
     }
 
     return null
+  }
+
+  function isGravitySingularityUseExAction(action: CombatScreenAction | null) {
+    return (
+      action?.metadata?.kind === 'useEx' &&
+      action.metadata.sourceCard?.defId === GRAVITY_SINGULARITY_EX_ID
+    )
+  }
+
+  function getExChoiceOptions(action: CombatScreenAction | null) {
+    return isGravitySingularityUseExAction(action) ? GRAVITY_SINGULARITY_CHOICES : []
   }
 
   function getBoardSelectionContext() {
@@ -967,6 +987,11 @@
           return '동률 대상 순서를 먼저 정해 주세요.'
         }
         return null
+      case 'EVENT_HORIZON':
+        if (selectedPendingIds.length !== 1) {
+          return '사건의 지평선 선택지를 고르세요.'
+        }
+        return null
       default:
         return null
     }
@@ -1011,7 +1036,16 @@
         return action.metadata.unsupportedReason ?? '지금은 EX 액션을 사용할 수 없습니다.'
       }
 
-      return getRequirementLocalBlock(action.metadata.requirementView)
+      const requirementBlock = getRequirementLocalBlock(action.metadata.requirementView)
+      if (requirementBlock) {
+        return requirementBlock
+      }
+
+      if (isGravitySingularityUseExAction(action) && !selectedExChoiceId) {
+        return '중력 특이점 증강을 선택하세요.'
+      }
+
+      return null
     }
 
     if (action.metadata.kind === 'pendingDecision') {
@@ -1249,11 +1283,13 @@
         const basePayload = buildPayloadWithCurrentVersion(action)
         const requirement = getSelectedActionRequirementView(action)
         const boardSelectionPayload = buildBoardSelectionPayload(requirement)
+        const choicePayload = isGravitySingularityUseExAction(action) ? { choiceId: selectedExChoiceId } : {}
         return {
           ...basePayload,
           targets: requirement?.boardObjectRequirement
             ? boardSelectionPayload.targets
             : buildTargetRefs(selectedTargetKeys),
+          ...choicePayload,
           reason: normalizeOptionalText(selectedReason),
         }
       }
@@ -1278,6 +1314,7 @@
           discardIds: selectedIdsField === 'discardIds' ? selectedDiscardIds : [],
           selectedIds: selectedIdsField === 'selectedIds' ? selectedPendingIds : [],
           cardId: selectedIdsField === 'cardId' ? (selectedPendingIds[0] ?? null) : null,
+          choiceId: selectedIdsField === 'choiceId' ? (selectedPendingIds[0] ?? '') : basePayload.choiceId,
           orderedActorKeys: selectedIdsField === 'orderedActorKeys' ? orderedActorKeys : [],
           tieGroupIndex: schema?.groupIndex ?? null,
           reason: normalizeOptionalText(selectedReason),
@@ -1573,12 +1610,18 @@
     selectedDiscardIds = []
     selectedFieldIds = []
     selectedPendingIds = []
+    selectedExChoiceId = null
     orderedActorKeys = []
   }
 
   function handleResolvePendingDecision() {
     selectedActionId = 'combat.resolvePending'
     void executeAction('combat.resolvePending')
+  }
+
+  function handleResolvePendingChoice(choiceId: string) {
+    selectedPendingIds = [choiceId]
+    handleResolvePendingDecision()
   }
 
   function handleResolveReactionCard(cardId: string) {
@@ -1589,6 +1632,16 @@
   function handleSkipPendingDecision() {
     selectedPendingIds = []
     handleResolvePendingDecision()
+  }
+
+  function handleSelectExChoice(choiceId: string) {
+    selectedExChoiceId = selectedExChoiceId === choiceId ? null : choiceId
+    actionErrorMessage = null
+  }
+
+  function handleUseEx() {
+    selectedActionId = 'combat.useEx'
+    void executeAction('combat.useEx')
   }
 
   function handlePopState() {
@@ -1638,6 +1691,7 @@
   const selectedAction = $derived.by(() =>
     screen && selectedActionId ? findCombatAction(screen, selectedActionId) : null,
   )
+  const exChoiceOptions = $derived.by(() => getExChoiceOptions(selectedAction))
   const selectedActionRequirement = $derived.by(() => getSelectedActionRequirementView(selectedAction))
   const selectedRequirementView = $derived.by(() => {
     if (!selectedAction?.metadata) {
@@ -1959,6 +2013,8 @@
           {canResolvePendingCommand}
           {selectedCount}
           {selectedReason}
+          {selectedExChoiceId}
+          {exChoiceOptions}
           {boardCountChoiceOptions}
           {boardCountChoiceRequired}
           {visiblePlayerView}
@@ -1981,8 +2037,11 @@
           onTogglePendingSelectedId={handleTogglePendingSelectedId}
           onToggleOrderedActorKey={handleToggleOrderedActorKey}
           onResolvePendingDecision={handleResolvePendingDecision}
+          onResolvePendingChoice={handleResolvePendingChoice}
           onResolveReactionCard={handleResolveReactionCard}
           onSkipPendingDecision={handleSkipPendingDecision}
+          onSelectExChoice={handleSelectExChoice}
+          onUseEx={handleUseEx}
           onToggleSelectedId={handleToggleFieldId}
           canToggleSelectedId={(instanceId) => canToggleBoardSelectionKey(fieldSelectionKey(instanceId))}
           onRetryEvents={() => void refreshCombatScreen('action-failure')}

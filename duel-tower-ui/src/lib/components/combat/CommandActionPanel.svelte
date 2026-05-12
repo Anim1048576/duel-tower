@@ -31,6 +31,8 @@
     canResolvePendingCommand: boolean
     selectedCount: number | null
     selectedReason: string
+    selectedExChoiceId: string | null
+    exChoiceOptions: readonly { id: string; label: string; description: string }[]
     boardCountChoiceOptions: readonly number[]
     boardCountChoiceRequired: boolean
     onCommandButtonClick: (actionId: CombatActionId) => void
@@ -41,8 +43,11 @@
     onTogglePendingSelectedId: (value: string) => void
     onToggleOrderedActorKey: (actorKey: string) => void
     onResolvePendingDecision: () => void
+    onResolvePendingChoice: (choiceId: string) => void
     onResolveReactionCard: (cardId: string) => void
     onSkipPendingDecision: () => void
+    onSelectExChoice: (choiceId: string) => void
+    onUseEx: () => void
   }
 
   let {
@@ -68,6 +73,8 @@
     canResolvePendingCommand,
     selectedCount,
     selectedReason,
+    selectedExChoiceId,
+    exChoiceOptions,
     boardCountChoiceOptions,
     boardCountChoiceRequired,
     onCommandButtonClick,
@@ -78,8 +85,11 @@
     onTogglePendingSelectedId,
     onToggleOrderedActorKey,
     onResolvePendingDecision,
+    onResolvePendingChoice,
     onResolveReactionCard,
     onSkipPendingDecision,
+    onSelectExChoice,
+    onUseEx,
   }: Props = $props()
 
   function handleCountInput(event: Event) {
@@ -167,6 +177,35 @@
     />
   </div>
 
+  {#if selectedCommandType === 'combat.useEx' && exChoiceOptions.length > 0}
+    <div class="command-action-panel__zone-panel command-action-panel__zone-panel--choice">
+      <strong>중력 특이점 증강</strong>
+      <div class="command-action-panel__choice-list">
+        {#each exChoiceOptions as option (option.id)}
+          <button
+            type="button"
+            class="command-action-panel__choice-button"
+            class:selected={selectedExChoiceId === option.id}
+            disabled={commandPending !== null}
+            onclick={() => onSelectExChoice(option.id)}
+          >
+            <span>{option.label}</span>
+            <small>{option.description}</small>
+          </button>
+        {/each}
+      </div>
+      <div class="command-action-panel__actions">
+        <button
+          type="button"
+          disabled={commandPending !== null || isSelectedCommandDisabled()}
+          onclick={() => onUseEx()}
+        >
+          {commandPending === 'combat.useEx' ? 'EX 사용 중...' : '선택한 증강으로 EX 사용'}
+        </button>
+      </div>
+    </div>
+  {/if}
+
   <div class="command-action-panel__zone-panel">
     <strong>Command helper inputs</strong>
     {#if boardCountChoiceOptions.length > 0}
@@ -228,6 +267,36 @@
           title="Pending decision is read-only"
           message={unsupportedPendingDecisionMessage}
         />
+      {:else if pendingDecision.type === 'EVENT_HORIZON'}
+        <div class="command-action-panel__last-words">
+          <div class="command-action-panel__last-words-heading">
+            <strong>사건의 지평선 선택</strong>
+            {#if pendingDecision.reason}
+              <p class="command-action-panel__pending-note">{pendingDecision.reason}</p>
+            {/if}
+          </div>
+
+          <div class="command-action-panel__choice-list">
+            <button
+              type="button"
+              class="command-action-panel__choice-button"
+              disabled={!canResolvePendingCommand || commandPending !== null}
+              onclick={() => onResolvePendingChoice('TAKE_DAMAGE')}
+            >
+              <span>최대 체력 40% 피해를 받는다</span>
+              <small>사건의 지평선 피해로 처리됩니다.</small>
+            </button>
+            <button
+              type="button"
+              class="command-action-panel__choice-button"
+              disabled={!canResolvePendingCommand || commandPending !== null}
+              onclick={() => onResolvePendingChoice('REMOVE_STATUS')}
+            >
+              <span>사건의 지평선을 해제한다</span>
+              <small>상태를 제거하고 pending을 해결합니다.</small>
+            </button>
+          </div>
+        </div>
       {:else if pendingDecision.type === 'LAST_WORDS'}
         <div class="command-action-panel__last-words">
           <div class="command-action-panel__last-words-heading">
@@ -578,11 +647,36 @@
       rgba(12, 11, 10, 0.28);
   }
 
+  .command-action-panel__zone-panel--choice {
+    border-color: rgba(226, 193, 155, 0.42);
+  }
+
   .command-action-panel__tag-row,
-  .command-action-panel__actions {
+  .command-action-panel__actions,
+  .command-action-panel__choice-list {
     display: flex;
     flex-wrap: wrap;
     gap: 0.65rem;
+  }
+
+  .command-action-panel__choice-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .command-action-panel__choice-button {
+    min-height: 3rem;
+    padding: 0.7rem 0.85rem;
+    display: grid;
+    gap: 0.25rem;
+    text-align: left;
+    border: 1px solid var(--combat-border, var(--color-border));
+    background: rgba(16, 14, 12, 0.58);
+    color: var(--combat-text, var(--color-text));
+  }
+
+  .command-action-panel__choice-button small {
+    color: var(--combat-text-soft, var(--color-text-soft));
   }
 
   .command-action-panel__last-words,

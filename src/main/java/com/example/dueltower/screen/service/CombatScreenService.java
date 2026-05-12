@@ -884,6 +884,7 @@ public class CombatScreenService {
                 case "LAST_WORDS" -> "LAST_WORDS";
                 case "REACTION_CARD" -> "RESOLVE_REACTION";
                 case "INITIATIVE_TIE_ORDER" -> "RESOLVE_INITIATIVE_TIE";
+                case "EVENT_HORIZON" -> "RESOLVE_EVENT_HORIZON";
                 default -> null;
             };
         }
@@ -1382,6 +1383,11 @@ public class CombatScreenService {
                 schema.put("actorKeys", pendingDecision.actorKeys());
                 schema.put("selectedIdsField", "orderedActorKeys");
             }
+            case "EVENT_HORIZON" -> {
+                schema.put("candidateIds", pendingDecision.candidateIds());
+                schema.put("choiceIds", pendingDecision.candidateIds());
+                schema.put("selectedIdsField", "choiceId");
+            }
             default -> {
                 schema.put("candidateIds", pendingDecision.candidateIds());
                 schema.put("actorKeys", pendingDecision.actorKeys());
@@ -1632,7 +1638,7 @@ public class CombatScreenService {
             return "Pending decision type is missing.";
         }
         return switch (pendingType) {
-            case "DISCARD_TO_HAND_LIMIT", "SEARCH_PICK", "LAST_WORDS", "REACTION_CARD", "INITIATIVE_TIE_ORDER" -> null;
+            case "DISCARD_TO_HAND_LIMIT", "SEARCH_PICK", "LAST_WORDS", "REACTION_CARD", "INITIATIVE_TIE_ORDER", "EVENT_HORIZON" -> null;
             default -> pendingType + " is not supported in this combat step yet.";
         };
     }

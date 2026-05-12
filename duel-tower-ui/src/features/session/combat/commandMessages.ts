@@ -39,6 +39,7 @@ export function getUnsupportedPendingDecisionMessage(pendingDecision: PendingDec
     case 'INITIATIVE_TIE_ORDER':
     case 'LAST_WORDS':
     case 'REACTION_CARD':
+    case 'EVENT_HORIZON':
       return null
     default:
       return `${pendingDecision.type} is not supported in this step yet.`

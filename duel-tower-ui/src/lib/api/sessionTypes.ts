@@ -42,9 +42,12 @@ export type OwnedCardDto = {
 export type PendingDecisionDto = {
   type: string | null
   reason: string | null
+  playerId?: string | null
+  statusId?: string | null
   limit: number | null
   pickCount: number | null
   candidateIds: string[]
+  choiceIds?: string[]
   destination: string | null
   shuffleAfterPick: boolean | null
   groupIndex: number | null

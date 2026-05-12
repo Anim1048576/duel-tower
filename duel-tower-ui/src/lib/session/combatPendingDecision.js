@@ -25,9 +25,12 @@ export function createCombatPendingDecisionView(metadata) {
   return {
     type: metadata.pendingDecisionType,
     reason: schema?.reason ?? null,
+    playerId: schema?.playerId ?? null,
+    statusId: schema?.statusId ?? null,
     limit: schema?.discardCount ?? null,
     pickCount: schema?.pickCount ?? null,
     candidateIds: schema?.candidateIds ?? [],
+    choiceIds: schema?.choiceIds ?? schema?.candidateIds ?? [],
     candidateCards: schema?.candidateCards ?? null,
     canSkip: schema?.canSkip ?? null,
     destination: schema?.destination ?? null,
