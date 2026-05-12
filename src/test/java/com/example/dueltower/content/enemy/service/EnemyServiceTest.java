@@ -42,6 +42,26 @@ class EnemyServiceTest {
     }
 
     @Test
+    void blankEnemyNameFails() {
+        EnemyDefinition definition = new EnemyDefinition(
+                "E001_TEST",
+                " ",
+                EnemyRole.NORMAL,
+                "",
+                new EnemyStatsDefinition(1, 0, 0, 0),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+
+        assertThatThrownBy(() -> service(List.of(definition)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("enemy field must not be blank")
+                .hasMessageContaining("E001_TEST")
+                .hasMessageContaining("name");
+    }
+
+    @Test
     void maxHpMustBePositive() {
         assertThatInvalidStat(enemyWithStats(new EnemyStatsDefinition(0, 0, 0, 0)), "maxHp");
     }

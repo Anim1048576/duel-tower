@@ -117,4 +117,48 @@ class EncounterTableConfigTest {
 
         assertEquals("duplicate enemy instance id in encounter: encounterId=T-1, instanceId=TE-1", ex.getMessage());
     }
+
+    @Test
+    void throwsWhenEnemyDefIdIsBlank() {
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> EncounterTables.load(new ByteArrayResource("""
+                {
+                  "fallbackEncounterId": "T-1",
+                  "encounters": [
+                    {
+                      "encounterId": "T-1",
+                      "enemies": [
+                        {
+                          "enemyDefId": " ",
+                          "instanceId": "TE-1"
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """.getBytes(StandardCharsets.UTF_8))));
+
+        assertEquals("encounter enemyDefId must not be blank", ex.getMessage());
+    }
+
+    @Test
+    void throwsWhenInstanceIdIsBlank() {
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> EncounterTables.load(new ByteArrayResource("""
+                {
+                  "fallbackEncounterId": "T-1",
+                  "encounters": [
+                    {
+                      "encounterId": "T-1",
+                      "enemies": [
+                        {
+                          "enemyDefId": "E001_TEST",
+                          "instanceId": " "
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """.getBytes(StandardCharsets.UTF_8))));
+
+        assertEquals("encounter instanceId must not be blank", ex.getMessage());
+    }
 }
