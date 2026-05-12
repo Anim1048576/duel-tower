@@ -30,7 +30,7 @@ public final class DamageOps {
             int amount,
             DamageFlags flags
     ) {
-        apply(state, ctx, out, sourceRef, null, source, target, amount, flags);
+        applyInternal(state, ctx, out, sourceRef, null, source, null, target, amount, flags);
     }
 
     public static void apply(
@@ -40,6 +40,36 @@ public final class DamageOps {
             TargetRef sourceRef,
             Ids.CardInstId sourceCardId,
             String source,
+            TargetRef target,
+            int amount,
+            DamageFlags flags
+    ) {
+        applyInternal(state, ctx, out, sourceRef, sourceCardId, source, null, target, amount, flags);
+    }
+
+    public static void apply(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef sourceRef,
+            Ids.CardInstId sourceCardId,
+            String source,
+            String sourceStatusId,
+            TargetRef target,
+            int amount,
+            DamageFlags flags
+    ) {
+        applyInternal(state, ctx, out, sourceRef, sourceCardId, source, sourceStatusId, target, amount, flags);
+    }
+
+    private static void applyInternal(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            TargetRef sourceRef,
+            Ids.CardInstId sourceCardId,
+            String source,
+            String sourceStatusId,
             TargetRef target,
             int amount,
             DamageFlags flags
@@ -66,7 +96,7 @@ public final class DamageOps {
 
         // 1) '받는 피해' 변형 순서: passive -> status(대상 상태 + 대상 진영 상태)
         remaining = PassiveOps.onIncomingDamage(state, ctx, out, sourceRef, target, remaining, source);
-        remaining = applyIncoming(state, ctx, rt, sourceRef, target, remaining, f);
+        remaining = applyIncoming(state, ctx, rt, sourceRef, target, remaining, f, sourceStatusId);
         remaining = Math.max(0, remaining + EquipmentCombatOps.incomingDamageBonus(state, target, ctx));
         if (remaining <= 0) return;
 
@@ -143,7 +173,8 @@ public final class DamageOps {
             TargetRef sourceRef,
             TargetRef target,
             int amount,
-            DamageFlags flags
+            DamageFlags flags,
+            String sourceStatusId
     ) {
         int cur = amount;
         List<HookEntry> entries = new ArrayList<>();
@@ -178,7 +209,7 @@ public final class DamageOps {
             if (!ctx.hasStatusEffect(k)) continue;
             int stacks = rt.stacks(it.owner(), k);
             if (stacks <= 0) continue;
-            cur = ctx.statusEffect(k).onIncomingDamage(rt, it.owner(), sourceRef, target, cur);
+            cur = ctx.statusEffect(k).onIncomingDamage(rt, it.owner(), sourceRef, target, cur, sourceStatusId);
         }
         return Math.max(cur, 0);
     }

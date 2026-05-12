@@ -153,6 +153,19 @@ public final class StateMapper {
                     List.of(),
                     rc.skippable()
             );
+        } else if (ps.pendingDecision() instanceof PendingDecision.EventHorizonChoice eh) {
+            pending = new PendingDecisionDto(
+                    "EVENT_HORIZON",
+                    eh.reason(),
+                    null,
+                    null,
+                    List.copyOf(eh.choiceIds()),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+            );
         }
 
         return new PlayerStateDto(

@@ -117,6 +117,7 @@ public final class VictoryOps {
         if (pd instanceof PendingDecision.JudgementChoice) return "JUDGEMENT";
         if (pd instanceof PendingDecision.LastWordsChoice) return "LAST_WORDS";
         if (pd instanceof PendingDecision.ReactionCard) return "REACTION_CARD";
+        if (pd instanceof PendingDecision.EventHorizonChoice) return "EVENT_HORIZON";
         return "UNKNOWN";
     }
 }

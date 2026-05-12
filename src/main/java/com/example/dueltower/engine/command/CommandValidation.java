@@ -46,7 +46,7 @@ public final class CommandValidation {
             errors.add("player is battle incapacitated");
         }
 
-        if (ps.pendingDecision() != null) errors.add("pending decision exists");
+        if (ps.pendingDecision() != null || hasEventHorizonPendingDecision(state)) errors.add("pending decision exists");
         return ps;
     }
 
@@ -84,5 +84,10 @@ public final class CommandValidation {
 
     public static boolean hasAnyPendingDecision(GameState state) {
         return state.players().values().stream().anyMatch(ps -> ps.pendingDecision() != null);
+    }
+
+    private static boolean hasEventHorizonPendingDecision(GameState state) {
+        return state.players().values().stream()
+                .anyMatch(ps -> ps.pendingDecision() instanceof PendingDecision.EventHorizonChoice);
     }
 }

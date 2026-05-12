@@ -148,6 +148,13 @@ public enum SessionCommandType {
             return new ResolveJudgementCommand(commandId, expectedVersion, commandPlayerId(req), choiceId);
         }
     },
+    RESOLVE_EVENT_HORIZON("RESOLVE_EVENT_HORIZON", SessionCommandAuth.PLAYER, false) {
+        @Override
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+            String choiceId = requireText(req.trimmedChoiceId(), "choiceId");
+            return new ResolveEventHorizonCommand(commandId, expectedVersion, commandPlayerId(req), choiceId);
+        }
+    },
     SURRENDER_COMBAT("SURRENDER_COMBAT", SessionCommandAuth.PLAYER, false) {
         @Override
         public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {

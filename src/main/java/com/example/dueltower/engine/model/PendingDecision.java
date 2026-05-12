@@ -3,7 +3,7 @@ package com.example.dueltower.engine.model;
 import java.util.Objects;
 import java.util.UUID;
 
-public sealed interface PendingDecision permits PendingDecision.DiscardToHandLimit, PendingDecision.SearchPick, PendingDecision.InitiativeTieOrder, PendingDecision.JudgementChoice, PendingDecision.LastWordsChoice, PendingDecision.ReactionCard {
+public sealed interface PendingDecision permits PendingDecision.DiscardToHandLimit, PendingDecision.SearchPick, PendingDecision.InitiativeTieOrder, PendingDecision.JudgementChoice, PendingDecision.LastWordsChoice, PendingDecision.ReactionCard, PendingDecision.EventHorizonChoice {
     record DiscardToHandLimit(String reason, int limit) implements PendingDecision {
         public DiscardToHandLimit {
             Objects.requireNonNull(reason);
@@ -112,6 +112,28 @@ public sealed interface PendingDecision permits PendingDecision.DiscardToHandLim
                 throw new IllegalArgumentException("candidateIds must not be empty");
             }
             Objects.requireNonNull(context);
+        }
+    }
+
+    record EventHorizonChoice(
+            String reason,
+            Ids.PlayerId playerId,
+            java.util.List<String> choiceIds
+    ) implements PendingDecision {
+        public EventHorizonChoice {
+            Objects.requireNonNull(reason);
+            Objects.requireNonNull(playerId);
+            Objects.requireNonNull(choiceIds);
+            choiceIds = java.util.List.copyOf(choiceIds);
+            if (choiceIds.isEmpty()) {
+                throw new IllegalArgumentException("choiceIds must not be empty");
+            }
+            if (choiceIds.stream().anyMatch(id -> id == null || id.isBlank())) {
+                throw new IllegalArgumentException("choiceIds must not contain blank");
+            }
+            if (choiceIds.size() != new java.util.LinkedHashSet<>(choiceIds).size()) {
+                throw new IllegalArgumentException("choiceIds must be unique");
+            }
         }
     }
 

@@ -13,6 +13,17 @@ public interface StatusEffect {
         return amount;
     }
 
+    default int onIncomingDamage(
+            StatusRuntime rt,
+            StatusOwnerRef owner,
+            TargetRef source,
+            TargetRef target,
+            int amount,
+            String sourceStatusId
+    ) {
+        return onIncomingDamage(rt, owner, source, target, amount);
+    }
+
     /** 상태가 '주는 피해'를 변형할 수 있는 훅 */
     default int onOutgoingDamage(StatusRuntime rt, StatusOwnerRef owner, TargetRef source, TargetRef target, int amount) {
         return amount;
