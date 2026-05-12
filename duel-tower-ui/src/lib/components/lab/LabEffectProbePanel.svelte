@@ -8,8 +8,8 @@
   } from '../../api/labTypes'
   import { getApiErrorMessage } from '../../api/types'
   import ContentStatePanel from '../ContentStatePanel.svelte'
+  import LabProbeResultPanel from './LabProbeResultPanel.svelte'
   import SectionFrame from '../SectionFrame.svelte'
-  import StatBlock from '../StatBlock.svelte'
   import TagChip from '../TagChip.svelte'
 
   type ProbeTargetKind = 'ENEMY' | 'PLAYER'
@@ -47,22 +47,10 @@
   let formErrors = $state<string[]>([])
   let probeErrorMessage = $state<string | null>(null)
   let probeResult = $state<LabEffectProbeResponse | null>(null)
+  let lastRequest = $state<LabEffectProbeRequest | null>(null)
 
   const selectedCard = $derived.by(() =>
     cards.find((card) => card.cardId === selectedCardId) ?? null,
-  )
-
-  const beforeText = $derived.by(() =>
-    probeResult ? JSON.stringify(probeResult.before, null, 2) : 'No before snapshot yet.',
-  )
-  const afterText = $derived.by(() =>
-    probeResult ? JSON.stringify(probeResult.after, null, 2) : 'No after snapshot yet.',
-  )
-  const changesText = $derived.by(() =>
-    probeResult ? JSON.stringify(probeResult.changes, null, 2) : 'No changes yet.',
-  )
-  const eventsText = $derived.by(() =>
-    probeResult ? JSON.stringify(probeResult.events, null, 2) : 'No events yet.',
   )
 
   onMount(() => {
@@ -216,6 +204,7 @@
 
     probeLoading = true
     probeErrorMessage = null
+    lastRequest = request
 
     try {
       const response = await probeLabEffect(request)
@@ -226,6 +215,29 @@
     } finally {
       probeLoading = false
     }
+  }
+
+  function applyPreset(preset: 'basic' | 'low' | 'high') {
+    if (preset === 'basic') {
+      actorAttackPower = 7
+      actorHealPower = 5
+      actorHp = 20
+      actorMaxHp = 20
+      targetKind = 'ENEMY'
+      targetId = 'dummy_enemy'
+      targetHp = 30
+      targetMaxHp = 30
+      return
+    }
+
+    if (preset === 'low') {
+      actorAttackPower = 3
+      actorHealPower = 3
+      return
+    }
+
+    actorAttackPower = 15
+    actorHealPower = 15
   }
 </script>
 
@@ -274,6 +286,20 @@
           <p>{selectedCard.text || 'No card text.'}</p>
         </article>
       {/if}
+    </SectionFrame>
+
+    <SectionFrame title="Presets" description="Presets only update request inputs. They do not run the API.">
+      <div class="lab-effect-probe-panel__actions">
+        <button type="button" onclick={() => applyPreset('basic')}>
+          Basic attacker
+        </button>
+        <button type="button" onclick={() => applyPreset('low')}>
+          Low stat
+        </button>
+        <button type="button" onclick={() => applyPreset('high')}>
+          High stat
+        </button>
+      </div>
     </SectionFrame>
 
     <SectionFrame title="Actor" description="Probe actor stats. These values are sent to the backend request.">
@@ -411,94 +437,13 @@
     </SectionFrame>
   </div>
 
-  <SectionFrame
-    title="Effect Probe result"
-    description="Displays backend validate, resolve, snapshots, changes, events, and notes without recalculation."
-  >
-    {#if probeResult}
-      <div class="lab-effect-probe-panel__result">
-        <div class="lab-effect-probe-panel__summary">
-          <StatBlock
-            value={probeResult.valid ? 'Valid' : 'Invalid'}
-            label="Validation"
-            note={`${probeResult.validationErrors.length} validation errors`}
-          />
-          <StatBlock
-            value={probeResult.resolved ? 'Resolved' : 'Not resolved'}
-            label="Resolve"
-            note={probeResult.cardName}
-          />
-          <StatBlock
-            value={probeResult.events.length}
-            label="Events"
-            note={`${probeResult.notes.length} backend notes`}
-          />
-        </div>
-
-        {#if probeResult.validationErrors.length > 0}
-          <div class="lab-effect-probe-panel__section">
-            <h3>Validation errors</h3>
-            <ul class="lab-effect-probe-panel__list">
-              {#each probeResult.validationErrors as error}
-                <li>{error}</li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
-
-        {#if probeResult.probeError}
-          <ContentStatePanel
-            title="Probe error"
-            message={probeResult.probeError}
-            tone="error"
-          />
-        {/if}
-
-        <div class="lab-effect-probe-panel__snapshot-grid">
-          <div class="lab-effect-probe-panel__section">
-            <h3>Before</h3>
-            <pre>{beforeText}</pre>
-          </div>
-          <div class="lab-effect-probe-panel__section">
-            <h3>After</h3>
-            <pre>{afterText}</pre>
-          </div>
-        </div>
-
-        <div class="lab-effect-probe-panel__section">
-          <h3>Changes</h3>
-          <pre>{changesText}</pre>
-        </div>
-
-        <div class="lab-effect-probe-panel__section">
-          <h3>Events</h3>
-          <pre>{eventsText}</pre>
-        </div>
-
-        <div class="lab-effect-probe-panel__section">
-          <h3>Notes</h3>
-          <ul class="lab-effect-probe-panel__list">
-            {#each probeResult.notes as note}
-              <li>{note}</li>
-            {/each}
-          </ul>
-        </div>
-      </div>
-    {:else}
-      <ContentStatePanel
-        title="No probe response yet"
-        message="Choose a card, adjust actor and target inputs, then run Validate or Resolve."
-      />
-    {/if}
-  </SectionFrame>
+  <LabProbeResultPanel request={lastRequest} response={probeResult} />
 </div>
 
 <style>
   .lab-effect-probe-panel,
   .lab-effect-probe-panel__setup,
   .lab-effect-probe-panel__form,
-  .lab-effect-probe-panel__result,
-  .lab-effect-probe-panel__section,
   .lab-effect-probe-panel__advanced {
     display: grid;
     gap: 1.5rem;
@@ -509,9 +454,7 @@
     align-items: start;
   }
 
-  .lab-effect-probe-panel__field-grid,
-  .lab-effect-probe-panel__summary,
-  .lab-effect-probe-panel__snapshot-grid {
+  .lab-effect-probe-panel__field-grid {
     display: grid;
     gap: 1rem;
   }
@@ -519,15 +462,6 @@
   .lab-effect-probe-panel__field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-bottom: 1rem;
-  }
-
-  .lab-effect-probe-panel__summary,
-  .lab-effect-probe-panel__snapshot-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .lab-effect-probe-panel__summary {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .lab-effect-probe-panel label,
@@ -595,14 +529,11 @@
 
   .lab-effect-probe-panel__card h3,
   .lab-effect-probe-panel__card p,
-  .lab-effect-probe-panel__section h3,
-  .lab-effect-probe-panel__list,
   .lab-effect-probe-panel__errors {
     margin: 0;
   }
 
-  .lab-effect-probe-panel__card h3,
-  .lab-effect-probe-panel__section h3 {
+  .lab-effect-probe-panel__card h3 {
     font-family: var(--font-display);
     font-size: 1.2rem;
   }
@@ -615,7 +546,6 @@
   }
 
   .lab-effect-probe-panel__card > p,
-  .lab-effect-probe-panel__list,
   .lab-effect-probe-panel__errors {
     color: var(--color-text-soft);
     line-height: 1.6;
@@ -637,33 +567,12 @@
     margin-top: 1rem;
   }
 
-  .lab-effect-probe-panel__section {
-    border-top: 1px solid var(--color-border);
-    padding-top: 1rem;
-  }
-
-  .lab-effect-probe-panel pre {
-    min-height: 8rem;
-    max-height: 24rem;
-    overflow: auto;
-    margin: 0;
-    padding: 1rem;
-    border: 1px solid var(--color-border);
-    background: rgba(8, 7, 6, 0.38);
-    color: var(--color-text-soft);
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-
-  .lab-effect-probe-panel__list,
   .lab-effect-probe-panel__errors {
     padding-left: 1.2rem;
   }
 
   @media (max-width: 1120px) {
-    .lab-effect-probe-panel,
-    .lab-effect-probe-panel__summary,
-    .lab-effect-probe-panel__snapshot-grid {
+    .lab-effect-probe-panel {
       grid-template-columns: 1fr;
     }
   }
