@@ -63,6 +63,7 @@ public final class PlayerState {
     // ===== 전투 스탯(현재값) =====
     private int hp;     // 현재 체력
     private int ap;     // 현재 행동력
+    private Integer maxHpOverride;
 
     // ===== 상태/수치(스택) =====
     // 예: "취약"=2, "보호막"=5, "공격력증가"=3 ...
@@ -173,10 +174,18 @@ public final class PlayerState {
 
     // ===== 파생 전투 스탯(공식 그대로) =====
     public int maxHp() {
+        if (maxHpOverride != null) {
+            return maxHpOverride;
+        }
         // s = body*5 + skill*3 + 3
         int s = body * 5 + skill * 3 + 3;
         int soft = softCapInt(s, 40);          // ROUNDDOWN(MIN(s,40)+MAX(s-40,0)/2)
         return Math.max(soft, 20);             // max(..., 20)
+    }
+
+    public void overrideVitals(int hp, int maxHp) {
+        this.maxHpOverride = Math.max(1, maxHp);
+        this.hp = clamp(hp, 0, this.maxHpOverride);
     }
 
     public int maxAp() {

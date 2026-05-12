@@ -126,6 +126,7 @@ public final class SecurityPaths {
     public static final HttpMethod SESSION_DELETE_METHOD = HttpMethod.DELETE;
     public static final HttpMethod SESSION_UPDATE_METHOD = HttpMethod.PUT;
     public static final HttpMethod CONTENT_READ_METHOD = HttpMethod.GET;
+    public static final HttpMethod LAB_READ_METHOD = HttpMethod.GET;
     public static final HttpMethod LAB_WRITE_METHOD = HttpMethod.POST;
     public static final HttpMethod SCREEN_READ_METHOD = HttpMethod.GET;
 }

@@ -35,6 +35,7 @@ public class SecurityConfig {
                         .requestMatchers(SecurityPaths.PUBLIC_WEB).permitAll()
 
                         .requestMatchers(SecurityPaths.CONTENT_READ_METHOD, SecurityPaths.API_CONTENT).permitAll()
+                        .requestMatchers(SecurityPaths.LAB_READ_METHOD, SecurityPaths.API_LAB).permitAll()
                         .requestMatchers(SecurityPaths.LAB_WRITE_METHOD, SecurityPaths.API_LAB).permitAll()
 
                         .requestMatchers(SecurityPaths.AUTH_PUBLIC).permitAll()
