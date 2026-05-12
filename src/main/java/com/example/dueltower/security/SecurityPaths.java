@@ -15,6 +15,8 @@ public final class SecurityPaths {
 
     public static final String API_CONTENT = "/api/content/**";
 
+    public static final String API_LAB = "/api/lab/**";
+
     public static final String[] AUTH_PUBLIC = {
             "/api/auth/signup",
             "/api/auth/login"
@@ -124,5 +126,6 @@ public final class SecurityPaths {
     public static final HttpMethod SESSION_DELETE_METHOD = HttpMethod.DELETE;
     public static final HttpMethod SESSION_UPDATE_METHOD = HttpMethod.PUT;
     public static final HttpMethod CONTENT_READ_METHOD = HttpMethod.GET;
+    public static final HttpMethod LAB_WRITE_METHOD = HttpMethod.POST;
     public static final HttpMethod SCREEN_READ_METHOD = HttpMethod.GET;
 }
