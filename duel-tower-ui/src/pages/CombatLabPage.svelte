@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getLabEffectCards, probeLabEffect, rollLabDice } from '../lib/api/lab'
+  import { getLabEffectCards, probeLabEffect } from '../lib/api/lab'
   import type {
     LabDiceResponse,
     LabEffectCardOptionDto,
@@ -7,6 +7,7 @@
   } from '../lib/api/labTypes'
   import { getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
+  import LabDicePanel from '../lib/components/lab/LabDicePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
@@ -14,13 +15,7 @@
   type LabTab = 'dice' | 'effect-probe'
 
   let activeTab = $state<LabTab>('dice')
-
-  let notation = $state('3d6+2')
-  let rollCount = $state(20)
-  let seed = $state('')
-  let diceLoading = $state(false)
-  let diceErrorMessage = $state<string | null>(null)
-  let diceResult = $state<LabDiceResponse | null>(null)
+  let lastDiceResult = $state<LabDiceResponse | null>(null)
 
   let cardsLoading = $state(false)
   let cardsErrorMessage = $state<string | null>(null)
@@ -39,38 +34,9 @@
     effectCards.find((card) => card.cardId === selectedCardId) ?? effectCards[0] ?? null,
   )
 
-  const diceResultText = $derived.by(() =>
-    diceResult ? JSON.stringify(diceResult, null, 2) : 'No dice response yet.',
-  )
-
   const probeResultText = $derived.by(() =>
     probeResult ? JSON.stringify(probeResult, null, 2) : 'No effect probe response yet.',
   )
-
-  function normalizeOptionalNumber(value: string) {
-    const normalized = value.trim()
-    if (!normalized) return null
-    const parsed = Number(normalized)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-
-  async function submitDice() {
-    diceLoading = true
-    diceErrorMessage = null
-
-    try {
-      diceResult = await rollLabDice({
-        notation,
-        rollCount,
-        seed: normalizeOptionalNumber(seed),
-      })
-    } catch (error) {
-      diceResult = null
-      diceErrorMessage = getApiErrorMessage(error, 'Unable to run the dice lab request.')
-    } finally {
-      diceLoading = false
-    }
-  }
 
   async function loadEffectCards() {
     cardsLoading = true
@@ -151,7 +117,7 @@
 
     <div class="combat-lab-page__stats">
       <StatBlock
-        value={diceResult ? diceResult.rollCount : '-'}
+        value={lastDiceResult ? lastDiceResult.rollCount : '-'}
         label="Dice rolls"
         note="Last backend dice response"
       />
@@ -182,41 +148,7 @@
   </section>
 
   {#if activeTab === 'dice'}
-    <div class="combat-lab-page__grid">
-      <SectionFrame title="Dice request" description="서버 Dice API로 표기와 roll 요청을 보냅니다.">
-        <form class="combat-lab-page__form" onsubmit={(event) => {
-          event.preventDefault()
-          void submitDice()
-        }}>
-          <label>
-            <span>Notation</span>
-            <input bind:value={notation} autocomplete="off" placeholder="3d6+2" />
-          </label>
-
-          <label>
-            <span>Roll count</span>
-            <input bind:value={rollCount} type="number" min="0" max="1000" />
-          </label>
-
-          <label>
-            <span>Seed</span>
-            <input bind:value={seed} autocomplete="off" placeholder="optional" />
-          </label>
-
-          <button type="submit" disabled={diceLoading}>
-            {diceLoading ? 'Running...' : 'Roll with API'}
-          </button>
-        </form>
-
-        {#if diceErrorMessage}
-          <ContentStatePanel title="Dice request failed" message={diceErrorMessage} tone="error" />
-        {/if}
-      </SectionFrame>
-
-      <SectionFrame title="Dice response" description="백엔드 응답을 그대로 표시합니다.">
-        <pre class="combat-lab-page__json">{diceResultText}</pre>
-      </SectionFrame>
-    </div>
+    <LabDicePanel onResultChange={(result) => (lastDiceResult = result)} />
   {:else}
     <div class="combat-lab-page__grid">
       <SectionFrame title="Effect Probe setup" description="Probe 가능한 카드 목록을 서버에서 불러옵니다.">
@@ -232,7 +164,7 @@
                 <option value="">No cards loaded</option>
               {:else}
                 {#each effectCards as card}
-                  <option value={card.cardId}>{card.cardId} · {card.name}</option>
+                  <option value={card.cardId}>{card.cardId} - {card.name}</option>
                 {/each}
               {/if}
             </select>
@@ -342,7 +274,6 @@
     gap: 0.4rem;
   }
 
-  .combat-lab-page__form input,
   .combat-lab-page__form select {
     min-height: 2.65rem;
     width: 100%;
