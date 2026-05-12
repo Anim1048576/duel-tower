@@ -1,6 +1,8 @@
 package com.example.dueltower.engine.core.effect.passive;
 
 import com.example.dueltower.common.util.Rational;
+import com.example.dueltower.engine.core.effect.status.StatusApplyContext;
+import com.example.dueltower.engine.core.effect.status.StatusApplyResult;
 import com.example.dueltower.engine.model.*;
 
 import java.util.List;
@@ -63,6 +65,12 @@ public interface PassiveEffect {
     default void validatePlayCard(PassiveRuntime rt, TargetRef actor, CardInstance ci, CardDefinition def, List<String> errors) {}
 
     default void onAfterPlayCard(PassiveRuntime rt, TargetRef actor, CardInstance ci, CardDefinition def) {}
+
+    default int onBeforeApplyStatus(PassiveRuntime rt, StatusApplyContext apply, int currentAmount) {
+        return currentAmount;
+    }
+
+    default void onAfterApplyStatus(PassiveRuntime rt, StatusApplyContext apply, StatusApplyResult result) {}
 
     default void onTurnEnd(PassiveRuntime rt, TargetRef owner) {}
 

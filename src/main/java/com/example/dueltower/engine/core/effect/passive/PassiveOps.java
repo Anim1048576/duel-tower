@@ -2,6 +2,8 @@ package com.example.dueltower.engine.core.effect.passive;
 
 import com.example.dueltower.common.util.Rational;
 import com.example.dueltower.engine.core.EngineContext;
+import com.example.dueltower.engine.core.effect.status.StatusApplyContext;
+import com.example.dueltower.engine.core.effect.status.StatusApplyResult;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -230,6 +232,38 @@ public final class PassiveOps {
             if (cur <= 0) return 0;
         }
         return Math.max(cur, 0);
+    }
+
+    public static int beforeApplyStatus(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            StatusApplyContext apply,
+            int currentAmount,
+            String hookSource
+    ) {
+        PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
+        int cur = currentAmount;
+        for (HookEntry it : collectEntries(state, ctx, apply.source())) {
+            if (!ctx.hasPassiveEffect(it.passiveId())) continue;
+            cur = ctx.passiveEffect(it.passiveId()).onBeforeApplyStatus(rt, apply, cur);
+        }
+        return cur;
+    }
+
+    public static void afterApplyStatus(
+            GameState state,
+            EngineContext ctx,
+            List<GameEvent> out,
+            StatusApplyContext apply,
+            StatusApplyResult result,
+            String hookSource
+    ) {
+        PassiveRuntime rt = new PassiveRuntime(state, ctx, out, hookSource);
+        for (HookEntry it : collectEntries(state, ctx, apply.source())) {
+            if (!ctx.hasPassiveEffect(it.passiveId())) continue;
+            ctx.passiveEffect(it.passiveId()).onAfterApplyStatus(rt, apply, result);
+        }
     }
 
     public static void turnStart(GameState state, EngineContext ctx, TargetRef owner, List<GameEvent> out, String source) {

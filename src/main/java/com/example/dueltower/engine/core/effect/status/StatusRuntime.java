@@ -3,11 +3,13 @@ package com.example.dueltower.engine.core.effect.status;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.combat.CombatEntityOps;
 import com.example.dueltower.engine.core.combat.DamageOps;
+import com.example.dueltower.engine.core.effect.passive.PassiveOps;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public final class StatusRuntime {
     private final GameState state;
@@ -78,6 +80,65 @@ public final class StatusRuntime {
     public void stacksAdd(StatusOwnerRef owner, String statusId, int delta) {
         if (delta == 0) return;
         stacksSet(owner, statusId, stacks(owner, statusId) + delta);
+    }
+
+    public StatusApplyResult applyStatus(StatusApplyContext context) {
+        Objects.requireNonNull(context, "context");
+
+        int requestedAmount = context.baseAmount();
+        int modifiedAmount = PassiveOps.beforeApplyStatus(
+                state,
+                ctx,
+                out,
+                context,
+                requestedAmount,
+                context.sourceLabel()
+        );
+
+        StatusApplyResult result = stacksAddWithResult(
+                context.owner(),
+                context.statusId(),
+                requestedAmount,
+                modifiedAmount
+        );
+
+        PassiveOps.afterApplyStatus(
+                state,
+                ctx,
+                out,
+                context,
+                result,
+                context.sourceLabel()
+        );
+        return result;
+    }
+
+    public StatusApplyResult stacksAddWithResult(StatusOwnerRef owner, String statusId, int delta) {
+        return stacksAddWithResult(owner, statusId, delta, delta);
+    }
+
+    public StatusApplyResult stacksAddWithResult(
+            StatusOwnerRef owner,
+            String statusId,
+            int requestedAmount,
+            int modifiedAmount
+    ) {
+        int before = stacks(owner, statusId);
+        int after = before + modifiedAmount;
+        if (modifiedAmount != 0) {
+            stacksSet(owner, statusId, after);
+        }
+        int actualAppliedAmount = Math.max(0, after - before);
+        return new StatusApplyResult(
+                owner,
+                statusId,
+                before,
+                requestedAmount,
+                modifiedAmount,
+                after,
+                before != after ? actualAppliedAmount : 0,
+                before != after
+        );
     }
 
     public Map<String, Integer> statusMap(TargetRef owner) {

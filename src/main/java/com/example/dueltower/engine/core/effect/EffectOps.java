@@ -8,6 +8,8 @@ import com.example.dueltower.engine.core.combat.HealOps;
 import com.example.dueltower.engine.core.effect.cardmodifier.CardModifierOps;
 import com.example.dueltower.engine.core.effect.keyword.KeywordOps;
 import com.example.dueltower.engine.core.effect.passive.PassiveOps;
+import com.example.dueltower.engine.core.effect.status.StatusApplyContext;
+import com.example.dueltower.engine.core.effect.status.StatusApplySourceKind;
 import com.example.dueltower.engine.core.effect.status.StatusRuntime;
 import com.example.dueltower.engine.core.effect.status.StatusOps;
 import com.example.dueltower.engine.core.targeting.TargetingOps;
@@ -129,7 +131,7 @@ public final class EffectOps {
         switch (scope) {
             case CHARACTER -> {
                 for (TargetRef ref : resolveTargets(t)) {
-                    rt.stacksAdd(StatusOwnerRef.of(ref), key, delta);
+                    rt.applyStatus(statusApplyContext(StatusOwnerRef.of(ref), key, delta));
                 }
             }
 
@@ -140,15 +142,36 @@ public final class EffectOps {
                     factions.add(CombatState.factionOf(ref));
                 }
                 for (CombatState.FactionId f : factions) {
-                    rt.stacksAdd(StatusOwnerRef.of(f), key, delta);
+                    rt.applyStatus(statusApplyContext(StatusOwnerRef.of(f), key, delta));
                 }
             }
 
             case CARD -> {
                 // 최소 구현: "지금 효과를 실행 중인 카드"에 부여
-                rt.stacksAdd(StatusOwnerRef.of(ec.cardId()), key, delta);
+                rt.applyStatus(statusApplyContext(StatusOwnerRef.of(ec.cardId()), key, delta));
             }
         }
+    }
+
+    private StatusApplyContext statusApplyContext(StatusOwnerRef owner, String key, int delta) {
+        CardInstance ci = ec.cardId() == null ? null : ec.state().card(ec.cardId());
+        CardDefinition def = ci == null ? null : ec.ctx().def(ci.defId());
+        StatusApplySourceKind sourceKind = StatusApplySourceKind.SYSTEM;
+        if (def != null) {
+            sourceKind = def.type() == CardType.EX ? StatusApplySourceKind.EX : StatusApplySourceKind.CARD;
+        }
+        return new StatusApplyContext(
+                ec.state(),
+                ec.ctx(),
+                ec.actorRef(),
+                owner,
+                key,
+                delta,
+                ec.cardId(),
+                def,
+                ec.sourceLabel(),
+                sourceKind
+        );
     }
 
     private List<TargetRef> resolveTargets(Target t) {
