@@ -15,6 +15,7 @@ export type PageKey =
   | 'character-create'
   | 'character-detail'
   | 'reference'
+  | 'combat-lab'
   | 'combat'
   | 'logs'
   | 'deck-editor'
@@ -57,6 +58,7 @@ export const routePaths = {
   inventory: '/inventory',
   shop: '/shop',
   reference: '/reference',
+  lab: '/lab',
   deckEditor: '/decks/editor',
   sessionEntry: '/lobby',
   sessionLobbyPlayer: '/lobby/player',
@@ -113,6 +115,7 @@ export const pathBuilders = {
       ? buildPathFromPattern(routePatterns.cardDetail, { id })
       : routePaths.cardLibrary,
   reference: () => routePaths.reference,
+  lab: () => routePaths.lab,
   deckEditor: (id?: string) =>
     hasRouteParam(id)
       ? buildPathFromPattern(routePatterns.deckEditor, { id })
@@ -190,6 +193,19 @@ export const PAGES: PageDefinition[] = [
     description: '키워드, 상태, 패시브 규칙을 확인합니다.',
   },
   {
+    key: 'combat-lab',
+    label: 'Combat Lab',
+    path: routePaths.lab,
+    title: 'Combat Lab',
+    description: '주사위, 카드 효과, 상태 조합을 실험합니다.',
+    eyebrow: 'Lab',
+    tags: [
+      { label: 'Dice', tone: 'accent' },
+      { label: 'Effect Probe', tone: 'success' },
+      { label: 'Build Test', tone: 'warning' },
+    ],
+  },
+  {
     key: 'combat',
     label: 'Combat',
     path: routePaths.combat,
@@ -263,6 +279,13 @@ export const APP_NAV_ITEMS = [
     label: 'Reference',
     path: routePaths.reference,
     description: '규칙 참고',
+    enabled: true,
+  },
+  {
+    key: 'combat-lab',
+    label: 'Lab',
+    path: routePaths.lab,
+    description: '주사위와 카드 효과 실험',
     enabled: true,
   },
   {
@@ -404,6 +427,23 @@ const activePageMap = new Map<string, PageDefinition>([
       description: '키워드, 상태, 패시브를 확인합니다.',
       eyebrow: 'Rules Codex',
       tags: [{ label: 'Codex', tone: 'accent' }],
+    },
+  ],
+  [
+    routePaths.lab,
+    {
+      key: 'combat-lab',
+      label: 'Combat Lab',
+      path: routePaths.lab,
+      area: 'app',
+      title: 'Combat Lab',
+      description: '주사위, 카드 효과, 상태 조합을 실험합니다.',
+      eyebrow: 'Lab',
+      tags: [
+        { label: 'Dice', tone: 'accent' },
+        { label: 'Effect Probe', tone: 'success' },
+        { label: 'Build Test', tone: 'warning' },
+      ],
     },
   ],
   [

@@ -5,6 +5,7 @@
   import CharacterDetailPage from './pages/CharacterDetailPage.svelte'
   import PublicEntryLayout from './layout/PublicEntryLayout.svelte'
   import CharacterListPage from './pages/CharacterListPage.svelte'
+  import CombatLabPage from './pages/CombatLabPage.svelte'
   import CombatCommandPage from './pages/CombatCommandPage.svelte'
   import DeckEditorPage from './pages/DeckEditorPage.svelte'
   import DeckListPage from './pages/DeckListPage.svelte'
@@ -42,6 +43,7 @@
     shop: ShopPage,
     'card-detail': CardDetailPage,
     reference: RulesReferencePage,
+    'combat-lab': CombatLabPage,
     'deck-editor': DeckEditorPage,
     lobby: SessionEntryPage,
     'player-lobby': PlayerLobbyPage,
