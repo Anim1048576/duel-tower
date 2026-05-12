@@ -1,0 +1,49 @@
+{
+  "enemies": [
+    {
+      "id": "E001_TRAINING_DUMMY",
+      "name": "훈련용 허수아비",
+      "role": "NORMAL",
+      "description": "A stationary enemy used to verify combat content loading.",
+      "stats": {
+        "maxHp": 30,
+        "maxActionPoint": 0,
+        "attackPower": 0,
+        "healPower": 0
+      },
+      "deck": [],
+      "startStatuses": [],
+      "passives": []
+    },
+    {
+      "id": "E002_TOWER_RAT",
+      "name": "탑쥐",
+      "role": "NORMAL",
+      "description": "A small tower enemy with basic combat stats.",
+      "stats": {
+        "maxHp": 18,
+        "maxActionPoint": 3,
+        "attackPower": 4,
+        "healPower": 0
+      },
+      "deck": [],
+      "startStatuses": [],
+      "passives": []
+    },
+    {
+      "id": "E003_GLASS_KNIGHT",
+      "name": "유리 기사",
+      "role": "ELITE",
+      "description": "A fragile elite enemy definition reserved for later encounter wiring.",
+      "stats": {
+        "maxHp": 42,
+        "maxActionPoint": 3,
+        "attackPower": 6,
+        "healPower": 0
+      },
+      "deck": [],
+      "startStatuses": [],
+      "passives": []
+    }
+  ]
+}

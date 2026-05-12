@@ -63,6 +63,10 @@ public class StatusService {
         return ContentLookupSupport.requireById(defsById, id, value -> value, "status");
     }
 
+    public boolean exists(String id) {
+        return defsById.containsKey(ContentLookupSupport.normalizeId(id));
+    }
+
     public List<StatusResponse> listForApi() {
         return list().stream()
                 .map(this::toResponse)

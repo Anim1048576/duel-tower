@@ -55,6 +55,10 @@ public class PassiveService {
         return ContentLookupSupport.requireById(defsById, id, value -> value, "passive");
     }
 
+    public boolean exists(String id) {
+        return defsById.containsKey(ContentLookupSupport.normalizeId(id));
+    }
+
     public List<PassiveResponse> listForApi() {
         return list().stream()
                 .map(this::toResponse)

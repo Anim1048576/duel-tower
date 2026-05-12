@@ -139,6 +139,10 @@ public class CardService {
         return requireBlueprint(id).playSpec();
     }
 
+    public boolean exists(CardDefId id) {
+        return id != null && id.value() != null && blueprintsById.containsKey(id);
+    }
+
     private CardBlueprint requireBlueprint(CardDefId id) {
         CardBlueprint blueprint = blueprintsById.get(id);
         if (blueprint == null) {
