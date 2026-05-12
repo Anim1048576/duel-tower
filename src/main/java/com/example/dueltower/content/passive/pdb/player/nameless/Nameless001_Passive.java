@@ -7,6 +7,7 @@ import com.example.dueltower.engine.core.effect.passive.PassiveRuntime;
 import com.example.dueltower.engine.core.effect.status.StatusApplyContext;
 import com.example.dueltower.engine.core.effect.status.StatusApplyResult;
 import com.example.dueltower.engine.model.PassiveDefinition;
+import com.example.dueltower.engine.model.StatusVisibility;
 import com.example.dueltower.engine.model.TargetRef;
 import org.springframework.stereotype.Component;
 
@@ -37,6 +38,10 @@ public class Nameless001_Passive implements PassiveBlueprint {
     @Override
     public void onAfterApplyStatus(PassiveRuntime rt, StatusApplyContext apply, StatusApplyResult result) {
         if (!(apply.source() instanceof TargetRef.Player)) return;
+        if (rt.ctx().hasStatusDef(apply.statusId())
+                && rt.ctx().statusDef(apply.statusId()).visibility() == StatusVisibility.IMPLEMENTATION) {
+            return;
+        }
         if (result.actualAppliedAmount() <= 0) return;
 
         int heal = result.actualAppliedAmount() / 3;

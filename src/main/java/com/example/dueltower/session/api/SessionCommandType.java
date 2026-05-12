@@ -63,7 +63,7 @@ public enum SessionCommandType {
     USE_EX("USE_EX", SessionCommandAuth.PLAYER, false) {
         @Override
         public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
-            return new UseExCommand(commandId, expectedVersion, commandPlayerId(req), parseTargetSelection(req));
+            return new UseExCommand(commandId, expectedVersion, commandPlayerId(req), parseTargetSelection(req), req.trimmedChoiceId());
         }
     },
     ENEMY_PLAY_CARD("ENEMY_PLAY_CARD", SessionCommandAuth.GM, false) {

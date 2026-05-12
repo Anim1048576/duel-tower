@@ -32,12 +32,18 @@ public final class UseExCommand implements GameCommand {
     private final long expectedVersion;
     private final PlayerId playerId;
     private final TargetSelection selection;
+    private final String choiceId;
 
     public UseExCommand(UUID commandId, long expectedVersion, PlayerId playerId, TargetSelection selection) {
+        this(commandId, expectedVersion, playerId, selection, null);
+    }
+
+    public UseExCommand(UUID commandId, long expectedVersion, PlayerId playerId, TargetSelection selection, String choiceId) {
         this.commandId = commandId;
         this.expectedVersion = expectedVersion;
         this.playerId = playerId;
         this.selection = (selection == null) ? TargetSelection.empty() : selection;
+        this.choiceId = (choiceId == null || choiceId.isBlank()) ? null : choiceId.trim();
     }
 
     @Override public UUID commandId() { return commandId; }
@@ -94,7 +100,7 @@ public final class UseExCommand implements GameCommand {
 
         // 카드 효과 validate(타겟 등)
         CardEffect eff = ctx.effect(ci.defId());
-        EffectContext ec = new EffectContext(state, ctx, playerId, exId, selection, dummyOut);
+        EffectContext ec = new EffectContext(state, ctx, playerId, exId, selection, choiceId, dummyOut);
         errors.addAll(eff.validate(ec));
 
         return errors;
@@ -133,7 +139,7 @@ public final class UseExCommand implements GameCommand {
 
         // 효과 실행
         CardEffect eff = ctx.effect(ci.defId());
-        EffectContext ec = new EffectContext(state, ctx, playerId, exId, selection, events);
+        EffectContext ec = new EffectContext(state, ctx, playerId, exId, selection, choiceId, events);
         eff.resolve(ec);
         LastWordsDecisionOps.openPendingIfPossible(ec, ps, events);
 

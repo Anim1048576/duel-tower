@@ -23,12 +23,14 @@ public record EffectContext(
         List<GameEvent> out,
         SummonInstId statSourceSummonId,
         SummonInstId actorSourceSummonId,
-        LastWordsBatchCollector lastWordsBatchCollector
+        LastWordsBatchCollector lastWordsBatchCollector,
+        String choiceId
 ) {
     public EffectContext {
         discardIds = (discardIds == null) ? List.of() : List.copyOf(discardIds);
         selectedIds = (selectedIds == null) ? List.of() : List.copyOf(selectedIds);
         lastWordsBatchCollector = (lastWordsBatchCollector == null) ? new LastWordsBatchCollector() : lastWordsBatchCollector;
+        choiceId = (choiceId == null || choiceId.isBlank()) ? null : choiceId.trim();
     }
 
     public EffectContext(
@@ -39,7 +41,19 @@ public record EffectContext(
             TargetSelection selection,
             List<GameEvent> out
     ) {
-        this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, null, null, null);
+        this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, null, null, null, null);
+    }
+
+    public EffectContext(
+            GameState state,
+            EngineContext ctx,
+            PlayerId actor,
+            CardInstId cardId,
+            TargetSelection selection,
+            String choiceId,
+            List<GameEvent> out
+    ) {
+        this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, null, null, null, choiceId);
     }
 
     public EffectContext(
@@ -51,7 +65,7 @@ public record EffectContext(
             List<GameEvent> out,
             LastWordsBatchCollector lastWordsBatchCollector
     ) {
-        this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, null, null, lastWordsBatchCollector);
+        this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, null, null, lastWordsBatchCollector, null);
     }
 
     public EffectContext(
@@ -63,7 +77,7 @@ public record EffectContext(
             List<GameEvent> out,
             SummonInstId statSourceSummonId
     ) {
-        this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, statSourceSummonId, null, null);
+        this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, statSourceSummonId, null, null, null);
     }
 
     public EffectContext(
@@ -76,7 +90,7 @@ public record EffectContext(
             SummonInstId statSourceSummonId,
             SummonInstId actorSourceSummonId
     ) {
-        this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, statSourceSummonId, actorSourceSummonId, null);
+        this(state, ctx, actor, cardId, selection, List.of(), List.of(), out, statSourceSummonId, actorSourceSummonId, null, null);
     }
 
     public EffectContext(
@@ -88,7 +102,7 @@ public record EffectContext(
             List<CardInstId> discardIds,
             List<GameEvent> out
     ) {
-        this(state, ctx, actor, cardId, selection, discardIds, List.of(), out, null, null, null);
+        this(state, ctx, actor, cardId, selection, discardIds, List.of(), out, null, null, null, null);
     }
 
     public EffectContext(
@@ -102,7 +116,7 @@ public record EffectContext(
             List<GameEvent> out,
             LastWordsBatchCollector lastWordsBatchCollector
     ) {
-        this(state, ctx, actor, cardId, selection, discardIds, selectedIds, out, null, null, lastWordsBatchCollector);
+        this(state, ctx, actor, cardId, selection, discardIds, selectedIds, out, null, null, lastWordsBatchCollector, null);
     }
 
     public EffectContext(
@@ -115,7 +129,7 @@ public record EffectContext(
             List<CardInstId> selectedIds,
             List<GameEvent> out
     ) {
-        this(state, ctx, actor, cardId, selection, discardIds, selectedIds, out, null, null, null);
+        this(state, ctx, actor, cardId, selection, discardIds, selectedIds, out, null, null, null, null);
     }
 
     public EffectContext(
@@ -130,7 +144,23 @@ public record EffectContext(
             SummonInstId statSourceSummonId,
             SummonInstId actorSourceSummonId
     ) {
-        this(state, ctx, actor, cardId, selection, discardIds, selectedIds, out, statSourceSummonId, actorSourceSummonId, null);
+        this(state, ctx, actor, cardId, selection, discardIds, selectedIds, out, statSourceSummonId, actorSourceSummonId, null, null);
+    }
+
+    public EffectContext(
+            GameState state,
+            EngineContext ctx,
+            PlayerId actor,
+            CardInstId cardId,
+            TargetSelection selection,
+            List<CardInstId> discardIds,
+            List<CardInstId> selectedIds,
+            List<GameEvent> out,
+            SummonInstId statSourceSummonId,
+            SummonInstId actorSourceSummonId,
+            String choiceId
+    ) {
+        this(state, ctx, actor, cardId, selection, discardIds, selectedIds, out, statSourceSummonId, actorSourceSummonId, null, choiceId);
     }
 
     public TargetRef actorRef() {
@@ -169,7 +199,8 @@ public record EffectContext(
                 out,
                 statSourceSummonId,
                 actorSourceSummonId,
-                lastWordsBatchCollector
+                lastWordsBatchCollector,
+                choiceId
         );
     }
 }

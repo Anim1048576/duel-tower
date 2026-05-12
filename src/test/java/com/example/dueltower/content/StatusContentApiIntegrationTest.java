@@ -3,6 +3,7 @@ package com.example.dueltower.content;
 import com.example.dueltower.content.meta.ContentOwnerIds;
 import com.example.dueltower.content.status.sdb.S901_InstalledFieldBuff;
 import com.example.dueltower.content.status.sdb.S902_SummonFieldAura;
+import com.example.dueltower.content.status.sdb.player.nameless.Nameless203_EventHorizonUsed;
 import com.example.dueltower.content.status.sdb.player.tig.Tig202_Status;
 import com.example.dueltower.content.status.sdb.player.tig.Tig203_Status;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +36,7 @@ class StatusContentApiIntegrationTest {
                 .andExpect(jsonPath("$[*].id", not(hasItems(
                         Tig202_Status.ID,
                         Tig203_Status.ID,
+                        Nameless203_EventHorizonUsed.ID,
                         S901_InstalledFieldBuff.ID,
                         S902_SummonFieldAura.ID
                 ))))
@@ -49,6 +51,7 @@ class StatusContentApiIntegrationTest {
                 .andExpect(jsonPath("$[*].id", hasItems(
                         Tig202_Status.ID,
                         Tig203_Status.ID,
+                        Nameless203_EventHorizonUsed.ID,
                         S901_InstalledFieldBuff.ID,
                         S902_SummonFieldAura.ID
                 )))
