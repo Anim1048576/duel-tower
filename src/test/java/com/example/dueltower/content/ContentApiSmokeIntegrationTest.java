@@ -71,6 +71,17 @@ class ContentApiSmokeIntegrationTest {
     }
 
     @Test
+    @DisplayName("카드 목록 API는 무명 카드를 노출한다")
+    void cardsEndpointShouldExposeNamelessCards() throws Exception {
+        mockMvc.perform(get("/api/content/cards")
+                        .param("q", "Nameless001_Card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(greaterThan(0)))
+                .andExpect(jsonPath("$[0].id.value").value("Nameless001_Card"))
+                .andExpect(jsonPath("$[0].contentOwner").value(ContentOwnerIds.NAMELESS));
+    }
+
+    @Test
     @DisplayName("키워드 엔드포인트는 정상 응답과 비어 있지 않은 payload를 반환한다")
     void keywordsEndpointShouldReturnOkAndNonEmptyPayload() throws Exception {
         mockMvc.perform(get("/api/content/keywords"))

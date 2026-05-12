@@ -464,7 +464,7 @@ public final class EffectOps {
         return me;
     }
 
-    private int actorAttackPower() {
+    public int actorAttackPower() {
         if (ec.statSourceSummonId() != null) {
             SummonState summon = ec.state().summon(ec.statSourceSummonId());
             if (summon == null) throw new IllegalStateException("missing summon: " + ec.statSourceSummonId().value());
@@ -474,7 +474,7 @@ public final class EffectOps {
         return actor.attackPower() + EquipmentCombatOps.attackPowerBonus(actor, ec.ctx());
     }
 
-    private int actorHealPower() {
+    public int actorHealPower() {
         if (ec.statSourceSummonId() != null) {
             SummonState summon = ec.state().summon(ec.statSourceSummonId());
             if (summon == null) throw new IllegalStateException("missing summon: " + ec.statSourceSummonId().value());
