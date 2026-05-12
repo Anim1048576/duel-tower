@@ -33,7 +33,7 @@ public class Nameless202_EventHorizon implements StatusBlueprint {
         return new StatusDefinition(
                 id(),
                 "사건의 지평선",
-                StatusKind.NEUTRAL,
+                StatusKind.BUFF,
                 StatusScope.CHARACTER,
                 Set.of(),
                 0,

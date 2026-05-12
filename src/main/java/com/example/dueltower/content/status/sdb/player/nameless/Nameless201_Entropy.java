@@ -32,7 +32,7 @@ public class Nameless201_Entropy implements StatusBlueprint {
         return new StatusDefinition(
                 id(),
                 "엔트로피",
-                StatusKind.NEUTRAL,
+                StatusKind.BUFF,
                 StatusScope.CHARACTER,
                 Set.of(),
                 50,

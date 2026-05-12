@@ -37,6 +37,11 @@ class Nameless202EventHorizonTest {
     private static final Ids.CardDefId EX_DEF_ID = new Ids.CardDefId("EH_TestEx");
 
     @Test
+    void eventHorizonDefinitionIsBuff() {
+        assertEquals(StatusKind.BUFF, new Nameless202_EventHorizon().definition().kind());
+    }
+
+    @Test
     @DisplayName("사건의 지평선 상태에서는 일반 피해를 받지 않는다")
     void eventHorizonBlocksNormalDamage() {
         Fixture fx = new Fixture();

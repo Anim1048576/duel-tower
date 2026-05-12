@@ -30,7 +30,10 @@ class Nameless201EntropyTest {
     @Test
     @DisplayName("엔트로피는 StatusService에 자동 등록된다")
     void entropyStatusIsRegisteredByStatusService() {
-        assertEquals(Nameless201_Entropy.ID, statusService.get(Nameless201_Entropy.ID).id());
+        StatusDefinition definition = statusService.get(Nameless201_Entropy.ID);
+
+        assertEquals(Nameless201_Entropy.ID, definition.id());
+        assertEquals(StatusKind.BUFF, definition.kind());
         assertTrue(statusService.defsMap().containsKey(Nameless201_Entropy.ID));
         assertTrue(statusService.effectsMap().containsKey(Nameless201_Entropy.ID));
         assertTrue(statusService.list().stream().anyMatch(def -> def.id().equals(Nameless201_Entropy.ID)));
