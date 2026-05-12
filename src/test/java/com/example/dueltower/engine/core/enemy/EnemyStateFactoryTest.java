@@ -51,6 +51,17 @@ class EnemyStateFactoryTest {
     }
 
     @Test
+    void maxApClampsCurrentAp() {
+        EnemyState enemy = new EnemyState(new com.example.dueltower.engine.model.Ids.EnemyId("E-1"), 10);
+
+        enemy.maxAp(3);
+        enemy.ap(10);
+        enemy.maxAp(2);
+
+        assertThat(enemy.ap()).isEqualTo(2);
+    }
+
+    @Test
     void clampsScaledStats() {
         EncounterTableConfig.EnemyTemplate template = new EncounterTableConfig.EnemyTemplate(
                 "E001_TEST",

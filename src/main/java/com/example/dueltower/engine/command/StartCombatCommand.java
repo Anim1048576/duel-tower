@@ -230,6 +230,7 @@ public final class StartCombatCommand implements GameCommand {
         events.add(new GameEvent.LogAppended("런 인카운터가 선택되었다: " + encounter.encounterId()));
         for (EnemyState enemy : enemies) {
             state.enemies().put(enemy.enemyId(), enemy);
+            events.add(new GameEvent.LogAppended("encounter enemy placed: " + enemy.enemyId().value() + " (" + enemy.enemyDefId() + ")"));
             events.add(new GameEvent.LogAppended("런 인카운터 적이 배치되었다: " + enemy.enemyId().value()));
         }
     }
