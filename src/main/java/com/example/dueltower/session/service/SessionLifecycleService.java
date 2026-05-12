@@ -4,6 +4,7 @@ import com.example.dueltower.config.GameRules;
 import com.example.dueltower.config.RewardTableConfig;
 import com.example.dueltower.content.card.service.CardService;
 import com.example.dueltower.content.cardmodifier.service.CardModifierService;
+import com.example.dueltower.content.enemy.service.EnemyService;
 import com.example.dueltower.content.equip.service.EquipService;
 import com.example.dueltower.content.item.service.ItemService;
 import com.example.dueltower.content.keyword.service.KeywordService;
@@ -53,6 +54,7 @@ public class SessionLifecycleService {
     private final CardModifierService cardModifierService;
     private final ItemService itemService;
     private final EquipService equipService;
+    private final EnemyService enemyService;
     private final GameRules gameRules;
     private final RewardTableConfig rewardTableConfig;
     private final RunConfigs runConfigs;
@@ -70,6 +72,7 @@ public class SessionLifecycleService {
                                    CardModifierService cardModifierService,
                                    ItemService itemService,
                                    EquipService equipService,
+                                   EnemyService enemyService,
                                    GameRules gameRules,
                                    RewardTableConfig rewardTableConfig,
                                    RunConfigs runConfigs,
@@ -84,6 +87,7 @@ public class SessionLifecycleService {
         this.cardModifierService = cardModifierService;
         this.itemService = itemService;
         this.equipService = equipService;
+        this.enemyService = enemyService;
         this.gameRules = gameRules;
         this.rewardTableConfig = rewardTableConfig;
         this.runConfigs = runConfigs;
@@ -115,7 +119,8 @@ public class SessionLifecycleService {
                     gameRules,
                     rewardTableConfig,
                     encounterTables.encounterTableConfig(),
-                    runConfigs.runConfig()
+                    runConfigs.runConfig(),
+                    enemyService.defsMap()
             );
             GameState state = new GameState(new SessionId(UUID.randomUUID()), rnd.nextLong(), runConfigs.runConfig());
             SessionRuntime rt = new SessionRuntime(code, gmId, generateGmToken(), state, ctx);

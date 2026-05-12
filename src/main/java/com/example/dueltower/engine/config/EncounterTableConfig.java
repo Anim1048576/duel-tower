@@ -1,7 +1,5 @@
 package com.example.dueltower.engine.config;
 
-import com.example.dueltower.engine.model.EnemyState;
-import com.example.dueltower.engine.model.Ids;
 import com.example.dueltower.engine.model.RunState;
 
 import java.util.ArrayList;
@@ -9,7 +7,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Set;
 
 public record EncounterTableConfig(
         List<EncounterTemplate> encounters,
@@ -72,33 +69,19 @@ public record EncounterTableConfig(
         throw new IllegalStateException("encounter not found for floor=" + floor + ", phase=" + phase + ", fallback=" + fallbackEncounterId);
     }
 
-    public List<EnemyState> instantiateEncounterEnemies(RunState runState) {
-        EncounterTemplate template = selectEncounter(runState);
-        int floor = resolveFloor(runState);
-        int anchorFloor = template.minFloor() == null ? 1 : Math.max(1, template.minFloor());
-        int floorDelta = Math.max(0, floor - anchorFloor);
-
-        List<EnemyState> enemies = new ArrayList<>();
-        Set<String> usedEnemyIds = new LinkedHashSet<>();
-        for (EnemyTemplate enemyTemplate : template.enemies()) {
-            String enemyId = enemyTemplate.enemyId();
-            if (!usedEnemyIds.add(enemyId)) {
-                throw new IllegalStateException("duplicate enemy id in encounter template: " + enemyId);
-            }
-
-            EnemyState enemy = new EnemyState(new Ids.EnemyId(enemyId), enemyTemplate.resolveHp(floorDelta));
-            enemy.attackPower(enemyTemplate.resolveAttackPower(floorDelta));
-            enemy.healPower(enemyTemplate.resolveHealPower(floorDelta));
-            enemies.add(enemy);
-        }
-        return enemies;
-    }
-
-    private int resolveFloor(RunState runState) {
+    public int resolveFloor(RunState runState) {
+        Objects.requireNonNull(runState, "runState");
         if (runState.currentNode() != null && runState.currentNode().phase() == RunState.NodePhase.COMBAT) {
             return Math.max(1, runState.currentNode().floor());
         }
         return Math.max(1, runState.floor());
+    }
+
+    public int resolveFloorDelta(RunState runState, EncounterTemplate template) {
+        Objects.requireNonNull(template, "template");
+        int floor = resolveFloor(runState);
+        int anchorFloor = template.minFloor() == null ? 1 : Math.max(1, template.minFloor());
+        return Math.max(0, floor - anchorFloor);
     }
 
     private static EncounterTemplate toEncounterTemplate(EncounterTemplateRaw raw) {
@@ -129,13 +112,11 @@ public record EncounterTableConfig(
             throw new IllegalStateException("enemy template config is missing");
         }
         return new EnemyTemplate(
-                normalizeRequired(raw.enemyId(), "enemyId"),
-                requireInt(raw.maxHp(), "maxHp"),
-                requireInt(raw.hpPerFloor(), "hpPerFloor"),
-                requireInt(raw.attackPower(), "attackPower"),
-                requireInt(raw.attackPowerPerFloor(), "attackPowerPerFloor"),
-                requireInt(raw.healingPower(), "healingPower"),
-                requireInt(raw.healingPowerPerFloor(), "healingPowerPerFloor")
+                normalizeRequired(raw.enemyDefId(), "enemyDefId"),
+                normalizeRequired(raw.instanceId(), "instanceId"),
+                nullToZero(raw.hpPerFloor()),
+                nullToZero(raw.attackPowerPerFloor()),
+                nullToZero(raw.healingPowerPerFloor())
         );
     }
 
@@ -157,11 +138,8 @@ public record EncounterTableConfig(
         return raw.trim();
     }
 
-    private static int requireInt(Integer value, String fieldName) {
-        if (value == null) {
-            throw new IllegalStateException("encounter enemy " + fieldName + " is required");
-        }
-        return value;
+    private static int nullToZero(Integer value) {
+        return value == null ? 0 : value;
     }
 
     public record EncounterTemplate(
@@ -176,6 +154,12 @@ public record EncounterTableConfig(
             enemies = List.copyOf(Objects.requireNonNull(enemies, "enemies"));
             if (enemies.isEmpty()) {
                 throw new IllegalArgumentException("encounter enemies must not be empty");
+            }
+            LinkedHashSet<String> instanceIds = new LinkedHashSet<>();
+            for (EnemyTemplate enemy : enemies) {
+                if (!instanceIds.add(enemy.instanceId())) {
+                    throw new IllegalArgumentException("duplicate enemy instance id in encounter: encounterId=" + encounterId + ", instanceId=" + enemy.instanceId());
+                }
             }
             if (minFloor != null && minFloor < 1) {
                 throw new IllegalArgumentException("minFloor must be >= 1");
@@ -203,31 +187,15 @@ public record EncounterTableConfig(
     }
 
     public record EnemyTemplate(
-            String enemyId,
-            int baseHp,
+            String enemyDefId,
+            String instanceId,
             int hpPerFloor,
-            int baseAttackPower,
             int attackPowerPerFloor,
-            int baseHealPower,
-            int healPowerPerFloor
+            int healingPowerPerFloor
     ) {
         public EnemyTemplate {
-            enemyId = Objects.requireNonNull(enemyId, "enemyId");
-            if (baseHp <= 0) {
-                throw new IllegalArgumentException("baseHp must be > 0");
-            }
-        }
-
-        int resolveHp(int floorDelta) {
-            return Math.max(1, baseHp + (hpPerFloor * floorDelta));
-        }
-
-        int resolveAttackPower(int floorDelta) {
-            return Math.max(0, baseAttackPower + (attackPowerPerFloor * floorDelta));
-        }
-
-        int resolveHealPower(int floorDelta) {
-            return Math.max(0, baseHealPower + (healPowerPerFloor * floorDelta));
+            enemyDefId = normalizeRequired(enemyDefId, "enemyDefId");
+            instanceId = normalizeRequired(instanceId, "instanceId");
         }
     }
 
@@ -245,12 +213,10 @@ public record EncounterTableConfig(
     ) {}
 
     public record EnemyTemplateRaw(
-            String enemyId,
-            Integer maxHp,
+            String enemyDefId,
+            String instanceId,
             Integer hpPerFloor,
-            Integer attackPower,
             Integer attackPowerPerFloor,
-            Integer healingPower,
             Integer healingPowerPerFloor
     ) {}
 }

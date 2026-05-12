@@ -1,6 +1,5 @@
 package com.example.dueltower.engine.config;
 
-import com.example.dueltower.engine.model.EnemyState;
 import com.example.dueltower.engine.model.RunState;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
@@ -14,17 +13,22 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class EncounterTableConfigTest {
 
     @Test
-    void defaultsSelectCombatEncounterAndScaleEnemyByFloor() {
+    void defaultsSelectCombatEncounterAndExposeScalingByFloor() {
         RunState runState = new RunState();
         runState.initialize(123L);
 
-        List<EnemyState> floorOneEnemies = EncounterTableConfig.defaults().instantiateEncounterEnemies(runState);
-        EnemyState floorOneEnemy = floorOneEnemies.get(0);
+        EncounterTableConfig config = EncounterTableConfig.defaults();
+        EncounterTableConfig.EncounterTemplate floorOneEncounter = config.selectEncounter(runState);
+        EncounterTableConfig.EnemyTemplate floorOneEnemy = floorOneEncounter.enemies().get(0);
 
-        assertEquals("RUN-ENEMY-1", floorOneEnemy.enemyId().value());
-        assertEquals(22, floorOneEnemy.hp());
-        assertEquals(5, floorOneEnemy.attackPower());
-        assertEquals(0, floorOneEnemy.healPower());
+        assertEquals("RUN-DEFAULT-COMBAT", floorOneEncounter.encounterId());
+        assertEquals("E002_TOWER_RAT", floorOneEnemy.enemyDefId());
+        assertEquals("RUN-ENEMY-1", floorOneEnemy.instanceId());
+        assertEquals(4, floorOneEnemy.hpPerFloor());
+        assertEquals(1, floorOneEnemy.attackPowerPerFloor());
+        assertEquals(0, floorOneEnemy.healingPowerPerFloor());
+        assertEquals(1, config.resolveFloor(runState));
+        assertEquals(0, config.resolveFloorDelta(runState, floorOneEncounter));
 
         RunState.NodeChoice choice = runState.availableChoices().stream().findFirst().orElseThrow();
         runState.beginNode(choice);
@@ -32,12 +36,10 @@ class EncounterTableConfigTest {
         runState.markCurrentFloorClearedByBoss();
         runState.completeResultAndPrepareNext(456L);
 
-        List<EnemyState> floorTwoEnemies = EncounterTableConfig.defaults().instantiateEncounterEnemies(runState);
-        EnemyState floorTwoEnemy = floorTwoEnemies.get(0);
+        EncounterTableConfig.EncounterTemplate floorTwoEncounter = config.selectEncounter(runState);
 
-        assertEquals(26, floorTwoEnemy.hp());
-        assertEquals(6, floorTwoEnemy.attackPower());
-        assertEquals(1, floorTwoEnemy.healPower());
+        assertEquals(2, config.resolveFloor(runState));
+        assertEquals(1, config.resolveFloorDelta(runState, floorTwoEncounter));
     }
 
     @Test
@@ -49,7 +51,7 @@ class EncounterTableConfigTest {
                                 10,
                                 null,
                                 RunState.NodePhase.COMBAT,
-                                List.of(new EncounterTableConfig.EnemyTemplate("E-1", 20, 0, 3, 0, 0, 0))
+                                List.of(new EncounterTableConfig.EnemyTemplate("E001_TEST", "E-1", 0, 0, 0))
                         )
                 ),
                 "MISSING-FALLBACK"
@@ -70,12 +72,10 @@ class EncounterTableConfigTest {
                       "requiredNodePhase": "COMBAT",
                       "enemies": [
                         {
-                          "enemyId": "TE-1",
-                          "maxHp": 30,
+                          "enemyDefId": "E001_TEST",
+                          "instanceId": "TE-1",
                           "hpPerFloor": 2,
-                          "attackPower": 6,
                           "attackPowerPerFloor": 1,
-                          "healingPower": 0,
                           "healingPowerPerFloor": 0
                         }
                       ]
@@ -88,10 +88,33 @@ class EncounterTableConfigTest {
 
         RunState runState = new RunState();
         runState.initialize(1L);
-        List<EnemyState> enemies = loaded.instantiateEncounterEnemies(runState);
+        EncounterTableConfig.EncounterTemplate encounter = loaded.selectEncounter(runState);
+        EncounterTableConfig.EnemyTemplate enemy = encounter.enemies().get(0);
 
-        assertEquals(1, enemies.size());
-        assertEquals("TE-1", enemies.get(0).enemyId().value());
-        assertEquals(30, enemies.get(0).hp());
+        assertEquals("T-1", encounter.encounterId());
+        assertEquals("E001_TEST", enemy.enemyDefId());
+        assertEquals("TE-1", enemy.instanceId());
+        assertEquals(2, enemy.hpPerFloor());
+    }
+
+    @Test
+    void throwsWhenEncounterContainsDuplicateInstanceId() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new EncounterTableConfig(
+                List.of(
+                        new EncounterTableConfig.EncounterTemplate(
+                                "T-1",
+                                1,
+                                null,
+                                RunState.NodePhase.COMBAT,
+                                List.of(
+                                        new EncounterTableConfig.EnemyTemplate("E001_TEST", "TE-1", 0, 0, 0),
+                                        new EncounterTableConfig.EnemyTemplate("E002_TEST", "TE-1", 0, 0, 0)
+                                )
+                        )
+                ),
+                "T-1"
+        ));
+
+        assertEquals("duplicate enemy instance id in encounter: encounterId=T-1, instanceId=TE-1", ex.getMessage());
     }
 }

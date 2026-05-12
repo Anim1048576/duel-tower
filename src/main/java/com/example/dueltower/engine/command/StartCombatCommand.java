@@ -1,6 +1,7 @@
 package com.example.dueltower.engine.command;
 
 import com.example.dueltower.common.util.DiceUtility;
+import com.example.dueltower.content.enemy.model.EnemyDefinition;
 import com.example.dueltower.engine.config.EncounterTableConfig;
 import com.example.dueltower.engine.core.EngineContext;
 import com.example.dueltower.engine.core.HandLimitOps;
@@ -8,6 +9,7 @@ import com.example.dueltower.engine.core.ZoneOps;
 import com.example.dueltower.engine.core.combat.CombatCleanupOps;
 import com.example.dueltower.engine.core.combat.CombatStatuses;
 import com.example.dueltower.engine.core.combat.TurnFlow;
+import com.example.dueltower.engine.core.enemy.EnemyStateFactory;
 import com.example.dueltower.engine.event.GameEvent;
 import com.example.dueltower.engine.model.*;
 
@@ -210,7 +212,17 @@ public final class StartCombatCommand implements GameCommand {
         }
 
         EncounterTableConfig.EncounterTemplate encounter = ctx.encounterTable().selectEncounter(state.runState());
-        List<EnemyState> enemies = ctx.encounterTable().instantiateEncounterEnemies(state.runState());
+        int floorDelta = ctx.encounterTable().resolveFloorDelta(state.runState(), encounter);
+        List<EnemyState> enemies = new ArrayList<>();
+        Set<Ids.EnemyId> usedEnemyIds = new LinkedHashSet<>();
+        for (EncounterTableConfig.EnemyTemplate template : encounter.enemies()) {
+            EnemyDefinition definition = ctx.enemyDef(template.enemyDefId());
+            EnemyState enemy = EnemyStateFactory.create(template, definition, floorDelta);
+            if (!usedEnemyIds.add(enemy.enemyId())) {
+                throw new IllegalStateException("duplicate enemy instance id in encounter: " + enemy.enemyId().value());
+            }
+            enemies.add(enemy);
+        }
         if (enemies.isEmpty()) {
             throw new IllegalStateException("encounter must contain at least one enemy: " + encounter.encounterId());
         }

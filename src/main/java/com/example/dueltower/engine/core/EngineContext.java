@@ -2,6 +2,8 @@ package com.example.dueltower.engine.core;
 
 import com.example.dueltower.config.GameRules;
 import com.example.dueltower.config.RewardTableConfig;
+import com.example.dueltower.content.enemy.model.EnemyDefinition;
+import com.example.dueltower.content.enemy.service.EnemyContentLoader;
 import com.example.dueltower.engine.config.EncounterTableConfig;
 import com.example.dueltower.engine.config.RunConfig;
 import com.example.dueltower.engine.config.RunConfigs;
@@ -19,7 +21,9 @@ import com.example.dueltower.engine.model.ItemDefinition;
 import com.example.dueltower.engine.model.KeywordDefinition;
 import com.example.dueltower.engine.model.PassiveDefinition;
 import com.example.dueltower.engine.model.StatusDefinition;
+import org.springframework.core.io.ClassPathResource;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -42,6 +46,7 @@ public final class EngineContext {
     private final Map<String, ItemDefinition> itemDefs;
     private final Map<String, ItemEffect> itemEffects;
     private final Map<String, EquipDefinition> equipDefs;
+    private final Map<String, EnemyDefinition> enemyDefs;
     private final GameRules gameRules;
     private final RewardTableConfig rewardTableConfig;
     private final EncounterTableConfig encounterTableConfig;
@@ -201,7 +206,32 @@ public final class EngineContext {
     ) {
         this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, passiveDefs, passiveEffects,
                 cardModifierDefs, cardModifierEffects, itemDefs, itemEffects, equipDefs, gameRules, rewardTableConfig,
-                encounterTableConfig, runConfig, false);
+                encounterTableConfig, runConfig, defaultEnemyDefs(), false);
+    }
+
+    public EngineContext(
+            Map<CardDefId, CardDefinition> definitions,
+            Map<CardDefId, CardEffect> effects,
+            Map<String, StatusDefinition> statusDefs,
+            Map<String, StatusEffect> statusEffects,
+            Map<String, KeywordDefinition> keywordDefs,
+            Map<String, KeywordEffect> keywordEffects,
+            Map<String, PassiveDefinition> passiveDefs,
+            Map<String, PassiveEffect> passiveEffects,
+            Map<String, CardModifierDefinition> cardModifierDefs,
+            Map<String, CardModifierEffect> cardModifierEffects,
+            Map<String, ItemDefinition> itemDefs,
+            Map<String, ItemEffect> itemEffects,
+            Map<String, EquipDefinition> equipDefs,
+            GameRules gameRules,
+            RewardTableConfig rewardTableConfig,
+            EncounterTableConfig encounterTableConfig,
+            RunConfig runConfig,
+            Map<String, EnemyDefinition> enemyDefs
+    ) {
+        this(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects, passiveDefs, passiveEffects,
+                cardModifierDefs, cardModifierEffects, itemDefs, itemEffects, equipDefs, gameRules, rewardTableConfig,
+                encounterTableConfig, runConfig, enemyDefs, false);
     }
 
     private EngineContext(
@@ -222,6 +252,7 @@ public final class EngineContext {
             RewardTableConfig rewardTableConfig,
             EncounterTableConfig encounterTableConfig,
             RunConfig runConfig,
+            Map<String, EnemyDefinition> enemyDefs,
             boolean resolvingReaction
     ) {
         this.definitions = Map.copyOf(definitions);
@@ -237,6 +268,7 @@ public final class EngineContext {
         this.itemDefs = Map.copyOf(itemDefs);
         this.itemEffects = Map.copyOf(itemEffects);
         this.equipDefs = Map.copyOf(equipDefs);
+        this.enemyDefs = Map.copyOf(enemyDefs);
         this.gameRules = Objects.requireNonNull(gameRules, "gameRules");
         this.rewardTableConfig = Objects.requireNonNull(rewardTableConfig, "rewardTableConfig");
         this.encounterTableConfig = Objects.requireNonNull(encounterTableConfig, "encounterTableConfig");
@@ -356,6 +388,14 @@ public final class EngineContext {
         return d;
     }
 
+    public boolean hasEnemyDef(String id) { return enemyDefs.containsKey(normalizeId(id)); }
+    public EnemyDefinition enemyDef(String id) {
+        String normalized = normalizeId(id);
+        EnemyDefinition d = enemyDefs.get(normalized);
+        if (d == null) throw new IllegalArgumentException("missing EnemyDefinition: " + normalized);
+        return d;
+    }
+
     public GameRules gameRules() { return gameRules; }
     public RewardTableConfig rewardTable() { return rewardTableConfig; }
     public EncounterTableConfig encounterTable() { return encounterTableConfig; }
@@ -366,6 +406,18 @@ public final class EngineContext {
         if (resolvingReaction == value) return this;
         return new EngineContext(definitions, effects, statusDefs, statusEffects, keywordDefs, keywordEffects,
                 passiveDefs, passiveEffects, cardModifierDefs, cardModifierEffects, itemDefs, itemEffects,
-                equipDefs, gameRules, rewardTableConfig, encounterTableConfig, runConfig, value);
+                equipDefs, gameRules, rewardTableConfig, encounterTableConfig, runConfig, enemyDefs, value);
+    }
+
+    private static String normalizeId(String id) {
+        return id == null ? "" : id.trim();
+    }
+
+    private static Map<String, EnemyDefinition> defaultEnemyDefs() {
+        Map<String, EnemyDefinition> defs = new HashMap<>();
+        for (EnemyDefinition definition : new EnemyContentLoader(new ClassPathResource("balance/enemies.json")).loadAll()) {
+            defs.put(definition.id(), definition);
+        }
+        return Map.copyOf(defs);
     }
 }

@@ -7,13 +7,11 @@
       "requiredNodePhase": "COMBAT",
       "enemies": [
         {
-          "enemyId": "RUN-ENEMY-1",
-          "maxHp": 22,
+          "enemyDefId": "E002_TOWER_RAT",
+          "instanceId": "RUN-ENEMY-1",
           "hpPerFloor": 4,
-          "attackPower": 5,
           "attackPowerPerFloor": 1,
-          "healingPower": 0,
-          "healingPowerPerFloor": 1
+          "healingPowerPerFloor": 0
         }
       ]
     }
