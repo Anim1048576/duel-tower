@@ -29,6 +29,7 @@
       <div class="combat-lab-page__copy">
         <p>Effect Lab</p>
         <h3>Inspect backend Lab API responses without running a combat session.</h3>
+        <span>Guide: docs/combat-lab.md</span>
       </div>
 
       <div class="combat-lab-page__tags">
@@ -36,6 +37,15 @@
         <TagChip label="Effect Probe" tone="success" />
         <TagChip label="Build Test" tone="warning" />
       </div>
+    </div>
+
+    <div class="combat-lab-page__notice" role="note">
+      <strong>Lab scope</strong>
+      <p>
+        Combat Lab does not run PlayCardCommand, spend AP, verify hand ownership, advance turns,
+        or process the full pending-decision flow. It is for observing backend dice and CardEffect
+        results in isolation.
+      </p>
     </div>
 
     <div class="combat-lab-page__stats">
@@ -101,7 +111,8 @@
   }
 
   .combat-lab-page__copy p,
-  .combat-lab-page__copy h3 {
+  .combat-lab-page__copy h3,
+  .combat-lab-page__notice p {
     margin: 0;
   }
 
@@ -116,6 +127,30 @@
     font-family: var(--font-display);
     font-size: clamp(1.65rem, 2.4vw, 2.25rem);
     line-height: 1.15;
+  }
+
+  .combat-lab-page__copy span {
+    color: var(--color-text-soft);
+    font-size: 0.88rem;
+  }
+
+  .combat-lab-page__notice {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid rgba(199, 167, 125, 0.34);
+    background: rgba(199, 167, 125, 0.08);
+  }
+
+  .combat-lab-page__notice strong {
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .combat-lab-page__notice p {
+    color: var(--color-text-soft);
+    line-height: 1.6;
   }
 
   .combat-lab-page__tags,
