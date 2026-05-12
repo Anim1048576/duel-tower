@@ -58,14 +58,24 @@ export type LabProbeSelectionInput = {
   targets?: LabProbeTargetInput[] | null
   discardIds?: string[] | null
   selectedIds?: string[] | null
+  discardAliases?: string[] | null
+  selectedAliases?: string[] | null
   choiceId?: string | null
+}
+
+export type LabProbeExtraCardInput = {
+  alias: string
+  cardId: string
+  zone?: string | null
 }
 
 export type LabEffectProbeRequest = {
   cardId: string
   actor: LabProbeActorInput
   target?: LabProbeTargetInput | null
+  targets?: LabProbeTargetInput[] | null
   selection?: LabProbeSelectionInput | null
+  extraCards?: LabProbeExtraCardInput[] | null
   seed?: number | null
   validateOnly?: boolean | null
 }

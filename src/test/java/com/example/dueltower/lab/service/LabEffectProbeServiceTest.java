@@ -3,6 +3,7 @@ package com.example.dueltower.lab.service;
 import com.example.dueltower.lab.dto.LabEffectProbeRequest;
 import com.example.dueltower.lab.dto.LabEffectProbeResponse;
 import com.example.dueltower.lab.dto.LabProbeActorDto;
+import com.example.dueltower.lab.dto.LabProbeExtraCardDto;
 import com.example.dueltower.lab.dto.LabProbeSelectionDto;
 import com.example.dueltower.lab.dto.LabProbeTargetDto;
 import org.junit.jupiter.api.DisplayName;
@@ -151,6 +152,105 @@ class LabEffectProbeServiceTest {
         assertFalse(service.cards().isEmpty());
         assertTrue(service.cards().stream().allMatch(card -> "SKILL".equals(card.type())));
         assertTrue(service.cards().stream().anyMatch(card -> "C001".equals(card.cardId())));
+    }
+
+    @Test
+    @DisplayName("targets 배열로 여러 ENEMY를 만들고 enemy all 카드가 모든 대상에 적용된다")
+    void probeShouldSupportMultipleEnemyTargets() {
+        LabEffectProbeResponse response = service.probe(new LabEffectProbeRequest(
+                "Tig005_Card",
+                actor(7, 5, 20, 20, Map.of("Tig201_Status", 3)),
+                null,
+                List.of(
+                        target("ENEMY", "enemy_a", 30, 30, Map.of()),
+                        target("ENEMY", "enemy_b", 25, 25, Map.of())
+                ),
+                new LabProbeSelectionDto(
+                        null,
+                        List.of(),
+                        List.of(),
+                        List.of("hand_1"),
+                        List.of(),
+                        null
+                ),
+                List.of(new LabProbeExtraCardDto("hand_1", "C001", "HAND")),
+                12345L,
+                false
+        ));
+
+        assertTrue(response.valid());
+        assertTrue(response.resolved());
+        assertEquals(2, response.before().targets().size());
+        assertEquals(-10, response.changes().targets().get(0).hpChange());
+        assertEquals(-10, response.changes().targets().get(1).hpChange());
+        assertTrue(response.notes().stream().anyMatch(note -> note.contains("Target states created: 2")));
+        assertTrue(response.notes().stream().anyMatch(note -> note.contains("hand_1")));
+    }
+
+    @Test
+    @DisplayName("PLAYER 대상은 TargetRef.ofPlayer로 변환되어 ally one 회복 카드 실험에 사용할 수 있다")
+    void probeShouldSupportPlayerTarget() {
+        LabEffectProbeResponse response = service.probe(new LabEffectProbeRequest(
+                "C002",
+                actor(2, 5, 20, 20, Map.of()),
+                target("PLAYER", "ally_player", 7, 20, Map.of()),
+                selection("PLAYER", "ally_player"),
+                12345L,
+                false
+        ));
+
+        assertTrue(response.valid());
+        assertTrue(response.resolved());
+        assertEquals("PLAYER", response.before().targets().get(0).kind());
+        assertEquals(7, response.before().targets().get(0).hp());
+        assertEquals(12, response.after().targets().get(0).hp());
+        assertEquals(5, response.changes().targets().get(0).hpChange());
+    }
+
+    @Test
+    @DisplayName("SELF 대상 카드는 target 없이 actor만으로 validate/resolve 된다")
+    void probeShouldSupportSelfWithoutTarget() {
+        LabEffectProbeResponse response = service.probe(new LabEffectProbeRequest(
+                "C003",
+                actor(2, 5, 20, 20, Map.of()),
+                null,
+                new LabProbeSelectionDto(List.of(), List.of(), List.of(), null),
+                12345L,
+                false
+        ));
+
+        assertTrue(response.valid());
+        assertTrue(response.resolved());
+        assertTrue(response.before().targets().isEmpty());
+        assertEquals(2, response.after().actor().statuses().get("SHIELD"));
+        assertEquals("SHIELD", response.changes().actor().statusChanges().get(0).statusId());
+    }
+
+    @Test
+    @DisplayName("extraCards alias는 selectedIds 입력으로 변환되어 카드 선택 요구 효과를 실험할 수 있다")
+    void probeShouldMapSelectedAliasesToExtraCards() {
+        LabEffectProbeResponse response = service.probe(new LabEffectProbeRequest(
+                "Tig001_Card",
+                actor(7, 5, 20, 20, Map.of("Tig201_Status", 3)),
+                target("ENEMY", "dummy_enemy", 30, 30, Map.of()),
+                null,
+                new LabProbeSelectionDto(
+                        List.of(new LabProbeTargetDto("ENEMY", "dummy_enemy", null, null, Map.of())),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of("installed_1"),
+                        null
+                ),
+                List.of(new LabProbeExtraCardDto("installed_1", "Tig008_Card", "FIELD")),
+                12345L,
+                false
+        ));
+
+        assertTrue(response.valid());
+        assertTrue(response.resolved());
+        assertTrue(response.events().stream().anyMatch(event -> "CardsMoved".equals(event.type())));
+        assertTrue(response.notes().stream().anyMatch(note -> note.contains("installed_1")));
     }
 
     private LabProbeActorDto actor(int attackPower, int healPower, int hp, int maxHp, Map<String, Integer> statuses) {

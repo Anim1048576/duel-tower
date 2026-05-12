@@ -10,6 +10,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -72,6 +73,47 @@ class LabEffectProbeControllerIntegrationTest {
                 .andExpect(jsonPath("$.valid").value(true))
                 .andExpect(jsonPath("$.resolved").value(true))
                 .andExpect(jsonPath("$.after.targets[0].hp").value(26))
-                .andExpect(jsonPath("$.notes[0]").value(containsString("AP cost")));
+                .andExpect(jsonPath("$.notes").value(hasItem(containsString("AP cost"))));
+    }
+
+    @Test
+    @DisplayName("POST /api/lab/effects/probe는 targets 배열과 alias 기반 extraCards를 받는다")
+    void probeShouldAcceptMultipleTargetsAndExtraCardAliases() throws Exception {
+        mockMvc.perform(post("/api/lab/effects/probe")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cardId": "Tig005_Card",
+                                  "actor": {
+                                    "attackPower": 7,
+                                    "healPower": 5,
+                                    "hp": 20,
+                                    "maxHp": 20,
+                                    "statuses": {
+                                      "Tig201_Status": 3
+                                    }
+                                  },
+                                  "targets": [
+                                    { "kind": "ENEMY", "id": "enemy_a", "hp": 30, "maxHp": 30 },
+                                    { "kind": "ENEMY", "id": "enemy_b", "hp": 25, "maxHp": 25 }
+                                  ],
+                                  "selection": {
+                                    "discardAliases": ["hand_1"],
+                                    "selectedAliases": []
+                                  },
+                                  "extraCards": [
+                                    { "alias": "hand_1", "cardId": "C001", "zone": "HAND" }
+                                  ],
+                                  "seed": 12345,
+                                  "validateOnly": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cardId").value("Tig005_Card"))
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.resolved").value(true))
+                .andExpect(jsonPath("$.after.targets[0].hp").value(20))
+                .andExpect(jsonPath("$.after.targets[1].hp").value(15))
+                .andExpect(jsonPath("$.notes").value(hasItem(containsString("Target states created: 2"))));
     }
 }

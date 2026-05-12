@@ -39,6 +39,7 @@ import com.example.dueltower.lab.dto.LabProbeActorDto;
 import com.example.dueltower.lab.dto.LabProbeCardOptionDto;
 import com.example.dueltower.lab.dto.LabProbeChangesDto;
 import com.example.dueltower.lab.dto.LabProbeEventDto;
+import com.example.dueltower.lab.dto.LabProbeExtraCardDto;
 import com.example.dueltower.lab.dto.LabProbeSelectionDto;
 import com.example.dueltower.lab.dto.LabProbeSnapshotDto;
 import com.example.dueltower.lab.dto.LabProbeTargetDto;
@@ -60,10 +61,15 @@ public class LabEffectProbeService {
 
     private static final PlayerId ACTOR_ID = new PlayerId("lab_actor");
     private static final String DEFAULT_ENEMY_ID = "dummy_enemy";
-    private static final List<String> NOTES = List.of(
+    private static final List<String> BASE_NOTES = List.of(
+            "Lab Probe supports multiple ENEMY/PLAYER target states through target or targets.",
+            "SELF effects can run without target or selection.targets.",
+            "extraCards can create probe-owned card instances and selection aliases for discardIds/selectedIds.",
             "Lab Probe does not check AP cost, hand ownership, zone movement, deck state, or turn flow.",
             "Attack/heal power is injected through a probe stat source.",
-            "Lab Probe runs CardEffect.validate and, when valid, CardEffect.resolve directly."
+            "Lab Probe runs CardEffect.validate and, when valid, CardEffect.resolve directly.",
+            "Faction statuses are not supported yet; actor and target character statuses are supported.",
+            "PlayCardCommand source-card post-use movement is not applied; CardEffect-internal zone changes may still occur."
     );
 
     private final CardService cardService;
@@ -135,14 +141,14 @@ public class LabEffectProbeService {
         PlayerState actor = createPlayer(ACTOR_ID, input.actor());
         state.players().put(ACTOR_ID, actor);
 
-        TargetRef targetRef = null;
-        if (input.target() != null) {
-            targetRef = createTarget(state, input.target());
-        }
+        List<TargetRef> targetRefs = input.targets().stream()
+                .map(target -> createTarget(state, target))
+                .toList();
 
         CardInstId sourceCardId = new CardInstId(UUID.randomUUID());
         state.cardInstances().put(sourceCardId, new CardInstance(sourceCardId, cardDefId, ACTOR_ID, Zone.HAND));
 
+        Map<String, CardInstId> extraCardAliases = createExtraCards(state, actor, input.extraCards());
         SummonInstId statSourceSummonId = new SummonInstId(UUID.randomUUID());
         state.summons().put(statSourceSummonId, new SummonState(
                 statSourceSummonId,
@@ -156,7 +162,7 @@ public class LabEffectProbeService {
                 false
         ));
 
-        TargetSelection selection = toSelection(input.selection(), targetRef);
+        TargetSelection selection = toSelection(input.selection(), targetRefs);
         List<GameEvent> events = new ArrayList<>();
         EffectContext effectContext = new EffectContext(
                 state,
@@ -164,15 +170,15 @@ public class LabEffectProbeService {
                 ACTOR_ID,
                 sourceCardId,
                 selection,
-                toCardInstIds(input.selection().discardIds(), "discardIds"),
-                toCardInstIds(input.selection().selectedIds(), "selectedIds"),
+                toCardInstIds(input.selection().discardIds(), input.selection().discardAliases(), extraCardAliases, "discardIds"),
+                toCardInstIds(input.selection().selectedIds(), input.selection().selectedAliases(), extraCardAliases, "selectedIds"),
                 events,
                 statSourceSummonId,
                 null,
                 input.selection().choiceId()
         );
 
-        List<TargetRef> snapshotTargets = snapshotTargets(targetRef);
+        List<TargetRef> snapshotTargets = snapshotTargets(targetRefs);
         LabProbeSnapshotDto before = snapshot(state, snapshotTargets);
         List<String> validationErrors = validate(effect, effectContext);
         boolean valid = validationErrors.isEmpty();
@@ -194,7 +200,7 @@ public class LabEffectProbeService {
                 after,
                 changes(before, after),
                 events.stream().map(this::toEvent).toList(),
-                NOTES
+                notes(input)
         );
     }
 
@@ -229,26 +235,46 @@ public class LabEffectProbeService {
     }
 
     private ProbeInput normalizeInput(LabEffectProbeRequest request) {
+        List<String> notes = new ArrayList<>();
         LabProbeActorDto actor = normalizeActor(request.actor());
         LabProbeSelectionDto selection = normalizeSelection(request.selection());
-        LabProbeTargetDto target = normalizeTarget(request.target(), false);
+        List<LabProbeTargetDto> targets = normalizeTargets(request, notes);
+        List<LabProbeExtraCard> extraCards = normalizeExtraCards(request.extraCards());
 
-        if (selection.targets() != null && selection.targets().size() > 1) {
-            throw badRequest("selection.targets supports at most 1 target in Lab Probe MVP");
-        }
-        if (target != null && selection.targets() != null && !selection.targets().isEmpty()) {
-            LabProbeTargetDto selected = normalizeTarget(selection.targets().get(0), true);
-            if (!sameTarget(target, selected)) {
-                throw badRequest("selection target must match target in Lab Probe MVP");
+        if (selection.targets() != null) {
+            for (LabProbeTargetDto selected : selection.targets()) {
+                if (!isKnownSelectionTarget(targets, selected)) {
+                    throw badRequest("selection target must be declared in target/targets in Lab Probe");
+                }
             }
         }
 
         return new ProbeInput(
                 actor,
-                target,
+                targets,
                 selection,
+                extraCards,
+                List.copyOf(notes),
                 Boolean.TRUE.equals(request.validateOnly())
         );
+    }
+
+    private List<LabProbeTargetDto> normalizeTargets(LabEffectProbeRequest request, List<String> notes) {
+        if (request.target() != null) {
+            if (request.targets() != null && !request.targets().isEmpty()) {
+                notes.add("request.targets was ignored because request.target was provided.");
+            }
+            return List.of(normalizeTarget(request.target(), false));
+        }
+        if (request.targets() == null || request.targets().isEmpty()) {
+            return List.of();
+        }
+
+        List<LabProbeTargetDto> targets = request.targets().stream()
+                .map(target -> normalizeTarget(target, false))
+                .toList();
+        ensureUniqueTargets(targets);
+        return targets;
     }
 
     private LabProbeActorDto normalizeActor(LabProbeActorDto actor) {
@@ -286,7 +312,7 @@ public class LabEffectProbeService {
 
     private LabProbeSelectionDto normalizeSelection(LabProbeSelectionDto selection) {
         if (selection == null) {
-            return new LabProbeSelectionDto(null, List.of(), List.of(), null);
+            return new LabProbeSelectionDto(null, List.of(), List.of(), List.of(), List.of(), null);
         }
         List<LabProbeTargetDto> targets = selection.targets() == null
                 ? null
@@ -295,8 +321,32 @@ public class LabEffectProbeService {
                 targets,
                 normalizeStringList(selection.discardIds()),
                 normalizeStringList(selection.selectedIds()),
+                normalizeStringList(selection.discardAliases()),
+                normalizeStringList(selection.selectedAliases()),
                 selection.choiceId() == null || selection.choiceId().isBlank() ? null : selection.choiceId().trim()
         );
+    }
+
+    private List<LabProbeExtraCard> normalizeExtraCards(List<LabProbeExtraCardDto> extraCards) {
+        if (extraCards == null || extraCards.isEmpty()) {
+            return List.of();
+        }
+        List<LabProbeExtraCard> normalized = new ArrayList<>();
+        LinkedHashSet<String> aliases = new LinkedHashSet<>();
+        for (LabProbeExtraCardDto card : extraCards) {
+            if (card == null) {
+                throw badRequest("extraCards must not contain null entries");
+            }
+            String alias = requireText(card.alias(), "extraCards.alias is required");
+            if (!aliases.add(alias)) {
+                throw badRequest("duplicate extraCards alias: " + alias);
+            }
+            CardDefId cardDefId = new CardDefId(requireText(card.cardId(), "extraCards.cardId is required"));
+            requireCard(cardDefId);
+            Zone zone = normalizeZone(card.zone());
+            normalized.add(new LabProbeExtraCard(alias, cardDefId, zone));
+        }
+        return List.copyOf(normalized);
     }
 
     private PlayerState createPlayer(PlayerId playerId, LabProbeActorDto source) {
@@ -335,9 +385,43 @@ public class LabEffectProbeService {
         };
     }
 
-    private TargetSelection toSelection(LabProbeSelectionDto selection, TargetRef defaultTarget) {
+    private Map<String, CardInstId> createExtraCards(
+            GameState state,
+            PlayerState actor,
+            List<LabProbeExtraCard> extraCards
+    ) {
+        if (extraCards == null || extraCards.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, CardInstId> aliases = new LinkedHashMap<>();
+        for (LabProbeExtraCard card : extraCards) {
+            CardInstId instanceId = new CardInstId(UUID.nameUUIDFromBytes(
+                    ("lab-extra-card:" + card.alias()).getBytes(StandardCharsets.UTF_8)
+            ));
+            state.cardInstances().put(instanceId, new CardInstance(instanceId, card.cardId(), ACTOR_ID, card.zone()));
+            addCardToActorZone(actor, instanceId, card.zone());
+            aliases.put(card.alias(), instanceId);
+        }
+        return Map.copyOf(aliases);
+    }
+
+    private void addCardToActorZone(PlayerState actor, CardInstId cardId, Zone zone) {
+        switch (zone) {
+            case DECK -> actor.deck().add(cardId);
+            case HAND -> actor.hand().add(cardId);
+            case GRAVE -> actor.grave().add(cardId);
+            case FIELD -> actor.field().add(cardId);
+            case EXCLUDED -> actor.excluded().add(cardId);
+            case EX -> actor.exCard(cardId);
+        }
+    }
+
+    private TargetSelection toSelection(LabProbeSelectionDto selection, List<TargetRef> defaultTargets) {
         if (selection.targets() == null) {
-            return defaultTarget == null ? TargetSelection.empty() : new TargetSelection(List.of(defaultTarget));
+            return defaultTargets == null || defaultTargets.isEmpty()
+                    ? TargetSelection.empty()
+                    : new TargetSelection(defaultTargets);
         }
         List<TargetRef> targets = selection.targets().stream().map(this::toTargetRef).toList();
         return new TargetSelection(targets);
@@ -532,8 +616,8 @@ public class LabEffectProbeService {
         );
     }
 
-    private List<TargetRef> snapshotTargets(TargetRef targetRef) {
-        return targetRef == null ? List.of() : List.of(targetRef);
+    private List<TargetRef> snapshotTargets(List<TargetRef> targetRefs) {
+        return targetRefs == null ? List.of() : List.copyOf(targetRefs);
     }
 
     private void applyStatuses(Map<String, Integer> target, Map<String, Integer> statuses) {
@@ -595,13 +679,29 @@ public class LabEffectProbeService {
                 .collect(LinkedHashMap::new, (map, entry) -> map.put(entry.getKey(), entry.getValue()), LinkedHashMap::putAll);
     }
 
-    private List<CardInstId> toCardInstIds(List<String> rawIds, String fieldName) {
-        if (rawIds == null || rawIds.isEmpty()) {
-            return List.of();
+    private List<CardInstId> toCardInstIds(
+            List<String> rawIds,
+            List<String> aliases,
+            Map<String, CardInstId> aliasMap,
+            String fieldName
+    ) {
+        List<CardInstId> out = new ArrayList<>();
+        if (rawIds != null && !rawIds.isEmpty()) {
+            rawIds.stream()
+                    .map(raw -> toCardInstId(raw, fieldName))
+                    .forEach(out::add);
         }
-        return rawIds.stream()
-                .map(raw -> toCardInstId(raw, fieldName))
-                .toList();
+        if (aliases != null && !aliases.isEmpty()) {
+            for (String alias : aliases) {
+                String value = requireText(alias, fieldName + " aliases must not contain blank values");
+                CardInstId cardInstId = aliasMap.get(value);
+                if (cardInstId == null) {
+                    throw badRequest("unknown " + fieldName + " alias: " + value);
+                }
+                out.add(cardInstId);
+            }
+        }
+        return List.copyOf(out);
     }
 
     private CardInstId toCardInstId(String raw, String fieldName) {
@@ -631,6 +731,17 @@ public class LabEffectProbeService {
         return normalized;
     }
 
+    private Zone normalizeZone(String zone) {
+        if (zone == null || zone.isBlank()) {
+            return Zone.HAND;
+        }
+        try {
+            return Zone.valueOf(zone.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw badRequest("unsupported extraCards.zone: " + zone);
+        }
+    }
+
     private String defaultTargetId(String kind) {
         return "PLAYER".equals(kind) ? ACTOR_ID.value() : DEFAULT_ENEMY_ID;
     }
@@ -640,6 +751,36 @@ public class LabEffectProbeService {
                 && right != null
                 && left.kind().equals(right.kind())
                 && left.id().equals(right.id());
+    }
+
+    private boolean isKnownSelectionTarget(List<LabProbeTargetDto> targets, LabProbeTargetDto selected) {
+        if (selected == null) {
+            return false;
+        }
+        if ("PLAYER".equals(selected.kind()) && ACTOR_ID.value().equals(selected.id())) {
+            return true;
+        }
+        return targets.stream().anyMatch(target -> sameTarget(target, selected));
+    }
+
+    private void ensureUniqueTargets(List<LabProbeTargetDto> targets) {
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        for (LabProbeTargetDto target : targets) {
+            String key = target.kind() + ":" + target.id();
+            if (!ids.add(key)) {
+                throw badRequest("duplicate target: " + key);
+            }
+        }
+    }
+
+    private List<String> notes(ProbeInput input) {
+        List<String> notes = new ArrayList<>(BASE_NOTES);
+        notes.add("Target states created: " + input.targets().size());
+        if (!input.extraCards().isEmpty()) {
+            notes.add("Extra card aliases created: " + input.extraCards().stream().map(LabProbeExtraCard::alias).toList());
+        }
+        notes.addAll(input.notes());
+        return List.copyOf(notes);
     }
 
     private int requireMin(Integer value, int min, String fieldName) {
@@ -665,9 +806,18 @@ public class LabEffectProbeService {
 
     private record ProbeInput(
             LabProbeActorDto actor,
-            LabProbeTargetDto target,
+            List<LabProbeTargetDto> targets,
             LabProbeSelectionDto selection,
+            List<LabProbeExtraCard> extraCards,
+            List<String> notes,
             boolean validateOnly
+    ) {
+    }
+
+    private record LabProbeExtraCard(
+            String alias,
+            CardDefId cardId,
+            Zone zone
     ) {
     }
 }
