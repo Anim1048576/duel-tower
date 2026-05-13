@@ -27,6 +27,7 @@
     { value: 'EX', label: getCardTypeLabel('EX') },
     { value: 'TOKEN', label: getCardTypeLabel('TOKEN') },
   ]
+  const cardTypeValues = new Set<CardType>(['SKILL', 'EX', 'TOKEN'])
 
   let query = $state('')
   let selectedType = $state<'' | CardType>('')
@@ -44,6 +45,85 @@
   let requestSequence = 0
   let mounted = false
   let cardLoadTimer = 0
+
+  function isCardType(value: string | null): value is CardType {
+    return value !== null && cardTypeValues.has(value as CardType)
+  }
+
+  function normalizeCardTypeParam(value: string | null): '' | CardType {
+    return isCardType(value) ? value : ''
+  }
+
+  function readUrlFilterState() {
+    if (typeof window === 'undefined') {
+      return {
+        query: '',
+        type: '' as '' | CardType,
+        keywordId: '',
+      }
+    }
+
+    const searchParams = new URLSearchParams(window.location.search)
+
+    return {
+      query: searchParams.get('q')?.trim() ?? '',
+      type: normalizeCardTypeParam(searchParams.get('type')),
+      keywordId: searchParams.get('keywordId')?.trim() ?? '',
+    }
+  }
+
+  function buildCardLibraryPath(
+    nextQuery = query,
+    nextType: '' | CardType = selectedType,
+    nextKeywordId = selectedKeywordId,
+  ) {
+    const searchParams = new URLSearchParams()
+    const normalizedQuery = nextQuery.trim()
+    const normalizedKeywordId = nextKeywordId.trim()
+
+    if (normalizedQuery) {
+      searchParams.set('q', normalizedQuery)
+    }
+
+    if (nextType) {
+      searchParams.set('type', nextType)
+    }
+
+    if (normalizedKeywordId) {
+      searchParams.set('keywordId', normalizedKeywordId)
+    }
+
+    const queryString = searchParams.toString()
+    return queryString ? `${pathBuilders.cardLibrary()}?${queryString}` : pathBuilders.cardLibrary()
+  }
+
+  function syncFiltersFromUrl() {
+    const nextState = readUrlFilterState()
+
+    query = nextState.query
+    selectedType = nextState.type
+    selectedKeywordId = nextState.keywordId
+  }
+
+  function replaceCardLibraryUrl(nextQuery: string, nextType: '' | CardType, nextKeywordId: string) {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const nextPath = buildCardLibraryPath(nextQuery, nextType, nextKeywordId)
+    const currentPath = `${window.location.pathname}${window.location.search}`
+
+    if (currentPath !== nextPath) {
+      window.history.replaceState({}, '', nextPath)
+    }
+  }
+
+  function createCardDetailPath(cardId: string) {
+    const searchParams = new URLSearchParams()
+    searchParams.set('returnTo', buildCardLibraryPath())
+
+    return `${pathBuilders.cardDetail(cardId)}?${searchParams.toString()}`
+  }
 
   function summarizeDescription(description: string | null | undefined, maxLength = 132) {
     const normalized = description?.trim()
@@ -159,11 +239,14 @@
   }
 
   onMount(() => {
+    syncFiltersFromUrl()
     mounted = true
     void loadKeywordArchive()
+    window.addEventListener('popstate', syncFiltersFromUrl)
 
     return () => {
       mounted = false
+      window.removeEventListener('popstate', syncFiltersFromUrl)
 
       if (cardLoadTimer) {
         window.clearTimeout(cardLoadTimer)
@@ -179,6 +262,8 @@
     const nextQuery = query
     const nextType = selectedType
     const nextKeywordId = selectedKeywordId
+
+    replaceCardLibraryUrl(nextQuery, nextType, nextKeywordId)
 
     if (cardLoadTimer) {
       window.clearTimeout(cardLoadTimer)
@@ -218,6 +303,9 @@
     () => keywords.find((keyword) => keyword.id === selectedKeywordId)?.name ?? null,
   )
   const selectedCard = $derived.by(() => cards.find((card) => card.id === selectedCardId) ?? cards[0] ?? null)
+  const selectedCardDetailPath = $derived.by(() =>
+    selectedCard ? createCardDetailPath(selectedCard.id) : pathBuilders.cardLibrary(),
+  )
   const listSummary = $derived.by(() => {
     if (cardsLoading) {
       return 'Refreshing the current card archive.'
@@ -395,7 +483,7 @@
               class="card-library-page__card"
               class:card-library-page__card--selected={selectedCard?.id === card.id}
               data-nav
-              href={pathBuilders.cardDetail(card.id)}
+              href={createCardDetailPath(card.id)}
               onmouseenter={() => previewCard(card.id)}
               onfocus={() => previewCard(card.id)}
             >
@@ -478,7 +566,7 @@
           <a
             class="card-library-page__link-action"
             data-nav
-            href={pathBuilders.cardDetail(selectedCard.id)}
+            href={selectedCardDetailPath}
           >
             Open detail for {selectedCard.name}
           </a>

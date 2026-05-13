@@ -92,17 +92,29 @@
     }
   }
 
+  function buildNavigationTarget(path: string, finalPath: string, preserveQuery: boolean) {
+    const targetUrl = new URL(path, window.location.origin)
+    const suffix = preserveQuery ? `${targetUrl.search}${targetUrl.hash}` : ''
+
+    return `${finalPath}${suffix}`
+  }
+
+  function getCurrentNavigationTarget() {
+    return `${normalizePath(window.location.pathname)}${window.location.search}${window.location.hash}`
+  }
+
   function updateCurrentPage(pathname: string, mode: 'push' | 'replace' = 'replace') {
-    const { requestedPage, finalPage } = getAccessiblePage(pathname)
-    const currentPath = normalizePath(window.location.pathname)
-    const nextPath = finalPage.path
-    const shouldRedirect = currentPath !== nextPath
+    const targetUrl = new URL(pathname, window.location.origin)
+    const { requestedPage, finalPage } = getAccessiblePage(targetUrl.pathname)
+    const shouldPreserveQuery = requestedPage.path === finalPage.path
+    const nextTarget = buildNavigationTarget(pathname, finalPage.path, shouldPreserveQuery)
+    const shouldRedirect = getCurrentNavigationTarget() !== nextTarget
 
     if (shouldRedirect) {
       const historyMethod: 'pushState' | 'replaceState' =
         requestedPage.path === finalPage.path && mode === 'push' ? 'pushState' : 'replaceState'
 
-      history[historyMethod]({}, '', nextPath)
+      history[historyMethod]({}, '', nextTarget)
     }
 
     current = finalPage
@@ -113,7 +125,7 @@
   }
 
   function syncFromLocation() {
-    updateCurrentPage(window.location.pathname)
+    updateCurrentPage(`${window.location.pathname}${window.location.search}${window.location.hash}`)
   }
 
   function handleDocumentClick(event: MouseEvent) {
@@ -160,7 +172,7 @@
     if (!initialized) return
 
     void isAuthenticated
-    updateCurrentPage(window.location.pathname)
+    updateCurrentPage(`${window.location.pathname}${window.location.search}${window.location.hash}`)
   })
 
   $effect(() => {

@@ -4,6 +4,7 @@
   import type { CardDetailResponse } from '../lib/api/contentTypes'
   import { ApiError, getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
+  import PlaySpecSummary from '../lib/components/PlaySpecSummary.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
@@ -13,7 +14,7 @@
     getCardTypeLabel,
     getCardTypeTone,
   } from '../lib/content/display'
-  import { pathBuilders, resolveRouteMatch } from '../lib/navigation'
+  import { normalizePath, pathBuilders, resolveRouteMatch } from '../lib/navigation'
 
   function hasCardId(value: string | null | undefined): value is string {
     return typeof value === 'string' && value.trim().length > 0
@@ -31,26 +32,34 @@
     return match.params.id ?? null
   }
 
-  function formatPlaySpec(playSpec: CardDetailResponse['playSpec']) {
-    if (playSpec === null) {
-      return null
+  function getReturnToPath() {
+    if (typeof window === 'undefined') {
+      return pathBuilders.cardLibrary()
     }
 
-    if (typeof playSpec === 'string') {
-      const normalized = playSpec.trim()
-      return normalized.length > 0 ? normalized : null
+    const returnTo = new URLSearchParams(window.location.search).get('returnTo')
+
+    if (!returnTo) {
+      return pathBuilders.cardLibrary()
     }
 
     try {
-      return JSON.stringify(playSpec, null, 2)
+      const url = new URL(returnTo, window.location.origin)
+
+      if (url.origin !== window.location.origin || normalizePath(url.pathname) !== pathBuilders.cardLibrary()) {
+        return pathBuilders.cardLibrary()
+      }
+
+      return `${pathBuilders.cardLibrary()}${url.search}${url.hash}`
     } catch {
-      return 'Play spec을 표시할 수 없습니다.'
+      return pathBuilders.cardLibrary()
     }
   }
 
   const requestedCardId = getCardIdFromRoute()
   const cardId = hasCardId(requestedCardId) ? requestedCardId.trim() : null
   const invalidRouteId = requestedCardId !== null && !hasCardId(requestedCardId) ? requestedCardId : null
+  const returnToPath = getReturnToPath()
 
   let loading = $state(cardId !== null)
   let notFound = $state(invalidRouteId !== null)
@@ -88,10 +97,6 @@
   })
 
   const keywordCount = $derived.by(() => card?.keywords.length ?? 0)
-  const formattedPlaySpec = $derived.by(() => (card ? formatPlaySpec(card.playSpec) : null))
-  const hasStructuredPlaySpec = $derived.by(
-    () => card?.playSpec !== null && typeof card?.playSpec === 'object',
-  )
   const stateTitle = $derived.by(() => {
     if (notFound) {
       return 'Card not found'
@@ -132,49 +137,58 @@
     <SectionFrame
       eyebrow="Selected Card"
       title={card.name}
-      description="선택한 카드 정보를 확인합니다."
+      description="카드의 정체성과 플레이 조건을 읽습니다."
     >
-      <div class="card-detail-page__hero">
-        <div class="card-detail-page__hero-copy">
-          <p>{getCardTypeLabel(card.type)}</p>
-          <h3>{card.description || '카드 설명이 없습니다.'}</h3>
-        </div>
+      <div class="card-detail-page__reader">
+        <article class="card-detail-page__preview">
+          <div class="card-detail-page__preview-chrome">
+            <strong>{card.cost ?? 'N/A'}</strong>
+            <span>{getCardTypeLabel(card.type)}</span>
+          </div>
 
-        <div class="card-detail-page__hero-tags">
-          <TagChip label={getCardTypeLabel(card.type)} tone={getCardTypeTone(card.type)} />
-          {#if card.keywords.length > 0}
-            <TagChip label={`${card.keywords.length} Keywords`} tone="accent" />
-          {/if}
-          {#if card.token}
-            <TagChip label="Token Link" tone="warning" />
-          {/if}
-        </div>
-      </div>
+          <div class="card-detail-page__preview-art">
+            <p>{card.id}</p>
+          </div>
 
-      <div class="card-detail-page__stats">
-        <StatBlock value={card.cost ?? 'N/A'} label="Cost" note="카드 비용" />
-        <StatBlock value={keywordCount} label="Keywords" note="연결된 키워드" />
-        <StatBlock
-          value={formatContentEnumLabel(card.resolveTo)}
-          label="Resolve To"
-          note="카드 처리 대상"
-        />
+          <div class="card-detail-page__preview-copy">
+            <p>{getCardTypeLabel(card.type)}</p>
+            <h3>{card.name}</h3>
+            <p>{card.description || '카드 설명이 없습니다.'}</p>
+          </div>
+
+          <div class="card-detail-page__hero-tags">
+            <TagChip label={getCardTypeLabel(card.type)} tone={getCardTypeTone(card.type)} />
+            {#if card.token}
+              <TagChip label="Token Link" tone="warning" />
+            {/if}
+          </div>
+        </article>
+
+        <aside class="card-detail-page__quick-facts" aria-label="Card quick facts">
+          <StatBlock value={card.cost ?? 'N/A'} label="Cost" note="카드 비용" />
+          <StatBlock value={keywordCount} label="Keywords" note="연결된 키워드" />
+          <StatBlock
+            value={formatContentEnumLabel(card.resolveTo)}
+            label="Resolve To"
+            note="카드 처리 대상"
+          />
+
+          <div class="card-detail-page__field">
+            <h3>Identifier</h3>
+            <p>{card.id}</p>
+          </div>
+        </aside>
       </div>
     </SectionFrame>
 
     <div class="card-detail-page__grid">
       <SectionFrame
-        title="Card profile"
-        description="카드 기본 정보입니다."
+        title="Effect text"
+        description="카드 효과와 연결 키워드입니다."
       >
         <div class="card-detail-page__section">
           <div class="card-detail-page__field">
-            <h3>Identifier</h3>
-            <p>{card.id}</p>
-          </div>
-
-          <div class="card-detail-page__field">
-            <h3>Description</h3>
+            <h3>Effect</h3>
             <p>{card.description || '카드 설명이 없습니다.'}</p>
           </div>
 
@@ -197,8 +211,8 @@
       </SectionFrame>
 
       <SectionFrame
-        title="Resolution and play spec"
-        description="처리 대상과 play spec을 확인합니다."
+        title="Play rules"
+        description="사용자가 읽을 수 있는 play spec 요약입니다."
       >
         <div class="card-detail-page__section">
           <div class="card-detail-page__field">
@@ -212,16 +226,8 @@
           </div>
 
           <div class="card-detail-page__field">
-            <h3>Play spec</h3>
-            {#if formattedPlaySpec}
-              {#if hasStructuredPlaySpec}
-                <pre class="card-detail-page__play-spec">{formattedPlaySpec}</pre>
-              {:else}
-                <p>{formattedPlaySpec}</p>
-              {/if}
-            {:else}
-              <p>Play spec이 없습니다.</p>
-            {/if}
+            <h3>Play spec summary</h3>
+            <PlaySpecSummary playSpec={card.playSpec} />
           </div>
         </div>
       </SectionFrame>
@@ -232,7 +238,7 @@
       description="카드 목록으로 돌아갈 수 있습니다."
     >
       <div class="card-detail-page__actions">
-        <a class="card-detail-page__link-action" data-nav href={pathBuilders.cardLibrary()}>
+        <a class="card-detail-page__link-action" data-nav href={returnToPath}>
           Back to card library
         </a>
       </div>
@@ -264,7 +270,7 @@
       </ContentStatePanel>
 
       <div class="card-detail-page__actions">
-        <a class="card-detail-page__link-action" data-nav href={pathBuilders.cardLibrary()}>
+        <a class="card-detail-page__link-action" data-nav href={returnToPath}>
           Back to card library
         </a>
       </div>
@@ -281,29 +287,106 @@
     gap: 1.5rem;
   }
 
-  .card-detail-page__hero {
+  .card-detail-page__reader {
+    display: grid;
+    grid-template-columns: minmax(17rem, 0.95fr) minmax(18rem, 1.05fr);
+    gap: 1.25rem;
+    align-items: stretch;
+  }
+
+  .card-detail-page__preview,
+  .card-detail-page__quick-facts {
+    border: 1px solid var(--color-border);
+    background:
+      linear-gradient(180deg, rgba(20, 17, 16, 0.9), rgba(14, 12, 11, 0.96)),
+      radial-gradient(circle at top, rgba(226, 193, 155, 0.08), transparent 60%);
+    padding: 1rem;
+    display: grid;
+    gap: 1rem;
+  }
+
+  .card-detail-page__preview {
+    align-content: start;
+  }
+
+  .card-detail-page__quick-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-content: start;
+  }
+
+  .card-detail-page__quick-facts .card-detail-page__field {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+  }
+
+  .card-detail-page__preview-chrome {
     display: flex;
     justify-content: space-between;
-    gap: 1rem;
-    align-items: flex-start;
-    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
   }
 
-  .card-detail-page__hero-copy {
+  .card-detail-page__preview-chrome strong,
+  .card-detail-page__preview-chrome span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--color-border);
+    background: rgba(8, 7, 6, 0.42);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .card-detail-page__preview-chrome strong {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+  }
+
+  .card-detail-page__preview-art {
+    min-height: 13.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background:
+      linear-gradient(145deg, rgba(44, 38, 34, 0.36), rgba(10, 9, 8, 0.88)),
+      radial-gradient(circle at 30% 20%, rgba(226, 193, 155, 0.12), transparent 42%),
+      repeating-linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.025),
+        rgba(255, 255, 255, 0.025) 6px,
+        transparent 6px,
+        transparent 14px
+      );
+    display: flex;
+    align-items: flex-end;
+    padding: 0.85rem;
+  }
+
+  .card-detail-page__preview-art p {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    word-break: break-all;
+  }
+
+  .card-detail-page__preview-copy {
     display: grid;
-    gap: 0.5rem;
-    max-width: 42rem;
+    gap: 0.55rem;
   }
 
-  .card-detail-page__hero-copy p,
-  .card-detail-page__hero-copy h3,
+  .card-detail-page__preview-copy p,
+  .card-detail-page__preview-copy h3,
   .card-detail-page__field h3,
   .card-detail-page__field p,
   .card-detail-page__note p {
     margin: 0;
   }
 
-  .card-detail-page__hero-copy p,
+  .card-detail-page__preview-copy > p:first-child,
   .card-detail-page__field h3 {
     color: var(--color-text-muted);
     text-transform: uppercase;
@@ -311,10 +394,15 @@
     font-size: 0.78rem;
   }
 
-  .card-detail-page__hero-copy h3 {
+  .card-detail-page__preview-copy h3 {
     font-family: var(--font-display);
-    font-size: clamp(1.8rem, 2.6vw, 2.4rem);
+    font-size: clamp(1.9rem, 2.8vw, 2.6rem);
     line-height: 1.1;
+  }
+
+  .card-detail-page__preview-copy > p:last-child {
+    color: var(--color-text-soft);
+    line-height: 1.7;
   }
 
   .card-detail-page__hero-tags,
@@ -323,12 +411,6 @@
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
-  }
-
-  .card-detail-page__stats {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
   }
 
   .card-detail-page__grid {
@@ -343,17 +425,6 @@
   .card-detail-page__field p {
     color: var(--color-text-soft);
     line-height: 1.7;
-  }
-
-  .card-detail-page__play-spec {
-    margin: 0;
-    padding: 1rem;
-    border: 1px solid var(--color-border);
-    background: rgba(12, 11, 10, 0.22);
-    color: var(--color-text-soft);
-    font: 0.88rem/1.6 'Fira Code', 'Consolas', monospace;
-    white-space: pre-wrap;
-    word-break: break-word;
   }
 
   .card-detail-page__note {
@@ -383,8 +454,12 @@
   }
 
   @media (max-width: 960px) {
-    .card-detail-page__stats,
+    .card-detail-page__reader,
     .card-detail-page__grid {
+      grid-template-columns: 1fr;
+    }
+
+    .card-detail-page__quick-facts {
       grid-template-columns: 1fr;
     }
   }
