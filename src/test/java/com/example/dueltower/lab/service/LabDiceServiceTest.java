@@ -30,8 +30,11 @@ class LabDiceServiceTest {
         assertEquals(5, response.min());
         assertEquals(20, response.max());
         assertEquals("12.5", response.expected());
-        assertEquals(25, response.expectedNumerator());
-        assertEquals(2, response.expectedDenominator());
+        assertEquals(25L, response.expectedNumerator());
+        assertEquals(2L, response.expectedDenominator());
+        assertTrue(response.expectedAvailable());
+        assertEquals("3d6+2", response.normalizedNotation());
+        assertEquals(2, response.expression().terms().size());
     }
 
     @Test
@@ -47,6 +50,56 @@ class LabDiceServiceTest {
     }
 
     @Test
+    @DisplayName("1D6+2D4+3 요청은 복합식 min/max를 반환한다")
+    void calculateShouldReturnMinMaxForCompositeExpression() {
+        LabDiceResponse response = service.calculate(new LabDiceRequest("1D6+2D4+3", 0, null));
+
+        assertEquals("1D6+2D4+3", response.normalizedNotation());
+        assertEquals(6, response.min());
+        assertEquals(17, response.max());
+        assertEquals("11.5", response.expected());
+        assertTrue(response.expectedAvailable());
+        assertEquals(23L, response.expectedNumerator());
+        assertEquals(2L, response.expectedDenominator());
+        assertEquals(3, response.expression().terms().size());
+    }
+
+    @Test
+    @DisplayName("selector 주사위식은 min/max를 반환한다")
+    void calculateShouldReturnMinMaxForSelectorExpressions() {
+        LabDiceResponse keepHigh = service.calculate(new LabDiceRequest("4D6KH2", 0, null));
+        assertEquals(2, keepHigh.min());
+        assertEquals(12, keepHigh.max());
+
+        LabDiceResponse max = service.calculate(new LabDiceRequest("4D6MAX", 0, null));
+        assertEquals(1, max.min());
+        assertEquals(6, max.max());
+    }
+
+    @Test
+    @DisplayName("복합 selector 주사위식은 expression terms를 반환한다")
+    void calculateShouldReturnExpressionForMixedSelectorExpression() {
+        LabDiceResponse response = service.calculate(new LabDiceRequest("3D6KH2+2D4MAX+1", 5, 123L));
+
+        assertEquals(3, response.expression().terms().size());
+        assertEquals(5, response.rolls().size());
+        assertEquals("N/A", response.expected());
+        assertTrue(!response.expectedAvailable());
+        assertTrue(response.expectedNote().contains("expectedDice"));
+    }
+
+    @Test
+    @DisplayName("selector 기대값이 미지원이어도 rolls는 정상 반환한다")
+    void calculateShouldReturnRollsWhenSelectorExpectedIsUnsupported() {
+        LabDiceResponse response = service.calculate(new LabDiceRequest("4D6KH2", 20, 9876L));
+
+        assertEquals("N/A", response.expected());
+        assertTrue(!response.expectedAvailable());
+        assertEquals(20, response.rolls().size());
+        assertTrue(response.rolls().stream().allMatch(roll -> roll >= 2 && roll <= 12));
+    }
+
+    @Test
     @DisplayName("seed가 같으면 rolls가 재현된다")
     void calculateShouldReturnDeterministicRollsForSeed() {
         LabDiceRequest request = new LabDiceRequest("3d6+2", 20, 12345L);
@@ -58,6 +111,18 @@ class LabDiceServiceTest {
         assertEquals(20, first.rollCount());
         assertEquals(20, first.rolls().size());
         assertEquals(12345L, first.seed());
+    }
+
+    @Test
+    @DisplayName("seed가 같으면 복합 주사위식 rolls가 재현된다")
+    void calculateShouldReturnDeterministicRollsForCompositeExpressionSeed() {
+        LabDiceRequest request = new LabDiceRequest("3D6KH2+2D4MAX+1", 20, 12345L);
+
+        LabDiceResponse first = service.calculate(request);
+        LabDiceResponse second = service.calculate(request);
+
+        assertIterableEquals(first.rolls(), second.rolls());
+        assertEquals(20, first.rolls().size());
     }
 
     @Test

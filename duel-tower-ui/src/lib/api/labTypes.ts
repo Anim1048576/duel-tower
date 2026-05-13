@@ -15,14 +15,33 @@ export type LabDiceHistogramEntryDto = {
   count: number
 }
 
+export type LabDiceExpressionDto = {
+  terms: LabDiceTermDto[]
+}
+
+export type LabDiceTermDto = {
+  sign: number
+  kind: 'DICE' | 'CONSTANT' | string
+  value?: number | null
+  count?: number | null
+  sides?: number | null
+  selector?: string | null
+  selectorAmount?: number | null
+  display: string
+}
+
 export type LabDiceResponse = {
   notation: string
-  spec: LabDiceSpecDto
+  normalizedNotation?: string | null
+  spec?: LabDiceSpecDto | null
+  expression?: LabDiceExpressionDto | null
   min: number
   max: number
+  expectedAvailable?: boolean
   expected: string
-  expectedNumerator?: number
-  expectedDenominator?: number
+  expectedNumerator?: number | null
+  expectedDenominator?: number | null
+  expectedNote?: string | null
   rollCount: number
   seed?: number | null
   rolls: number[]

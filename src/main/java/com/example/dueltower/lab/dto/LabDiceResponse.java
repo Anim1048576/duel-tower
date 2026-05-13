@@ -4,12 +4,16 @@ import java.util.List;
 
 public record LabDiceResponse(
         String notation,
+        String normalizedNotation,
         LabDiceSpecDto spec,
+        LabDiceExpressionDto expression,
         int min,
         int max,
+        boolean expectedAvailable,
         String expected,
-        long expectedNumerator,
-        long expectedDenominator,
+        Long expectedNumerator,
+        Long expectedDenominator,
+        String expectedNote,
         int rollCount,
         Long seed,
         List<Integer> rolls,

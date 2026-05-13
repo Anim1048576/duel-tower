@@ -15,6 +15,7 @@
 
   const DEFAULT_NOTATION = '1d6'
   const DEFAULT_ROLL_COUNT = 20
+  const DICE_EXAMPLES = ['3D6KH2+2D4MAX+1', '4D6DL2', '1D6+2D4+3']
 
   let notation = $state(DEFAULT_NOTATION)
   let rollCount = $state(DEFAULT_ROLL_COUNT)
@@ -28,10 +29,22 @@
   )
   const expectedNote = $derived.by(() => {
     if (!result) return 'Server expected value'
+    if (result.expectedAvailable === false) {
+      return result.expectedNote ?? 'Expected value is not available for this notation.'
+    }
     if (result.expectedNumerator === undefined || result.expectedDenominator === undefined) {
       return 'Server expected value'
     }
     return `Rational ${result.expectedNumerator}/${result.expectedDenominator}`
+  })
+  const resultNotation = $derived.by(() => result?.normalizedNotation ?? result?.notation ?? '')
+  const specSummary = $derived.by(() => {
+    if (!result?.spec) return 'Expression'
+    return `${result.spec.count}d${result.spec.sides}`
+  })
+  const specNote = $derived.by(() => {
+    if (!result?.spec) return 'Composite or selector notation'
+    return `Modifier ${result.spec.modifier >= 0 ? '+' : ''}${result.spec.modifier}`
   })
 
   function createRequest(): LabDiceRequest {
@@ -88,8 +101,23 @@
     }}>
       <label>
         <span>Notation</span>
-        <input bind:value={notation} autocomplete="off" placeholder="3d6+2" />
+        <input bind:value={notation} autocomplete="off" placeholder="3D6KH2+2D4MAX+1" />
       </label>
+
+      <div class="lab-dice-panel__examples" aria-label="Dice notation examples">
+        {#each DICE_EXAMPLES as example}
+          <button
+            type="button"
+            class="lab-dice-panel__example"
+            onclick={() => {
+              notation = example
+            }}
+            disabled={loading}
+          >
+            {example}
+          </button>
+        {/each}
+      </div>
 
       <label>
         <span>Roll count</span>
@@ -134,23 +162,66 @@
     {#if result}
       <div class="lab-dice-panel__result">
         <div class="lab-dice-panel__summary">
-          <StatBlock value={result.notation} label="Notation" note="Server normalized input" />
-          <StatBlock
-            value={`${result.spec.count}d${result.spec.sides}`}
-            label="Spec"
-            note={`Modifier ${result.spec.modifier >= 0 ? '+' : ''}${result.spec.modifier}`}
-          />
+          <StatBlock value={resultNotation} label="Notation" note="Server normalized input" />
+          <StatBlock value={specSummary} label="Spec" note={specNote} />
           <StatBlock value={result.expected} label="Expected" note={expectedNote} />
           <StatBlock value={result.rollCount} label="Roll count" note={`Seed ${seedLabel}`} />
         </div>
 
         <div class="lab-dice-panel__chips" aria-label="Dice metadata">
-          <TagChip label={`Count ${result.spec.count}`} tone="accent" />
-          <TagChip label={`Sides ${result.spec.sides}`} tone="success" />
-          <TagChip label={`Modifier ${result.spec.modifier}`} tone="warning" />
+          {#if result.spec}
+            <TagChip label={`Count ${result.spec.count}`} tone="accent" />
+            <TagChip label={`Sides ${result.spec.sides}`} tone="success" />
+            <TagChip label={`Modifier ${result.spec.modifier}`} tone="warning" />
+          {:else if result.expression?.terms?.length}
+            {#each result.expression.terms as term}
+              <TagChip
+                label={term.display}
+                tone={term.kind === 'DICE' ? 'accent' : 'warning'}
+              />
+            {/each}
+          {/if}
           <TagChip label={`Min ${result.min}`} tone="muted" />
           <TagChip label={`Max ${result.max}`} tone="muted" />
+          {#if result.expectedAvailable === false}
+            <TagChip label="Expected N/A" tone="muted" />
+          {/if}
         </div>
+
+        {#if result.expression?.terms?.length}
+          <div class="lab-dice-panel__section">
+            <div class="lab-dice-panel__section-header">
+              <h3>Expression</h3>
+              <span>{result.expression.terms.length} terms</span>
+            </div>
+
+            <div class="lab-dice-panel__terms" aria-label="Parsed dice expression terms">
+              {#each result.expression.terms as term}
+                <div class="lab-dice-panel__term">
+                  <strong>{term.display}</strong>
+                  <span>{term.kind}</span>
+                  {#if term.kind === 'DICE'}
+                    <small>
+                      {term.count}D{term.sides}
+                      {#if term.selector}
+                        · {term.selector}{term.selectorAmount}
+                      {/if}
+                    </small>
+                  {:else}
+                    <small>Value {term.value}</small>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        {#if result.expectedAvailable === false && result.expectedNote}
+          <ContentStatePanel
+            title="Expected value is not available"
+            message={result.expectedNote}
+          />
+        {/if}
 
         <div class="lab-dice-panel__section">
           <div class="lab-dice-panel__section-header">
@@ -251,6 +322,21 @@
     gap: 0.75rem;
   }
 
+  .lab-dice-panel__examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .lab-dice-panel__example {
+    min-height: 2rem;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid var(--color-border);
+    background: rgba(12, 11, 10, 0.22);
+    color: var(--color-text-muted);
+    font-size: 0.74rem;
+  }
+
   .lab-dice-panel__actions button {
     min-height: 2.75rem;
     padding: 0.65rem 0.95rem;
@@ -330,6 +416,33 @@
   .lab-dice-panel__rolls strong {
     font-family: var(--font-display);
     font-size: 1.1rem;
+  }
+
+  .lab-dice-panel__terms {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+    gap: 0.6rem;
+  }
+
+  .lab-dice-panel__term {
+    min-height: 4.75rem;
+    display: grid;
+    align-content: center;
+    gap: 0.2rem;
+    border: 1px solid var(--color-border);
+    background: rgba(12, 11, 10, 0.2);
+    padding: 0.65rem 0.75rem;
+  }
+
+  .lab-dice-panel__term strong {
+    font-family: var(--font-display);
+    font-size: 1rem;
+  }
+
+  .lab-dice-panel__term span,
+  .lab-dice-panel__term small {
+    color: var(--color-text-muted);
+    font-size: 0.72rem;
   }
 
   .lab-dice-panel__histogram {

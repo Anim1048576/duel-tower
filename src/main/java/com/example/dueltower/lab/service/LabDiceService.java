@@ -2,10 +2,12 @@ package com.example.dueltower.lab.service;
 
 import com.example.dueltower.common.util.DiceUtility;
 import com.example.dueltower.common.util.Rational;
+import com.example.dueltower.lab.dto.LabDiceExpressionDto;
 import com.example.dueltower.lab.dto.LabDiceHistogramEntryDto;
 import com.example.dueltower.lab.dto.LabDiceRequest;
 import com.example.dueltower.lab.dto.LabDiceResponse;
 import com.example.dueltower.lab.dto.LabDiceSpecDto;
+import com.example.dueltower.lab.dto.LabDiceTermDto;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,22 +33,27 @@ public class LabDiceService {
         }
 
         String notation = request.notation();
-        DiceUtility.DiceSpec spec = parseSpec(notation);
-        String normalizedNotation = notation.trim();
+        DiceUtility.DiceExpression expression = parseExpression(notation);
+        LabDiceSpecDto spec = parseLegacySpec(notation);
+        String normalizedNotation = normalizeNotation(notation);
         int rollCount = normalizeRollCount(request.rollCount());
 
-        Rational expected = expectedDice(normalizedNotation);
+        ExpectedResult expected = expectedDice(normalizedNotation);
         List<Integer> rolls = roll(normalizedNotation, rollCount, request.seed());
         List<LabDiceHistogramEntryDto> histogram = histogram(rolls);
 
         return new LabDiceResponse(
+                notation,
                 normalizedNotation,
-                new LabDiceSpecDto(spec.count(), spec.sides(), spec.modifier()),
+                spec,
+                toExpressionDto(expression),
                 minDice(normalizedNotation),
                 maxDice(normalizedNotation),
-                formatExpected(expected),
-                expected.getNumerator(),
-                expected.getDenominator(),
+                expected.available(),
+                expected.display(),
+                expected.numerator(),
+                expected.denominator(),
+                expected.note(),
                 rollCount,
                 request.seed(),
                 rolls,
@@ -54,17 +61,35 @@ public class LabDiceService {
         );
     }
 
-    private DiceUtility.DiceSpec parseSpec(String notation) {
+    private DiceUtility.DiceExpression parseExpression(String notation) {
         try {
-            return DiceUtility.parseDice(notation);
+            return DiceUtility.parseDiceExpression(notation);
         } catch (IllegalArgumentException ex) {
             throw badRequest(ex.getMessage());
         }
     }
 
-    private Rational expectedDice(String notation) {
+    private LabDiceSpecDto parseLegacySpec(String notation) {
         try {
-            return DiceUtility.expectedDice(notation);
+            DiceUtility.DiceSpec spec = DiceUtility.parseDice(notation);
+            return new LabDiceSpecDto(spec.count(), spec.sides(), spec.modifier());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private ExpectedResult expectedDice(String notation) {
+        try {
+            Rational value = DiceUtility.expectedDice(notation);
+            return new ExpectedResult(
+                    true,
+                    formatExpected(value),
+                    value.getNumerator(),
+                    value.getDenominator(),
+                    null
+            );
+        } catch (UnsupportedOperationException ex) {
+            return new ExpectedResult(false, "N/A", null, null, ex.getMessage());
         } catch (IllegalArgumentException | ArithmeticException ex) {
             throw badRequest(ex.getMessage());
         }
@@ -121,6 +146,61 @@ public class LabDiceService {
                 .toList();
     }
 
+    private String normalizeNotation(String notation) {
+        return notation.replaceAll("\\s+", "");
+    }
+
+    private LabDiceExpressionDto toExpressionDto(DiceUtility.DiceExpression expression) {
+        return new LabDiceExpressionDto(expression.terms().stream()
+                .map(this::toTermDto)
+                .toList());
+    }
+
+    private LabDiceTermDto toTermDto(DiceUtility.SignedTerm signedTerm) {
+        DiceUtility.DiceTerm term = signedTerm.term();
+        if (term instanceof DiceUtility.ConstantTerm constant) {
+            return new LabDiceTermDto(
+                    signedTerm.sign(),
+                    "CONSTANT",
+                    constant.value(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    displaySign(signedTerm.sign()) + constant.value()
+            );
+        }
+        if (term instanceof DiceUtility.DiceRollTerm dice) {
+            String selector = dice.selector() == null ? null : dice.selector().kind().name();
+            Integer selectorAmount = dice.selector() == null ? null : dice.selector().amount();
+            return new LabDiceTermDto(
+                    signedTerm.sign(),
+                    "DICE",
+                    null,
+                    dice.count(),
+                    dice.sides(),
+                    selector,
+                    selectorAmount,
+                    displayDiceTerm(signedTerm.sign(), dice)
+            );
+        }
+        throw new IllegalArgumentException("unsupported dice term: " + term);
+    }
+
+    private String displayDiceTerm(int sign, DiceUtility.DiceRollTerm dice) {
+        StringBuilder display = new StringBuilder();
+        display.append(displaySign(sign));
+        display.append(dice.count()).append("D").append(dice.sides());
+        if (dice.selector() != null) {
+            display.append(dice.selector().kind()).append(dice.selector().amount());
+        }
+        return display.toString();
+    }
+
+    private String displaySign(int sign) {
+        return sign < 0 ? "-" : "+";
+    }
+
     private String formatExpected(Rational value) {
         if (value.getDenominator() == 1L) {
             return Long.toString(value.getNumerator());
@@ -133,5 +213,14 @@ public class LabDiceService {
 
     private ResponseStatusException badRequest(String message) {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+    }
+
+    private record ExpectedResult(
+            boolean available,
+            String display,
+            Long numerator,
+            Long denominator,
+            String note
+    ) {
     }
 }
