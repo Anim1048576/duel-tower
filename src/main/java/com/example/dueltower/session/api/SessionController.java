@@ -19,6 +19,7 @@ import com.example.dueltower.session.dto.RecentResultsResponse;
 import com.example.dueltower.session.dto.ResetSessionRequest;
 import com.example.dueltower.session.dto.RestoreGmAccessResponse;
 import com.example.dueltower.session.dto.RunStateDto;
+import com.example.dueltower.session.dto.SessionShopResponse;
 import com.example.dueltower.session.dto.SessionRunChoicesResponse;
 import com.example.dueltower.session.dto.SessionRunInventoryResponse;
 import com.example.dueltower.session.dto.SessionStateDto;
@@ -139,6 +140,14 @@ public class SessionController {
                                                  @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
                                                  Authentication authentication) {
         return sessionQueryService.getInventory(code, gmTokenHeader, playerTokenHeader, authentication);
+    }
+
+    @GetMapping("/{code}/shop")
+    public SessionShopResponse shop(@PathVariable String code,
+                                    @RequestHeader(value = "X-GM-Token", required = false) String gmTokenHeader,
+                                    @RequestHeader(value = "X-Player-Token", required = false) String playerTokenHeader,
+                                    Authentication authentication) {
+        return sessionQueryService.getShop(code, gmTokenHeader, playerTokenHeader, authentication);
     }
 
     @GetMapping("/{code}/results")

@@ -145,6 +145,8 @@ public final class RunState {
         this.runConfig = Objects.requireNonNull(runConfig, "runConfig");
     }
 
+    public RunConfig runConfig() { return runConfig; }
+
     public int floor() { return floor; }
     public boolean currentFloorCleared() { return currentFloorCleared; }
     public boolean currentFloorSafeZone() { return currentFloorCleared; }

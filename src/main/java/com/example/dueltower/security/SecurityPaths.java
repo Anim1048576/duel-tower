@@ -56,6 +56,7 @@ public final class SecurityPaths {
             "/api/sessions/*/recent-results",
             "/api/sessions/*/run",
             "/api/sessions/*/inventory",
+            "/api/sessions/*/shop",
             "/api/sessions/*/results",
             "/api/sessions/*/choices"
     };

@@ -1,7 +1,11 @@
 package com.example.dueltower.session.service;
 
+import com.example.dueltower.engine.model.GameState;
+import com.example.dueltower.engine.model.NodeState;
+import com.example.dueltower.engine.model.RunState;
 import com.example.dueltower.session.dto.RecentResultsResponse;
 import com.example.dueltower.session.dto.RunStateDto;
+import com.example.dueltower.session.dto.SessionShopResponse;
 import com.example.dueltower.session.dto.SessionRunChoicesResponse;
 import com.example.dueltower.session.dto.SessionRunInventoryResponse;
 import com.example.dueltower.session.dto.SessionStateDto;
@@ -88,6 +92,30 @@ public class SessionQueryService {
         );
     }
 
+    public SessionShopResponse getShop(String code,
+                                       String gmTokenHeader,
+                                       String playerTokenHeader,
+                                       Authentication authentication) {
+        return withSessionReadableAccess(
+                code,
+                gmTokenHeader,
+                playerTokenHeader,
+                authentication,
+                "GET /api/sessions/{code}/shop",
+                rt -> {
+                    ShopAvailability availability = shopAvailability(rt.state());
+                    return new SessionShopResponse(
+                            rt.code(),
+                            rt.state().version(),
+                            availability.open(),
+                            availability.unavailableReason(),
+                            rt.state().runState().inventory().gold(),
+                            StateMapper.toShopOfferDtos(rt.state().runState())
+                    );
+                }
+        );
+    }
+
     public RecentResultsResponse getResults(String code,
                                             String gmTokenHeader,
                                             String playerTokenHeader,
@@ -150,4 +178,20 @@ public class SessionQueryService {
             return reader.apply(rt);
         });
     }
+
+    private ShopAvailability shopAvailability(GameState state) {
+        if (state.combat() != null || state.nodeState() == NodeState.COMBAT) {
+            return new ShopAvailability(false, "전투 중에는 구매할 수 없습니다.");
+        }
+        RunState run = state.runState();
+        if (run.currentNode() == null || run.currentNode().phase() != RunState.NodePhase.EVENT) {
+            return new ShopAvailability(false, "이벤트 노드에서만 구매할 수 있습니다.");
+        }
+        if (run.resultPending()) {
+            return new ShopAvailability(false, "이벤트 결과 확인 후 구매할 수 있습니다.");
+        }
+        return new ShopAvailability(true, null);
+    }
+
+    private record ShopAvailability(boolean open, String unavailableReason) {}
 }

@@ -393,6 +393,62 @@ public final class StateMapper {
         );
     }
 
+    public static List<ShopOfferDto> toShopOfferDtos(RunState run) {
+        if (run == null || run.runConfig() == null) {
+            return List.of();
+        }
+        return run.runConfig().defaultShopOffers().stream()
+                .map(StateMapper::toShopOfferDto)
+                .toList();
+    }
+
+    private static ShopOfferDto toShopOfferDto(RunState.ShopOffer offer) {
+        if (offer.ref() instanceof ItemRef itemRef) {
+            ItemDefinition def = itemDefsById.get(itemRef.itemId());
+            if (def == null) {
+                throw new IllegalStateException("item definition not found: " + itemRef.itemId());
+            }
+            return new ShopOfferDto(
+                    offer.offerId(),
+                    "ITEM",
+                    def.id(),
+                    def.name(),
+                    offer.price(),
+                    offer.stock(),
+                    offer.bound(),
+                    def.battleUsable(),
+                    def.summary(),
+                    def.description(),
+                    def.tags(),
+                    null,
+                    null
+            );
+        }
+        if (offer.ref() instanceof EquipRef equipRef) {
+            EquipDefinition def = equipDefsById.get(equipRef.equipId());
+            if (def == null) {
+                throw new IllegalStateException("equip definition not found: " + equipRef.equipId());
+            }
+            EquipAmmoPolicy ammoPolicy = def.ammoPolicy();
+            return new ShopOfferDto(
+                    offer.offerId(),
+                    "EQUIP",
+                    def.id(),
+                    def.name(),
+                    offer.price(),
+                    offer.stock(),
+                    offer.bound(),
+                    false,
+                    def.summary(),
+                    def.description(),
+                    def.tags(),
+                    ammoPolicy == null ? null : ammoPolicy.initialLoadedAmmo(),
+                    ammoPolicy == null ? null : ammoPolicy.maxLoadedAmmo()
+            );
+        }
+        throw new IllegalStateException("unsupported shop offer ref");
+    }
+
     public static List<EventDto> toEventDtos(List<GameEvent> events) {
         List<EventDto> out = new ArrayList<>(events.size());
         for (GameEvent ev : events) out.add(toEventDto(ev));
