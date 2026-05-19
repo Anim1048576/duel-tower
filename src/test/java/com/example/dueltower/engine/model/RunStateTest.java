@@ -32,12 +32,21 @@ class RunStateTest {
     @Test
     void shopOffersContainConsumablesEquipmentsAndBulletBundle() {
         RunState run = new RunState();
+        run.initialize(1234L);
+        RunState.NodeChoice event = run.availableChoices().stream()
+                .filter(choice -> choice.phase() == RunState.NodePhase.EVENT)
+                .findFirst()
+                .orElseThrow();
 
+        run.beginNode(event);
+
+        assertTrue(run.shopState().open());
         assertEquals("I-1", ((ItemRef) run.findShopOffer("O-1").ref()).itemId());
         assertEquals("I-7", ((ItemRef) run.findShopOffer("O-7").ref()).itemId());
         assertEquals("E-1", ((EquipRef) run.findShopOffer("O-8").ref()).equipId());
         assertEquals("E-2", ((EquipRef) run.findShopOffer("O-9").ref()).equipId());
         assertEquals("I-8", ((ItemRef) run.findShopOffer("O-10").ref()).itemId());
+        assertEquals(5, run.findShopOffer("O-1").stockRemaining());
     }
 
     @Test

@@ -103,6 +103,18 @@ public final class RunState {
             boolean bound
     ) {}
 
+    public record ShopOfferState(
+            String offerId,
+            InventoryEntryRef ref,
+            int price,
+            int stockRemaining,
+            boolean bound
+    ) {
+        public ShopOfferState {
+            stockRemaining = Math.max(0, stockRemaining);
+        }
+    }
+
     public static final class Inventory {
         private int keys;
         private int chests;
@@ -128,6 +140,37 @@ public final class RunState {
         }
     }
 
+    public static final class ShopState {
+        private boolean open;
+        private final List<ShopOfferState> offers = new ArrayList<>();
+
+        public boolean open() { return open; }
+        public void open(boolean open) { this.open = open; }
+
+        public List<ShopOfferState> offers() {
+            return Collections.unmodifiableList(offers);
+        }
+
+        public void replaceOffers(List<ShopOfferState> value) {
+            offers.clear();
+            if (value != null) {
+                offers.addAll(value);
+            }
+        }
+
+        public void replaceOffer(ShopOfferState value) {
+            if (value == null) {
+                return;
+            }
+            for (int i = 0; i < offers.size(); i++) {
+                if (offers.get(i).offerId().equals(value.offerId())) {
+                    offers.set(i, value);
+                    return;
+                }
+            }
+        }
+    }
+
     private final RunConfig runConfig;
     private int floor = 1;
     private boolean currentFloorCleared;
@@ -136,6 +179,7 @@ public final class RunState {
     private final List<NodeChoice> availableChoices = new ArrayList<>();
     private final List<RecentResult> recentResults = new ArrayList<>();
     private final Inventory inventory = new Inventory();
+    private final ShopState shopState = new ShopState();
 
     public RunState() {
         this(RunConfigs.defaultConfig());
@@ -178,11 +222,16 @@ public final class RunState {
         return inventory;
     }
 
+    public ShopState shopState() {
+        return shopState;
+    }
+
     public void initialize(long seed) {
         floor = 1;
         currentFloorCleared = false;
         currentNode = null;
         resultPending = false;
+        closeShop();
         inventory.keys(runConfig.startingKeys());
         inventory.chests(runConfig.startingChests());
         inventory.gold(runConfig.startingGold());
@@ -217,6 +266,11 @@ public final class RunState {
         );
         this.resultPending = false;
         availableChoices.clear();
+        if (choice.phase() == NodePhase.EVENT) {
+            openDefaultShop();
+        } else {
+            closeShop();
+        }
     }
 
     public boolean currentNodeForcedSuccessJudgement() {
@@ -265,6 +319,7 @@ public final class RunState {
         if (resultPending) {
             currentNode = null;
             resultPending = false;
+            closeShop();
         }
     }
 
@@ -287,16 +342,50 @@ public final class RunState {
         return true;
     }
 
-    public ShopOffer findShopOffer(String offerId) {
+    public ShopOfferState findShopOffer(String offerId) {
         if (offerId == null || offerId.isBlank()) {
             return null;
         }
-        for (ShopOffer offer : runConfig.defaultShopOffers()) {
+        for (ShopOfferState offer : shopState.offers()) {
             if (offer.offerId().equals(offerId.trim())) {
                 return offer;
             }
         }
         return null;
+    }
+
+    public boolean decrementShopOfferStock(String offerId, int count) {
+        ShopOfferState offer = findShopOffer(offerId);
+        if (offer == null || count <= 0 || count > offer.stockRemaining()) {
+            return false;
+        }
+        shopState.replaceOffer(new ShopOfferState(
+                offer.offerId(),
+                offer.ref(),
+                offer.price(),
+                offer.stockRemaining() - count,
+                offer.bound()
+        ));
+        return true;
+    }
+
+    public void closeShop() {
+        shopState.open(false);
+        shopState.replaceOffers(List.of());
+    }
+
+    private void openDefaultShop() {
+        // Extension point: node-specific shop types can replace this default offer copy later.
+        shopState.open(true);
+        shopState.replaceOffers(runConfig.defaultShopOffers().stream()
+                .map(offer -> new ShopOfferState(
+                        offer.offerId(),
+                        offer.ref(),
+                        offer.price(),
+                        offer.stock(),
+                        offer.bound()
+                ))
+                .toList());
     }
 
     public void appendRecentResult(String type,

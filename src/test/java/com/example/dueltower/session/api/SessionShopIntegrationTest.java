@@ -57,12 +57,39 @@ class SessionShopIntegrationTest {
         assertOfferIdsPresent(shop.path("offers"), "O-1", "O-8", "O-9", "O-10");
         assertEquals("ITEM", findOffer(shop, "O-1").path("entryType").asText());
         assertEquals("I-1", findOffer(shop, "O-1").path("refId").asText());
+        assertEquals(5, findOffer(shop, "O-1").path("stock").asInt());
         assertEquals("EQUIP", findOffer(shop, "O-8").path("entryType").asText());
         assertEquals("E-1", findOffer(shop, "O-8").path("refId").asText());
         assertEquals("EQUIP", findOffer(shop, "O-9").path("entryType").asText());
         assertEquals("E-2", findOffer(shop, "O-9").path("refId").asText());
         assertEquals(6, findOffer(shop, "O-9").path("loadedAmmo").asInt());
         assertEquals(6, findOffer(shop, "O-9").path("maxLoadedAmmo").asInt());
+    }
+
+    @Test
+    void shopReturnsRemainingStockAfterPurchase() throws Exception {
+        Fixture fx = createFixture("shop-stock");
+        selectEventNode(fx);
+        JsonNode before = getShop(fx);
+        assertEquals(5, findOffer(before, "O-1").path("stock").asInt());
+
+        JsonNode bought = commandAsPlayer(
+                fx.code(),
+                fx.playerToken(),
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-1",
+                  "expectedVersion": %d
+                }
+                """.formatted(before.path("version").asLong())
+        );
+        assertTrue(bought.path("accepted").asBoolean());
+
+        JsonNode after = getShop(fx);
+        assertTrue(after.path("open").asBoolean());
+        assertEquals(4, findOffer(after, "O-1").path("stock").asInt());
     }
 
     @Test
@@ -73,7 +100,7 @@ class SessionShopIntegrationTest {
 
         assertFalse(shop.path("open").asBoolean());
         assertEquals("이벤트 노드에서만 구매할 수 있습니다.", shop.path("unavailableReason").asText());
-        assertOfferIdsPresent(shop.path("offers"), "O-1", "O-8", "O-9", "O-10");
+        assertTrue(shop.path("offers").isEmpty());
     }
 
     @Test
@@ -99,7 +126,7 @@ class SessionShopIntegrationTest {
 
         assertFalse(shop.path("open").asBoolean());
         assertEquals("전투 중에는 구매할 수 없습니다.", shop.path("unavailableReason").asText());
-        assertOfferIdsPresent(shop.path("offers"), "O-1", "O-8", "O-9", "O-10");
+        assertTrue(shop.path("offers").isEmpty());
     }
 
     private JsonNode getShop(Fixture fx) throws Exception {

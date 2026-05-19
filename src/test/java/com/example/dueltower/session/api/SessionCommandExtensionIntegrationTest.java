@@ -16,6 +16,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -77,6 +79,20 @@ class SessionCommandExtensionIntegrationTest {
         assertTrue(left.path("state").path("run").path("resultPending").asBoolean());
         JsonNode recentResult = left.path("state").path("run").path("recentResults").get(0);
         assertEquals("shop", recentResult.path("type").asText());
+        JsonNode buyAfterLeave = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-1",
+                  "expectedVersion": %d
+                }
+                """.formatted(left.path("state").path("version").asLong())
+        );
+        assertFalse(buyAfterLeave.path("accepted").asBoolean());
+        assertTrue(hasError(buyAfterLeave, "shop is not available now"));
         assertEquals("상점 이용 완료", recentResult.path("title").asText());
     }
 
@@ -679,6 +695,58 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    void buyShopItemRejectsWhenStockInsufficientOrDepleted() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectEventNode(fx);
+
+        JsonNode tooMany = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-1",
+                  "count": 6,
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.path("state").path("version").asLong())
+        );
+        assertFalse(tooMany.path("accepted").asBoolean());
+        assertTrue(hasError(tooMany, "not enough stock"));
+
+        JsonNode boughtAll = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-1",
+                  "count": 5,
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.path("state").path("version").asLong())
+        );
+        assertTrue(boughtAll.path("accepted").asBoolean());
+
+        JsonNode outOfStock = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-1",
+                  "expectedVersion": %d
+                }
+                """.formatted(boughtAll.path("state").path("version").asLong())
+        );
+        assertFalse(outOfStock.path("accepted").asBoolean());
+        assertTrue(hasError(outOfStock, "offer out of stock"));
+    }
+
+    @Test
     @DisplayName("상점 아이템 구매는 플레이어 토큰이 없으면 실패한다")
     void buyShopItemFailsWithoutPlayerToken() throws Exception {
         Fixture fx = createFixture();
@@ -805,7 +873,7 @@ class SessionCommandExtensionIntegrationTest {
 
     @Test
     @DisplayName("상점 아이템 구매는 골드가 부족하면 거부한다")
-    void buyShopItemRejectsWhenGoldInsufficient() throws Exception {
+    void buyShopItemRejectsWhenStockInsufficient() throws Exception {
         Fixture fx = createFixture();
         JsonNode selected = selectEventNode(fx);
 
@@ -824,7 +892,7 @@ class SessionCommandExtensionIntegrationTest {
         );
 
         assertFalse(response.path("accepted").asBoolean());
-        assertTrue(hasError(response, "not enough gold"));
+        assertTrue(hasError(response, "not enough stock"));
     }
 
     @Test
@@ -1406,6 +1474,30 @@ class SessionCommandExtensionIntegrationTest {
         assertTrue(hasError(used, "combat not started") || hasError(used, "item is not battle usable"));
     }
 
+    @Test
+    void buyEquipOfferTwiceCreatesDistinctInventoryEquipIds() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectEventNode(fx);
+
+        JsonNode bought = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-9",
+                  "count": 2,
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.get("state").get("version").asLong())
+        );
+
+        assertTrue(bought.path("accepted").asBoolean());
+        assertEquals(2, countInventoryEntries(bought.path("state"), "E-2", "EQUIP"));
+        assertEquals(2, inventoryEquipIds(bought.path("state"), "E-2").size());
+    }
+
     private JsonNode startCombatAndReachPlayerMainTurn(Fixture fx) throws Exception {
         markReady(fx.code, "player1", fx.playerToken);
         if (fx.otherPlayerToken != null) {
@@ -1572,6 +1664,19 @@ class SessionCommandExtensionIntegrationTest {
             }
         }
         return count;
+    }
+
+    private Set<String> inventoryEquipIds(JsonNode stateNode, String equipId) {
+        Set<String> ids = new HashSet<>();
+        JsonNode items = stateNode.path("run").path("inventory").path("items");
+        for (JsonNode item : items) {
+            if (equipId.equals(item.path("id").asText()) && "EQUIP".equals(item.path("entryType").asText())) {
+                String inventoryEquipId = item.path("inventoryEquipId").asText();
+                assertFalse(inventoryEquipId.isBlank());
+                ids.add(inventoryEquipId);
+            }
+        }
+        return ids;
     }
 
     private JsonNode commandAsPlayer(String code, String playerToken, String body) throws Exception {

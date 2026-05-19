@@ -44,14 +44,22 @@ public record BuyShopItemCommand(
             errors.add("cannot buy shop item during combat");
             return errors;
         }
-        if (!RunCommandSupport.isEventNodePending(state)) {
+        if (!RunCommandSupport.isEventNodePending(state) || !state.runState().shopState().open()) {
             errors.add("shop is not available now");
             return errors;
         }
 
-        RunState.ShopOffer offer = state.runState().findShopOffer(offerId);
+        RunState.ShopOfferState offer = state.runState().findShopOffer(offerId);
         if (offer == null) {
             errors.add("offer not found");
+            return errors;
+        }
+        if (offer.stockRemaining() <= 0) {
+            errors.add("offer out of stock");
+            return errors;
+        }
+        if (count > offer.stockRemaining()) {
+            errors.add("not enough stock");
             return errors;
         }
 
@@ -64,8 +72,11 @@ public record BuyShopItemCommand(
 
     @Override
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
-        RunState.ShopOffer offer = state.runState().findShopOffer(offerId);
+        RunState.ShopOfferState offer = state.runState().findShopOffer(offerId);
         if (offer == null) {
+            return List.of();
+        }
+        if (!state.runState().decrementShopOfferStock(offerId, count)) {
             return List.of();
         }
 

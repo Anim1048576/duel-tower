@@ -190,6 +190,9 @@ public class SessionQueryService {
         if (run.resultPending()) {
             return new ShopAvailability(false, "이벤트 결과 확인 후 구매할 수 있습니다.");
         }
+        if (!run.shopState().open()) {
+            return new ShopAvailability(false, "shop is not open.");
+        }
         return new ShopAvailability(true, null);
     }
 

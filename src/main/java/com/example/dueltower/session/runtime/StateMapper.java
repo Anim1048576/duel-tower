@@ -394,15 +394,15 @@ public final class StateMapper {
     }
 
     public static List<ShopOfferDto> toShopOfferDtos(RunState run) {
-        if (run == null || run.runConfig() == null) {
+        if (run == null) {
             return List.of();
         }
-        return run.runConfig().defaultShopOffers().stream()
+        return run.shopState().offers().stream()
                 .map(StateMapper::toShopOfferDto)
                 .toList();
     }
 
-    private static ShopOfferDto toShopOfferDto(RunState.ShopOffer offer) {
+    private static ShopOfferDto toShopOfferDto(RunState.ShopOfferState offer) {
         if (offer.ref() instanceof ItemRef itemRef) {
             ItemDefinition def = itemDefsById.get(itemRef.itemId());
             if (def == null) {
@@ -414,7 +414,7 @@ public final class StateMapper {
                     def.id(),
                     def.name(),
                     offer.price(),
-                    offer.stock(),
+                    offer.stockRemaining(),
                     offer.bound(),
                     def.battleUsable(),
                     def.summary(),
@@ -436,7 +436,7 @@ public final class StateMapper {
                     def.id(),
                     def.name(),
                     offer.price(),
-                    offer.stock(),
+                    offer.stockRemaining(),
                     offer.bound(),
                     false,
                     def.summary(),

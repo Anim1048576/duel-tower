@@ -31,7 +31,7 @@ public record LeaveShopCommand(
             errors.add("cannot leave shop during combat");
             return errors;
         }
-        if (!RunCommandSupport.isEventNodePending(state)) {
+        if (!RunCommandSupport.isEventNodePending(state) || !state.runState().shopState().open()) {
             errors.add("shop is not available now");
         }
         return errors;
@@ -39,6 +39,7 @@ public record LeaveShopCommand(
 
     @Override
     public List<GameEvent> handle(GameState state, EngineContext ctx) {
+        state.runState().closeShop();
         state.runState().resolveCurrentNode(
                 "shop",
                 "상점 이용 완료",
