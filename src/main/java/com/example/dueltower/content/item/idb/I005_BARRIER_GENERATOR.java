@@ -25,8 +25,8 @@ public class I005_BARRIER_GENERATOR implements ItemBlueprint {
                 id(),
                 "장벽 생성기",
                 true,
-                "전투 중 사용 가능 · 아군 진영 [방벽] 20",
-                "아군 진영에 [방벽] 20을 적용합니다.",
+                "전투 중 사용 가능 · 아군 진영 [방벽] 15",
+                "아군 진영에 [방벽] 15을 적용합니다.",
                 List.of("소모품", "방어")
         );
     }
@@ -37,7 +37,7 @@ public class I005_BARRIER_GENERATOR implements ItemBlueprint {
             return;
         }
 
-        int added = 20 * ctx.useCount();
+        int added = 15 * ctx.useCount();
         ctx.combat().factionStatusValues(CombatState.FactionId.PLAYERS)
                 .merge(S301_Barrier.ID, added, Integer::sum);
 

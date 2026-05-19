@@ -70,6 +70,6 @@
     { "offerId": "O-7", "refId": "I-7", "price": 500, "stock": 5, "bound": false },
     { "offerId": "O-8", "refId": "E-1", "price": 200, "stock": 5, "bound": false },
     { "offerId": "O-9", "refId": "E-2", "price": 500, "stock": 5, "bound": false },
-    { "offerId": "O-10", "refId": "I-8", "price": 25, "stock": 5, "bound": false }
+    { "offerId": "O-10", "refId": "I-8", "price": 50, "stock": 5, "bound": false }
   ]
 }

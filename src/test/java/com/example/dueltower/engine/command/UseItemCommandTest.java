@@ -233,7 +233,7 @@ class UseItemCommandTest {
         EngineResult result = new GameEngine().process(state, defaultItemCtx(), command);
 
         assertTrue(result.accepted());
-        assertEquals(20, state.combat().factionStatusValues(CombatState.FactionId.PLAYERS).getOrDefault(S301_Barrier.ID, 0));
+        assertEquals(15, state.combat().factionStatusValues(CombatState.FactionId.PLAYERS).getOrDefault(S301_Barrier.ID, 0));
     }
 
     @Test
