@@ -36,6 +36,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -1175,23 +1176,24 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
         JsonNode screen = getCombatScreen(session.code(), playerToken);
         JsonNode playCardAction = findAction(screen, "combat.playCard");
         JsonNode source = StreamSupport.stream(playCardAction.path("metadata").path("sourceOptions").spliterator(), false)
-                .filter(option -> option.path("requirementView").path("boardObjectRequirement").isNull())
+                .filter(option -> option.path("supported").asBoolean())
+                .filter(option -> canBuildPlayCardPayloadFromRequirement(screen, option))
                 .findFirst()
-                .orElse(playCardAction.path("metadata").path("sourceOptions").get(0));
+                .orElseThrow(() -> new AssertionError(
+                        "No supported combat.playCard source option with a test-buildable requirement: "
+                                + playCardAction.path("metadata").path("sourceOptions")));
 
         JsonNode body = executeCombatAction(
                 session.code(),
                 "combat.playCard",
                 playerToken,
-                """
-                {
-                  "cardId": "%s"
-                }
-                """.formatted(source.path("instanceId").asText())
+                buildPlayCardPayloadFromRequirement(screen, source)
         );
 
         assertCombatActionResponseContract(body);
-        assertThat(body.path("success").asBoolean()).isTrue();
+        assertThat(body.path("success").asBoolean())
+                .as("combat.playCard action failed: %s", combatActionFailureSummary(body))
+                .isTrue();
         JsonNode logs = body.path("latestScreen").path("sidebar").path("logs");
         assertThat(logs).isNotEmpty();
         assertThat(hasCombatLog(logs, "combat.playCard")).isTrue();
@@ -1621,6 +1623,89 @@ class ScreenControllerIntegrationTest extends ScreenApiContractTestSupport {
                 .andExpect(status().isOk())
                 .andReturn();
         return readJson(result);
+    }
+
+    private boolean canBuildPlayCardPayloadFromRequirement(JsonNode screen, JsonNode source) {
+        JsonNode boardObjectRequirement = source.path("requirementView").path("boardObjectRequirement");
+        if (boardObjectRequirement.isNull()) {
+            return true;
+        }
+        if (!containsText(boardObjectRequirement.path("kinds"), "CHARACTER")) {
+            return false;
+        }
+        return switch (boardObjectRequirement.path("relation").asText()) {
+            case "HOSTILE" -> screen.path("actors").path("enemies").size() > 0;
+            case "ALLY" -> screen.path("actors").path("players").size() > 0;
+            default -> false;
+        };
+    }
+
+    private String buildPlayCardPayloadFromRequirement(JsonNode screen, JsonNode source) throws Exception {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("cardId", source.path("instanceId").asText());
+
+        JsonNode boardObjectRequirement = source.path("requirementView").path("boardObjectRequirement");
+        if (!boardObjectRequirement.isNull() && boardObjectRequirement.path("minSelections").asInt() > 0) {
+            payload.put("targets", List.of(targetFromBoardObjectRequirement(screen, boardObjectRequirement)));
+        }
+        return JSON.writeValueAsString(payload);
+    }
+
+    private Map<String, String> targetFromBoardObjectRequirement(JsonNode screen, JsonNode boardObjectRequirement) {
+        if (!containsText(boardObjectRequirement.path("kinds"), "CHARACTER")) {
+            throw new AssertionError("Only CHARACTER board-object targets are supported by this test: " + boardObjectRequirement);
+        }
+
+        return switch (boardObjectRequirement.path("relation").asText()) {
+            case "HOSTILE" -> Map.of("enemyId", firstRequiredText(
+                    screen.path("actors").path("enemies"),
+                    "enemyId",
+                    "No enemy target candidate for HOSTILE boardObjectRequirement"
+            ));
+            case "ALLY" -> Map.of("playerId", allyPlayerId(screen));
+            default -> throw new AssertionError("Unsupported boardObjectRequirement relation for test payload: "
+                    + boardObjectRequirement);
+        };
+    }
+
+    private String allyPlayerId(JsonNode screen) {
+        JsonNode players = screen.path("actors").path("players");
+        String visiblePlayerId = screen.path("zones").path("visiblePlayerId").asText();
+        if (!visiblePlayerId.isBlank()) {
+            for (JsonNode player : players) {
+                if (visiblePlayerId.equals(player.path("playerId").asText())) {
+                    return visiblePlayerId;
+                }
+            }
+        }
+        return firstRequiredText(players, "playerId", "No player target candidate for ALLY boardObjectRequirement");
+    }
+
+    private String firstRequiredText(JsonNode nodes, String fieldName, String failureMessage) {
+        if (nodes.size() == 0) {
+            throw new AssertionError(failureMessage);
+        }
+        String value = nodes.get(0).path(fieldName).asText();
+        if (value.isBlank()) {
+            throw new AssertionError(failureMessage + ": " + nodes);
+        }
+        return value;
+    }
+
+    private boolean containsText(JsonNode nodes, String expected) {
+        for (JsonNode node : nodes) {
+            if (expected.equals(node.asText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String combatActionFailureSummary(JsonNode body) {
+        return "outcome=" + body.path("outcome").asText()
+                + ", message=" + body.path("message").asText()
+                + ", disabledReason=" + body.path("disabledReason")
+                + ", resultSummary=" + body.path("resultSummary");
     }
 
     private void assertHandSwapDisabled(JsonNode screen,
