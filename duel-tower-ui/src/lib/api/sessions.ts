@@ -23,6 +23,7 @@ import type {
   SessionRequestAccess,
   SessionRunChoicesResponse,
   SessionRunInventoryResponse,
+  SessionShopResponse,
   SessionStateDto,
   SessionToken,
   UpdatePlayerReadyRequest,
@@ -118,6 +119,13 @@ export function getSessionStateAlias(code: SessionCode) {
   return apiGet<SessionStateDto>(`${getSessionResourcePath(code)}/state`, {
     handleUnauthorized: false,
   })
+}
+
+export function getSessionShop(code: SessionCode, access: SessionRequestAccess) {
+  return apiGet<SessionShopResponse>(
+    `${getSessionResourcePath(code)}/shop`,
+    withSessionAccess(access),
+  )
 }
 
 export function joinSession(code: SessionCode, payload: JoinSessionRequest) {

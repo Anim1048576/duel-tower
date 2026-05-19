@@ -386,6 +386,31 @@ export type SessionRunChoicesResponse = {
   availableChoices: RunNodeChoiceDto[]
 }
 
+export type ShopOfferDto = {
+  offerId: string
+  entryType: 'ITEM' | 'EQUIP'
+  refId: string
+  name: string
+  price: number
+  stock: number
+  bound: boolean
+  battleUsable: boolean
+  summary: string | null
+  description: string | null
+  tags: string[]
+  loadedAmmo: number | null
+  maxLoadedAmmo: number | null
+}
+
+export type SessionShopResponse = {
+  sessionCode: SessionCode
+  version: number
+  open: boolean
+  unavailableReason: string | null
+  gold: number
+  offers: ShopOfferDto[]
+}
+
 export type SessionEventsQuery = {
   afterVersion?: number | null
   limit?: number | null

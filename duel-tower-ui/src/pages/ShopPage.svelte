@@ -1,21 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { listItems } from '../lib/api/content'
-  import { executeSessionCommand, getSessionStateAlias } from '../lib/api/sessions'
-  import type { ItemDefinition } from '../lib/api/contentTypes'
-  import type { SessionStateDto, RunInventoryItemDto } from '../lib/api/sessionTypes'
+  import { executeSessionCommand, getSessionShop, getSessionStateAlias } from '../lib/api/sessions'
+  import type { SessionStateDto, RunInventoryItemDto, SessionShopResponse, ShopOfferDto } from '../lib/api/sessionTypes'
   import { getApiErrorMessage } from '../lib/api/types'
   import ContentStatePanel from '../lib/components/ContentStatePanel.svelte'
   import SectionFrame from '../lib/components/SectionFrame.svelte'
   import StatBlock from '../lib/components/StatBlock.svelte'
   import TagChip from '../lib/components/TagChip.svelte'
   import { pathBuilders } from '../lib/navigation'
-  import {
-    defaultShopCatalog,
-    getShopOfferFallback,
-    isEquipmentOfferRef,
-    type ShopCatalogOffer,
-  } from '../lib/session/shopCatalog'
   import {
     hasStoredSessionCode,
     isStoredGmSessionAccess,
@@ -35,16 +27,20 @@
   type OfferCategory = Exclude<ShopFilterKey, 'all'>
   type ResolvedShopOffer = {
     offerId: string
+    entryType: 'ITEM' | 'EQUIP'
     refId: string
     price: number
     stock: number
     bound: boolean
+    battleUsable: boolean
     name: string
     summary: string
     description: string
     tags: string[]
+    loadedAmmo: number | null
+    maxLoadedAmmo: number | null
     category: OfferCategory
-    source: 'item-api' | 'fallback'
+    source: 'shop-api' | 'fallback'
   }
 
   const shopFilters = [
@@ -58,16 +54,17 @@
   let errorMessage = $state<string | null>(null)
   let contextMessage = $state<string | null>(null)
   let accessNoticeMessage = $state<string | null>(null)
-  let itemCatalogNoticeMessage = $state<string | null>(null)
+  let shopCatalogNoticeMessage = $state<string | null>(null)
   let actionErrorMessage = $state<string | null>(null)
   let actionSuccessMessage = $state<string | null>(null)
   let runtimeAccess = $state<StoredSessionAccess | null>(null)
   let requestedSessionCode = $state<string | null>(null)
   let sessionState = $state<SessionStateDto | null>(null)
-  let itemCatalog = $state<ItemDefinition[]>([])
+  let shopState = $state<SessionShopResponse | null>(null)
   let selectedFilter = $state<ShopFilterKey>('all')
   let selectedOfferId = $state('')
   let purchasePendingOfferId = $state<string | null>(null)
+  let leavePending = $state(false)
 
   const goldFormatter = new Intl.NumberFormat('en-US')
 
@@ -90,11 +87,13 @@
       .join(' ')
   }
 
-  function getOfferCategory(offer: ShopCatalogOffer, itemDef: ItemDefinition | null): OfferCategory {
-    if (isEquipmentOfferRef(offer.refId)) return 'equipment'
-    const classifier = [itemDef?.id, ...(itemDef?.tags ?? [])].filter(Boolean).join(' ').toLowerCase()
-    if (itemDef?.battleUsable || classifier.includes('consum')) return 'consumable'
-    return classifier.includes('ammo') || classifier.includes('bundle') ? 'special' : 'special'
+  function getOfferCategory(offer: ShopOfferDto): OfferCategory {
+    if (offer.entryType === 'EQUIP') return 'equipment'
+    const classifier = [offer.refId, ...(offer.tags ?? [])].filter(Boolean).join(' ').toLowerCase()
+    if (offer.battleUsable || classifier.includes('consumable') || classifier.includes('consum') || classifier.includes('소모품')) {
+      return 'consumable'
+    }
+    return 'special'
   }
 
   function getOfferTone(category: OfferCategory): ShopTone {
@@ -110,32 +109,54 @@
     return 'SP'
   }
 
+  function getAmmoLabel(offer: Pick<ResolvedShopOffer, 'loadedAmmo' | 'maxLoadedAmmo'>) {
+    if (typeof offer.loadedAmmo !== 'number' || typeof offer.maxLoadedAmmo !== 'number') return null
+    return `Ammo ${offer.loadedAmmo}/${offer.maxLoadedAmmo}`
+  }
+
   function getInventoryGlyph(item: RunInventoryItemDto) {
     return getOfferGlyph(item.id, [item.entryType, ...item.tags])
   }
 
-  function resolveOffer(offer: ShopCatalogOffer): ResolvedShopOffer {
-    const itemDef = itemCatalog.find((item) => item.id === offer.refId) ?? null
-    const fallback = getShopOfferFallback(offer.refId)
-    const category = getOfferCategory(offer, itemDef)
+  function getOfferFallback(offer: ShopOfferDto) {
+    const normalizedRefId = offer.refId.trim() || offer.offerId
+    const entryType = offer.entryType === 'EQUIP' ? 'Equipment' : 'Item'
+    return {
+      name: normalizedRefId,
+      summary: `${entryType} offer`,
+      description: 'No detailed shop description is available yet.',
+      tags: [entryType.toLowerCase()],
+    }
+  }
+
+  function resolveOffer(offer: ShopOfferDto): ResolvedShopOffer {
+    const fallback = getOfferFallback(offer)
+    const category = getOfferCategory(offer)
+    const rawTags = offer.tags?.length ? offer.tags : fallback.tags
     return {
       offerId: offer.offerId,
+      entryType: offer.entryType,
       refId: offer.refId,
       price: offer.price,
       stock: offer.stock,
       bound: offer.bound,
-      name: itemDef?.name ?? fallback.name,
-      summary: itemDef?.summary ?? fallback.summary,
-      description: itemDef?.description ?? fallback.description,
+      battleUsable: offer.battleUsable,
+      name: offer.name?.trim() || fallback.name,
+      summary: offer.summary?.trim() || fallback.summary,
+      description: offer.description?.trim() || fallback.description,
       tags: Array.from(
         new Set([
+          offer.entryType,
           formatLabel(category),
-          ...(itemDef?.tags ?? fallback.tags).slice(0, 3).map((tag) => formatLabel(tag)),
+          ...rawTags.slice(0, 3).map((tag) => formatLabel(tag)),
           ...(offer.bound ? ['Bound'] : []),
+          ...(offer.battleUsable ? ['Battle usable'] : []),
         ]),
       ),
+      loadedAmmo: offer.loadedAmmo,
+      maxLoadedAmmo: offer.maxLoadedAmmo,
       category,
-      source: itemDef ? 'item-api' : 'fallback',
+      source: offer.name || offer.summary || offer.description ? 'shop-api' : 'fallback',
     }
   }
 
@@ -143,6 +164,25 @@
     sessionState = nextState
     if (requestedSessionCode) {
       syncSessionSelectionHandoff(requestedSessionCode)
+    }
+  }
+
+  function syncShopSnapshot(nextShop: SessionShopResponse | null) {
+    shopState = nextShop
+  }
+
+  async function refreshShopSnapshot() {
+    const access = toSessionReadAccess(runtimeAccess)
+    if (!requestedSessionCode || !access) {
+      shopState = null
+      return
+    }
+
+    try {
+      shopState = await getSessionShop(requestedSessionCode, access)
+      shopCatalogNoticeMessage = null
+    } catch (error) {
+      shopCatalogNoticeMessage = getApiErrorMessage(error, 'Could not load the server shop catalog.')
     }
   }
 
@@ -157,19 +197,24 @@
     readAccess: () => readStoredSessionAccess(),
     canLoad: ({ code, access }) => Boolean(code && access),
     loadState: async (code) => {
-      const [nextState, nextItems] = await Promise.allSettled([getSessionStateAlias(code), listItems()])
+      const access = toSessionReadAccess(runtimeAccess)
+      if (!access) {
+        throw new Error('Session access is required to load shop offers.')
+      }
+
+      const [nextState, nextShop] = await Promise.allSettled([getSessionStateAlias(code), getSessionShop(code, access)])
 
       if (nextState.status === 'rejected') {
         throw nextState.reason
       }
 
-      if (nextItems.status === 'fulfilled') {
-        itemCatalog = nextItems.value
-        itemCatalogNoticeMessage = null
+      if (nextShop.status === 'fulfilled') {
+        syncShopSnapshot(nextShop.value)
+        shopCatalogNoticeMessage = null
       } else {
-        itemCatalog = []
-        itemCatalogNoticeMessage = getApiErrorMessage(
-          nextItems.reason,
+        syncShopSnapshot(null)
+        shopCatalogNoticeMessage = getApiErrorMessage(
+          nextShop.reason,
           '일부 상품 설명을 불러오지 못했습니다.',
         )
       }
@@ -201,11 +246,11 @@
           : null
       loading = true
       errorMessage = null
-      itemCatalogNoticeMessage = null
+      shopCatalogNoticeMessage = null
       actionErrorMessage = null
       actionSuccessMessage = null
       sessionState = null
-      itemCatalog = []
+      shopState = null
     },
     onLoaded: (nextState) => {
       syncShopState(nextState)
@@ -213,6 +258,7 @@
     onPolled: (nextState, { access }) => {
       runtimeAccess = access
       syncShopState(nextState)
+      void refreshShopSnapshot()
     },
     onError: (error) => {
       errorMessage = getApiErrorMessage(error, '상점 목록을 불러오지 못했습니다.')
@@ -274,6 +320,10 @@
       actionErrorMessage = `Not enough gold for ${selected.name}.`
       return
     }
+    if (selected.stock <= 0) {
+      actionErrorMessage = `${selected.name} is out of stock.`
+      return
+    }
 
     purchasePendingOfferId = selected.offerId
 
@@ -293,6 +343,7 @@
       if (response.state) {
         syncShopState(response.state)
         updateShopPollingVersion(response.state)
+        await refreshShopSnapshot()
 
         if (!isShopOpenState(response.state)) {
           stopShopPolling()
@@ -308,11 +359,69 @@
         return
       }
 
+      if (!response.state) {
+        await refreshShopSnapshot()
+      }
+
       actionSuccessMessage = `${selected.name} was added to the expedition supplies for ${formatGold(selected.price)}.`
     } catch (error) {
       actionErrorMessage = getApiErrorMessage(error, '구매를 완료하지 못했습니다.')
     } finally {
       purchasePendingOfferId = null
+    }
+  }
+
+  async function handleLeaveShop() {
+    const access = toSessionReadAccess(runtimeAccess)
+    const playerAccess = isStoredPlayerSessionAccess(runtimeAccess) ? runtimeAccess : null
+
+    actionErrorMessage = null
+    actionSuccessMessage = null
+
+    if (!requestedSessionCode || !access || access.role !== 'player' || !playerAccess) {
+      actionErrorMessage = '?뚮젅?댁뼱濡??ㅼ떆 李멸???二쇱꽭??'
+      return
+    }
+    if (!shopOpen) {
+      actionErrorMessage = 'Shop is already closed.'
+      return
+    }
+    if (typeof sessionState?.version !== 'number') {
+      actionErrorMessage = '?붾㈃???덈줈怨좎묠?????ㅼ떆 ?쒕룄??二쇱꽭??'
+      return
+    }
+
+    leavePending = true
+
+    try {
+      const response = await executeSessionCommand(
+        requestedSessionCode,
+        {
+          type: 'LEAVE_SHOP',
+          expectedVersion: sessionState.version,
+          playerId: playerAccess.playerId,
+        },
+        access,
+      )
+
+      if (response.state) {
+        syncShopState(response.state)
+        updateShopPollingVersion(response.state)
+      }
+
+      await refreshShopSnapshot()
+
+      if (!response.accepted) {
+        actionErrorMessage = response.errors.filter(Boolean).join(' ') || 'Could not leave the shop.'
+        return
+      }
+
+      stopShopPolling()
+      actionSuccessMessage = 'Shop visit completed.'
+    } catch (error) {
+      actionErrorMessage = getApiErrorMessage(error, 'Could not leave the shop.')
+    } finally {
+      leavePending = false
     }
   }
 
@@ -333,12 +442,12 @@
   const runState = $derived(sessionState?.run ?? null)
   const inventory = $derived(runState?.inventory ?? null)
   const currentNode = $derived(runState?.currentNode ?? null)
-  const currentGold = $derived(inventory?.gold ?? 0)
-  const shopOpen = $derived(Boolean(currentNode && currentNode.phase === 'EVENT' && !runState?.resultPending))
+  const currentGold = $derived(shopState?.gold ?? inventory?.gold ?? 0)
+  const shopOpen = $derived(Boolean(shopState?.open))
   const inventoryItems = $derived.by(() => [...(inventory?.items ?? [])].sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)))
   const featuredItems = $derived.by(() => inventoryItems.slice(0, 5))
   const emptyFeaturedSlotCount = $derived.by(() => Math.max(0, 5 - featuredItems.length))
-  const offerCatalog = $derived.by(() => defaultShopCatalog.map(resolveOffer))
+  const offerCatalog = $derived.by(() => (shopState?.offers ?? []).map(resolveOffer))
   const filteredOffers = $derived.by(() => selectedFilter === 'all' ? offerCatalog : offerCatalog.filter((offer) => offer.category === selectedFilter))
   const selectedOffer = $derived.by(() => filteredOffers.find((offer) => offer.offerId === selectedOfferId) ?? filteredOffers[0] ?? null)
   const recentResults = $derived.by(() => runState?.recentResults.slice(0, 4) ?? [])
@@ -352,8 +461,15 @@
     if (!selectedOffer) return 'Select an offer to inspect its details.'
     if (!isStoredPlayerSessionAccess(runtimeAccess)) return '플레이어로 다시 참가해 주세요.'
     if (!shopOpen) return '이벤트 노드에서만 구매할 수 있습니다.'
+    if (selectedOffer.stock <= 0) return `${selectedOffer.name} is out of stock.`
     if (currentGold < selectedOffer.price) return `This offer needs ${formatGold(selectedOffer.price)}, but the run currently holds ${formatGold(currentGold)}.`
     if (purchasePendingOfferId) return 'Sending the purchase request now.'
+    return null
+  })
+  const leaveBlockedMessage = $derived.by(() => {
+    if (!shopOpen) return 'Shop is already closed.'
+    if (!isStoredPlayerSessionAccess(runtimeAccess)) return 'Only the player can leave the shop.'
+    if (leavePending) return 'Leaving the shop now.'
     return null
   })
 
@@ -396,6 +512,11 @@
         <div class="shop-page__tag-row">
           <TagChip label={shopOpen ? 'Shop Open' : 'View Only'} tone={shopOpen ? 'success' : 'warning'} />
           <TagChip label={accessRoleLabel} tone={isStoredPlayerSessionAccess(runtimeAccess) ? 'accent' : 'muted'} />
+          {#if shopOpen}
+            <button type="button" class="shop-page__inline-action" disabled={Boolean(leaveBlockedMessage)} onclick={() => void handleLeaveShop()}>
+              {leavePending ? 'Leaving...' : 'Leave shop'}
+            </button>
+          {/if}
         </div>
       </div>
       <div class="shop-page__stats">
@@ -407,8 +528,8 @@
     </SectionFrame>
     <div class="shop-page__notice-row">
       {#if accessNoticeMessage}<ContentStatePanel message={accessNoticeMessage} />{/if}
-      {#if itemCatalogNoticeMessage}<ContentStatePanel title="Some item notes are simplified" message={itemCatalogNoticeMessage} />{/if}
-      {#if !shopOpen}<ContentStatePanel title="Merchant is between stops" message="지금은 구매할 수 없습니다." />{/if}
+      {#if shopCatalogNoticeMessage}<ContentStatePanel title="Shop catalog unavailable" message={shopCatalogNoticeMessage} />{/if}
+      {#if !shopOpen}<ContentStatePanel title="Merchant is between stops" message={shopState?.unavailableReason ?? '지금은 구매할 수 없습니다.'} />{/if}
     </div>
     <div class="shop-page__layout">
       <section class="shop-page__panel">
@@ -458,7 +579,12 @@
               <button type="button" class="shop-page__offer-card" class:selected={selectedOffer?.offerId === offer.offerId} class:shop-page__offer-card--blocked={currentGold < offer.price} onclick={() => { selectedOfferId = offer.offerId; actionErrorMessage = null; actionSuccessMessage = null }}>
                 <div class="shop-page__offer-top">
                   <span>{getOfferGlyph(offer.refId, offer.tags)}</span>
-                  <TagChip label={formatLabel(offer.category)} tone={getOfferTone(offer.category)} />
+                  <div class="shop-page__tag-row">
+                    <TagChip label={offer.entryType} tone="muted" />
+                    <TagChip label={formatLabel(offer.category)} tone={getOfferTone(offer.category)} />
+                    {#if offer.bound}<TagChip label="Bound" tone="warning" />{/if}
+                    {#if offer.battleUsable}<TagChip label="Battle usable" tone="success" />{/if}
+                  </div>
                 </div>
                 <div class="shop-page__offer-copy">
                   <strong>{offer.name}</strong>
@@ -466,7 +592,7 @@
                 </div>
                 <div class="shop-page__offer-foot">
                   <span>{formatGold(offer.price)}</span>
-                  <small>{offer.refId} | stock {formatCount(offer.stock)}</small>
+                  <small>{offer.refId} | stock {formatCount(offer.stock)}{getAmmoLabel(offer) ? ` | ${getAmmoLabel(offer)}` : ''}</small>
                 </div>
               </button>
             {/each}
@@ -480,14 +606,17 @@
             <div>
               <p class="shop-page__eyebrow">Offer Selected</p>
               <h4>{selectedOffer.name}</h4>
-              <p>{selectedOffer.source === 'item-api' ? 'Expanded item notes available' : 'Compact fallback notes'}</p>
+              <p>{selectedOffer.source === 'shop-api' ? 'Server shop entry' : 'Compact fallback notes'}</p>
             </div>
           </div>
           <div class="shop-page__tag-row">
             <TagChip label={selectedOffer.offerId} tone="accent" />
             <TagChip label={selectedOffer.refId} tone="muted" />
+            <TagChip label={selectedOffer.entryType} tone="muted" />
             <TagChip label={formatGold(selectedOffer.price)} tone={currentGold >= selectedOffer.price ? 'success' : 'warning'} />
             {#if selectedOffer.bound}<TagChip label="Bound" tone="warning" />{/if}
+            {#if selectedOffer.battleUsable}<TagChip label="Battle usable" tone="success" />{/if}
+            {#if getAmmoLabel(selectedOffer)}<TagChip label={getAmmoLabel(selectedOffer) ?? ''} tone="warning" />{/if}
           </div>
           <p class="shop-page__detail-copy">{selectedOffer.summary}</p>
           <p class="shop-page__detail-copy">{selectedOffer.description}</p>
@@ -495,7 +624,7 @@
             <div><span>Viewer</span><strong>{viewerLabel}</strong></div>
             <div><span>Current node</span><strong>{currentNode ? `${currentNode.name} | ${formatLabel(currentNode.phase)}` : 'Unavailable'}</strong></div>
             <div><span>Stock</span><strong>{formatCount(selectedOffer.stock)}</strong></div>
-            <div><span>Detail level</span><strong>{selectedOffer.source === 'item-api' ? 'Expanded entry' : 'Compact entry'}</strong></div>
+            <div><span>Detail level</span><strong>{selectedOffer.source === 'shop-api' ? 'Server entry' : 'Compact entry'}</strong></div>
           </div>
           <div class="shop-page__tag-row">
             {#each selectedOffer.tags as tag}<TagChip label={tag} tone="muted" />{/each}
@@ -678,12 +807,14 @@
   .shop-page__filters button,
   .shop-page__offer-card,
   .shop-page__purchase button,
+  .shop-page__inline-action,
   .shop-page__link-action {
     text-align: left;
   }
 
   .shop-page__filters button,
   .shop-page__purchase button,
+  .shop-page__inline-action,
   .shop-page__link-action {
     border: 1px solid var(--color-border);
     background: transparent;
@@ -715,6 +846,7 @@
   .shop-page__feedback p { margin: 0; color: var(--color-text-soft); }
 
   .shop-page__purchase button,
+  .shop-page__inline-action,
   .shop-page__link-action {
     min-height: 3rem;
     display: inline-flex;
@@ -725,6 +857,7 @@
     color: var(--color-text);
   }
 
+  .shop-page__inline-action:disabled,
   .shop-page__purchase button:disabled { opacity: 0.56; cursor: not-allowed; }
   .shop-page__link-action--muted { background: rgba(12, 11, 10, 0.22); border-color: var(--color-border); }
 
