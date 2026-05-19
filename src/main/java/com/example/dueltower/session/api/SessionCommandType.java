@@ -121,6 +121,12 @@ public enum SessionCommandType {
             return new BuyShopItemCommand(commandId, expectedVersion, commandPlayerId(req), offerId, req.countOrDefault(1));
         }
     },
+    LEAVE_SHOP("LEAVE_SHOP", SessionCommandAuth.PLAYER, false) {
+        @Override
+        public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {
+            return new LeaveShopCommand(commandId, expectedVersion, commandPlayerId(req));
+        }
+    },
     EQUIP_EQUIPMENT("EQUIP_EQUIPMENT", SessionCommandAuth.PLAYER, false) {
         @Override
         public GameCommand toCommand(CommandRequest req, UUID commandId, long expectedVersion) {

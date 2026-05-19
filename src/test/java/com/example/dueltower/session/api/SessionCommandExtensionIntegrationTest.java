@@ -42,6 +42,45 @@ class SessionCommandExtensionIntegrationTest {
     }
 
     @Test
+    void leaveShopClosesEventNodeAndAddsShopResult() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectEventNode(fx);
+
+        JsonNode bought = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-1",
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.path("state").path("version").asLong())
+        );
+        assertTrue(bought.path("accepted").asBoolean());
+        assertFalse(bought.path("state").path("run").path("resultPending").asBoolean());
+
+        JsonNode left = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "LEAVE_SHOP",
+                  "playerId": "player1",
+                  "expectedVersion": %d
+                }
+                """.formatted(bought.path("state").path("version").asLong())
+        );
+
+        assertTrue(left.path("accepted").asBoolean());
+        assertTrue(left.path("state").path("run").path("resultPending").asBoolean());
+        JsonNode recentResult = left.path("state").path("run").path("recentResults").get(0);
+        assertEquals("shop", recentResult.path("type").asText());
+        assertEquals("상점 이용 완료", recentResult.path("title").asText());
+    }
+
+    @Test
     @DisplayName("아이템 사용은 자신의 토큰이면 성공하고 인벤토리를 변경한다")
     void useItemSucceedsWithOwnTokenAndMutatesInventory() throws Exception {
         Fixture fx = createFixture();
@@ -575,7 +614,7 @@ class SessionCommandExtensionIntegrationTest {
 
     @Test
     @DisplayName("상점 아이템 구매는 이벤트 노드에서 성공하고 골드를 소모한다")
-    void buyShopItemSucceedsOnEventNodeAndConsumesGold() throws Exception {
+    void buyShopItemSucceedsOnEventNodeAndKeepsShopOpen() throws Exception {
         Fixture fx = createFixture();
         JsonNode initialState = snapshotState(fx);
         String eventChoiceId = findChoiceIdByPhase(initialState, "EVENT");
@@ -595,8 +634,10 @@ class SessionCommandExtensionIntegrationTest {
         assertTrue(selected.get("accepted").asBoolean());
 
         long expectedVersion = selected.get("state").get("version").asLong();
+        String currentNodeId = selected.get("state").path("run").path("currentNode").path("id").asText();
         int beforeGold = selected.get("state").path("run").path("inventory").path("gold").asInt();
         int beforeSmokeBomb = findItemCount(selected.get("state"), "I-4");
+        int beforePotion = findItemCount(selected.get("state"), "I-1");
 
         JsonNode bought = commandAsPlayer(
                 fx.code,
@@ -614,7 +655,27 @@ class SessionCommandExtensionIntegrationTest {
         assertTrue(bought.get("accepted").asBoolean());
         assertEquals(beforeGold - 50, bought.get("state").path("run").path("inventory").path("gold").asInt());
         assertEquals(beforeSmokeBomb + 1, findItemCount(bought.get("state"), "I-4"));
-        assertTrue(bought.get("state").path("run").path("resultPending").asBoolean());
+        assertFalse(bought.get("state").path("run").path("resultPending").asBoolean());
+        assertEquals(currentNodeId, bought.get("state").path("run").path("currentNode").path("id").asText());
+
+        JsonNode boughtAgain = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-1",
+                  "expectedVersion": %d
+                }
+                """.formatted(bought.get("state").path("version").asLong())
+        );
+
+        assertTrue(boughtAgain.get("accepted").asBoolean());
+        assertEquals(beforeGold - 100, boughtAgain.get("state").path("run").path("inventory").path("gold").asInt());
+        assertEquals(beforePotion + 1, findItemCount(boughtAgain.get("state"), "I-1"));
+        assertFalse(boughtAgain.get("state").path("run").path("resultPending").asBoolean());
+        assertEquals(currentNodeId, boughtAgain.get("state").path("run").path("currentNode").path("id").asText());
     }
 
     @Test
@@ -814,6 +875,64 @@ class SessionCommandExtensionIntegrationTest {
 
     @Test
     @DisplayName("상자 열기는 상자를 소모하고 보상을 추가한다")
+    void buyShopItemAndLeaveShopRejectDuringCombat() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode stateAfterStart = startCombatAndReachPlayerMainTurn(fx);
+        long expectedVersion = stateAfterStart.path("version").asLong();
+
+        JsonNode buy = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "BUY_SHOP_ITEM",
+                  "playerId": "player1",
+                  "offerId": "O-1",
+                  "expectedVersion": %d
+                }
+                """.formatted(expectedVersion)
+        );
+        assertFalse(buy.path("accepted").asBoolean());
+        assertTrue(hasError(buy, "cannot buy shop item during combat"));
+
+        JsonNode leave = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "LEAVE_SHOP",
+                  "playerId": "player1",
+                  "expectedVersion": %d
+                }
+                """.formatted(expectedVersion)
+        );
+        assertFalse(leave.path("accepted").asBoolean());
+        assertTrue(hasError(leave, "cannot leave shop during combat"));
+    }
+
+    @Test
+    void leaveShopRejectsWhenCurrentNodeIsNotEvent() throws Exception {
+        Fixture fx = createFixture();
+        JsonNode selected = selectJudgementNode(fx);
+
+        JsonNode response = commandAsPlayer(
+                fx.code,
+                fx.playerToken,
+                """
+                {
+                  "type": "LEAVE_SHOP",
+                  "playerId": "player1",
+                  "expectedVersion": %d
+                }
+                """.formatted(selected.path("state").path("version").asLong())
+        );
+
+        assertFalse(response.path("accepted").asBoolean());
+        assertTrue(hasError(response, "shop is not available now"));
+    }
+
+    @Test
+    @DisplayName("전투 중 상점 구매와 상점 종료는 거부된다")
     void openChestConsumesChestAndAddsRewards() throws Exception {
         Fixture fx = createFixture();
         JsonNode initialState = snapshotState(fx);
